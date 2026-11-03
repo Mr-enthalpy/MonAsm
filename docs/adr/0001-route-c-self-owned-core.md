@@ -84,11 +84,18 @@ Neutral:
 
 | Claim | Basis | Confidence |
 |---|---|---|
-| xirasm-lib has no AArch64 backend | file listing + `xirasm_backend.zig` | high |
+| xirasm-lib has no AArch64 backend | file listing + `xirasm_backend.zig` | high — confirmed in Phase 1 (F-01) |
 | lib excludes symbols/layout/object formats | `deps/xirasm-lib/README.md:12-19` | high |
-| RISC-V API is mnemonic-driven | `riscv_encoder/api.zig:16-57`, `types.zig` | high |
-| x86 relaxation is hint-controllable | `x86_encoder/api.zig:78,153,331` | medium — behavior unverified |
-| AArch64 encoding runs in the Meta VM | generated `.inc` sizes + frontend modules | medium — runtime unverified |
+| RISC-V API is mnemonic-driven | `riscv_encoder/api.zig:16-57`, `types.zig` | high — refined in Phase 1: `encodeRaw` is form-addressable, identity is not (F-08) |
+| x86 relaxation is hint-controllable | `x86_encoder/api.zig:78,153,331` | high — verified by experiment in Phase 1 (F-04, F-06); the hint requires declaring the target unknown |
+| AArch64 encoding runs in the Meta VM | generated `.inc` sizes + frontend modules | high — verified by experiment in Phase 1 (F-12); 40.9 MB of Meta source, no encoder without it |
+
+Phase 1 update (2026-11-03): every row above is now backed by
+`docs/fmp-v0/90_boundary_audit.md` and
+`research/evidence/experiments/EXP-0001-xirasm-boundary-probes.md`. The decision
+in this ADR is unchanged; the evidence that supports it is stronger. The claim
+that x86 relaxation could be *disabled* without a fork is the one that got
+weaker: it can be steered, not disabled.
 
 ## Review triggers
 

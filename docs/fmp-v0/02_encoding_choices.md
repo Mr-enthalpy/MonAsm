@@ -41,7 +41,7 @@ For each candidate:
 | EC-01 | x86-64 | `add r/m64, imm` as sign-extended imm8 (`83 /0 ib`) vs imm32 (`81 /0 id`) | 4 vs 7 bytes | `form_id` variant (`r64-imm8` / `r64-imm32`) | `add rax, 1` is legal both ways; an encoder that "picks short" violates INV-02 and shifts every later offset. | frozen |
 | EC-02 | x86-64 | Memory displacement as disp8 (mod=01) vs disp32 (mod=10) | 1 vs 4 displacement bytes | `form_id` variant (`mem-disp8` / `mem-disp32`) | `mov rax, [rbp-8]` fits disp8; forcing disp32 is legal but 3 bytes longer. | frozen |
 | EC-03 | x86-64 | Relative branch rel8 (`EB`/`70+cc`) vs rel32 (`E9`/`0F 80+cc`) | 2 vs 5/6 bytes, different range | `form_id` variant (`rel8` / `rel32`) | Both are legal for a near target; choosing by distance is relaxation (INV-04). | frozen |
-| EC-04 | x86-64 | Accumulator short form vs ModRM immediate form | Different opcode bytes, same length | `form_id` variant | `mov eax, imm32` (`B8+rd`) vs `mov r/m32, imm32` (`C7 /0`) both exist. | draft |
+| EC-04 | x86-64 | Accumulator short form vs ModRM immediate form | Different opcode bytes, same length | `form_id` variant | `mov eax, imm32` (`B8+rd`) vs `mov r/m32, imm32` (`C7 /0`) both exist; and `add rax, 300` is `48 05 2c 01 00 00` (`05 id`) or `48 81 c0 2c 01 00 00` (`81 /0 id`). XirAsm and llvm-mc both pick the accumulator form and neither exposes the other. | frozen |
 | EC-05 | x86-64 | `moffs` absolute form (`A0-A3`) vs ModRM with disp32 | Different length and prefix behavior | `form_id` variant | `mov al, [0x1234]` has two legal encodings with different sizes. | draft |
 | EC-06 | x86-64 | REX presence and W/R/X/B bits; high-byte registers (`AH`) are illegal with any REX | Legality and one prefix byte | `operand.target_type` + definition rule | A plan naming `AH` with a 64-bit operand cannot be encoded; the encoder must not silently switch registers. | frozen |
 | EC-07 | x86-64 | Operand-size prefix `0x66` vs distinct 32/64-bit form for 16-bit operations | One prefix byte, different semantics | `form_id` | `add ax, bx` requires `66`; omitting it changes the operand width. | frozen |
@@ -67,6 +67,30 @@ For each candidate:
 
 `frozen` means the counterexample is written and the owner is decided. `draft`
 means the owner is plausible but not yet proven against a real vector.
+
+## Phase 1 evidence
+
+`docs/fmp-v0/90_boundary_audit.md` supplies observed counterexamples for the
+following rows. "Observed" means a built assembler produced both variants or
+refused to, and `llvm-mc` 23.1.2 agreed where it could express the case.
+
+- `EC-01` — F-07: `add rax, 1` → `48 83 c0 01` (imm8) in both XirAsm and
+  llvm-mc; there is no way to request the `81 /0 id` form.
+- `EC-02` — F-07: `mov rax, [rbp-8]` → `48 8b 45 f8` (disp8); `[rbp-200]` →
+  disp32. Chosen implicitly in both tools.
+- `EC-03` — F-04, F-06: `jmp 0x10` → `eb 0e`, `jmp 0x1000` → `e9 fb 0f 00 00`.
+  The same mnemonic changes size with the target value.
+- `EC-04` — F-07: `add rax, 300` → `48 05 2c 01 00 00` (accumulator) in both
+  tools; `81 /0 id` is equally legal and unreachable.
+- `EC-16` — EXP-0001 §5: AArch64 `mov x13, #1` assembled to `movz` bytes
+  (`2d 00 80 d2`) inside the macro layer.
+- `EC-19` — F-11: `addi a0, a0, 1` stays 4 bytes; `c.addi a4, 5` is 2 bytes only
+  when written explicitly.
+- `EC-20` — F-10: `c.addi a6, 5` rejected; the `x8..x15` range is enforced at
+  `encode.zig:1109-1112`.
+
+Rows still marked `draft` have no observed counterexample yet. They must not be
+moved to `frozen` on the strength of this audit alone.
 
 ## Not choices
 

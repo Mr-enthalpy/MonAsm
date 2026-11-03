@@ -27,6 +27,20 @@ Applicability notes: N12 is not applicable to x86-64 in v0 because the selected
 x86 slice uses a single-site `rel32`; if an x86 pair case is added, the row must
 be revisited.
 
+### Phase 1 evidence for N03 and N04
+
+The audit produced both the positive restraint and the negative counterexample
+from a built reference implementation (`90_boundary_audit.md` F-06, F-10, F-11;
+raw commands in `research/evidence/experiments/EXP-0001-xirasm-boundary-probes.md`):
+
+| Behaviour | Reference implementation | What our materializer must do instead |
+|---|---|---|
+| RISC-V immediate out of field range | rejects (`addi a0,a1,2048`) | same: `E-RANGE-001` |
+| RISC-V branch out of range | rejects (`beq ...,0x1008`, `c.j 0x800`) | same: `E-RANGE-002` |
+| x86 label branch out of `rel8` | rejects (`does not fit the signed 8-bit displacement`) | same: `E-FIXUP-003` |
+| x86 numeric `short` branch out of `rel8` | emits `eb 80` for target `0x82` — **silently truncated** | reject: `E-RANGE-002`. This is the concrete failure N04 exists to prevent. |
+| x86 unqualified branch | auto-shortens to `rel8`, promotes to `rel32` when far | never shorten, never promote: `INV-02`, `INV-04` |
+
 ## 2. Determinism experiments (`EXP-R*`)
 
 | ID | Experiment | Method | Observable | Status |
@@ -52,7 +66,7 @@ host" is the honest result.
 | AC-05 | Fixups validated | x86 `rel32`; AArch64 `adrp`+`:lo12:`; RV64 `auipc`+`lo12` or B-type scatter | planned |
 | AC-06 | Strict rejection | All applicable N01–N12 with recorded codes | planned |
 | AC-07 | Deterministic replay | EXP-R1, EXP-R2, EXP-R4, EXP-R5 | planned |
-| AC-08 | Reuse boundary backed by source evidence | `90_boundary_audit.md` with revision, file, symbol, line range | in progress |
+| AC-08 | Reuse boundary backed by source evidence | `90_boundary_audit.md` with revision, file, symbol, line range | **done** for XirAsm; LLVM internals deferred (see audit §8) |
 | AC-09 | Unresolved problems stated | `05_open_decisions.md` with blocking impact, no "later" hand-waving | in progress |
 | AC-10 | Executable next step | Final report §H: modules, order, gates, blockers | planned |
 

@@ -12,9 +12,11 @@ The materializer has no planning authority. That is the whole point.
 
 ## Status
 
-**Phase 0 complete; Phase 1 next.** Gate G0 passed: LLVM 23.1.2 provides the
-oracle, Zig 0.17.0 is available for the XirAsm audit. No encoder is implemented
-yet.
+**Phase 1 complete; Phase 2 next.** Gate G0 (oracle toolchain) and G1 (encoder
+boundary audit) passed. The audit found that XirAsm's x86 path makes four
+independent encoding decisions the caller cannot address, that its RISC-V path is
+the only form-addressable entry point, and that AArch64 exists solely as a
+40.9 MB interpreted Meta-language tree. No encoder of ours is implemented yet.
 
 | Area | State |
 |---|---|

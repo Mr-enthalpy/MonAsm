@@ -27,8 +27,9 @@ Verified 2026-11-03 on the development host:
 
 | Source | URL | Revision | Version | License | Retrieved | Use | Status |
 |---|---|---|---|---|---|---|---|
-| XirAsm | https://github.com/xir-kuku/XirAsm | `3ee8a439f5ba` (`main`) | repo `0.3.5` | Apache-2.0 | 2026-11-03 | Boundary audit, knowledge, test ideas | read-only, not built |
-| XirAsm-lib | same repo, `deps/xirasm-lib` | `3ee8a439f5ba` | `0.1.5` | Apache-2.0 | 2026-11-03 | Encoder audit; Zig `0.17.0` minimum | not built |
+| XirAsm | https://github.com/xir-kuku/XirAsm | `3ee8a439f5ba` (`main`) | repo `0.3.5` | Apache-2.0 | 2026-11-03 | Boundary audit, knowledge, oracle cross-check | **built and executed** 2026-11-03; snapshot in gitignored `research/external/XirAsm` |
+| XirAsm-lib | same repo, `deps/xirasm-lib` | `3ee8a439f5ba` | `0.1.5` | Apache-2.0 | 2026-11-03 | Encoder audit; Zig `0.17.0` minimum | audited, not adopted (see `docs/fmp-v0/91_reuse_matrix.md`) |
+| AArch64 MRS (via XirAsm) | Arm Architecture Machine Readable Specification 2026-06 | recorded in `include/arm/a64/generated/latest/manifest.json` | 2026-06 | Arm BSD-style notice + MPL-2.0 tooling | 2026-11-03 (indirect) | Candidate knowledge source for `OD-07` | **provenance read, licence unverified** |
 | LLVM | https://github.com/llvm/llvm-project | `llvmorg-23.1.2` | 23.1.2 | Apache-2.0 WITH LLVM-exception | 2026-11-03 | Oracle, encoding knowledge | installed (`C:\Users\hanni\Tools\llvm`) |
 | GNU binutils | — | not installed | — | GPL | — | Secondary oracle | deferred (LLVM tools cover v0) |
 
@@ -111,19 +112,32 @@ experiment:   <command or fixture, if any>
 
 | ID | Question | Command | Result | Status |
 |---|---|---|---|---|
-| EV-01 | Does the library expose an AArch64 encoder? | repository tree listing | No `aarch64_encoder`; `xirasm_backend.zig:3-5` exports x86, riscv, spirv | observed (source) |
-| EV-02 | Is the RISC-V API form-addressable? | read `riscv_encoder/api.zig` | No: mnemonic + operands, internal table lookup | observed (source) |
-| EV-03 | Can x86 relaxation be pinned? | read `x86_encoder/api.zig` | There is a hint field; default `null` leaves the decision inside | inference; needs experiment |
-| EV-04 | Does XirAsm build with the available toolchain? | — | Zig 0.17.0 now installed; build not yet attempted | **pending** |
+| EV-01 | Does the library expose an AArch64 encoder? | repository tree listing | No `aarch64_encoder`; `xirasm_backend.zig:3-5` exports x86, riscv, spirv; zero `aarch64`/`arm64` references in library sources | observed (source) |
+| EV-02 | Is the RISC-V API form-addressable? | read `riscv_encoder/api.zig` | Partly: `encodeRaw(request, spec)` accepts a pinned spec and `tables.instructions` is public, but spec identity is an index or `match/mask` | observed (source) |
+| EV-03 | Can x86 relaxation be pinned? | read `x86_encoder/api.zig` + probes | Hint exists but only applies when the caller declares the target unknown; default auto-shortens (`jmp 0x10` → `eb 0e`) | observed (source + experiment) |
+| EV-04 | Does XirAsm build with the available toolchain? | `zig build -Doptimize=ReleaseSafe` | Yes, exit 0; `xirasm.exe` 3,227,136 bytes | observed (experiment) |
 | EV-05 | Can `llvm-mc` emit bytes for all three ISAs? | `llvm-mc -triple=... -show-encoding` | Yes; outputs recorded above | observed (experiment) |
+| EV-06 | Does x86 auto-shorten branches? | `jmp 0x10`, `jmp 0x1000` | `eb 0e` then `e9 fb 0f 00 00`; the same mnemonic changes size with the target | observed (experiment) |
+| EV-07 | Does an explicit `short` branch range-check? | `jmp short 0x82`, `jmp short 0x1000` | No: `eb 80` and `eb fe` — silently truncated | observed (experiment) |
+| EV-08 | Does a label branch range-check? | `jmp short far_lbl` + 200 nops | Yes: rejected, "does not fit the signed 8-bit displacement" | observed (experiment) |
+| EV-09 | Does RV64 auto-compress? | `addi a0,a0,1`, `nop` | No: 4 bytes each; `c.*` only when written | observed (experiment) |
+| EV-10 | Does RV64 reject out-of-range values? | `addi ...,2048`, `beq ...,0x1008`, `c.j 0x800` | Yes, all rejected | observed (experiment) |
+| EV-11 | Is AArch64 reachable without the macro include? | `--isa aarch64` + `add x0,x1,x2` | No: "instruction text emission is not supported for this target ISA" | observed (experiment) |
+| EV-12 | Do duplicate RISC-V specs create ambiguity? | parse all 1,700 specs | No: 1,363 distinct names at xlen 64, zero duplicates per xlen | observed (experiment) |
+| EV-13 | Where does AArch64 encoding knowledge originate? | `include/arm/a64/generated/latest/NOTICE`, `manifest.json` | Arm Architecture Machine Readable Specification 2026-06; 4,350 instructions, 292 aliases | observed (source) |
+
+Full commands and byte-level output: `experiments/EXP-0001-xirasm-boundary-probes.md`.
+Findings and interpretations: `docs/fmp-v0/90_boundary_audit.md`.
 
 ## Known gaps
 
-- XirAsm has not been built or executed yet; all behavior claims are source
-  reading.
-- No AArch64 encoding source has been selected yet (OD-07).
+- LLVM was verified as an oracle only; no LLVM source has been read, so the
+  `MCAssembler` vs `MCCodeEmitter` relaxation boundary stays `unverified`.
+- The AArch64 licence question is open: the NOTICE and `MPL-2.0.txt` were read,
+  but which files fall under which licence was not determined (`OD-07`).
+- RISC-V relocation pairs (`auipc` + `lo12`) were not exercised; `AC-05` needs
+  them in Phase 3.
 - Cross-host determinism (EXP-R3) is untested and must stay marked `unverified`.
-- LLVM was verified as an oracle only; no LLVM code has been read in depth yet.
 - The LLVM archive hash is recorded from the download, not cross-checked against
   an upstream digest (the `.jsonl` asset downloaded empty and the API request was
   rate-limited). Re-check when convenient.
