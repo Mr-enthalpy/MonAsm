@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-04
-Phase: **3 in progress (x86, AArch64 and RV64 slices): four definition documents, the materializer and the fixture gate are in place; four AArch64 coverage rows remain, and RV64's pair row is blocked on a psABI decision**
+Phase: **3 in progress (x86, AArch64 and RV64 slices): four definition documents, the materializer and the fixture gate are in place; four AArch64 coverage rows remain, and RV64's pair row is blocked on a format decision whose source is now pinned**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -85,16 +85,19 @@ composite payload. OD-14 is settled by ADR-0009: `EXP-0012` §2 measured that
 `c.addi a0, 0` (`01 05`) and `c.addi x0, 1` (`05 00`) are reserved HINTs despite
 being inside the declared range, so the slot excludes `0` and
 `riscv:c.addi/rd-imm6` lands in `rv64/0.2.0.json` (`RV-P7`, `N16a`/`N16b`). RV64's
-`auipc`+`lo12` pair still needs the psABI relation; that is a new format decision,
-not a missing source. OD-06 was load-bearing because `EXP-0002`
+`auipc`+`lo12` pair now has a pinned normative source (the ELF psABI at tag
+`v2.0-rc0`, `EV-22`), so what remains is the format decision ADR-0010 will
+record, not missing evidence. OD-06 was load-bearing because `EXP-0002`
 W1 shows that a definition drift the digest does not cover is caught only by the
 weaker size check; it is now settled, and `EXP-0004` §4 measures both halves.
 
 ## Next action
 
 1. Decide the next format question, one ADR each, before widening any table:
-   - the psABI `R_RISCV_PCREL_HI20`/`R_RISCV_PCREL_LO12_I` pairing. It unblocks
-     `RV-P8`'s pair half; the `auipc` form already exists.
+   - the psABI `R_RISCV_PCREL_HI20`/`R_RISCV_PCREL_LO12_I` pairing. The source is
+     pinned (`v2.0-rc0`, `04c0eb8a…`, `EV-22`), so the remaining work is the
+     format decision ADR-0010 will record. It unblocks `RV-P8`'s pair half; the
+     `auipc` form already exists.
    Each lands with a counterexample, an error code where rejection is the answer,
    and a fixture that shows the rejection (`E-FORM-001` or the new code).
    The memory-operand question is closed: `OD-13`/ADR-0008 chose one operand per
@@ -158,8 +161,8 @@ immediates, with the 4-byte `addi` on the same immediate beside it). The eight
 negatives pin `E-FORM-001` (including `N01c`, the same form named against
 `0.1.0`), `E-OPERAND-001`, `E-RANGE-001`, `E-RANGE-002`, `E-RANGE-004`
 (`N16a`/`N16b`, the excluded zeroes), and (read time) `E-OPERAND-003`. Only the
-`auipc`+`lo12` pair stays out, for a recorded format reason — the psABI relation
-is not pinned — rather than a missing source.
+`auipc`+`lo12` pair stays out, for a recorded format reason — the pairing rule is
+not yet expressed in `fmp/0.1` (ADR-0010) — rather than a missing source.
 
 The materializer is deliberately not a bridge to LLVM: it reads only the plan
 and the pinned definition, writes bytes and RELA-shaped records, and has no

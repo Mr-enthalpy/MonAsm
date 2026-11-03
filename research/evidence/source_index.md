@@ -31,10 +31,21 @@ Verified 2026-11-03 on the development host:
 | XirAsm-lib | same repo, `deps/xirasm-lib` | `3ee8a439f5ba` | `0.1.5` | Apache-2.0 | 2026-11-03 | Encoder audit; Zig `0.17.0` minimum | audited, not adopted (see `docs/fmp-v0/91_reuse_matrix.md`) |
 | Arm MRS 2026-06 OPENSOURCE A-profile FAT (**pinned**) | Arm download; archive `AARCHMRS_OPENSOURCE_A_profile_FAT-2026-06.tar.gz`, local drop `research/external/arm-mrs/` | archive `sha256:fe458c52…`; `Instructions.json` `a1ad2c65…`; `Features.json` `63325900…`; release `2026-06_rel`, build 818, schema 2.9.5 | 2026-06 | **BSD-3-Clause**: `_meta.license.info` = "licensed under the BSD 3-clause license"; `docs/notice.html` = three conditions + disclaimer | 2026-11-04 | Source of `definitions/aarch64/`; notice ships beside the table | read; hashes match XirAsm's manifest exactly; gate is `python tools/check_mrs.py` (`EXP-0007`, ADR-0006) |
 | Arm MRS 2026-06 A-profile FAT (**rejected**) | same release, different packaging, `AARCHMRS_A_profile_FAT-2026-06` | `Features.json` only, `1590274` B, `sha256:6d5c19e7…` | 2026-06 | **Arm proprietary notice**: no reproduction without prior written permission; use/distribution bound to the recipient's Arm agreement | 2026-11-04 | Licence evidence for `OD-07` | **not usable**: fails the hash and licence gate (`EXP-0006`, ADR-0006) |
-| RISC-V UDB resolved spec (**pinned**) | `resolved_spec` export of https://github.com/riscv/riscv-unified-db, local drop `research/external/rv64-udb/` | archive `sha256:be184986…` (`2694443` B); 8 nodes hashed in `EXP-0009` §4; revision **unverified** (`.stamp` empty) | no revision embedded | **BSD-3-Clause-Clear**, per-file SPDX header; text `sha256:e3f4d72a…` (1,700 B, UDB `LICENSE-BSD-3-Clause-Clear.txt`) | 2026-11-04 | Source of `definitions/rv64/0.1.0.json` (seven base-`I` forms) and `0.2.0.json` (the same seven plus `riscv:c.addi/rd-imm6`); notice ships beside the tables | read; the generator's 16 probe vectors match `llvm-mc` and seven positive / eight negative fixtures gate the generated tables; gates are `python tools/check_rv64_source.py` and `python tools/check_definition.py` (`EXP-0009`, `EXP-0010`, `EXP-0012`, `EXP-0011`, ADR-0007, ADR-0009) |
+| RISC-V UDB resolved spec (**pinned**) | `resolved_spec` export of https://github.com/riscv/riscv-unified-db, local drop `research/external/rv64-udb/` | archive `sha256:be184986…` (`2694443` B); 8 nodes hashed in `EXP-0009` §4; upstream repo commit **`cadd46e22487a2002cead3883b34e72766103cdf`** (2026-10-31), agreed by `EV-24` and **not asserted by the archive**, whose `.stamp` is still empty | no revision embedded | **BSD-3-Clause-Clear**, per-file SPDX header; text `sha256:e3f4d72a…` (1,700 B, UDB `LICENSE-BSD-3-Clause-Clear.txt`) | 2026-11-04 | Source of `definitions/rv64/0.1.0.json` (seven base-`I` forms) and `0.2.0.json` (the same seven plus `riscv:c.addi/rd-imm6`); notice ships beside the tables | read; the generator's 16 probe vectors match `llvm-mc` and seven positive / eight negative fixtures gate the generated tables; gates are `python tools/check_rv64_source.py` and `python tools/check_definition.py` (`EXP-0009`, `EXP-0010`, `EXP-0012`, `EXP-0011`, ADR-0007, ADR-0009). `EV-24` binds the nodes to the commit by source-map geometry |
+| RISC-V ELF psABI (**pinned**) | https://github.com/riscv-non-isa/riscv-elf-psabi-doc | tag `v2.0-rc0` = `04c0eb8a1a83edc81b20f1fd919e773960354b3e`, which is also tagged `draft-20261008-04c0eb8a…`; 2026-10-08; `riscv-elf.adoc` `sha256:3d65a2ce…` (115,951 B) | adoc sources, no release number | **CC-BY-4.0**: `LICENSE` `sha256:1a7ddeb1…` (19,046 B); attribution required | 2026-11-04 | Normative `R_RISCV_PCREL_HI20` / `_LO12_I` / `_LO12_S` pairing (ADR-0010) | read `riscv-elf.adoc` §"PC-Relative Symbol Addresses" (`:1570-1605`), relocation rows `:1184`/`:1186`, linker note `:2495-2509`; clone at `research/external/architecture-knowledge/riscv-elf-psabi-doc`, not redistributed (`EV-22`) |
+| Arm AAELF64, via `abi-aa` (**pinned, unread**) | https://github.com/ARM-software/abi-aa | `a1b53459479e88f3492ca9b11a161313764ab138` (`git describe` → `2026Q3`), 2026-11-02; `aaelf64/aaelf64.rst` `sha256:f2342b4b…` (156,341 B) | 2026Q3 | **CC-BY-SA-4.0**: `aaelf64/LICENSE` `sha256:4d066ca5…` (1,334 B) — ShareAlike, so its prose must not be absorbed into `docs/` | 2026-11-04 | Candidate source for AArch64 relocation semantics (`A64-P2` `-lsl12`, `A64-P3`/`P7`/`P8`) | **cloned, body not read**; licence read from `LICENSE.md` and `aaelf64/LICENSE` (`EV-25`) |
+| ELF x86-64 psABI | https://gitlab.com/x86-psABIs/x86-64-ABI | `e1ce098331da5dbd66e1ffc74162380bcc213236`, 2025-03-12 | — | **CC-BY-4.0**, declared inside the document at `abi.tex:31-32`; the tree carries **no** `LICENSE` file | 2026-11-04 | Candidate source for x86 ModRM/SIB and relocation rules (`X86-P4`/`P6`) | **cloned, body not read**; `object-files.tex` `sha256:6d28e669…` (32,309 B), `low-level-sys-info.tex` `sha256:a9a6bddf…` (107,786 B) |
+| Intel SDM, combined Vol 1 + 2A-2D + 3A-3D + 4 (**pinned, citation-only**) | local drop `C:\Users\hanni\Downloads\325462-093-sdm-vol-1-2abcd-3abcd-4.pdf`, from Intel's developer manual page | order number `253665-093US`, September 2026; `sha256:a4a62e6a…` (26,664,929 B; 5,364 pages) | revision 093 | **no licence granted**: p.2 allows "publish an unmodified copy" and 0BSD for sample code, and states "No rights are granted to create modifications or derivatives of this document" | 2026-11-04 | Reference for x86 encoding *rules* (Vol 2 ModRM/SIB, opcode maps) | **pinned by hash; front matter read (pp.2-3), body not read** (`EV-23`). Never redistributed, and a generated table would be a derivative, so x86 table facts must come from a permissive source (`xed`) or from our own measurement |
+| RISC-V ISA manual | https://github.com/riscv/riscv-isa-manual | `418bdc4990ae2d60a86f1e11e8d7795aa279da61`, 2026-11-02 | — | **CC-BY-4.0** (`src/license.adoc`, which also fixes the citation format) | 2026-11-04 | Optional normative cross-check for HINT semantics behind `c.addi`'s `excluded 0` (`EC-19`, `OD-14`) | **cloned, body not read**; chapters live in `src/unpriv/` and `src/priv/`, not `src/*.adoc` |
+| intelxed/xed | https://github.com/intelxed/xed | `0bcb6237345c5066726dcc08b3d87928df3b5b26`, 2026-08-24 | — | **Apache-2.0**: `LICENSE` `sha256:6f3ca222…` (10,205 B) | 2026-11-04 | Permissive x86 opcode-table cross-check, the role riscv-opcodes plays for RV64 | **cloned, not read**; opcode data under `datafiles/` |
 | riscv-opcodes (**cross-check**) | https://github.com/riscv/riscv-opcodes | `f24ac23ec9fa947011781a09cd6fd25a7c36dc45`, 2026-10-14 | `main` | BSD-3-Clause (`LICENSE` `sha256:ea19b748…`) | 2026-11-04 | Upstream cross-check for RV64 fixed bits, register ranges, and the `EC-19`/`EC-20` claims | read; **not a source of the table**: it gives field ranges but no B/J/RVC value-bit scatter (`EXP-0009` §7) |
 | LLVM | https://github.com/llvm/llvm-project | `llvmorg-23.1.2` | 23.1.2 | Apache-2.0 WITH LLVM-exception | 2026-11-03 | Oracle, encoding knowledge | installed (`C:\Users\hanni\Tools\llvm`) |
 | GNU binutils | — | not installed | — | GPL | — | Secondary oracle | deferred (LLVM tools cover v0) |
+
+PDF reading harness: `research/external/pdfpeek.py` (pypdf 5.9.0) prints document
+metadata, a bounded page range, or the lines matching a term. It exists so the
+5,364-page SDM never enters a context window. pypdf is a research-only
+convenience: no gate imports it, and the Python gates stay stdlib-only.
 
 ## Installed toolchain (gate G0)
 
@@ -136,6 +147,10 @@ experiment:   <command or fixture, if any>
 | EV-19 | Does a table derived from `location` reproduce `llvm-mc` through the materializer? | build `definitions/rv64/0.1.0.json` and `0.2.0.json` from eight nodes, then `cargo test --workspace` | Yes: seven positive fixtures match `llvm-mc 23.1.2` bytes and eight negatives produce exactly the registered diagnostics; the generator refuses a form whose bits are not covered once | observed (experiment, `EXP-0010`) |
 | EV-20 | Is a memory operand one field or several? | `llvm-mc -show-encoding` for x86 `movq` disp8/disp32/`[rbp]`, AArch64 `ldr x0,[x1,#16]`, RV64 `ld`/`sd` ±2047; read the `RV64` block of `inst/I/{ld,sd}.yaml` | Several: RV64 spans `xs1`/`imm`/`xd`; x86 changes form with the value (`48 8b 41 08` vs `48 8b 81 00 10 00 00`, `[rbp]` → `48 8b 45 00`); AArch64's `imm12` is scaled (`#16` → `2`) | observed (experiment, `EXP-0011`) |
 | EV-21 | Does an in-range zero in `c.addi` still encode the operation the plan names? | `llvm-mc -triple=riscv64 -mattr=+c` on `c.addi a0, 0`, `c.addi x0, 1`, `c.addi x0, 0`; decode with `llvm-objdump` | No: `01 05` is `c.addi a0, 0x0` (a HINT), `05 00` is `c.nop 0x1`, `01 00` is `nop`. Both zeroes are inside the declared ranges, so the rejection needs a slot-level rule; the `x8..x15` class belongs to `c.lw`, not `c.addi` (`c.addi a6, 5` → `15 08` is accepted) | observed (experiment, `EXP-0012` §2) |
+| EV-22 | Does the psABI state the HI20/LO12 pairing normatively, or only by example? | read `riscv-elf.adoc` at `v2.0-rc0` | Normatively: `PCREL_HI20` is "High 20 bits of 32-bit PC-relative reference"; `PCREL_LO12_I`/`_S` are "Low 12 bits … `%pcrel_lo(address of %pcrel_hi)`, the addend must be 0" (`:1184`, `:1186`); the low half's symbol is a label at the `auipc`, one `hi` may serve several `lo`s, and they need not be adjacent (`:1574-1605`) | observed (source) |
+| EV-23 | May the Intel SDM be vendored or turned into a generated table? | read p.2 "Notices & Disclaimers" and p.3 of `325462-093` | No. The only grants are "publish an unmodified copy" and 0BSD for code marked as sample; the same page states "No rights are granted to create modifications or derivatives of this document". The SDM is therefore citation-only, and a table generated from its opcode maps would be a derivative | observed (source) |
+| EV-24 | Does the revision-less UDB archive agree with an upstream commit? | `python tools/udb_binding.py` compares each node's `SOURCE MAP` `key -> file:line:column` against the repo tree at `cadd46e2` | All 231 recorded positions land: 199 direct (key token on the recorded line) and 32 indexed (a list element's index resolves to its parent key). Zero unexplained. No drift, but the archive still does not name a commit, so this is agreement, not provenance | observed (experiment) |
+| EV-25 | What licence do the AArch64 ABI documents carry? | read `abi-aa/LICENSE.md`, `abi-aa/aaelf64/LICENSE`, and the AAELF64 directory listing | CC-BY-SA-4.0 plus a patent grant, **per directory**: `LICENSE.md` says each ABI document "ha[s its] own license file included in the directory", and the legacy folder is Arm-proprietary. ShareAlike means quoting AAELF64 prose into `docs/` would extend that licence to those documents | observed (source) |
 
 Full commands and byte-level output: `experiments/EXP-0001-xirasm-boundary-probes.md`.
 Findings and interpretations: `docs/fmp-v0/90_boundary_audit.md`.
@@ -152,14 +167,28 @@ Findings and interpretations: `docs/fmp-v0/90_boundary_audit.md`.
   `definitions/aarch64/`, and ADR-0006 makes the archive hash, both file hashes
   and the licence string the gate. Unverified: the `schema/` tree hash XirAsm
   records, and whether an embedded (non-JSON) table satisfies notice condition 2.
-- RISC-V relocation pairs (`auipc` + `lo12`) were not exercised; `AC-05` needs
-  them in Phase 3. The UDB encoding blocks do not state the
-  `R_RISCV_PCREL_HI20`/`R_RISCV_PCREL_LO12_I` relation, so the psABI must be
-  pinned before `RV-P8` (`EXP-0009` §9).
-- The UDB resolved-spec archive records no revision: its `.stamp` is empty and the
-  `$source` map names only a CI workspace. The RV64 pin is therefore by archive
-  and file hashes (`sha256:be184986…`), not by commit; the revision stays
-  `unverified` (ADR-0007).
+- RISC-V relocation pairs (`auipc` + `lo12`) are not yet exercised end to end, but
+  the *source* gap is closed: the psABI is pinned (`v2.0-rc0`, `04c0eb8a…`) and
+  states the HI20 value, the "the low half names the address of the `%pcrel_hi`"
+  rule, the zero-addend rule, and that one `hi` may serve several `lo`s (`EV-22`).
+  What `RV-P8` still needs is a format decision (ADR-0010) and a fixture, not
+  more evidence.
+- The UDB resolved-spec archive records no revision of its own: `.stamp` is empty
+  and `$source` names only a CI workspace. `EV-24` narrows this without closing
+  it: all 231 recorded source-map positions land on the upstream tree at commit
+  `cadd46e2` (2026-10-31), 199 directly and 32 through their parent key. The pin
+  is therefore "archive hash plus this agreement check", which rules out drift on
+  the eight nodes but does not prove the archive was generated from that commit.
+  The check is `python tools/udb_binding.py`; it is not a gate because it needs
+  both disposable drops.
+- The x86 slice has no permissive *encoding* source in use. The SDM is pinned but
+  citation-only and explicitly non-derivative (`EV-23`), so `X86-P4`/`P6` cannot
+  generate a table from it; `xed` (Apache-2.0) is cloned and unread, and would
+  play the cross-check role riscv-opcodes plays for RV64. The x86-64 psABI is
+  CC-BY-4.0 but declares that inside `abi.tex` rather than in a `LICENSE` file.
+- AAELF64 is cloned but unread, and its CC-BY-SA-4.0 terms forbid absorbing its
+  prose into `docs/` (`EV-25`). If `A64-P2`'s `-lsl12` half needs a normative
+  statement, cite it; do not paraphrase it into the contract set.
 - `c.addi` is admitted through a slot-level `excluded` list (ADR-0009, `OD-14`):
   the two zeroes are in range and are rejected only because the form excludes
   them (`EXP-0012`). The same construct's 16-value Zilsd list is read from the
