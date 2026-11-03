@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-04
-Phase: **3 in progress (x86 slice): definition table, materializer and fixture gate are in place; AArch64/RV64 block on OD-07**
+Phase: **3 in progress (x86 slice): definition table, materializer and fixture gate are in place; AArch64/RV64 need their tables generated and verified**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -13,7 +13,7 @@ this file plus `AGENTS.md` alone.
 |---|---|---|
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
-| 2 | FMP v0 contract, schema, error model | **complete for the x86 slice**; AArch64/RV64 surfaces block on OD-07 |
+| 2 | FMP v0 contract, schema, error model | **complete for the x86 slice**; AArch64/RV64 surfaces wait on their tables (`OD-07` settled by ADR-0005) |
 | 3 | Three-ISA vertical prototype | **in progress** on x86: definition table frozen (`07_definition_format.md`, `EXP-0004`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; 5 positive and 12 negative fixtures pass the two-source gate (`EXP-0005`) |
 | 4 | Invariants, negative tests, replay | not started |
 | 5 | Convergence, route evaluation, roadmap | not started |
@@ -25,7 +25,7 @@ this file plus `AGENTS.md` alone.
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
 | G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: the x86 slice rows are frozen (EC-01/02/03/04/06/07/27/28); 10 rows are still `draft` |
-| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **x86 satisfied** (5 positive, 12 negative); AArch64/RV64 blocked on OD-07 |
+| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **x86 satisfied** (5 positive, 12 negative); AArch64/RV64 pending their definition tables |
 
 ## Decisions
 
@@ -35,6 +35,7 @@ this file plus `AGENTS.md` alone.
 | ADR-0002 | Docs-first with explicit context anchors | accepted |
 | ADR-0003 | Rust prototype, Level 0/1 output | accepted (provisional); OD-03 narrowed v0 to Level 0 |
 | ADR-0004 | `form_id` carries every encoding decision; `encoding_choices` removed | accepted 2026-11-04 |
+| ADR-0005 | AArch64 knowledge comes from the Arm MRS 2026-06; no XirAsm file is copied, the Arm notice ships with the table | accepted 2026-11-04 |
 
 ## Settled decisions (contract level)
 
@@ -45,6 +46,7 @@ this file plus `AGENTS.md` alone.
 | OD-03 | v0 emits Level 0; Level 1 optional and deferred; Level 2 out of scope | `EXP-0002` §6 |
 | OD-04 | `form_id` is a structured name resolved by exact lookup; a rename is loud (`E-FORM-001`, or `E-DEF-001` first); no opaque id, no `match`/`mask` | `01_contract.md` §7; F-09 |
 | OD-06 | The definition digest covers the whole data-only definition in canonical form; a rule change moves it, formatting does not, and a comment is unrepresentable | `EXP-0004` §4; `07_definition_format.md` §6 |
+| OD-07 | AArch64 facts come from the Arm MRS 2026-06; our own table is generated from the data, no MPL-2.0 script is copied, and the Arm BSD-3-Clause notice ships with `definitions/aarch64/` | ADR-0005; `90_boundary_audit.md` F-12, F-13; both A64 `NOTICE` files |
 | OD-09 | Exact integers with declared domains, no wrap, one range check per value after the transform | `01_contract.md` §3.1–§3.2 |
 | OD-10 | v0 ships only the forms the slices use; the definition table is the feature surface and absence is `E-FORM-001` | `02_encoding_choices.md`, "v0 surface"; ADR-0004 |
 | OD-11 | A byte-affecting decision is carried by `form_id`, a typed operand, a fixup field or a target field — never by a separate choice list | ADR-0004; `02_encoding_choices.md` |
@@ -56,18 +58,22 @@ See `docs/fmp-v0/05_open_decisions.md`. Blocking items currently:
 | ID | Question | Blocks |
 |---|---|---|
 | OD-05 | Unknown fields and extensions | AC-10, Q10 |
-| OD-07 | AArch64 encoding knowledge source | AC-03, AC-05 |
 | OD-08 | Canonical wire form | AC-07 |
 
-OD-07 has evidence but is not accepted. OD-06 was load-bearing because `EXP-0002`
-W1 shows that a definition drift the digest does not cover is caught only by the
-weaker size check; it is now settled, and `EXP-0004` §4 measures both halves.
+OD-05 and OD-08 do not block the x86 slice. OD-07 is settled by ADR-0005; its
+remaining work is verification, not a decision: the AArch64 table must still be
+generated from the MRS data and matched against `llvm-mc` before it is frozen.
+OD-06 was load-bearing because `EXP-0002` W1 shows that a definition drift the
+digest does not cover is caught only by the weaker size check; it is now settled,
+and `EXP-0004` §4 measures both halves.
 
 ## Next action
 
-1. Unblock OD-07 (licence review) before starting AArch64/RV64: both definition
-   tables, their `EC-*` rows and their slices are blocked on a knowledge source.
-2. While OD-07 is open, close the remaining x86 contract debt:
+1. Build the AArch64 table under ADR-0005: generate `definitions/aarch64/0.1.0.json`
+   from MRS data, ship the Arm notice beside it, and verify `A64-P1` (`add`),
+   `A64-P5` (`bl`) and `A64-P6` (`adrp` + `add #:lo12:`) against `llvm-mc`
+   before calling the table frozen. No MPL-2.0 script is copied.
+2. Close the remaining x86 contract debt:
    - `OD-05` (unknown fields/extensions) and `OD-08` (canonical wire form);
    - the Level 1 artifact envelope, which is deferred by `OD-03` and is not
      needed by the Level 0 gate;

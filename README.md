@@ -16,17 +16,18 @@ The materializer has no planning authority. That is the whole point.
 boundary audit) passed. The audit found that XirAsm's x86 path makes four
 independent encoding decisions the caller cannot address, that its RISC-V path is
 the only form-addressable entry point, and that AArch64 exists solely as a 40.9 MB
-interpreted Meta-language tree. Eight contract-level decisions are settled
-(OD-01, OD-02, OD-03, OD-04, OD-06, OD-09, OD-10, OD-11); ADR-0004 makes
-`form_id` the only encoding selector. The x86-64 definition table is frozen and
-decoder-verified; the materializer itself is the next artifact.
+interpreted Meta-language tree. Nine contract-level decisions are settled
+(OD-01, OD-02, OD-03, OD-04, OD-06, OD-07, OD-09, OD-10, OD-11); ADR-0004 makes
+`form_id` the only encoding selector, and ADR-0005 takes AArch64 knowledge from
+the Arm MRS. The x86-64 definition table is frozen and decoder-verified; the
+materializer and its fixture gate are implemented.
 
 | Area | State |
 |---|---|
 | Contract (`docs/fmp-v0/01_contract.md`) | draft, fields marked `TBD` where unproven |
 | Schema (`schema/fmp-v0.schema.json`) | draft, examples validate |
-| Definitions (`definitions/`) | x86-64 `0.1.0` frozen, digest pinned |
-| Prototype (`prototype/`) | workspace compiled, no encoder yet |
+| Definitions (`definitions/`) | x86-64 `0.1.0` frozen, digest pinned; AArch64 next |
+| Prototype (`prototype/`) | workspace compiled; x86-64 slice materializes from the plan |
 | Oracles (`tools/oracle/`) | planned; `llvm-mc` drives the experiments |
 | Evidence (`research/evidence/`) | index started, XirAsm pinned |
 
