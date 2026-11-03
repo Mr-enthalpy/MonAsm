@@ -1,26 +1,32 @@
 #!/usr/bin/env python3
-"""Generate `definitions/aarch64/0.1.0.json` from the pinned Arm MRS drop.
+"""Generate `definitions/aarch64/**` from the pinned Arm MRS drop.
 
-This is disposable research tooling (ADR-0005 §4). The shipped artifact is the
-JSON document plus its digest; this script is how that document was derived and
-how it stays traceable to the four MRS nodes it reads.
+This is disposable research tooling (ADR-0005 §4). The shipped artifacts are
+the JSON documents plus their digests; this script is how those documents were
+derived and how they stay traceable to the MRS nodes they read.
 
 What it does, per form:
 
 1. Reads the MRS node named in the spec from `Instructions.json`.
 2. Splits the node's encode fields into *fixed* (no `x` in the value string) and
-   *variable*. A variable field is either mapped to a slot, or listed in
-   `pinned_zero` — a value our form fixes although the MRS leaves it open. The
-   pinned-zero list is the byte-affecting decision the `form_id` carries
-   (AArch64 `shift`/`imm6`/`sh`), so it is stated here, not inferred.
-3. Builds the template from the fixed bits plus the pinned zeros.
+   *variable*. A variable field is either mapped to a slot, or named in
+   `pinned` — a value our form fixes although the MRS leaves it open. The
+   pinned list is the byte-affecting decision the `form_id` carries (AArch64
+   `shift`/`imm6`/`sh`), so it is stated here, not inferred.
+3. Builds the template from the fixed bits plus the pinned values.
 4. Derives each slot's placements from the MRS field ranges, so a wrong bit
    position is a mismatch, never a typo that silently emits bytes.
 5. Refuses to emit unless every one of the 32 bits is covered exactly once by
    either a fixed bit or a slot placement.
 
+Documents are emitted per version. A form appears in a document when its `in`
+list names that version (absent `in` means every version). `0.1.0` stays frozen:
+its digest is asserted below, so a later edit that perturbs it fails loudly
+instead of shipping.
+
 Reads:  research/external/arm-mrs/Instructions.json (pinned by check_mrs.py)
 Writes: definitions/aarch64/0.1.0.json
+        definitions/aarch64/0.2.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -36,22 +42,24 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))))
 
 MRS = os.path.join(ROOT, "research", "external", "arm-mrs", "Instructions.json")
-OUT = os.path.join(ROOT, "definitions", "aarch64", "0.1.0.json")
+OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
+
+VERSIONS = ["0.1.0", "0.2.0"]
+
+# The frozen digest of `0.1.0`. Four fixtures name it; it may not move.
+FROZEN_DIGESTS = {
+    "0.1.0": "sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e",
+}
 
 WIDTH = 32
 
-DOCUMENT = {
-    "definition_format": "fmp-def/0.1",
-    "namespace": "monasm.isa.aarch64",
-    "version": "0.1.0",
-    "target_identity": {
-        "isa_family": "aarch64",
-        "isa_variant": "aarch64",
-        "execution_mode": "n/a",
-        "enabled_extensions": [],
-        "byte_order": "little",
-        "address_width": 64,
-    },
+TARGET_IDENTITY = {
+    "isa_family": "aarch64",
+    "isa_variant": "aarch64",
+    "execution_mode": "n/a",
+    "enabled_extensions": [],
+    "byte_order": "little",
+    "address_width": 64,
 }
 
 # One entry per row of 07_definition_format.md §8.
@@ -59,13 +67,14 @@ DOCUMENT = {
 # `mrs` is the exact node name in Instructions.json. `slots` is in plan operand
 # order; each entry names the MRS field(s) that carry it (an ADRP immediate is
 # one value split over `immhi` and `immlo`, most significant part first).
-# `pinned_zero` names MRS fields our form fixes to zero.
+# `pinned` maps an MRS field name to the integer value our form fixes it to.
+# `in` lists the document versions a form belongs to; omit it for all of them.
 FORMS = [
     {
         "form_id": "aarch64:add/x64-x64-x64-lsl0",
         "mrs": "ADD_64_addsub_shift",
         "decision": "shift = LSL (00) and imm6 = 000000",
-        "pinned_zero": ["shift", "imm6"],
+        "pinned": {"shift": 0, "imm6": 0},
         "slots": [
             {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
              "from": "reg_number", "target_type": "x64"},
@@ -79,7 +88,27 @@ FORMS = [
         "form_id": "aarch64:add/x64-imm12-lsl0",
         "mrs": "ADD_64_addsub_imm",
         "decision": "sh = 0 (no LSL #12)",
-        "pinned_zero": ["sh"],
+        "pinned": {"sh": 0},
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm12"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm12",
+             "range": {"signed": False, "bits": 12, "align_bits": 0}},
+        ],
+    },
+    {
+        # A64-P2's `-lsl12` half (ADR-0011). The `imm12` slot still holds field
+        # content in [0, 4095]; the `sh = 1` the form fixes makes the instruction
+        # shift it. No slot-level scale is involved (07_definition_format.md
+        # §8.3: the slot is the field).
+        "form_id": "aarch64:add/x64-imm12-lsl12",
+        "mrs": "ADD_64_addsub_imm",
+        "decision": "sh = 1 (LSL #12), imm12 still field content",
+        "pinned": {"sh": 1},
+        "in": ["0.2.0"],
         "slots": [
             {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
              "from": "reg_number", "target_type": "x64"},
@@ -94,7 +123,7 @@ FORMS = [
         "form_id": "aarch64:bl/imm26",
         "mrs": "BL_only_branch_imm",
         "decision": "nothing is left open by the MRS",
-        "pinned_zero": [],
+        "pinned": {},
         "slots": [
             # The slot is the field, so a plain operand value is the imm26
             # content. A byte displacement is the fixup path (`scale`, shift 2);
@@ -108,7 +137,7 @@ FORMS = [
         "form_id": "aarch64:adrp/x64-imm21",
         "mrs": "ADRP_only_pcreladdr",
         "decision": "nothing is left open by the MRS",
-        "pinned_zero": [],
+        "pinned": {},
         "slots": [
             {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
              "from": "reg_number", "target_type": "x64"},
@@ -118,6 +147,19 @@ FORMS = [
         ],
     },
 ]
+
+
+def document_for(version):
+    return {
+        "definition_format": "fmp-def/0.1",
+        "namespace": "monasm.isa.aarch64",
+        "version": version,
+        "target_identity": dict(TARGET_IDENTITY),
+    }
+
+
+def forms_for(version):
+    return [spec for spec in FORMS if version in spec.get("in", VERSIONS)]
 
 
 def quote_value(field):
@@ -228,7 +270,7 @@ def build(spec, node):
             variable.append(field)
 
     pinned = []
-    for name in spec["pinned_zero"]:
+    for name, value in spec["pinned"].items():
         field = by_name.get(name)
         if field is None:
             raise SystemExit(
@@ -239,7 +281,14 @@ def build(spec, node):
                 "{0}: pinned field {1!r} is already fixed by the MRS; pinning it "
                 "again would hide that".format(spec["mrs"], name)
             )
-        pinned.append(field)
+        if not isinstance(value, int) or not 0 <= value < (1 << field["width"]):
+            raise SystemExit(
+                "{0}: pinned value {1!r} does not fit field {2!r} ({3} bits)".format(
+                    spec["mrs"], value, name, field["width"]
+                )
+            )
+        word |= value << field["start"]
+        pinned.append((field, value))
 
     slots = []
     covered = []
@@ -279,12 +328,12 @@ def build(spec, node):
         slot["placements"] = placements
         slots.append(slot)
 
-    # Every bit exactly once: fixed, pinned zero, or one slot placement.
+    # Every bit exactly once: fixed, pinned, or one slot placement.
     owner = {}
     for field in fixed:
         for bit in range(field["start"], field["start"] + field["width"]):
             owner[bit] = "fixed"
-    for field in pinned:
+    for field, _ in pinned:
         for bit in range(field["start"], field["start"] + field["width"]):
             owner[bit] = "pinned"
     for start, width, role in covered:
@@ -313,8 +362,8 @@ def build(spec, node):
         "slots": slots,
         "fixed": ["{0}@{1}+{2}".format(f["name"] or "<bits>", f["start"], f["width"])
                   for f in fixed],
-        "pinned": ["{0}@{1}+{2}=0".format(f["name"], f["start"], f["width"])
-                   for f in pinned],
+        "pinned": ["{0}@{1}+{2}={3}".format(f["name"], f["start"], f["width"], v)
+                   for f, v in pinned],
     }
 
 
@@ -382,10 +431,12 @@ def canonical_digest(document):
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def main():
-    nodes = load_nodes()
+def emit(version, nodes):
+    specs = forms_for(version)
+    if not specs:
+        raise SystemExit("{0}: no forms".format(version))
     forms = []
-    for spec in FORMS:
+    for spec in specs:
         built = build(spec, nodes[spec["mrs"]])
         forms.append(built)
         print("{0}".format(built["form_id"]))
@@ -395,31 +446,49 @@ def main():
         for name in built["pinned"]:
             print("    pinned {0}".format(name))
 
-    document = dict(DOCUMENT)
+    document = document_for(version)
     document["forms"] = [
         {"form_id": f["form_id"], "template": f["template"], "slots": f["slots"]}
         for f in forms
     ]
 
-    text = render(DOCUMENT, forms)
+    text = render(document_for(version), forms)
     parsed = json.loads(text)
     if parsed != document:
         raise SystemExit("renderer and builder disagree; refusing to write")
     if canonical_digest(parsed) != canonical_digest(document):
         raise SystemExit("digest mismatch after rendering")
 
-    directory = os.path.dirname(OUT)
-    if not os.path.isdir(directory):
-        os.makedirs(directory)
-    with io.open(OUT, "w", encoding="utf-8", newline="\n") as handle:
+    out = os.path.join(OUT_DIR, version + ".json")
+    if not os.path.isdir(OUT_DIR):
+        os.makedirs(OUT_DIR)
+    with io.open(out, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(text)
+
+    digest = canonical_digest(document)
+    frozen = FROZEN_DIGESTS.get(version)
+    if frozen is not None and digest != frozen:
+        raise SystemExit(
+            "{0} moved: {1} != frozen {2}".format(version, digest, frozen)
+        )
+
+    print("")
+    print("wrote {0} ({1} forms)".format(
+        os.path.relpath(out, ROOT).replace("\\", "/"), len(forms)))
+    print("definition digest {0}{1}".format(
+        digest, "" if frozen is None else "  (frozen)"))
+    print("")
+    return digest
+
+
+def main():
+    nodes = load_nodes()
+    for version in VERSIONS:
+        emit(version, nodes)
 
     with io.open(MRS, "rb") as handle:
         digest = hashlib.sha256(handle.read()).hexdigest()
-    print("")
-    print("wrote {0}".format(os.path.relpath(OUT, ROOT).replace("\\", "/")))
     print("source Instructions.json sha256:{0}".format(digest))
-    print("definition digest {0}".format(canonical_digest(document)))
     return 0
 
 

@@ -7,6 +7,6 @@
   "output_sha256": "d4e6cbee30dbf649db115e954e34e85f0fe116e2b51354b4264ec72cfb113aa7",
   "size": 8,
   "records": 0,
-  "notes": "Input: `add x0, x1, #0` / `add x2, x3, #4095`, the two ends of the unsigned imm12 range. `sh` is 0 in both; the scaled form is `aarch64:add/x64-imm12-lsl12` and is not in this table (A64-P2 remains partly planned).",
+  "notes": "Input: `add x0, x1, #0` / `add x2, x3, #4095`, the two ends of the unsigned imm12 range. `sh` is 0 in both; the scaled half of A64-P2 is the separate `A64-P2-add-imm12-lsl12` fixture against `aarch64/0.2.0.json`.",
   "source": "Arm MRS ADD_64_addsub_imm, imm12 at 10+12"
 }

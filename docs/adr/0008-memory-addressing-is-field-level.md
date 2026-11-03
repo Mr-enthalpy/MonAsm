@@ -120,8 +120,8 @@ record which choice was made and no digest could pin it.
   every future memory form, in exchange for one fewer operand per instruction.
 - **Read the offset as bytes and scale it in the definition.** Rejected: a
   definition slot has no transform (`§8.3`), and adding one would let a slot
-  rescale values silently — the failure mode `A64-P2`'s `-lsl12` half is already
-  waiting on.
+  rescale values silently — the failure mode `A64-P2`'s `-lsl12` half was waiting
+  on (ADR-0011 answered it with a second form, not a slot transform).
 
 ## Evidence status
 

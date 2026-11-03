@@ -27,6 +27,7 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 | N15 | Operand payload is a composite memory operand (`{"mem": {"base": …, "disp": …}}`), not one of the four `fmp/0.1` shapes | Reject at read time, never split it into operands | E-OPERAND-003 | all | `rv64/negative/N15-composite-memory-payload.fmp.json` | rv64 passing |
 | N16 | Operand value is inside the slot's field range but excluded by the form (`c.addi` zero immediate, `c.addi` zero destination) | Reject, never encode the HINT the bytes would mean | E-RANGE-004 | rv64 | `rv64/negative/N16a-caddi-imm-zero.fmp.json`, `rv64/negative/N16b-caddi-rd-zero.fmp.json` | rv64 passing |
 | N17 | RV64 pair half is inconsistent: `N17a` a `pcrel_lo12` low half with a non-zero `addend`, `N17b` a `pcrel_hi` fixup with no `pair_role: lo`, `N17c` a `pcrel_hi` low half in a different section than its `hi` | Reject, never fold the addend in, fall back to `pcrel_begin`, or measure across sections | E-FIXUP-009 / E-FIXUP-007 | rv64 | `rv64/negative/N17a-lo12-addend-nonzero.fmp.json`, `rv64/negative/N17b-pcrel-hi-without-lo-role.fmp.json`, `rv64/negative/N17c-lo-in-other-section.fmp.json` | rv64 passing |
+| N18 | Operand value is legal as a *literal* for the instruction but not inside the named form's field: `0x1000` on `add/x64-imm12-lsl0`, or `0x123000` on `add/x64-imm12-lsl12` | Reject, never switch to the other form or pre-scale the operand | E-RANGE-001 | aarch64 | `aarch64/negative/N18a-no-form-switch.fmp.json`, `aarch64/negative/N18b-operand-is-field-content.fmp.json` | aarch64 passing |
 
 N13's counterexample is `EXP-0002` W2: a same-length encoder defect turns
 `48 89 d8` (`mov rax, rbx`) into `49 89 d8` (`mov r8, rbx`), both 3 bytes and
@@ -39,8 +40,17 @@ N14 is the field-width failure, not the class failure. `r9` is a legal
 and the `REX` byte is pinned, so the value simply does not fit. `EXP-0004` §3
 measured what truncation would do: `48 89 c8` decodes as `movq %rcx, %rax`, a
 move of a different register. The AArch64 fixture is the same shape with a 5-bit
-field (`x32` would truncate to `x0`); RV64 gets its own case when its table
-lands.
+field (`x32` would truncate to `x0`); an RV64 case would have the same shape, but
+no such fixture exists yet.
+
+N18 is the A64-P2 pair: the operand is inside the *literal's* legal set but not
+inside the named form's field. `llvm-mc` accepts `#0x1000` and silently emits the
+`sh=1` form (`EV-26`, `EXP-0013` §2); the materializer must reject it on `-lsl0`
+(`N18a`, `E-RANGE-001`), because choosing the form from the value is `INV-02`.
+The converse spelling is `N18b`: naming `-lsl12` and passing `0x123000` is also
+`E-RANGE-001`, because the operand is `imm12` field content (0…4095) and the
+`<< 12` belongs to the form, not to the slot. Together they pin "the slot is the
+field" (`07_definition_format.md` §8.3) on both sides.
 
 Applicability notes: N12 is not applicable to x86-64 in v0 because the selected
 x86 slice uses a single-site `rel32`; if an x86 pair case is added, the row must
@@ -157,7 +167,7 @@ that definition slice lands.
 | ID | Requirement | Candidate form | Oracle | Status |
 |---|---|---|---|---|
 | A64-P1 | Register arithmetic | `add x0, x1, x2` (`shifted-register`, pinned `LSL #0`) | llvm-mc | **passing** — `aarch64/positive/A64-P1-add-register` |
-| A64-P2 | Immediate arithmetic | `add x0, x1, #imm12` and scaled variant | llvm-mc | **partly passing** — `add/x64-imm12-lsl0` (imm 0 and 4095) in `A64-P2-add-imm12`; the `-lsl12` form is absent, so naming it is `E-FORM-001` |
+| A64-P2 | Immediate arithmetic | `add x0, x1, #imm12` and the `LSL #12` variant as two forms | llvm-mc | **passing** — `add/x64-imm12-lsl0` (imm 0 and 4095) in `A64-P2-add-imm12`; `add/x64-imm12-lsl12` (field content 1, 291, 4095, 0) in `A64-P2-add-imm12-lsl12`; `N18a`/`N18b` reject the form-switching spellings |
 | A64-P3 | Load/store addressing | unsigned-offset vs pre/post-index as distinct forms | llvm-mc | planned — needs the four addressing kinds as separate `form_id`s (`ADR-0008`, `OD-13`) |
 | A64-P4 | Conditional branch | `b.eq` imm19 | llvm-mc | planned — no table row |
 | A64-P5 | Unconditional branch/call | `bl` imm26 | llvm-mc + ld.lld | **passing** — `A64-P5-bl-local-symbol` (+4 and −4) |
@@ -165,15 +175,22 @@ that definition slice lands.
 | A64-P7 | Scattered/scaled field | ins/del of a scaled immediate, or `movz` shift | llvm-mc | planned — no table row |
 | A64-P8 | Target-specific modifier | shift/extend modifier on a register operand | llvm-mc | planned — no table row |
 
-Definition anchor for A64-P1/P2/P5/P6, measured 2026-11-04: the four forms live in
-`definitions/aarch64/0.1.0.json` (digest
+Definition anchor for A64-P1/P2/P5/P6, measured 2026-11-04: the four base forms
+live in `definitions/aarch64/0.1.0.json` (digest
 `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e`),
-generated from four Arm MRS 2026-06 nodes by `EXP-0008`. `llvm-mc` does not
+generated from four Arm MRS 2026-06 nodes by `EXP-0008`. `0.2.0` adds the fifth,
+`aarch64:add/x64-imm12-lsl12` (digest
+`sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed`), a
+superset of the same four plus a second reading of `ADD_64_addsub_imm` with
+`sh = 1`; `0.1.0` is unchanged, which is why `N01` still rejects that id
+when a plan names it against `0.1.0`. The `-lsl0`/`-lsl12` suffix names the pinned
+`sh`, and neither form rescales the operand (ADR-0011). `llvm-mc` does not
 resolve AArch64 branch or `adrp` immediates, so A64-P5/P6 take their bytes after
 `ld.lld --image-base=0 -Ttext=0` has resolved the same `(S, P)` pair; the
 relocation kinds were read with `llvm-readobj -r` before linking (see
-`fixtures/aarch64/README.md`). The four negative fixtures
-(`N01`, `N03`, `N12a`, `N14`) exercise this table with exact diagnostic sets.
+`fixtures/aarch64/README.md`). The six negative fixtures
+(`N01`, `N03`, `N12a`, `N14`, `N18a`, `N18b`) exercise these tables with exact
+diagnostic sets.
 
 ### RV64 (directive §6.3)
 

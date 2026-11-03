@@ -16,23 +16,25 @@ The materializer has no planning authority. That is the whole point.
 G1 (encoder boundary audit) passed. The audit found that XirAsm's x86 path makes
 four independent encoding decisions the caller cannot address, that its RISC-V
 path is the only form-addressable entry point, and that AArch64 exists solely as a
-40.9 MB interpreted Meta-language tree. Twelve contract-level decisions are
+40.9 MB interpreted Meta-language tree. Thirteen contract-level decisions are
 settled (OD-01, OD-02, OD-03, OD-04, OD-06, OD-07, OD-09, OD-10, OD-11, OD-12,
-OD-13, OD-14); ADR-0004 makes `form_id` the only encoding selector, ADR-0005 takes
-AArch64 knowledge from the Arm MRS, ADR-0006 pins the MRS packaging by hash and
-licence, ADR-0007 takes RV64 knowledge from the UDB resolved spec, ADR-0008
-makes a memory operand one operand per encoded field, and ADR-0009 gives a slot a
-closed `excluded` list. Four definition documents are frozen and oracle-verified;
-the materializer and its fixture gate are implemented.
+OD-13, OD-14, OD-15); ADR-0004 makes `form_id` the only encoding selector, ADR-0005
+takes AArch64 knowledge from the Arm MRS, ADR-0006 pins the MRS packaging by hash
+and licence, ADR-0007 takes RV64 knowledge from the UDB resolved spec, ADR-0008
+makes a memory operand one operand per encoded field, ADR-0009 gives a slot a
+closed `excluded` list, ADR-0010 makes an RV64 low half name its high half, and
+ADR-0011 makes AArch64 `add ..., lsl #12` a form rather than a slot scale. Five
+definition documents are frozen and oracle-verified; the materializer and its
+fixture gate are implemented.
 
 | Area | State |
 |---|---|
 | Contract (`docs/fmp-v0/01_contract.md`) | draft, fields marked `TBD` where unproven |
 | Schema (`schema/fmp-v0.schema.json`) | draft, examples validate |
-| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), aarch64 `0.1.0` (4 forms), rv64 `0.1.0` (7 forms) and rv64 `0.2.0` (8 forms) frozen, digests pinned |
+| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), aarch64 `0.1.0` (4 forms) and `0.2.0` (5 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
 | Prototype (`prototype/`) | workspace compiled; all three slices materialize from the plan |
 | Oracles (`tools/oracle/`) | planned; `llvm-mc` (± `ld.lld`) drives the experiments |
-| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0012 |
+| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0013 |
 
 Read `docs/STATUS.md` for the current phase, gate status, and next action.
 

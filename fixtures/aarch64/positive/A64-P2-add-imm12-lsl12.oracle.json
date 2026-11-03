@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P2-add-imm12-lsl12.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "d2a5b611988ac5abf0d379aa3ae78a5218a75f0509c053e3bdf8f7a7ae210485",
+  "output_sha256": "f5c58e6e124afdded3271dce68c3f2282ea8f6521889f08b5ad390f76fb6d0b7",
+  "size": 16,
+  "records": 0,
+  "notes": "Input: `add x0, x1, #0x1, lsl #12` / `#0x123` / `add x2, x3, #0xfff, lsl #12` / `add x0, x1, #0x0, lsl #12`, which give field content 0, 291, 4095 and 0 with `sh` = 1. The `lsl #12` spelling makes `llvm-mc` treat the operand as `imm12` content; the same literals without the shift would be `aarch64:add/x64-imm12-lsl0`. Measured in `EXP-0013` §3.",
+  "source": "Arm MRS ADD_64_addsub_imm, sh at 22+1, imm12 at 10+12"
+}

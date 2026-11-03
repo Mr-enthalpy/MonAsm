@@ -113,19 +113,22 @@ is what makes the two `mov` forms and the two `add` immediate forms distinct
 without an extra choice field. A plan that names `x86:mov/r64-r64` or
 `x86:add/rm64-imm` is rejected: those ids are not in the v0 definition.
 
-The AArch64 slice is four forms covering five frozen `EC` rows:
+The AArch64 slice is five forms covering five frozen `EC` rows:
 
 | `form_id` | Encoding | Operand signature | Covers |
 |---|---|---|---|
 | `aarch64:add/x64-x64-x64-lsl0` | `ADD (shifted register)`, `sf=1`, `shift=LSL`, `imm6=0` | dest `x64`, src `x64`, src2 `x64` | EC-11, EC-13 |
 | `aarch64:add/x64-imm12-lsl0` | `ADD (immediate)`, `sf=1`, `sh=0` | dest `x64`, src `x64`, imm `imm12` | EC-11, EC-12 (`sh=0` half) |
+| `aarch64:add/x64-imm12-lsl12` | `ADD (immediate)`, `sf=1`, `sh=1` | dest `x64`, src `x64`, imm `imm12` (field content) | EC-11, EC-12 (`sh=1` half) |
 | `aarch64:bl/imm26` | `BL imm26` | `imm26` target | A64-P5 |
 | `aarch64:adrp/x64-imm21` | `ADRP immlo:immhi` | dest `x64`, `imm21` target | EC-15, EC-17 |
 
-The `-lsl0` suffix is part of the id because the MRS node leaves `shift`, `imm6`
-and `sh` variable; the table pins them and the name says so (`07_definition_format.md`
-§8.2). `A64-P3`/`P4`/`P7`/`P8` and the `-lsl12` half of `A64-P2` have no row, so
-naming them is `E-FORM-001`.
+The `-lsl0`/`-lsl12` suffix is part of the id because the MRS node leaves
+`shift`, `imm6` and `sh` variable; the table pins them and the name says so
+(`07_definition_format.md` §8.2). Both halves of `EC-12` are therefore carried
+by a form variant, not by a value-dependent bit. `-lsl12` is in `0.2.0` only, so
+naming it against `0.1.0` is `E-FORM-001` (`N01`). `A64-P3`/`P4`/`P7`/`P8` have
+no row, so naming them is `E-FORM-001` too.
 
 `EC-05`, `EC-09` and `EC-10` are out of v0. `X86-P9` (explicit encoding family)
 stays deferred, so `vex`/`evex` never appear in a v0 `form_id`.
@@ -287,11 +290,13 @@ The v0 `EC` set is decided (OD-10). What remains is per-row evidence:
 - `EC-05`, `EC-08`, `EC-09`, `EC-10`, `EC-16`, `EC-18`, `EC-23`, `EC-24`,
   `EC-25`, `EC-26` are `draft` and need an observed counterexample before they can
   be frozen. None of them is required by the x86 slice.
-- The AArch64 rows now have a table (ADR-0005, ADR-0006): EC-11, EC-13, EC-15 and
-  EC-17 are exercised by `definitions/aarch64/0.1.0.json`; EC-12 only in its
-  `sh=0` half. EC-16 and EC-18 stay `draft` and are not in the v0 surface.
+- The AArch64 rows now have a table (ADR-0005, ADR-0006, ADR-0011): EC-11, EC-13,
+  EC-15 and EC-17 are exercised by `definitions/aarch64/0.1.0.json`; EC-12 in both
+  halves, `sh=0` in `0.1.0` and `sh=1` in `0.2.0`. EC-16 and EC-18 stay `draft`
+  and are not in the v0 surface.
 - The RV64 source is settled (ADR-0007: the UDB resolved spec, pinned by archive
-  hash in `EXP-0009`), but the v0 surface is not: `definitions/rv64/0.1.0.json`
-  comes next. `RV-P7` (`c.addi`) is blocked by a format decision, not a source
-  one: the source forbids `imm = 0` and `xd = 0`, and `fmp-def/0.1` cannot yet
-  express `not: 0` (§4 of `07_definition_format.md`).
+  hash in `EXP-0009`), and both documents are generated: `definitions/rv64/0.1.0.json`
+  and `0.2.0.json` (ADR-0009). `RV-P7` (`c.addi`) needed a format decision before
+  it could land: the source forbids `imm = 0` and `xd = 0`, and `fmp-def/0.1`
+  cannot express `not: 0` (§4 of `07_definition_format.md`); ADR-0009 added the
+  closed `excluded` list instead of widening the schema.

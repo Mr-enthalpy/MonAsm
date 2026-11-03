@@ -250,11 +250,21 @@ The ISA table:
 | x86-64 PLT/GOT | semantics depend on link-time policy | v0: not expressible; a plan that names it is `E-VERSION-001` (§10) |
 | AArch64 `b`/`bl` | imm26, signed, scaled by 4, `P` = instruction address, ±128 MiB | `pcrel_begin`, `scale(2)`, `range.bits = 26`, `align_bits = 2` |
 | AArch64 `adrp` | immhi:immlo = `(page(S+A) - page(P)) >> 12`, signed 21 bits | `pcrel_page`, `value_transform = page`, pair `hi` |
-| AArch64 `add :lo12:` | imm12 = `(S+A) & 0xFFF`, optional `lsl #12` | `value_transform = lo12_i`, pair `lo`, same `pair_group` |
+| AArch64 `add :lo12:` | imm12 = `(S+A) & 0xFFF`; `sh` picks `LSL #0`/`#12` and is fixed by the form, not by the fixup | `value_transform = lo12_i`, pair `lo`, same `pair_group` |
 | RV64 B-type | imm12…imm1 scattered; `P` = instruction address; ±4 KiB, 2-byte aligned | `pcrel_begin`, `range.bits = 12`, `align_bits = 1` |
 | RV64 J-type (`jal`) | imm20…imm1 scattered; ±1 MiB | `pcrel_begin`, `range.bits = 20`, `align_bits = 1` |
 | RV64 `auipc` hi20 | `hi20 = (S + A - P + 0x800) >> 12` in exact arithmetic, `P` = the `auipc`'s address | pair `hi`, `pcrel_begin`, `pcrel_hi20` |
 | RV64 `addi`/load/store lo12 | `lo12 = (S + A - P_hi) & 0xFFF`, `P_hi` = the paired `auipc`'s address | pair `lo`, `pcrel_hi`, `pcrel_lo12`, `addend` MUST be 0 |
+
+The scaled AArch64 low half adds no fixup field: `#:lo12:ext, lsl #12` emits the
+same `R_AARCH64_ADD_ABS_LO12_NC` record as the unscaled spelling and, for the
+same symbol, the linker writes the same 12-bit field value, so the shift is the `form_id`'s
+(`-lsl0`/`-lsl12`, ADR-0011) and a fixup cannot choose it (`EXP-0013` §5,
+measured). The `#` is required by the assembler when a shift follows. What the
+scaled form does *not* do is address the symbol: the instruction adds the field
+at bit 12, so with `S = 0x123450` and `P = 0` the `adrp` + scaled `:lo12:` pair
+yields `0x573000`, not `0x123450`. A scaled low half is therefore not a drop-in
+address sequence, and no fixture links one; `A64-P6` covers the `-lsl0` pair only.
 
 The RISC-V `%pcrel_lo` semantics are the sharpest case: the low fixup references
 the *high instruction*, not the symbol directly, because the linker needs the

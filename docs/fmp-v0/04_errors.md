@@ -48,7 +48,7 @@ Rules:
 | E-OPERAND-002 | Operand count or role sequence mismatch | `expected`, `found` | — |
 | E-OPERAND-003 | Operand payload malformed for its kind | `kind`, `reason` | — |
 | E-OPERAND-004 | Operand value is not representable in the slot's field width (register number wider than the encoded field) | `target_type`, `value`, `field_bits` | N14 |
-| E-RANGE-001 | Immediate outside the legal encoding range | `min`, `max`, `value`, `target_type` | N03 |
+| E-RANGE-001 | Immediate outside the legal encoding range | `min`, `max`, `value`, `target_type` | N03, N18a, N18b |
 | E-RANGE-002 | Displacement or branch offset outside the legal range | `min`, `max`, `value`, `bits`, `align_bits` | N04 |
 | E-RANGE-003 | Alignment requirement not met | `required_align`, `value` | — |
 | E-RANGE-004 | Operand value is excluded by the slot's declared domain | `target_type`, `value`, `excluded` | N16a, N16b |
@@ -97,7 +97,13 @@ rejection; `derived` means it follows from a measured byte sequence.
   label with "does not fit the signed 8-bit displacement". The same condition on
   a planned fixup is this code.
 - `E-RANGE-001` — observed, F-10: XirAsm rejects `addi a0, a1, 2048` and
-  `addi a0, a1, -2049`. The RV64 slice reproduces the boundary.
+  `addi a0, a1, -2049`. The RV64 slice reproduces the boundary. The AArch64
+  counterexample is a value that another form *could* encode: `add x0, x1,
+  #0x1000` is legal as `-lsl12` but is out of `imm12` for `-lsl0`, and `llvm-mc`
+  accepts it by switching forms (`EV-26`, `EXP-0013` §2). A materializer rejects
+  it instead (`N18a`); the converse, `0x123000` on `-lsl12`, is `N18b`. The code
+  is the same because the failure is the same: the value is not in the named
+  form's field.
 - `E-OPERAND-001` — observed, F-10: `c.addi a6, 5` (x16) is rejected because the
   compressed register class is `x8..x15`. A register-class violation is a
   legality rule, never a widening opportunity.
