@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-04
-Phase: **2 complete for the x86 slice (OD-01, OD-02, OD-03, OD-04, OD-09, OD-10, OD-11 settled); AArch64/RV64 surfaces block on OD-07**
+Phase: **3 in progress (x86 slice): the definition table is frozen and verified; the materializer is the next artifact**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -14,7 +14,7 @@ this file plus `AGENTS.md` alone.
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86 slice**; AArch64/RV64 surfaces block on OD-07 |
-| 3 | Three-ISA vertical prototype | not started; x86 can start |
+| 3 | Three-ISA vertical prototype | **in progress** on x86: definition table frozen (`07_definition_format.md`, `EXP-0004`); encoder/validator not written |
 | 4 | Invariants, negative tests, replay | not started |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
@@ -44,6 +44,7 @@ this file plus `AGENTS.md` alone.
 | OD-02 | Exactly two fixup modes, one effect each: `resolve_in_place` writes, `emit_relocation` zeroes and records; records are RELA-shaped; the mode never depends on symbol liveness | `EXP-0002` §6; `03_fixup_model.md` §5, §8 |
 | OD-03 | v0 emits Level 0; Level 1 optional and deferred; Level 2 out of scope | `EXP-0002` §6 |
 | OD-04 | `form_id` is a structured name resolved by exact lookup; a rename is loud (`E-FORM-001`, or `E-DEF-001` first); no opaque id, no `match`/`mask` | `01_contract.md` §7; F-09 |
+| OD-06 | The definition digest covers the whole data-only definition in canonical form; a rule change moves it, formatting does not, and a comment is unrepresentable | `EXP-0004` §4; `07_definition_format.md` §6 |
 | OD-09 | Exact integers with declared domains, no wrap, one range check per value after the transform | `01_contract.md` §3.1–§3.2 |
 | OD-10 | v0 ships only the forms the slices use; the definition table is the feature surface and absence is `E-FORM-001` | `02_encoding_choices.md`, "v0 surface"; ADR-0004 |
 | OD-11 | A byte-affecting decision is carried by `form_id`, a typed operand, a fixup field or a target field — never by a separate choice list | ADR-0004; `02_encoding_choices.md` |
@@ -55,26 +56,33 @@ See `docs/fmp-v0/05_open_decisions.md`. Blocking items currently:
 | ID | Question | Blocks |
 |---|---|---|
 | OD-05 | Unknown fields and extensions | AC-10, Q10 |
-| OD-06 | Definition digest coverage | N10, EXP-R5 |
 | OD-07 | AArch64 encoding knowledge source | AC-03, AC-05 |
 | OD-08 | Canonical wire form | AC-07 |
 
-OD-07 has evidence but is not accepted. OD-06 is load-bearing: `EXP-0002` W1
-shows that a definition drift the digest does not cover is caught only by the
-weaker size check.
+OD-07 has evidence but is not accepted. OD-06 was load-bearing because `EXP-0002`
+W1 shows that a definition drift the digest does not cover is caught only by the
+weaker size check; it is now settled, and `EXP-0004` §4 measures both halves.
 
 ## Next action
 
-1. Start Phase 3 (`ADR-0003`) on x86 only: the seven forms in
-   `02_encoding_choices.md` under "v0 surface". Oracle bytes are already measured
-   for five of them; `mov r64, r/m64` (`8B`) and the `81 /0` add variant are
-   verified by disassembly because llvm-mc will not emit them.
-2. Build, in this order: the definition table (one byte template per key), the
-   exact-integer fixup engine (OD-02 modes, OD-09 arithmetic), then N01, N02,
-   N03, N05, N07, N08 and N13 fixtures against the x86 forms.
-3. Keep `python tools/check_ids.py` green after every change.
-4. Unblock OD-07 (licence review) before starting AArch64. OD-05, OD-06 and OD-08
-   are the remaining contract decisions; none blocks the x86 slice.
+1. Write the x86 materializer in `prototype/`: plan model and parser (`fmp-model`),
+   static checks (`fmp-validate`), definition loading + encoding + fixup execution
+   (`fmp-materialize`), and the `fmp` CLI.
+2. Order inside that work: definition load with the digest check, exact-integer
+   fixup engine (OD-02 modes, OD-09 arithmetic), then the `N01`, `N02`, `N03`,
+   `N04`, `N05`, `N07`, `N08`, `N10`, `N13`, `N14` fixtures and the `X86-P1`–`P8`
+   positive fixtures with their oracle records.
+3. Keep `python tools/check_ids.py` and `python tools/check_definition.py` green
+   after every change.
+4. Unblock OD-07 (licence review) before starting AArch64. OD-05 and OD-08 are the
+   remaining contract decisions; neither blocks the x86 slice.
+
+Phase 3 output so far: `07_definition_format.md` (the definition artifact and its
+load-time checks), `definitions/x86_64/0.1.0.json` (the seven v0 forms, digest
+`sha256:c6bfa9…`), `EXP-0004` (223 decoded byte strings across all seven rows,
+plus the `OD-06` digest measurement), `E-OPERAND-004`/`N14` (an operand wider than
+its field is rejected, not truncated), and `tools/check_definition.py`, which
+fails if the document and the JSON table disagree.
 
 Phase 2 output: `EXP-0002` (OD-01, OD-03), `EXP-0003` (the alias pairs behind
 OD-11/ADR-0004), the `pcrel_end` fix in `03_fixup_model.md` §4, the observed

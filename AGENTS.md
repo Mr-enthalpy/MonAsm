@@ -63,13 +63,15 @@ materializer.
 | `docs/adr/` | Architecture decision records |
 | `docs/STATUS.md` | Phase, gate status, next action |
 | `schema/` | Machine-readable FMP schema (draft) |
+| `definitions/` | Pinned encoding definitions (`x86_64/0.1.0.json` is canonical) |
 | `fixtures/` | Per-ISA plans, expected bytes, oracle metadata |
 | `research/` | Evidence index and disposable external snapshots |
 | `prototype/` | Rust workspace; empty until Phase 3 |
-| `tools/` | Oracles and doc consistency checks (`check_ids.py`) |
+| `tools/` | Oracles, doc consistency (`check_ids.py`) and definition consistency (`check_definition.py`) |
 
 ## Definition of done for any change
 
 - Every ID used by the change is declared in its registry document.
 - `python tools/check_ids.py` passes.
+- `python tools/check_definition.py` passes when `definitions/` changes.
 - New behavior has a negative test, or an explicit "not applicable" reason.

@@ -12,20 +12,22 @@ The materializer has no planning authority. That is the whole point.
 
 ## Status
 
-**Phase 2 in progress.** Gate G0 (oracle toolchain) and G1 (encoder boundary
-audit) passed. The audit found that XirAsm's x86 path makes four independent
-encoding decisions the caller cannot address, that its RISC-V path is the only
-form-addressable entry point, and that AArch64 exists solely as a 40.9 MB
-interpreted Meta-language tree. Four contract-level decisions are settled
-(OD-01, OD-03, OD-10, OD-11); ADR-0004 makes `form_id` the only encoding
-selector. No encoder of ours is implemented yet.
+**Phase 3 in progress on x86.** Gate G0 (oracle toolchain) and G1 (encoder
+boundary audit) passed. The audit found that XirAsm's x86 path makes four
+independent encoding decisions the caller cannot address, that its RISC-V path is
+the only form-addressable entry point, and that AArch64 exists solely as a 40.9 MB
+interpreted Meta-language tree. Eight contract-level decisions are settled
+(OD-01, OD-02, OD-03, OD-04, OD-06, OD-09, OD-10, OD-11); ADR-0004 makes
+`form_id` the only encoding selector. The x86-64 definition table is frozen and
+decoder-verified; the materializer itself is the next artifact.
 
 | Area | State |
 |---|---|
 | Contract (`docs/fmp-v0/01_contract.md`) | draft, fields marked `TBD` where unproven |
-| Schema (`schema/fmp-v0.schema.json`) | draft, not yet frozen |
-| Prototype (`prototype/`) | empty workspace, Phase 3 |
-| Oracles (`tools/oracle/`) | planned, Phase 0 gate G0 |
+| Schema (`schema/fmp-v0.schema.json`) | draft, examples validate |
+| Definitions (`definitions/`) | x86-64 `0.1.0` frozen, digest pinned |
+| Prototype (`prototype/`) | workspace compiled, no encoder yet |
+| Oracles (`tools/oracle/`) | planned; `llvm-mc` drives the experiments |
 | Evidence (`research/evidence/`) | index started, XirAsm pinned |
 
 Read `docs/STATUS.md` for the current phase, gate status, and next action.
@@ -46,12 +48,14 @@ docs/
   fmp-v0/                    contract, encoding choices, fixups, errors, matrix
   adr/                       architecture decision records
 schema/                      JSON Schema for FMP v0 (draft)
+definitions/{x86_64,aarch64,rv64}/  pinned encoding tables, one target each
 fixtures/{x86_64,aarch64,rv64}/ plan + expected bytes + oracle metadata
 research/evidence/           source index, pinned revisions, experiment records
 research/external/           disposable snapshots (gitignored, pinned by SHA)
-prototype/                   Rust workspace (empty until Phase 3)
+prototype/                   Rust workspace (materializer, Phase 3)
 tools/oracle/                temporary oracle wrappers (llvm-mc, binutils)
 tools/check_ids.py           documentation consistency check
+tools/check_definition.py    definition table <-> document consistency check
 ```
 
 ## Invariants at a glance

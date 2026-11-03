@@ -12,7 +12,7 @@
   "definition_identity": {
     "namespace": "monasm.isa.x86",
     "version": "0.1.0",
-    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    "digest": "sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad"
   },
   "output_contract": {
     "artifact": "bytes",

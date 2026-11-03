@@ -276,6 +276,22 @@ Rules:
   (no near-match), and `EXP-R5` confirms the digest gate fires first when the
   revision is honest.
 
+### 7.1 The definition artifact
+
+`form_id` is resolved against a **pinned definition artifact**. The contract fixes
+only what the plan names — `definition_identity` = `namespace` + `version` +
+`digest` — and delegates the artifact itself to `07_definition_format.md`, which
+fixes its shape, its load-time checks, its digest coverage and the v0 x86 table
+(`definitions/x86_64/0.1.0.json`).
+
+- A definition that fails a load-time check is `E-DEF-001`; the process stops
+  before any plan is read from it.
+- A `namespace`/`version` this materializer does not ship is `E-DEF-002`, checked
+  before hashing, so a plan cannot pull in an arbitrary table by digest alone.
+- A plan's digest that does not match the loaded definition is `E-DEF-001`
+  (`N10`). Formatting never moves the digest; a rule change always does
+  (`EXP-0004` §4).
+
 `expected_digest` rules (OD-01, measured in `EXP-0002`):
 
 - It is a **check**, never an input. The materializer MUST encode from

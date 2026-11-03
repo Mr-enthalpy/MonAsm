@@ -40,12 +40,13 @@ Rules:
 | E-TARGET-002 | Invalid or missing `execution_mode` for the family | `found`, `required` | — |
 | E-TARGET-003 | Form requires an extension that is not enabled | `extension`, `form_id` | N06 |
 | E-TARGET-004 | Unsupported `byte_order` or `address_width` | `found` | — |
-| E-DEF-001 | `definition_identity.digest` does not match the loaded definition | `declared`, `actual` | N10 |
+| E-DEF-001 | The definition cannot be loaded (unknown `definition_format`, duplicate form, bad template or placement), or `definition_identity.digest` does not match the loaded definition | `declared`, `actual`, `reason` | N10 |
 | E-DEF-002 | Namespace or version not available in this materializer | `namespace`, `version` | EXP-R5 |
 | E-FORM-001 | `form_id` is not present in the pinned definition | `form_id`, `namespace`, `version` | N01 |
 | E-OPERAND-001 | Operand kind or register class does not match the form | `expected`, `found` | N02 |
 | E-OPERAND-002 | Operand count or role sequence mismatch | `expected`, `found` | — |
 | E-OPERAND-003 | Operand payload malformed for its kind | `kind`, `reason` | — |
+| E-OPERAND-004 | Operand value is not representable in the slot's field width (register number wider than the encoded field) | `target_type`, `value`, `field_bits` | N14 |
 | E-RANGE-001 | Immediate outside the legal encoding range | `min`, `max`, `value`, `target_type` | N03 |
 | E-RANGE-002 | Displacement or branch offset outside the legal range | `min`, `max`, `value`, `bits`, `align_bits` | N04 |
 | E-RANGE-003 | Alignment requirement not met | `required_align`, `value` | — |
@@ -88,6 +89,12 @@ rejection; `derived` means it follows from a measured byte sequence.
 - `E-OPERAND-001` — observed, F-10: `c.addi a6, 5` (x16) is rejected because the
   compressed register class is `x8..x15`. A register-class violation is a
   legality rule, never a widening opportunity.
+- `E-OPERAND-004` — observed, `EXP-0004` §3: the v0 x86 `ModRM` field is 3 bits
+  and the `REX` byte is pinned to `0x48`, so `r9` is not encodable. Truncating 9
+  (`0b1001`) to 3 bits yields `0b001`, and `48 89 c8` decodes as
+  `movq %rcx, %rax` — measured, not argued. `r9` fits `x86.gpr64` and therefore
+  passes `E-OPERAND-001`; the failure is that the form's field is too narrow,
+  which is a different diagnostic from "the form does not accept this class".
 - `E-SIZE-001` — observed, `EXP-0002` W1: a definition drift that changes the
   encoded length is caught by `expected_size` alone.
 - `E-BYTE-001` — observed, `EXP-0002` W2: a same-length encoder defect emits
@@ -97,8 +104,11 @@ rejection; `derived` means it follows from a measured byte sequence.
 - `E-FORM-001` — derived, ADR-0004: the v0 x86 slice has no coarse form such as
   `x86:mov/r64-r64`. A plan naming one must be rejected, not resolved to a
   default variant. The test is N01; it runs in Phase 3.
-- `E-DEF-001` — `planned` (EXP-R5). No observation yet; it must not be cited as
-  evidenced.
+- `E-DEF-001` — partly measured, `EXP-0004` §4: a one-bit change to an immediate
+  range moves the definition digest, and a formatting-only change does not. The
+  end-to-end case (a plan whose `definition_identity.digest` does not match the
+  loaded definition) is `N10` and runs in Phase 3; until then the plan-side half
+  must not be cited as evidenced.
 - `E-RANGE-003` — derived, OD-09: an AArch64 `b` targets `.text+2`. The
   displacement is not a multiple of 4, and `imm26 = D >> 2` would silently drop
   the low two bits, branching 2 bytes before the requested address. Reject

@@ -23,12 +23,20 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 | N11 | Plan implies implicit alignment or padding | Reject | E-LAYOUT-002 / E-LAYOUT-005 | all | TBD | planned |
 | N12 | Associated relocation pair is incomplete or inconsistent | Reject | E-FIXUP-007 | aarch64 (`adrp`+`lo12`), rv64 (`auipc`+`lo12`) | TBD | planned |
 | N13 | `expected_digest` is present and the emitted bytes hash to a different value | Reject, never re-encode to match | E-BYTE-001 | x86, aarch64, rv64 | TBD | planned |
+| N14 | Operand value does not fit the slot's encoded field: `r9` in a 3-bit `ModRM` field | Reject, never truncate to another register | E-OPERAND-004 | x86 | TBD | planned |
 
 N13's counterexample is `EXP-0002` W2: a same-length encoder defect turns
 `48 89 d8` (`mov rax, rbx`) into `49 89 d8` (`mov r8, rbx`), both 3 bytes and
 both legal. `expected_size` cannot see it; only the digest can. The test must
 also confirm the materializer does **not** attempt a repair (W4: a plan whose
 immediate is edited must be rejected, not re-encoded around).
+
+N14 is the field-width failure, not the class failure. `r9` is a legal
+`x86.gpr64`, so `E-OPERAND-001` does not apply; the v0 `ModRM` field is 3 bits
+and the `REX` byte is pinned, so the value simply does not fit. `EXP-0004` §3
+measured what truncation would do: `48 89 c8` decodes as `movq %rcx, %rax`, a
+move of a different register. AArch64 and RV64 get their own case when their
+tables land.
 
 Applicability notes: N12 is not applicable to x86-64 in v0 because the selected
 x86 slice uses a single-site `rel32`; if an x86 pair case is added, the row must
@@ -106,7 +114,7 @@ Each vector needs **two independent sources**: our materializer, and an oracle
 | X86-P5 | Prefix rules | 16-bit operand with `0x66`; REX + high-byte rejection | llvm-mc | planned |
 | X86-P6 | RIP-relative reference | `mov rax, [rip+disp32]` with a fixup | llvm-mc + readelf | planned |
 | X86-P7 | Short vs near branch | `x86:jmp/rel8/legacy` and `x86:jmp/rel32/legacy` as explicit plans | llvm-mc | planned |
-| X86-P8 | External call fixup | `call rel32` to an undefined symbol, record emitted | llvm-mc + readelf | planned |
+| X86-P8 | External branch fixup | `x86:jmp/rel32/legacy` to an undefined symbol with `emit_relocation`, record emitted. `call rel32` is not in the v0 surface (`OD-10`); its descriptor is identical, so the record shape is exercised without adding a form | llvm-mc + llvm-readobj | planned |
 | X86-P9 | Explicit encoding family | SSE vs VEX vs EVEX for one operation | llvm-mc | deferred (OD-10) |
 
 Oracle note for X86-P7, measured 2026-11-04: llvm-mc does not accept a bare
@@ -115,6 +123,13 @@ numeric branch target (`jmp 0x12`, `0x7f`, `0x80`, `0x1000`, `5` all emit
 `jmp .+0x81` → `eb 7f`, `jmp .+0x82` → `e9 7d 00 00 00`. The disassembler prints
 the displacement, not the resolved target, so the vector is compared as bytes and
 the target is computed from the plan.
+
+Definition anchor for X86-P1–P8, measured 2026-11-04: the seven forms live in
+`definitions/x86_64/0.1.0.json` (digest
+`sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad`), and
+`EXP-0004` decodes 223 plan-derived byte strings with `llvm-mc` to confirm every
+row's field placement. The vectors below stay `planned` until a fixture exists;
+the table itself is no longer the open question.
 
 ### AArch64 (directive §6.2)
 
