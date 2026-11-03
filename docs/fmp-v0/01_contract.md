@@ -236,8 +236,11 @@ meant.
 <form_id> := <isa_family> ":" <mnemonic> "/" <variant> [ "/" <encoding_family> ]
 ```
 
-Examples: `x86:add/rm64-imm32/legacy`, `aarch64:add/x64-imm12-scaled`,
-`riscv:c.addi/rd-eq-rs1`.
+Examples: `x86:add/rm64-imm32/legacy`, `aarch64:add/x64-imm12-lsl0`,
+`riscv:c.addi/rd-eq-rs1`. The `-lsl0` suffix is load-bearing, not decoration: the
+MRS node leaves AArch64 `shift`/`imm6`/`sh` variable, and the form name states the
+pinned value so the operand list does not have to (`07_definition_format.md`
+§8.2, ADR-0004).
 
 Rules:
 
@@ -284,8 +287,8 @@ Rules:
 `form_id` is resolved against a **pinned definition artifact**. The contract fixes
 only what the plan names — `definition_identity` = `namespace` + `version` +
 `digest` — and delegates the artifact itself to `07_definition_format.md`, which
-fixes its shape, its load-time checks, its digest coverage and the v0 x86 table
-(`definitions/x86_64/0.1.0.json`).
+fixes its shape, its load-time checks, its digest coverage and the v0 tables
+(`definitions/x86_64/0.1.0.json`, `definitions/aarch64/0.1.0.json`).
 
 - A definition that fails a load-time check is `E-DEF-001`; the process stops
   before any plan is read from it.

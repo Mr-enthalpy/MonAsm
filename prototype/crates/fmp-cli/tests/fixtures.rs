@@ -48,18 +48,37 @@ fn negatives() -> Vec<PathBuf> {
 }
 
 fn fixture_files(kind: &str, suffix: &str) -> Vec<PathBuf> {
-    let dir = root().join("fixtures/x86_64").join(kind);
-    let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
-        .unwrap_or_else(|error| panic!("{}: {error}", dir.display()))
+    // Every ISA directory is scanned, not a hard-coded one: a new table's
+    // fixtures are gated the moment they land, and an ISA directory without a
+    // fixture set is skipped rather than failing the whole gate.
+    let fixtures = root().join("fixtures");
+    let mut isa_dirs: Vec<PathBuf> = std::fs::read_dir(&fixtures)
+        .unwrap_or_else(|error| panic!("{}: {error}", fixtures.display()))
         .map(|entry| entry.expect("readable directory entry").path())
-        .filter(|path| {
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .is_some_and(|name| name.ends_with(suffix))
-        })
+        .filter(|path| path.is_dir() && path.join(kind).is_dir())
         .collect();
+    isa_dirs.sort();
+
+    let mut paths: Vec<PathBuf> = Vec::new();
+    for isa in &isa_dirs {
+        let dir = isa.join(kind);
+        paths.extend(
+            std::fs::read_dir(&dir)
+                .unwrap_or_else(|error| panic!("{}: {error}", dir.display()))
+                .map(|entry| entry.expect("readable directory entry").path())
+                .filter(|path| {
+                    path.file_name()
+                        .and_then(|name| name.to_str())
+                        .is_some_and(|name| name.ends_with(suffix))
+                }),
+        );
+    }
     paths.sort();
-    assert!(!paths.is_empty(), "no fixtures under {}", dir.display());
+    assert!(
+        !paths.is_empty(),
+        "no fixtures under {}",
+        fixtures.display()
+    );
     paths
 }
 

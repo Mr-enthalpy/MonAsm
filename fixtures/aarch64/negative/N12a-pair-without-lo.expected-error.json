@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-FIXUP-007", "path": "/fixups/0", "detail_keys": ["pair_group", "problem"] }
+  ]
+}

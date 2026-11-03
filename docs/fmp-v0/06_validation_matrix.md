@@ -10,9 +10,9 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 
 | ID | Input condition | Expected | Code | ISAs | Fixture | Status |
 |---|---|---|---|---|---|---|
-| N01 | Plan names a form that leaves a byte-affecting decision open (`x86:mov/r64-r64`, `x86:add/rm64-imm`), a form missing a required component (`x86:mov/rm-r64` without `/legacy`), a renamed variant, or names a variant the definition does not contain | Reject, never append a default variant or match a near neighbour | E-FORM-001 | x86, aarch64, rv64 | `x86_64/negative/N01-absent-form.fmp.json` | x86 passing |
+| N01 | Plan names a form that leaves a byte-affecting decision open (`x86:mov/r64-r64`, `x86:add/rm64-imm`), a form missing a required component (`x86:mov/rm-r64` without `/legacy`), a renamed variant, or names a variant the definition does not contain | Reject, never append a default variant or match a near neighbour | E-FORM-001 | x86, aarch64, rv64 | `x86_64/negative/N01-absent-form.fmp.json`, `aarch64/negative/N01-absent-scaled-form.fmp.json` | x86 and aarch64 passing |
 | N02 | Operand register class does not match the form | Reject | E-OPERAND-001 | x86, aarch64, rv64 | `x86_64/negative/N02-operand-kind-mismatch.fmp.json` | x86 passing |
-| N03 | Immediate exceeds the field's range | Reject | E-RANGE-001 | x86, aarch64, rv64 | `x86_64/negative/N03-imm8-out-of-range.fmp.json` | x86 passing |
+| N03 | Immediate exceeds the field's range | Reject | E-RANGE-001 | x86, aarch64, rv64 | `x86_64/negative/N03-imm8-out-of-range.fmp.json`, `aarch64/negative/N03-imm12-out-of-range.fmp.json` | x86 and aarch64 passing |
 | N04 | Branch displacement exceeds the form's range | Reject, never expand | E-RANGE-002 / E-FIXUP-003 | x86, aarch64, rv64 | `x86_64/negative/N04a-rel8-out-of-range.fmp.json`, `N04b-rel32-absolute-out-of-range.fmp.json` | x86 passing |
 | N05 | `expected_size` disagrees with the encoded length | Reject | E-SIZE-001 / E-LAYOUT-003 | x86, aarch64, rv64 | `x86_64/negative/N05-expected-size-mismatch.fmp.json` | x86 passing |
 | N06 | Form requires a disabled target extension | Reject | E-TARGET-003 | rv64 (C), x86 (AVX), aarch64 (optional feature) | none | not applicable to x86 v0 (no extension-gated form); see `04_errors.md` §2.3 |
@@ -21,9 +21,9 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 | N09 | Two layout fragments overlap | Reject | E-LAYOUT-001 | all (layout is ISA-independent) | `x86_64/negative/N09-overlapping-fragments.fmp.json` | x86 passing |
 | N10 | Definition digest does not match | Reject | E-DEF-001 | all | `x86_64/negative/N10-definition-digest-mismatch.fmp.json` | x86 passing |
 | N11 | Plan implies implicit alignment or padding | Reject | E-LAYOUT-002 / E-LAYOUT-005 | all | `x86_64/negative/N11-fragment-gap.fmp.json` | x86 passing (`E-LAYOUT-002`; `E-LAYOUT-005` unreachable in v0, `04_errors.md` §2.3) |
-| N12 | Associated relocation pair is incomplete or inconsistent | Reject | E-FIXUP-007 | aarch64 (`adrp`+`lo12`), rv64 (`auipc`+`lo12`) | none | not applicable to x86 v0 (single-site `rel32`) |
+| N12 | Associated relocation pair is incomplete or inconsistent | Reject | E-FIXUP-007 | aarch64 (`adrp`+`lo12`), rv64 (`auipc`+`lo12`) | `aarch64/negative/N12a-pair-without-lo.fmp.json` | aarch64 passing (two `hi`, no `lo`); not applicable to x86 v0 (single-site `rel32`) |
 | N13 | `expected_digest` is present and the emitted bytes hash to a different value | Reject, never re-encode to match | E-BYTE-001 | x86, aarch64, rv64 | `x86_64/negative/N13-expected-digest-mismatch.fmp.json` | x86 passing |
-| N14 | Operand value does not fit the slot's encoded field: `r9` in a 3-bit `ModRM` field | Reject, never truncate to another register | E-OPERAND-004 | x86 | `x86_64/negative/N14-register-wider-than-field.fmp.json` | x86 passing |
+| N14 | Operand value does not fit the slot's encoded field: `r9` in a 3-bit `ModRM` field, or `x32` in a 5-bit AArch64 register field | Reject, never truncate to another register | E-OPERAND-004 | x86, aarch64 | `x86_64/negative/N14-register-wider-than-field.fmp.json`, `aarch64/negative/N14-register-wider-than-field.fmp.json` | x86 and aarch64 passing |
 
 N13's counterexample is `EXP-0002` W2: a same-length encoder defect turns
 `48 89 d8` (`mov rax, rbx`) into `49 89 d8` (`mov r8, rbx`), both 3 bytes and
@@ -35,8 +35,9 @@ N14 is the field-width failure, not the class failure. `r9` is a legal
 `x86.gpr64`, so `E-OPERAND-001` does not apply; the v0 `ModRM` field is 3 bits
 and the `REX` byte is pinned, so the value simply does not fit. `EXP-0004` §3
 measured what truncation would do: `48 89 c8` decodes as `movq %rcx, %rax`, a
-move of a different register. AArch64 and RV64 get their own case when their
-tables land.
+move of a different register. The AArch64 fixture is the same shape with a 5-bit
+field (`x32` would truncate to `x0`); RV64 gets its own case when its table
+lands.
 
 Applicability notes: N12 is not applicable to x86-64 in v0 because the selected
 x86 slice uses a single-site `rel32`; if an x86 pair case is added, the row must
@@ -148,14 +149,24 @@ return when that slice lands, together with the AArch64/RV64 tables under
 
 | ID | Requirement | Candidate form | Oracle | Status |
 |---|---|---|---|---|
-| A64-P1 | Register arithmetic | `add x0, x1, x2` (`shifted-register`) | llvm-mc | planned |
-| A64-P2 | Immediate arithmetic | `add x0, x1, #imm12` and scaled variant | llvm-mc | planned |
-| A64-P3 | Load/store addressing | unsigned-offset vs pre/post-index as distinct forms | llvm-mc | planned |
-| A64-P4 | Conditional branch | `b.eq` imm19 | llvm-mc | planned |
-| A64-P5 | Unconditional branch/call | `bl` imm26 | llvm-mc | planned |
-| A64-P6 | PC-relative pair | `adrp` + `add #:lo12:` with `pair_group` | llvm-mc + readelf | planned |
-| A64-P7 | Scattered/scaled field | ins/del of a scaled immediate, or `movz` shift | llvm-mc | planned |
-| A64-P8 | Target-specific modifier | shift/extend modifier on a register operand | llvm-mc | planned |
+| A64-P1 | Register arithmetic | `add x0, x1, x2` (`shifted-register`, pinned `LSL #0`) | llvm-mc | **passing** — `aarch64/positive/A64-P1-add-register` |
+| A64-P2 | Immediate arithmetic | `add x0, x1, #imm12` and scaled variant | llvm-mc | **partly passing** — `add/x64-imm12-lsl0` (imm 0 and 4095) in `A64-P2-add-imm12`; the `-lsl12` form is absent, so naming it is `E-FORM-001` |
+| A64-P3 | Load/store addressing | unsigned-offset vs pre/post-index as distinct forms | llvm-mc | planned — no table row |
+| A64-P4 | Conditional branch | `b.eq` imm19 | llvm-mc | planned — no table row |
+| A64-P5 | Unconditional branch/call | `bl` imm26 | llvm-mc + ld.lld | **passing** — `A64-P5-bl-local-symbol` (+4 and −4) |
+| A64-P6 | PC-relative pair | `adrp` + `add #:lo12:` with `pair_group` | llvm-mc + ld.lld + llvm-readobj | **passing** — `A64-P6-adrp-lo12-pair` |
+| A64-P7 | Scattered/scaled field | ins/del of a scaled immediate, or `movz` shift | llvm-mc | planned — no table row |
+| A64-P8 | Target-specific modifier | shift/extend modifier on a register operand | llvm-mc | planned — no table row |
+
+Definition anchor for A64-P1/P2/P5/P6, measured 2026-11-04: the four forms live in
+`definitions/aarch64/0.1.0.json` (digest
+`sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e`),
+generated from four Arm MRS 2026-06 nodes by `EXP-0008`. `llvm-mc` does not
+resolve AArch64 branch or `adrp` immediates, so A64-P5/P6 take their bytes after
+`ld.lld --image-base=0 -Ttext=0` has resolved the same `(S, P)` pair; the
+relocation kinds were read with `llvm-readobj -r` before linking (see
+`fixtures/aarch64/README.md`). The four negative fixtures
+(`N01`, `N03`, `N12a`, `N14`) exercise this table with exact diagnostic sets.
 
 ### RV64 (directive §6.3)
 

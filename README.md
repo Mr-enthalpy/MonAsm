@@ -12,24 +12,25 @@ The materializer has no planning authority. That is the whole point.
 
 ## Status
 
-**Phase 3 in progress on x86.** Gate G0 (oracle toolchain) and G1 (encoder
-boundary audit) passed. The audit found that XirAsm's x86 path makes four
+**Phase 3 in progress on x86-64 and AArch64.** Gate G0 (oracle toolchain) and G1
+(encoder boundary audit) passed. The audit found that XirAsm's x86 path makes four
 independent encoding decisions the caller cannot address, that its RISC-V path is
 the only form-addressable entry point, and that AArch64 exists solely as a 40.9 MB
 interpreted Meta-language tree. Nine contract-level decisions are settled
 (OD-01, OD-02, OD-03, OD-04, OD-06, OD-07, OD-09, OD-10, OD-11); ADR-0004 makes
-`form_id` the only encoding selector, and ADR-0005 takes AArch64 knowledge from
-the Arm MRS. The x86-64 definition table is frozen and decoder-verified; the
-materializer and its fixture gate are implemented.
+`form_id` the only encoding selector, ADR-0005 takes AArch64 knowledge from the
+Arm MRS, and ADR-0006 pins the MRS packaging by hash and licence. Both definition
+tables are frozen and oracle-verified; the materializer and its fixture gate are
+implemented.
 
 | Area | State |
 |---|---|
 | Contract (`docs/fmp-v0/01_contract.md`) | draft, fields marked `TBD` where unproven |
 | Schema (`schema/fmp-v0.schema.json`) | draft, examples validate |
-| Definitions (`definitions/`) | x86-64 `0.1.0` frozen, digest pinned; AArch64 next |
-| Prototype (`prototype/`) | workspace compiled; x86-64 slice materializes from the plan |
-| Oracles (`tools/oracle/`) | planned; `llvm-mc` drives the experiments |
-| Evidence (`research/evidence/`) | index started, XirAsm pinned |
+| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms) and aarch64 `0.1.0` (4 forms) frozen, digests pinned; RV64 next |
+| Prototype (`prototype/`) | workspace compiled; x86-64 and AArch64 slices materialize from the plan |
+| Oracles (`tools/oracle/`) | planned; `llvm-mc` (± `ld.lld`) drives the experiments |
+| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0008 |
 
 Read `docs/STATUS.md` for the current phase, gate status, and next action.
 
@@ -57,6 +58,7 @@ prototype/                   Rust workspace (materializer, Phase 3)
 tools/oracle/                temporary oracle wrappers (llvm-mc, binutils)
 tools/check_ids.py           documentation consistency check
 tools/check_definition.py    definition table <-> document consistency check
+tools/check_mrs.py           verifies the pinned Arm MRS drop (ADR-0006)
 ```
 
 ## Invariants at a glance

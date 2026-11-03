@@ -1,0 +1,56 @@
+AArch64 encoding definitions
+============================
+
+`definitions/aarch64/0.1.0.json` is derived from the Arm Architecture Machine
+Readable Specification, A-profile, 2026-06 (release `2026-06_rel`, build 818,
+schema 2.9.5).
+
+Pinned source archive (ADR-0006):
+
+    AARCHMRS_OPENSOURCE_A_profile_FAT-2026-06.tar.gz
+    size   5696585
+    sha256 fe458c521745cc2d07244c416106add69ae8faa12fa3da8aad34fa76ab29399a
+
+    Instructions.json  sha256 a1ad2c6538a47cd97d8762791ac5af88bce1d5f6aff096c9b77aef853e76acfe
+    Features.json      sha256 633259000ffd3da32900bd0c0c1beae4a9eea7095c278f74d62a00c846b41187
+
+The derived table is data: bit patterns, field ranges and form names. It
+contains no Arm schema, script, or descriptive text. The generator that produced
+it is `research/evidence/experiments/EXP-0008/generate_aarch64.py`.
+
+The upstream notice, reproduced in full from `docs/notice.html` in that archive:
+
+--------------------------------------------------------------------------
+
+AARCHMRS Schema 2.9.5
+
+Copyright 2010-2026 Arm Limited or its affiliates.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS” AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Copyright © 2025 ARM Limited or its affiliates. All rights reserved.
+
+--------------------------------------------------------------------------

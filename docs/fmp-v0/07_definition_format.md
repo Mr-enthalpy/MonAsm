@@ -1,11 +1,11 @@
 # Definition Format
 
-Status: **frozen for `x86-64` `0.1.0`**; the same format is intended for the
-other targets, whose tables wait on source data, not on an open decision
-(`OD-07` is settled by ADR-0005). This document defines the artifact a pinned
-`definition_identity` names. It is the operational form of `OD-10`: the table
-*is* the feature surface, and a `form_id` the table does not contain is
-`E-FORM-001`.
+Status: **frozen for `x86-64` `0.1.0` and `aarch64` `0.1.0`**; the same format
+is intended for the other targets, whose tables wait on source data, not on an
+open decision (`OD-07` is settled by ADR-0005 and pinned by ADR-0006). This
+document defines the artifact a pinned `definition_identity` names. It is the
+operational form of `OD-10`: the table *is* the feature surface, and a `form_id`
+the table does not contain is `E-FORM-001`.
 
 A definition is **data**. It is not a library, a plugin, or a table of callbacks
 (`INV-06`). The materializer reads it, checks it, and encodes from it.
@@ -198,20 +198,19 @@ table by digest alone.
 
 Only after these pass is a byte written.
 
-## 8. `x86-64` `0.1.0` table
+## 8. v0 definition tables
 
-`definitions/x86_64/0.1.0.json` is canonical. The table below is a reading aid;
-`tools/check_definition.py` fails if the two disagree.
+Each table below is a reading aid; `definitions/<isa>/<version>.json` is
+canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
-Canonical digest, computed per §6:
+| Table | Namespace | Digest |
+|---|---|---|
+| `definitions/x86_64/0.1.0.json` | `monasm.isa.x86` | `sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad` |
+| `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 
-```text
-sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad
-```
+A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-A plan names `namespace: monasm.isa.x86`, `version: 0.1.0` and that digest in
-`definition_identity`. The value is reproducible with
-`python tools/check_definition.py`, which prints it for every definition.
+### 8.1 `x86-64` `0.1.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -240,12 +239,67 @@ for those registers. A plan that names `mov rax, r9` is rejected
 implicit widening.
 
 Every row is verified against `llvm-mc` 23.1.2 in `EXP-0004`: each template byte
-string is decoded, and each `ModRM` and immediate/branch field is exercised across
-its whole encoded range.
-
-Every row is verified against `llvm-mc` 23.1.2 in `EXP-0004`: each template byte
-string is decoded, and each `ModRM`/immediate/relaxation field is exercised
+string is decoded, and each `ModRM` and immediate/branch field is exercised
 across its whole encoded range.
+
+### 8.2 `aarch64` `0.1.0`
+
+| `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
+|---|---|---|---|---|
+| `aarch64:add/x64-x64-x64-lsl0` | `0000008b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-13`, `A64-P1` |
+| `aarch64:add/x64-imm12-lsl0` | `00000091` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; imm: `aarch64.imm`/`imm12` → `[10,12]` | 4 | `EC-11`, `EC-12`, `A64-P2` |
+| `aarch64:bl/imm26` | `00000094` | target: `aarch64.rel`/`imm26` → `[0,26]` | 4 | `A64-P5` |
+| `aarch64:adrp/x64-imm21` | `00000090` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; target: `aarch64.rel`/`imm21` → `[5,19]`, `[29,2]` | 4 | `EC-15`, `EC-17`, `A64-P6` |
+
+The templates are little-endian file order, so `0000008b` is the word
+`0x8b000000` in a disassembler. The generator
+(`research/evidence/experiments/EXP-0008/generate_aarch64.py`) derives every
+bit from the MRS node, requires the MRS node name to exist, and refuses to emit
+unless all 32 bits are covered exactly once by a fixed bit or a slot placement;
+`EXP-0008` §2–§3 records the four nodes and the coverage check.
+
+The `-lsl0` suffix on both `add` rows carries a decision the operand list does
+not state, and the name states it instead (`01_contract.md` §7, `ADR-0004`): the
+MRS leaves AArch64 `shift` (2 bits) and `imm6` (6 bits) variable in the
+shifted-register node, and `sh` (1 bit) variable in the immediate node. This
+table pins them to `LSL #0` and to `sh = 0`. A plan that wants
+`add x0, x1, x2, lsl #4` or `add x0, x1, #0x1000` names a form that does not
+exist and is rejected `E-FORM-001`; nothing shifts implicitly (`INV-02`,
+`INV-03`, `N01`).
+
+`adrp`'s immediate is one value over two fields: `immhi` holds bits `[20:2]` and
+`immlo` holds `[1:0]`, which is why the slot has two placements in that order
+(§4.1: first placement, most significant bits).
+
+`bl` and `adrp` are the two rows whose field is not a plain integer, and the
+next subsection is the rule that follows from it.
+
+### 8.3 Scaled branch fields: the slot is the field
+
+`bl`'s `imm26` counts instructions, not bytes, and `adrp`'s `imm21` counts
+4 KiB pages. A definition slot has no scaling transform, so the table cannot say
+"divide by 4 first" and must not pretend to:
+
+- `{ "value": n }` on those slots writes `n` into the field, exactly as the
+  definition says. It is the field content, not a byte offset. This is the same
+  rule as an x86 `rel32` slot; the difference is only that x86's scale is 1.
+- A byte offset is expressed with a fixup, which does carry a transform:
+  `scale` with `transform_shift: 2` for `bl`, `page` with `pcrel_page` for
+  `adrp`. That is the only path where the division happens, and it is why both
+  AArch64 branch fixtures use a symbol instead of a plain value.
+- `align_bits` follows the value it is attached to: `0` on the slot (a field
+  value need not be a multiple of 4), and `2` on the `bl` fixup, where the
+  pre-transform displacement must be instruction-aligned (`E-RANGE-003`).
+  `adrp`'s fixup uses `align_bits: 0` because the page delta is already divided;
+  an `align_bits: 12` there would reject every symbol that is not page-aligned.
+- An operand whose bits a fixup owns carries `{}`, not a `symbol_id`
+  (`01_contract.md` §8.1): only a `target` slot may name a symbol. In
+  `A64-P6` the `add`'s `imm12` is such a slot.
+
+This keeps `INV-04` intact: nothing is relaxed, and a plan that omits the
+transform emits the field value it stated, which is a wrong program rather than a
+repaired one. The alternative — a slot that silently scales — was rejected
+because the same number would then mean different things on `add` and `bl`.
 
 ## 9. Load-time checks
 
@@ -269,11 +323,18 @@ without a plan error: the input is the definition.
 
 - `OD-06` (digest coverage) is settled for this document shape by §6; the
   measurement that confirms both halves is the digest test in `EXP-0004` §4.
-- `OD-07` (AArch64 knowledge source) is settled by ADR-0005: the facts come
-  from the Arm MRS 2026-06, and the Arm notice ships with the generated table.
-  The format does not need to change for it: `adrp`'s split `immhi:immlo` and
-  RV64's B-type scatter are both expressible as multiple placements of one
-  slot. What is missing is the data, not the design: the archive is not
-  vendored, so the table waits on the drop that `tools/check_mrs.py` verifies.
+- `OD-07` (AArch64 knowledge source) is settled by ADR-0005 and pinned by
+  ADR-0006: the facts come from the Arm MRS 2026-06 OPENSOURCE packaging, and
+  the Arm notice ships with the generated table. The format did not need to
+  change for it: `adrp`'s split `immhi:immlo` is two placements of one slot, as
+  §4.1 anticipated. `definitions/aarch64/0.1.0.json` now exists (§8.2). What is
+  missing is coverage, not design: `A64-P3`/`P4`/`P7`/`P8` and the `-lsl12`
+  half of `A64-P2` have no row, so naming them is `E-FORM-001`.
+- The archive is still not vendored and the drop is not a build input: a
+  regeneration reads `research/external/arm-mrs/` after `tools/check_mrs.py`
+  passes, and the shipped artifact is the JSON plus its digest.
+- A slot has no scaling transform (§8.3). If a future slice needs an operand
+  value that is *not* the field content, that is a format change with its own
+  ADR, not a convention added here.
 - `X86-P9` (explicit encoding family) stays deferred; no `/vex` or `/evex` row
   exists, so naming one is `E-FORM-001`.

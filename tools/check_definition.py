@@ -245,7 +245,7 @@ def check_doc_table(documents, errors):
         cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
         if len(cells) != 5:
             continue
-        match = re.match(r"^`(x86:[^`]+)`$", cells[0])
+        match = re.match(r"^`((?:x86|aarch64|riscv):[^`]+)`$", cells[0])
         if not match:
             continue
         rows[match.group(1)] = cells
@@ -253,8 +253,6 @@ def check_doc_table(documents, errors):
     expected = {}
     for document in documents:
         for form in document["forms"]:
-            if not form["form_id"].startswith("x86:"):
-                continue
             expected[form["form_id"]] = [
                 "`%s`" % form["form_id"],
                 "`%s`" % form["template"],
