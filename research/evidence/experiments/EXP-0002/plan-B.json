@@ -1,0 +1,201 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "x86",
+    "isa_variant": "x86-64",
+    "execution_mode": "64",
+    "enabled_extensions": [],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.x86",
+    "version": "0.1.0",
+    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [
+      ".text"
+    ],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "base_address": 0,
+      "declared_size": 17,
+      "fragments": [
+        {
+          "offset": 0,
+          "size": 3,
+          "kind": "instruction",
+          "instruction_id": "I0001"
+        },
+        {
+          "offset": 3,
+          "size": 4,
+          "kind": "instruction",
+          "instruction_id": "I0002"
+        },
+        {
+          "offset": 7,
+          "size": 6,
+          "kind": "instruction",
+          "instruction_id": "I0003"
+        },
+        {
+          "offset": 13,
+          "size": 4,
+          "kind": "instruction",
+          "instruction_id": "I0004"
+        }
+      ]
+    }
+  ],
+  "symbols": [],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "x86:mov/r64-r64",
+      "operands": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "payload": {
+            "reg": 0
+          },
+          "modifiers": []
+        },
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "payload": {
+            "reg": 3
+          },
+          "modifiers": []
+        }
+      ],
+      "encoding_choices": [],
+      "expected_size": 3,
+      "expected_digest": "sha256:1905e16a57ded07bfc68d68c653eb00f4da2a323dcaca1b5855134c600ae0697"
+    },
+    {
+      "instruction_id": "I0002",
+      "section_id": ".text",
+      "offset": 3,
+      "form_id": "x86:add/r64-imm8",
+      "operands": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "payload": {
+            "reg": 0
+          },
+          "modifiers": []
+        },
+        {
+          "role": "imm",
+          "kind": "x86.imm8",
+          "target_type": "i8",
+          "payload": {
+            "value": 1
+          },
+          "modifiers": []
+        }
+      ],
+      "encoding_choices": [],
+      "expected_size": 4,
+      "expected_digest": "sha256:2e1f519fff3ae6380de1b70cadee7f85e8e24013eff56fa3ef9c01e23b836a48"
+    },
+    {
+      "instruction_id": "I0003",
+      "section_id": ".text",
+      "offset": 7,
+      "form_id": "x86:add/r64-imm32-accum",
+      "operands": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "payload": {
+            "reg": 0
+          },
+          "modifiers": []
+        },
+        {
+          "role": "imm",
+          "kind": "x86.imm32",
+          "target_type": "i32",
+          "payload": {
+            "value": 300
+          },
+          "modifiers": []
+        }
+      ],
+      "encoding_choices": [
+        {
+          "choice_id": "EC-04",
+          "value": "accumulator"
+        }
+      ],
+      "expected_size": 6,
+      "expected_digest": "sha256:3702c0815c338d86903503d8ae808405c5aa0799fd6e644bc5e33da869b5436d"
+    },
+    {
+      "instruction_id": "I0004",
+      "section_id": ".text",
+      "offset": 13,
+      "form_id": "x86:mov/r64-mem-base-disp8",
+      "operands": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "payload": {
+            "reg": 0
+          },
+          "modifiers": []
+        },
+        {
+          "role": "src",
+          "kind": "x86.mem",
+          "target_type": "mem64",
+          "payload": {
+            "base": {
+              "reg": 5
+            },
+            "index": null,
+            "scale": 1,
+            "disp": -8,
+            "rip_relative": false
+          },
+          "modifiers": []
+        }
+      ],
+      "encoding_choices": [
+        {
+          "choice_id": "EC-02",
+          "value": "disp8"
+        }
+      ],
+      "expected_size": 4,
+      "expected_digest": "sha256:433bb8495a5cb760ccd5a5c2ea3c4b05054b9e434183f1627772c3620f28ba49"
+    }
+  ],
+  "fixups": [],
+  "provenance": {
+    "materializer_version": "0.1.0-draft",
+    "notes": "EXP-0002 measurement artefact. No bytes are claimed, only plan shapes."
+  }
+}

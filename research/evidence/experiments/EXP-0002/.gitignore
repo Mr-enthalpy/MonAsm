@@ -1,0 +1,3 @@
+# Derived objects and extracted bytes: regenerate with `python exp0002.py`.
+*.o
+*.bin

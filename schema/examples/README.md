@@ -5,7 +5,7 @@ fixtures: they claim no byte correctness and are not used by any test.
 
 | File | Shows |
 |---|---|
-| `x86-mov-r64-r64.example.json` | Minimal plan: one section, one instruction, one symbol, no fixups |
+| `x86-mov-r64-r64.example.json` | Minimal plan: one section, one instruction, no symbols, no fixups |
 | `aarch64-adrp-add.example.json` | Associated fixup pair (`adrp` + `:lo12:`) |
 | `rv64-caddi.example.json` | Explicit compressed form with an encoding choice |
 

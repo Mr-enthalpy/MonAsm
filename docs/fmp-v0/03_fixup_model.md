@@ -72,8 +72,14 @@ defaulted.
 |---|---|---|
 | `none` | not applicable | absolute patches |
 | `pcrel_begin` | address of the fixup site | RISC-V B-type and J-type, AArch64 `b`/`bl` |
-| `pcrel_end` | address of the site + `expected_size` | x86-64 `rel32` |
+| `pcrel_end` | address immediately after the instruction that contains the site | x86-64 `rel32` |
 | `pcrel_page` | page base of `P` | AArch64 `adrp` |
+
+For `pcrel_end` the containing instruction is found through the section's
+fragments, not by arithmetic on the site offset: the site may sit several bytes
+into the instruction (x86 `rel32` starts at byte 1), so "site + size" would be
+wrong by exactly that much. An earlier draft of this table said that; it was
+fixed after `EXP-0002` §6.1 exposed the off-by-one.
 
 A definition MAY declare additional named rules (`definition:<id>`), but the
 string must be resolved by the pinned definition, never by convention.
@@ -108,6 +114,37 @@ The RISC-V `%pcrel_lo` semantics are the sharpest case: the low fixup references
 the *high instruction*, not the symbol directly, because the linker needs the
 paired PC. A model that only stores "symbol + addend" cannot express it. This is
 AC-05's associated-relocation requirement.
+
+### 6.1 Observed in an object file (EXP-0002 §6.2)
+
+`llvm-readobj --relocations` on hand-written sources produces:
+
+```text
+x86-64   call ext                 0x1 R_X86_64_PLT32            ext  -4
+AArch64  adrp x0, ext             0x0 R_AARCH64_ADR_PREL_PG_HI21 ext  0
+         add  x0, x0, :lo12:ext   0x4 R_AARCH64_ADD_ABS_LO12_NC  ext  0
+RV64     auipc a0, %pcrel_hi(ext) 0x0 R_RISCV_PCREL_HI20        ext  0
+         addi  a0, a0, %pcrel_lo(.L0)
+                                  0x4 R_RISCV_PCREL_LO12_I      .L0  0
+```
+
+Three facts this pins down:
+
+1. **RISC-V's low half names the `auipc` site, not the target.** `.L0` is a local
+   symbol in `.text` at the `auipc` offset (`llvm-readobj --symbols`), and the
+   relocation's symbol field is that label. The pair relation is therefore
+   load-bearing, not cosmetic.
+2. **AArch64 and RISC-V differ in spelling, not in model.** AArch64's low half
+   names `ext`; RISC-V's names `.L0`. Storing `pair_group` + `pair_role` covers
+   both, because the relation is stored instead of inferred from the symbol.
+3. **x86's `-4` is the ELF spelling of `pcrel_end` with `addend = 0`.** ELF
+   writes `S + A - P` with `P` at the displacement field; the plan writes `P`
+   after the instruction and leaves `A` at zero. The two are the same value.
+
+Consequence for output level (`OD-03`): a Level 0 record expresses all three
+shapes directly. A Level 1 emitter for RISC-V would have to synthesize a local
+symbol per `hi` site to fill the relocation, which is extra state, not extra
+information.
 
 ## 7. Pairing rules
 

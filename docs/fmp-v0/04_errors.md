@@ -68,6 +68,7 @@ Rules:
 | E-FIXUP-006 | Two fixups patch overlapping bits | `first`, `second` | — |
 | E-FIXUP-007 | Pair group incomplete, duplicated role, or target mismatch | `pair_group`, `problem` | N12 |
 | E-SIZE-001 | Encoded length != `expected_size` | `instruction_id`, `expected`, `actual` | N05 |
+| E-BYTE-001 | Emitted bytes do not match `expected_digest` | `instruction_id`, `declared`, `actual` | N13 |
 | E-VERSION-001 | Materializer cannot honor a declared plan feature | `feature`, `format_version` | — |
 | E-INTERNAL-001 | Internal invariant violated (bug); never used for user input | `invariant` | — |
 

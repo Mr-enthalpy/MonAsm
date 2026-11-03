@@ -22,6 +22,13 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 | N10 | Definition digest does not match | Reject | E-DEF-001 | all | TBD | planned |
 | N11 | Plan implies implicit alignment or padding | Reject | E-LAYOUT-002 / E-LAYOUT-005 | all | TBD | planned |
 | N12 | Associated relocation pair is incomplete or inconsistent | Reject | E-FIXUP-007 | aarch64 (`adrp`+`lo12`), rv64 (`auipc`+`lo12`) | TBD | planned |
+| N13 | `expected_digest` is present and the emitted bytes hash to a different value | Reject, never re-encode to match | E-BYTE-001 | x86, aarch64, rv64 | TBD | planned |
+
+N13's counterexample is `EXP-0002` W2: a same-length encoder defect turns
+`48 89 d8` (`mov rax, rbx`) into `49 89 d8` (`mov r8, rbx`), both 3 bytes and
+both legal. `expected_size` cannot see it; only the digest can. The test must
+also confirm the materializer does **not** attempt a repair (W4: a plan whose
+immediate is edited must be rejected, not re-encoded around).
 
 Applicability notes: N12 is not applicable to x86-64 in v0 because the selected
 x86 slice uses a single-site `rel32`; if an x86 pair case is added, the row must

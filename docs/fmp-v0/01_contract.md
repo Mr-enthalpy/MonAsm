@@ -147,7 +147,7 @@ Fragment rules:
 | `operands` | yes | Ordered typed operands (§8) | Determines field values and legality | Untyped operands force the encoder to guess operand kind. | frozen |
 | `encoding_choices` | yes | Ordered list of `EC-*` selections; may be empty | INV-02's whole mechanism | Empty when a choice exists means the encoder picks silently. | frozen |
 | `expected_size` | yes | Bytes this instruction MUST emit | Detects definition drift and forces rejection | A definition update changing size corrupts layout silently (`N05`). | frozen |
-| `expected_digest` | no | Hash of expected bytes (OD-01) | Extra tamper detection | None yet; not used in v0 pending OD-01. | draft |
+| `expected_digest` | no | `sha256:<hex>` over the exact bytes this instruction MUST emit, derived independently of the materializer (OD-01) | Detects a same-length encoder defect that `expected_size` cannot see | A materializer whose `REX.B` comes from the wrong operand bit emits `49 89 d8` (`mov r8, rbx`) where the plan meant `48 89 d8` (`mov rax, rbx`). Both are 3 bytes, both legal, and no other field contradicts the output. `EXP-0002` W2. | frozen |
 | `source_trace` | no | Planner-side origin (file, line, node) | Audit only | Must never affect output; if it does, replay breaks (INV-05). | draft |
 
 `form_id` format (draft):
@@ -168,6 +168,22 @@ Rules:
   a definition bug, not a plan choice.
 - Resolution of `form_id` MUST be a pure lookup. "Closest match" or fallback is
   forbidden (`E-FORM-001`).
+
+`expected_digest` rules (OD-01, measured in `EXP-0002`):
+
+- It is a **check**, never an input. The materializer MUST encode from
+  `form_id + operands + encoding_choices`, then compare, then reject
+  (`E-BYTE-001`). It MUST NOT derive emitted bytes from the digest.
+- The plan MUST carry a hash. Raw expected bytes are forbidden: bytes can be
+  emitted and a hash cannot, so a hash cannot silently become the source of
+  truth. Variant C (byte template + patch fields) was rejected for exactly this
+  reason, and it also loses the operand and form that legality depends on.
+- `expected_size` is checked first; a length fault is `E-SIZE-001` and the
+  digest is never consulted.
+- When any `expected_digest` is present, `provenance.generated_by` MUST name its
+  derivation source. A digest produced by the same encoder the materializer runs
+  is recorded as such and buys nothing: only an independently derived digest
+  (oracle or hand derivation) detects a same-length encoder defect.
 
 ## 8. Typed operands
 
@@ -226,6 +242,16 @@ resolution mode. No field may be defaulted by the materializer.
 | `symbol_order` | no | Explicit list of `symbol_id` | Only for Level 1 tables | Hash order changes table bytes across processes. | draft |
 | `fixup_record_order` | yes | `(section_id, offset, fixup_id)` | Record order is part of the output contract | Any other order makes byte comparison environment-dependent. | frozen |
 | `include_symbol_table` | yes | Boolean | Level 1 only | Ambiguous whether Level 1 output includes symbols. | draft |
+
+Output level (OD-03, measured in `EXP-0002` §6): v0 emits **Level 0** — bytes
+plus normalized fixup records. Level 1 (`artifact: sections` with
+`include_symbol_table: true`) is optional and deferred. No AC-05 shape needs a
+symbol table or a relocation table to be expressed: the Level 0 fixup record
+already carries the site, the bit range, the target, the addend, the PC rule, the
+transform, the range and the pair relation. Level 1 would add serialization, and
+for RV64 it would add a synthesized local symbol per `hi` site, because
+`R_RISCV_PCREL_LO12_I` names the `auipc`, not the target. `artifact: sections`
+stays legal in the schema so a later slice can opt in without a format bump.
 | `emit_fixups` | yes | Boolean, MUST be true for unresolved targets | Prevents "resolved by magic" behavior | A plan with external references could emit bytes with no records. | frozen |
 
 ## 12. Canonicalization, ordering, fingerprint
@@ -260,8 +286,8 @@ sha256("fmp/0.1\0" || canonical_plan_bytes || "\0" ||
 6. Static instruction checks: form lookup, operand legality, ranges, choice-set
    exactness (`E-FORM-*`, `E-OPERAND-*`, `E-RANGE-*`, `E-CHOICE-*`).
 7. Fixup compatibility (`E-FIXUP-*`).
-8. Emission: encode, compare `expected_size`, apply/record fixups
-   (`E-SIZE-*`, `E-FIXUP-*`).
+8. Emission: encode, compare `expected_size`, compare `expected_digest`, apply or
+   record fixups (`E-SIZE-*`, `E-BYTE-*`, `E-FIXUP-*`).
 
 Steps 1–7 are pure static checks and MUST NOT emit bytes. Emission runs only if
 steps 1–7 produce no errors. Errors are reported sorted by `(plan_path, code)`;
