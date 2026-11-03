@@ -1,0 +1,12 @@
+# Normalize text to LF so documentation and source are diff-stable across hosts.
+* text=auto eol=lf
+
+# Byte-exact test vectors must never be normalized or converted.
+fixtures/** -text
+**/*.bin -text
+**/*.expected -text
+
+# Images are binary.
+*.png binary
+*.jpg binary
+*.gif binary

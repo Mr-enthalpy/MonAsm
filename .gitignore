@@ -1,0 +1,27 @@
+# Rust
+target/
+**/target/
+
+# Zig (experimental reuse work only)
+.zig-cache/
+zig-cache/
+zig-out/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Disposable zones: never commit external snapshots or oracle scratch output.
+# Pinned revisions live in research/evidence/source_index.md instead.
+research/external/
+tools/oracle/out/
+tools/oracle/tmp/
+
+# Editors and OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
