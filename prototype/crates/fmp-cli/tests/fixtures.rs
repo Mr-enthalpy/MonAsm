@@ -159,20 +159,41 @@ fn negatives_produce_exactly_the_registered_diagnostics() {
     for path in negatives() {
         let name = stem(&path);
         let dir = path.parent().expect("fixture directory");
-        let plan = read_plan(&path);
-        let definition = registry
-            .find(&plan.definition.namespace, &plan.definition.version)
-            .unwrap_or_else(|error| panic!("{name}: {}", error.message()));
-
-        let errors = match fmp_materialize::materialize(&plan, definition) {
-            Ok(artifact) => panic!("{name} was accepted and emitted {}", artifact.bytes_hex()),
-            Err(errors) => errors,
-        };
-
         let expected_path = case_file(dir, &name, "expected-error.json");
         let expected = std::fs::read(&expected_path)
             .unwrap_or_else(|error| panic!("{}: {error}", expected_path.display()));
         let expected = fmp_model::json::parse(&expected).expect("expected-error.json must parse");
+
+        // A negative fixture is either a plan the reader must reject (a schema
+        // shape that is not in `fmp/0.1`) or a plan the materializer must
+        // reject. `phase` says which, because the reader returns one diagnostic
+        // and there is no definition to look up when the plan does not parse.
+        let phase = expected
+            .get("phase")
+            .and_then(Json::as_str)
+            .unwrap_or("materialize");
+        if phase != "read" && phase != "materialize" {
+            panic!("{name}: unknown `phase` {phase:?}");
+        }
+
+        let errors = if phase == "read" {
+            let bytes =
+                std::fs::read(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+            match fmp_model::plan::read(&bytes) {
+                Ok(_) => panic!("{name} was read and should have been rejected"),
+                Err(error) => vec![error],
+            }
+        } else {
+            let plan = read_plan(&path);
+            let definition = registry
+                .find(&plan.definition.namespace, &plan.definition.version)
+                .unwrap_or_else(|error| panic!("{name}: {}", error.message()));
+            match fmp_materialize::materialize(&plan, definition) {
+                Ok(artifact) => panic!("{name} was accepted and emitted {}", artifact.bytes_hex()),
+                Err(errors) => errors,
+            }
+        };
+
         let wanted = expected
             .get("errors")
             .and_then(Json::as_array)

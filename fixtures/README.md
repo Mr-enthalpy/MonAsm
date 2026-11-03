@@ -14,10 +14,24 @@ fixtures/<isa>/
     <ID>-<slug>.oracle.json     tool, version, exact command, sha256
   negative/
     N0X-<slug>.fmp.json         invalid plan
-    N0X-<slug>.expected-error.json  { code, path, detail_keys }
+    N0X-<slug>.expected-error.json  { phase, errors: [{ code, path, detail_keys }] }
 ```
 
 `<isa>` is `x86_64`, `aarch64`, or `rv64`.
+
+## `phase`
+
+`phase` says which stage must reject the plan, and defaults to `materialize`:
+
+| Value | Meaning |
+|---|---|
+| `materialize` | The plan parses; `materialize()` must return exactly these diagnostics |
+| `read` | `plan::read()` must reject the plan itself (a shape that is not in `fmp/0.1`), so there is no definition to look up |
+
+`read` exists because the reader returns one diagnostic and stops. A plan that
+hands the materializer a payload shape the schema does not have (`N15`'s
+`{"mem": …}`) never reaches validation, and recording it as a `materialize`
+fixture would assert the wrong stage. Any other value fails the gate.
 
 ## `oracle.json`
 

@@ -1,12 +1,12 @@
 # EXP-0010 — the RV64 definition table is generated from `location`, not typed
 
 - Date: 2026-11-04
-- Subject: `definitions/rv64/0.1.0.json`, its five forms, and the fixtures that
+- Subject: `definitions/rv64/0.1.0.json`, its seven forms, and the fixtures that
   gate it
 - Basis: **experiment** for every template, placement, digest and byte string
 - Reproduce: `python research/evidence/experiments/EXP-0010/generate_rv64.py`
   then `cargo test --workspace`
-- Depends on: `EXP-0009`, ADR-0007
+- Depends on: `EXP-0009`, `EXP-0011`, ADR-0007, ADR-0008
 
 ## 1. What this experiment had to show
 
@@ -24,7 +24,7 @@ not against the generator.
 
 ## 2. Inputs, and which nodes were read
 
-The five unblocked nodes from ADR-0007 §Decision 2, still pinned by
+The seven unblocked nodes from ADR-0007 §Decision 2, still pinned by
 `tools/check_rv64_source.py`:
 
 | Node | Form | `left_shift` |
@@ -34,11 +34,14 @@ The five unblocked nodes from ADR-0007 §Decision 2, still pinned by
 | `inst/I/beq.yaml` | `riscv:beq/rs1-rs2-imm12` | 1 |
 | `inst/I/jal.yaml` | `riscv:jal/rd-imm20` | 1 |
 | `inst/I/auipc.yaml` | `riscv:auipc/rd-imm20` | 12 |
+| `inst/I/ld.yaml` | `riscv:ld/rd-base-imm12` | 0 |
+| `inst/I/sd.yaml` | `riscv:sd/rs-base-imm12` | 0 |
 
-`inst/I/ld.yaml`, `inst/I/sd.yaml` and `inst/C/c.addi.yaml` stay in the pin but
-are **not read by this generator**. `ld`/`sd` need a memory payload shape;
-`c.addi` needs a non-zero constraint. Both gaps are format gaps, recorded in §7,
-and the generator refuses to emit a form whose source states `not:`.
+`inst/C/c.addi.yaml` stays in the pin but is **not read by this generator**; it
+needs a non-zero constraint, recorded in §7, and the generator refuses to emit a
+form whose source states `not:`. `ld`/`sd` were blocked when this experiment was
+first written and are read now that ADR-0008 fixed the operand representation;
+§3.1 records how their two `encoding:` blocks are selected.
 
 `PyYAML` is not installed in this environment (Python 3.8.10), so the generator
 reads the node text with a small line-oriented extractor for exactly the fields
@@ -59,8 +62,9 @@ For each form the generator:
    no bit is claimed twice, and that no placement touches a fixed bit;
 4. asserts the source `sign_extend` and `left_shift` against the table's intent,
    so a source drift cannot silently change scaling;
-5. refuses a form whose `definedBy.extension.name` is not `I`, which is why the
-   document may declare `enabled_extensions: ["rv64i"]`.
+5. accepts a form when some `definedBy` branch is unconditional or guarded by
+   `xlen: 64`, and that branch names `I` — which is why the document may declare
+   `enabled_extensions: ["rv64i"]`.
 
 The result:
 
@@ -71,10 +75,28 @@ The result:
 | `riscv:beq/rs1-rs2-imm12` | `63000000` | `[15,5]`, `[20,5]`, `[31,1]`, `[7,1]`, `[25,6]`, `[8,4]` |
 | `riscv:jal/rd-imm20` | `6f000000` | `[7,5]`, `[31,1]`, `[12,8]`, `[20,1]`, `[21,10]` |
 | `riscv:auipc/rd-imm20` | `17000000` | `[7,5]`, `[12,20]` |
+| `riscv:ld/rd-base-imm12` | `03300000` | `[7,5]`, `[15,5]`, `[20,12]` |
+| `riscv:sd/rs-base-imm12` | `23300000` | `[20,5]`, `[15,5]`, `[31,7]`, `[7,5]` |
 
 Templates are little-endian file order, so `33000000` is the word `0x00000033`.
 The document digest is
-`sha256:8cd063a50db57179fc9ea027f1dab4de8820a7001242bc4046dc03fef1489ea2`.
+`sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083`.
+
+### 3.1 Two nodes, two xlen blocks
+
+`ld.yaml` and `sd.yaml` carry one `encoding:` block per xlen. Both RV32 blocks
+state `not:` lists on the destination/source register (the Zilsd pair rule: even
+registers only); the RV64 blocks do not. The generator selects the block **by
+header** (`RV64:`) rather than taking the first one, and fails if the named block
+is absent. This is not cosmetic: taking the first block would derive the RV32
+placements and import a 32-bit legality rule into a 64-bit table, and the
+`not:` check would then reject the form for the wrong reason.
+
+`definedBy` gets the same treatment. `ld`/`sd` state an `anyOf` over (`xlen: 64`,
+`I`) and (`xlen: 32`, `Zilsd`); `add` states a bare `extension: {name: I}`. The
+extractor returns `[(xlen, name)]`, with `xlen` `None` for the unconditional
+branch, so the assertion can say *which* branch admitted the node instead of
+matching the first `name:` it sees.
 
 `enabled_extensions` is `["rv64i"]`, not `[]`: every node says `definedBy: I`,
 and `01_contract.md` §4 uses `["rv64i","rv64m","rv64c"]` as its example spelling.
@@ -85,8 +107,9 @@ contract gives the definition.
 
 ## 4. Self-check before writing
 
-The generator re-encodes nine vectors from the table it has just built (template
-plus placements) and compares them with the bytes recorded in `EXP-0009` §6:
+The generator re-encodes twelve vectors from the table it has just built (template
+plus placements) and compares them with the bytes recorded in `EXP-0009` §6 and
+`EXP-0011` §3:
 
 ```text
 add a0, a1, a2       33 85 c5 00
@@ -97,6 +120,10 @@ jal ra, 8            ef 00 80 00
 jal ra, -8           ef f0 9f ff
 auipc a0, 1          17 15 00 00
 auipc a0, 1048575    17 f5 ff ff
+ld a0, 8(a1)         03 b5 85 00
+ld a0, -2048(a1)     03 b5 05 80
+sd a2, 8(a1)         23 b4 c5 00
+sd a2, 2047(a1)      a3 bf c5 7e
 ```
 
 This is a transcription check, not the two-source gate: the bytes it compares
@@ -105,7 +132,7 @@ placement derivation with the table. §5 is the independent check.
 
 ## 5. The fixture gate
 
-Five positive fixtures reproduce `llvm-mc 23.1.2 -triple=riscv64` bytes through
+Six positive fixtures reproduce `llvm-mc 23.1.2 -triple=riscv64` bytes through
 the Rust materializer:
 
 | Fixture | Bytes | What it adds |
@@ -115,6 +142,7 @@ the Rust materializer:
 | `RV-P4-beq-btype` | `63 04 b5 00 13 85 15 00 e3 0c b5 fe` | B-type scatter, forward and backward, through `scale(1)` fixups |
 | `RV-P5-jal-jtype` | `ef 00 80 00 13 85 15 00 ef f0 9f ff` | J-type scatter, forward and backward |
 | `RV-P8-auipc-imm20` | `17 15 00 00 17 f5 ff 7f 17 f5 ff ff` | field values `1`, `0x7FFFF`, `0xFFFFF` |
+| `RV-P3-ld-sd-base-offset` | `03 b5 85 00 23 b4 c5 00 03 b5 05 80 a3 bf c5 7e` | `ld`/`sd`, contiguous and split immediate, both signed imm12 endpoints |
 
 The branches state a **byte** displacement in the plan (a symbol plus a `scale`
 fixup with `transform_shift: 1`) and the materializer stores `displacement >> 1`
@@ -128,7 +156,7 @@ is emitted (`records: 0`).
 the same 20-bit field, and the plan states `-1` because the slot is signed. The
 oracle record says so; nothing is inferred from the assembler's spelling.
 
-Four negative fixtures pin rejection:
+Five negative fixtures pin rejection:
 
 | Fixture | Diagnostic |
 |---|---|
@@ -136,6 +164,7 @@ Four negative fixtures pin rejection:
 | `N02-operand-kind-mismatch` | `E-OPERAND-001` at `/instructions/0/operands/0/kind` |
 | `N03-imm12-out-of-range` | `E-RANGE-001` at `/instructions/0/operands/2/payload/value` |
 | `N04-branch-out-of-range` | `E-RANGE-002` at `/instructions/0/operands/2/payload/value` |
+| `N15-composite-memory-payload` | `E-OPERAND-003` at `/instructions/0/operands/1/payload`, at **read** time (`"phase": "read"`) |
 
 `N03` is the counterexample for the signed range: `addi a0, a1, 2048` must not
 become `addi a0, a1, -2048` by truncation. `N04` is the same failure for the
@@ -150,16 +179,10 @@ change the target.
 - It does not scale. The `beq`/`jal`/`auipc` slots hold field content
   (`align_bits: 0`); scaling is a fixup field (`transform_shift` 1 or 12).
 - It does not lay out. No padding, relaxation or trampoline is in the document.
-- It does not cover the three blocked rows in §7.
+- It does not cover the two blocked rows in §7.
 
 ## 7. Open, and why each is a format question
 
-- **`RV-P3` (`ld`/`sd`).** The nodes are pinned and their RV64 encoding blocks
-  are simple (`imm` `[31,20]`, `xs1` `[19,15]`, `xd` `[11,7]`; `sd`: `imm`
-  `[31,25]`,`[11,7]`). But `fmp/0.1` fixes the payload shapes to `{reg}`,
-  `{value}`, `{symbol_id}` and `{}`, and a load/store needs a base register and an
-  offset in one operand (`riscv.mem.base-offset`). Admitting it needs a contract
-  change and an ADR, the same blocker as x86's P4–P6.
 - **`RV-P7` (`c.addi`).** A 16-bit form whose source states `not: 0` on `imm` and
   `xd`. The generator models 16-bit words and would derive the placements
   (`[7,5]`, `[12,1]`, `[2,5]`), but `fmp-def/0.1` has no non-zero constraint, and
@@ -181,7 +204,7 @@ python tools\check_definition.py
 cd prototype; cargo test --workspace
 ```
 
-The generator prints the five forms, the nine self-check vectors, the digest and
+The generator prints the seven forms, the twelve self-check vectors, the digest and
 the `07_definition_format.md` §8.4 rows. It refuses to write if the rendered JSON
 does not parse back to the document it built, or if a placement does not cover
 exactly the bits `match` calls variable.

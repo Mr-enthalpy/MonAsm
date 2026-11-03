@@ -2,7 +2,7 @@
 
 Vectors: `RV-P1` … `RV-P8` in `docs/fmp-v0/06_validation_matrix.md`. The table is
 `definitions/rv64/0.1.0.json` (digest
-`sha256:8cd063a50db57179fc9ea027f1dab4de8820a7001242bc4046dc03fef1489ea2`),
+`sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083`),
 generated from the pinned UDB resolved spec by
 `research/evidence/experiments/EXP-0010/generate_rv64.py`.
 
@@ -15,11 +15,20 @@ generated from the pinned UDB resolved spec by
 | `RV-P4-beq-btype` | `riscv:beq/rs1-rs2-imm12` | `RV-P4`, `RV-P6`, forward and backward |
 | `RV-P5-jal-jtype` | `riscv:jal/rd-imm20` | `RV-P5`, `RV-P6`, forward and backward |
 | `RV-P8-auipc-imm20` | `riscv:auipc/rd-imm20` | `RV-P8` field half only |
+| `RV-P3-ld-sd-base-offset` | `riscv:ld/rd-base-imm12`, `riscv:sd/rs-base-imm12` | `RV-P3`, four instructions, signed imm12 endpoints |
 
 Oracle: `llvm-mc 23.1.2 -triple=riscv64 -filetype=obj`, then
 `llvm-objcopy -O binary --only-section=.text`. The oracle's `.s` input is not
 shipped, but each `oracle.json` lists its lines and pins them by `input_sha256`.
 `c.*` is not exercised, so `-mattr=+c` is not needed.
+
+`RV-P3` splits the address into `base` + `disp` operands rather than one memory
+payload (`ADR-0008`, `OD-13`), because the base is a 5-bit register field and the
+offset a 12-bit signed field; a fixup covering one does not cover the other.
+RV64 does not scale the immediate, so `disp` is the byte displacement and the
+slot holds it unchanged. The store's data operand is `src` (not `src2`): there is
+one source register in `sd`. `04_errors.md` `E-OPERAND-003` is exercised by `N15`
+from the other side — a composite `{"mem": …}` payload is rejected at read time.
 
 `RV-P4`/`RV-P5` use `pcrel_begin` with `value_transform: scale` and
 `transform_shift: 1`, because the slot holds field content (`07_definition_format.md`
@@ -39,18 +48,16 @@ and the oracle line is `auipc a0, 1048575`; both describe the same 20 bits. The
 | `N02-operand-kind-mismatch` | `E-OPERAND-001` | an operand's `kind` is not the slot's storage class |
 | `N03-imm12-out-of-range` | `E-RANGE-001` | `addi` rejects `2048`, it does not truncate to `-2048` |
 | `N04-branch-out-of-range` | `E-RANGE-002` | `beq` rejects a 12-bit field value of `2048` |
+| `N15-composite-memory-payload` | `E-OPERAND-003` | a `{"mem": {base, disp}}` payload is not one of the four `fmp/0.1` shapes, so the reader rejects it before the definition is looked up |
 
 ## Not covered
 
-- `RV-P3` (`ld`/`sd`) needs an `riscv.mem.base-offset` payload shape, and
-  `fmp/0.1` fixes only `{reg}`, `{value}`, `{symbol_id}` and `{}`
-  (`01_contract.md` §8.1).
 - `RV-P7` (`c.addi`) needs `imm != 0` and `xd != 0`; `fmp-def/0.1` cannot
   express `not: 0`, and encoding either zero silently emits `c.nop` or a HINT
   (ADR-0007 §Decision 5).
 - `RV-P8`'s pair half needs the psABI `R_RISCV_PCREL_HI20`/`R_RISCV_PCREL_LO12_I`
   relation pinned; the encoding blocks do not state it.
 
-Naming any of those forms is `E-FORM-001`.
+Naming either form is `E-FORM-001`.
 
 See `../README.md` for naming and oracle rules.

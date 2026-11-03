@@ -148,6 +148,68 @@
           "placements": [{ "bit_offset": 12, "width": 20 }]
         }
       ]
+    },
+    {
+      "form_id": "riscv:ld/rd-base-imm12",
+      "template": "03300000",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "riscv.xreg",
+          "target_type": "xreg",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 7, "width": 5 }]
+        },
+        {
+          "role": "base",
+          "kind": "riscv.xreg",
+          "target_type": "xreg",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 15, "width": 5 }]
+        },
+        {
+          "role": "disp",
+          "kind": "riscv.imm",
+          "target_type": "imm12",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 12, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 20, "width": 12 }]
+        }
+      ]
+    },
+    {
+      "form_id": "riscv:sd/rs-base-imm12",
+      "template": "23300000",
+      "slots": [
+        {
+          "role": "src",
+          "kind": "riscv.xreg",
+          "target_type": "xreg",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 20, "width": 5 }]
+        },
+        {
+          "role": "base",
+          "kind": "riscv.xreg",
+          "target_type": "xreg",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 15, "width": 5 }]
+        },
+        {
+          "role": "disp",
+          "kind": "riscv.imm",
+          "target_type": "imm12",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 12, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 25, "width": 7 }, { "bit_offset": 7, "width": 5 }]
+        }
+      ]
     }
   ]
 }

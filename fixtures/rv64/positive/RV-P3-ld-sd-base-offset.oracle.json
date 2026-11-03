@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -filetype=obj RV-P3-ld-sd-base-offset.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "676c0707ab4f83f6e1024abf2f2219d68787ad511e7383ea38f0de75adfffa47",
+  "output_sha256": "eb1ed98b0adaee914df5c429223ea91434f049dd4255ef7f22f2f54f4203efb4",
+  "size": 16,
+  "records": 0,
+  "notes": "Input, one line each (LF, trailing newline): `ld a0, 8(a1)` / `sd a2, 8(a1)` / `ld a0, -2048(a1)` / `sd a2, 2047(a1)`. The offset is a byte displacement because RV64 does not scale the load/store immediate; `-2048` and `2047` are the signed imm12 endpoints. The address is two operands in the plan (`base` + `disp`), not one memory payload (ADR-0008).",
+  "source": "RISC-V UDB I/ld.yaml (sha256:a2afcd44…), RV64 block, `imm` 31-20 sign_extend true, `xs1` 19-15, `xd` 11-7; I/sd.yaml (sha256:f0b69996…) RV64 block, `imm` \"31-25|11-7\", `xs2` 24-20, `xs1` 19-15"
+}

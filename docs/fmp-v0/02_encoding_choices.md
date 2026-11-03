@@ -130,7 +130,7 @@ naming them is `E-FORM-001`.
 `EC-05`, `EC-09` and `EC-10` are out of v0. `X86-P9` (explicit encoding family)
 stays deferred, so `vex`/`evex` never appear in a v0 `form_id`.
 
-The RV64 slice is five forms generated from the pinned UDB nodes (ADR-0007,
+The RV64 slice is seven forms generated from the pinned UDB nodes (ADR-0007,
 `definitions/rv64/0.1.0.json`):
 
 | `form_id` | Encoding | Operand signature | Covers |
@@ -140,15 +140,20 @@ The RV64 slice is five forms generated from the pinned UDB nodes (ADR-0007,
 | `riscv:beq/rs1-rs2-imm12` | `BEQ` B-type, `funct3=0` | src `xreg`, src2 `xreg`, `imm12` target | `RV-P4`, `EC-22` |
 | `riscv:jal/rd-imm20` | `JAL` J-type | dest `xreg`, `imm20` target | `RV-P5`, `EC-22` |
 | `riscv:auipc/rd-imm20` | `AUIPC` U-type | dest `xreg`, `imm20` target | `RV-P8` (field half), `EC-21` (instruction half) |
+| `riscv:ld/rd-base-imm12` | `LOAD` I-type, `funct3=011` | dest `xreg`, base `xreg`, disp `imm12` | `RV-P3` |
+| `riscv:sd/rs-base-imm12` | `STORE` S-type, `funct3=011` | src `xreg`, base `xreg`, disp `imm12` | `RV-P3` |
+
+The two memory forms decompose the address into `base` + `disp` rather than one
+payload operand, and the addressing form is the `form_id` (ADR-0008, `OD-13`).
+That is the same carrier `EC-02` names for x86's disp8/disp32 split, and it is
+what keeps an encoder from choosing `mod` from the displacement's value.
 
 `EC-19` and `EC-20` stay without a carrier in v0: both describe `c.addi`, and the
-source's `not: 0` has no `fmp-def/0.1` spelling (ADR-0007 §Decision 5). `RV-P3`
-(`ld`/`sd`) also has no row: `fmp/0.1` fixes four payload shapes and none is
-`riscv.mem.base-offset` (`01_contract.md` §8.1). Naming any of those forms is
-`E-FORM-001`. `EC-21` is decided but only half carried: the `auipc` form fixes the
-PC-relative instruction, and `pcrel_hi20`/`lo12` exist as fixup transforms, but
-the psABI pairing that ties the two halves together is not pinned, so no fixture
-claims the pair yet.
+source's `not: 0` has no `fmp-def/0.1` spelling (ADR-0007 §Decision 5). Naming
+that form is `E-FORM-001`. `EC-21` is decided but only half carried: the `auipc`
+form fixes the PC-relative instruction, and `pcrel_hi20`/`lo12` exist as fixup
+transforms, but the psABI pairing that ties the two halves together is not
+pinned, so no fixture claims the pair yet.
 
 ## Evidence
 

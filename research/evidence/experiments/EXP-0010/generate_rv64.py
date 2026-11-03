@@ -9,7 +9,9 @@ What it does, per form:
 
 1. Reads the UDB node named in the spec. Only the `encoding` block is read:
    `match` (fixed bits) and `variables[]` (`location`, `sign_extend`,
-   `left_shift`, `not`). `operation()` is never read (INV-06).
+   `left_shift`, `not`). `operation()` is never read (INV-06). A node with one
+   block per xlen (`ld`, `sd`) names the block it wants, so the RV32 block's
+   `not:` list cannot leak into the RV64 table.
 2. Turns each variable's `location` into `{bit_offset, width}` placements. The
    source lists instruction bit groups in value order, most significant first,
    so no scatter is hand-written here; `beq`, `jal` and `auipc` are derived.
@@ -135,6 +137,40 @@ FORMS = [
         ],
         "covers": "`RV-P8` (field half)",
     },
+    {
+        "form_id": "riscv:ld/rd-base-imm12",
+        "node": "I/ld.yaml",
+        # `ld.yaml` has one `encoding:` block per xlen; the RV32 block carries a
+        # `not:` on `xd` for Zilsd pairing, the RV64 block does not. Select the
+        # block instead of letting the parser pick one.
+        "block": "RV64",
+        "udb_name": "ld",
+        "udb_extension": "I",
+        "operands": [
+            ("dest", "riscv.xreg", "xreg", "reg_number", "xd", None, 0),
+            ("base", "riscv.xreg", "xreg", "reg_number", "xs1", None, 0),
+            # I-type load immediate: contiguous 12 bits, sign-extended, no
+            # scaling, so the slot holds the byte displacement as field content.
+            ("disp", "riscv.imm", "imm12", "operand_value", "imm", True, 0),
+        ],
+        "covers": "`RV-P3`",
+    },
+    {
+        "form_id": "riscv:sd/rs-base-imm12",
+        "node": "I/sd.yaml",
+        "block": "RV64",
+        "udb_name": "sd",
+        "udb_extension": "I",
+        "operands": [
+            # S-type store: the stored register is the only source, so it is
+            # `src`; `src2` is reserved for a two-source form.
+            ("src", "riscv.xreg", "xreg", "reg_number", "xs2", None, 0),
+            ("base", "riscv.xreg", "xreg", "reg_number", "xs1", None, 0),
+            # S-type immediate: 12 bits over two placements, no scaling.
+            ("disp", "riscv.imm", "imm12", "operand_value", "imm", True, 0),
+        ],
+        "covers": "`RV-P3`",
+    },
 ]
 
 # (form_id, {variable: field value}, oracle bytes, assembler text). The bytes
@@ -158,6 +194,14 @@ VECTORS = [
      "17 15 00 00", "auipc a0, 1"),
     ("riscv:auipc/rd-imm20", {"dest": 10, "target": -1},
      "17 f5 ff ff", "auipc a0, 1048575"),
+    ("riscv:ld/rd-base-imm12", {"dest": 10, "base": 11, "disp": 8},
+     "03 b5 85 00", "ld a0, 8(a1)"),
+    ("riscv:ld/rd-base-imm12", {"dest": 10, "base": 11, "disp": -2048},
+     "03 b5 05 80", "ld a0, -2048(a1)"),
+    ("riscv:sd/rs-base-imm12", {"src": 12, "base": 11, "disp": 8},
+     "23 b4 c5 00", "sd a2, 8(a1)"),
+    ("riscv:sd/rs-base-imm12", {"src": 12, "base": 11, "disp": 2047},
+     "a3 bf c5 7e", "sd a2, 2047(a1)"),
 ]
 
 NAME_LINE = re.compile(r"^(\s*)-\s+name:\s*(\S+)\s*$")
@@ -173,15 +217,33 @@ def unquote(text):
     return text
 
 
-def defined_by_extension(lines):
+def defined_by_branches(lines):
+    """Return `[(xlen, extension)]` from `definedBy:`; `xlen` is None when the
+    branch is unconditional.
+
+    `add` states `definedBy: {extension: {name: I}}`; `ld`/`sd` state an `anyOf`
+    over (`xlen` 64, `I`) and (`xlen` 32, `Zilsd`). Reading only the first
+    `name:` would happen to work, but it would not say which branch was taken,
+    so the `xlen` guarding each name is carried alongside it.
+    """
     for index, line in enumerate(lines):
-        if line.rstrip() == "definedBy:":
-            for following in lines[index + 1:index + 12]:
-                found = re.match(r"^\s+name:\s*(\S+)\s*$", following)
-                if found:
-                    return found.group(1)
-            return None
-    return None
+        if line.rstrip() != "definedBy:":
+            continue
+        branches = []
+        xlen = None
+        for following in lines[index + 1:]:
+            if following and not following[0].isspace():
+                break
+            found_xlen = re.match(r"^\s+-\s+xlen:\s*(\d+)\s*$", following)
+            if found_xlen:
+                xlen = int(found_xlen.group(1))
+                continue
+            found_name = re.match(r"^\s+name:\s*(\S+)\s*$", following)
+            if found_name:
+                branches.append((xlen, found_name.group(1)))
+                xlen = None
+        return branches
+    return []
 
 
 def encoding_body(lines, block):
@@ -202,14 +264,28 @@ def encoding_body(lines, block):
     first = next((line for line in body if line.strip()), "")
     found = BLOCK_LINE.match(first)
     if found:
-        wanted = found.group(1)
         if block is None:
-            raise SystemExit("node has block {0!r}; say which one".format(wanted))
-        if wanted != block:
-            raise SystemExit("node has block {0!r}, wanted {1!r}".format(wanted, block))
+            raise SystemExit(
+                "node has block {0!r}; say which one".format(found.group(1))
+            )
+        # A node may carry several xlen blocks (`RV32`, `RV64`). Pick the named
+        # one by header, not by position.
+        headers = []
+        for index, line in enumerate(body):
+            header = BLOCK_LINE.match(line)
+            if header:
+                headers.append((index, header.group(1)))
+        chosen = next(
+            (index for index, name in headers if name == block), None
+        )
+        if chosen is None:
+            raise SystemExit(
+                "node has blocks {0!r}, wanted {1!r}".format(
+                    [name for _index, name in headers], block
+                )
+            )
         nested = []
-        after = body[body.index(first) + 1:]
-        for line in after:
+        for line in body[chosen + 1:]:
             if line and not line.startswith("    "):
                 break
             nested.append(line)
@@ -276,7 +352,7 @@ def parse_node(path, block):
         "path": path,
         "width": len(match),
         "match": match,
-        "extension": defined_by_extension(lines),
+        "extension": defined_by_branches(lines),
         "variables": variables,
     }
 
@@ -304,10 +380,16 @@ def build(spec, node):
                 spec["form_id"], width
             )
         )
-    if node["extension"] != spec["udb_extension"]:
+    # A branch is legal for this 64-bit table when it is unconditional or
+    # guarded by `xlen: 64`, and names the extension the spec expects.
+    branches = node["extension"]
+    if not any(
+        (xlen is None or xlen == 64) and name == spec["udb_extension"]
+        for xlen, name in branches
+    ):
         raise SystemExit(
-            "{0}: definedBy extension {1!r}, expected {2!r}".format(
-                spec["form_id"], node["extension"], spec["udb_extension"]
+            "{0}: definedBy branches {1!r}, expected {2!r} at xlen 64".format(
+                spec["form_id"], branches, spec["udb_extension"]
             )
         )
 
@@ -559,10 +641,11 @@ def main():
             raise SystemExit(
                 "missing pinned node {0}; restore the ADR-0007 drop".format(path)
             )
-        node = nodes.get(spec["node"])
+        key = (spec["node"], spec.get("block"))
+        node = nodes.get(key)
         if node is None:
-            node = parse_node(path, None)
-            nodes[spec["node"]] = node
+            node = parse_node(path, spec.get("block"))
+            nodes[key] = node
         built = build(spec, node)
         built["covers"] = spec["covers"]
         forms.append(built)

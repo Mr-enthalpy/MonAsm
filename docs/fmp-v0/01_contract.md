@@ -332,9 +332,10 @@ fixes its shape, its load-time checks, its digest coverage and the v0 tables
 `target_type` names the **slot constraint**, not the operand's storage class: a
 register placed in a `rm64` slot still says `rm64`, because the constraint is
 what the definition checks and what the operand must satisfy. The check is exact
-equality with the form's declared slot type, followed by the slot's own
-legality rule (a `r64` slot rejects a `x86.mem` payload). It is a guard, not a
-selector: it can only make a plan fail (`E-OPERAND-001`), never choose bits.
+equality with the form's declared slot type, followed by the slot's own legality
+rule (a `r64` slot rejects an operand whose payload is not `{reg}`). It is a
+guard, not a selector: it can only make a plan fail (`E-OPERAND-001`), never
+choose bits.
 That is why it is allowed to duplicate a definition constraint while
 `encoding_choices` was not (ADR-0004).
 
@@ -343,14 +344,30 @@ That is why it is allowed to duplicate a definition constraint while
 `(name, value)` is legal for that form. The list MUST be sorted by `name`, and
 an empty list is the explicit statement "no modifier", never a default.
 
-There is no universal `Memory(base, index, scale, displacement)`. Each ISA keeps
-its own addressing kinds, because the addressing semantics differ:
+There is no universal `Memory(base, index, scale, displacement)` payload. A memory
+operand is **decomposed into one operand per encoded field** — `base`, `disp`,
+and `index`/`scale` where an ISA has them — and the addressing *form* is a
+`form_id` variant (`ADR-0008`, `OD-13`). The four payload shapes in §8.1 are
+unchanged, and a composite object such as `{"mem": {...}}` is `E-OPERAND-003`
+(`N15`).
 
-| ISA | Addressing kinds (draft) |
+The reason is that the fields are not interchangeable. `ld a0, 8(a1)`
+(`03 b5 85 00`) is a 5-bit `xs1`, a 12-bit sign-extended `imm` and a 5-bit `xd`,
+so a single `{base, disp}` operand would own two ranges, two bit positions and
+two answers to "which field does a fixup cover". On x86 the addressing form is a
+function of the operand values, which is exactly why it may not be left to the
+encoder: `movq 8(%rcx), %rax` is `48 8b 41 08` (ModRM mod=01) while
+`movq 4096(%rcx), %rax` is `48 8b 81 00 10 00 00` (mod=10), and
+`movq (%rbp), %rax` is `48 8b 45 00`, because mod=00 with `r/m = 101` means
+RIP-relative. An encoder that picked mod from the displacement or the base
+register would be selecting an encoding form (`INV-02`), so two forms are two
+`form_id`s.
+
+| ISA | v0 memory carrier |
 |---|---|
-| x86-64 | `x86.mem` with `base`/`index`/`scale`/`disp`/`rip_relative`/`addr_size`/`segment` |
-| AArch64 | `aarch64.mem.unsigned-offset` (imm12 scaled), `.pre-index`, `.post-index`, `.register-offset`, `.literal` |
-| RV64 | `riscv.mem.base-offset` (base register + 12-bit signed offset) |
+| x86-64 | absent: each ModRM mod / SIB shape needs its own `form_id`, measured before `X86-P4`–`P6` can land |
+| AArch64 | absent: the four `A64-P3` addressing kinds (unsigned-offset, pre/post-index, register-offset, literal) are form variants, not payloads |
+| RV64 | `ld`/`sd` decompose into `dest`/`src`, `base`, `disp`; one form per mnemonic (`07_definition_format.md` §8.4) |
 
 Legality of an operand is owned by the definition, not by the schema. A schema
 that accepts an operand does not imply the definition accepts it (`N02`, `N03`).
@@ -358,7 +375,7 @@ that accepts an operand does not imply the definition accepts it (`N02`, `N03`).
 ### 8.1 Payload shapes in `fmp/0.1`
 
 `payload` is a JSON object. `fmp/0.1` fixes four shapes, and a payload that is
-none of them is `E-OPERAND-003`:
+none of them is `E-OPERAND-003` (`N15` pins the composite-memory case):
 
 | Shape | Meaning | Legal when |
 |---|---|---|

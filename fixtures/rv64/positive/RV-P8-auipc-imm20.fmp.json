@@ -12,7 +12,7 @@
   "definition_identity": {
     "namespace": "monasm.isa.riscv",
     "version": "0.1.0",
-    "digest": "sha256:8cd063a50db57179fc9ea027f1dab4de8820a7001242bc4046dc03fef1489ea2"
+    "digest": "sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083"
   },
   "output_contract": {
     "artifact": "bytes",

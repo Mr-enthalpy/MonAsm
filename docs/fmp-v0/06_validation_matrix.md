@@ -24,6 +24,7 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 | N12 | Associated relocation pair is incomplete or inconsistent | Reject | E-FIXUP-007 | aarch64 (`adrp`+`lo12`), rv64 (`auipc`+`lo12`) | `aarch64/negative/N12a-pair-without-lo.fmp.json` | aarch64 passing (two `hi`, no `lo`); not applicable to x86 v0 (single-site `rel32`) |
 | N13 | `expected_digest` is present and the emitted bytes hash to a different value | Reject, never re-encode to match | E-BYTE-001 | x86, aarch64, rv64 | `x86_64/negative/N13-expected-digest-mismatch.fmp.json` | x86 passing |
 | N14 | Operand value does not fit the slot's encoded field: `r9` in a 3-bit `ModRM` field, or `x32` in a 5-bit AArch64 register field | Reject, never truncate to another register | E-OPERAND-004 | x86, aarch64 | `x86_64/negative/N14-register-wider-than-field.fmp.json`, `aarch64/negative/N14-register-wider-than-field.fmp.json` | x86 and aarch64 passing |
+| N15 | Operand payload is a composite memory operand (`{"mem": {"base": …, "disp": …}}`), not one of the four `fmp/0.1` shapes | Reject at read time, never split it into operands | E-OPERAND-003 | all | `rv64/negative/N15-composite-memory-payload.fmp.json` | rv64 passing |
 
 N13's counterexample is `EXP-0002` W2: a same-length encoder defect turns
 `48 89 d8` (`mov rax, rbx`) into `49 89 d8` (`mov r8, rbx`), both 3 bytes and
@@ -111,9 +112,9 @@ Each vector needs **two independent sources**: our materializer, and an oracle
 | X86-P1 | Register-to-register transfer | `x86:mov/rm-r64/legacy` (`REX.W 89 /r`) and `x86:mov/r64-rm/legacy` (`REX.W 8B /r`) | llvm-mc | x86 passing (`EXP-0005`) |
 | X86-P2 | Arithmetic with immediate | `x86:add/rm64-imm8/legacy` and `x86:add/rm64-imm32/legacy` as separate forms | llvm-mc | x86 passing (`EXP-0005`) |
 | X86-P3 | Same operation, different legal encodings | `x86:add/rax-imm32/legacy` vs `x86:add/rm64-imm32/legacy`; `x86:mov/rm-r64` vs `x86:mov/r64-rm` | llvm-mc | x86 passing (`EXP-0005`) |
-| X86-P4 | Displacement width | `mov rax, [rbp-8]` (disp8) vs (disp32) | llvm-mc | deferred: no `x86.mem` form in the v0 surface (`OD-10`) |
+| X86-P4 | Displacement width | `mov rax, [rbp-8]` (disp8) vs (disp32) | llvm-mc | deferred: needs one `form_id` per ModRM mod shape, measured (`ADR-0008`, `OD-13`) |
 | X86-P5 | Prefix rules | 16-bit operand with `0x66`; REX + high-byte rejection | llvm-mc | deferred: no `0x66`/high-byte form in the v0 surface (`OD-10`) |
-| X86-P6 | RIP-relative reference | `mov rax, [rip+disp32]` with a fixup | llvm-mc + readelf | deferred: no `x86.mem` form in the v0 surface (`OD-10`) |
+| X86-P6 | RIP-relative reference | `mov rax, [rip+disp32]` with a fixup | llvm-mc + readelf | deferred: needs a `rip_relative` `form_id`, measured (`ADR-0008`, `OD-13`) |
 | X86-P7 | Short vs near branch | `x86:jmp/rel8/legacy` and `x86:jmp/rel32/legacy` as explicit plans | llvm-mc | x86 passing (`EXP-0005`) |
 | X86-P8 | External branch fixup | `x86:jmp/rel32/legacy` to an undefined symbol with `emit_relocation`, record emitted. `call rel32` is not in the v0 surface (`OD-10`); its descriptor is identical, so the record shape is exercised without adding a form | llvm-mc + llvm-readobj | x86 passing (`EXP-0005`) |
 | X86-P9 | Explicit encoding family | SSE vs VEX vs EVEX for one operation | llvm-mc | deferred (OD-10) |
@@ -135,14 +136,18 @@ X86-P1, P2, P3, P7 and P8 have fixtures under `fixtures/x86_64/positive/` and a
 recorded oracle in `EXP-0005`; the fixture gate compares their bytes with the
 oracle's, never with the materializer's own expectation.
 
-X86-P4, P5 and P6 are **deferred, not omitted**. All three need a memory-operand
-form (`ModRM.mod != 11`), and the v0 x86 surface named by `OD-10`/`EC-01`/`EC-27`
-contains only the seven register and immediate forms. Adding a memory form is a
-definition-slice decision, not a fixture decision: the plan schema would need a
-`{mem: {base, index, scale, disp}}` payload, and `01_contract.md` §8.1 currently
-fixes the payload shapes to `{reg}`, `{value}`, `{symbol_id}` and `{}`. The rows
-return when that slice lands; `RV-P3` has the same blocker for
-`riscv.mem.base-offset`.
+X86-P4, P5 and P6 are **deferred, not omitted**. P4 and P6 need memory
+addressing, and `ADR-0008` settled the representation: it is one operand per
+encoded field (`base`, `disp`, `index`, `scale`), never a `{mem: …}` payload,
+because the encoding form changes with the operand values. `movq 8(%rcx), %rax`
+is `48 8b 41 08` (mod=01), `movq 4096(%rcx), %rax` is
+`48 8b 81 00 10 00 00` (mod=10), and `movq (%rbp), %rax` is `48 8b 45 00`
+(mod=01, because mod=00 with `r/m = 101` is RIP-relative). An encoder that
+picked mod from the displacement would select an encoding form (`INV-02`), so
+the slice needs one `form_id` per ModRM mod / SIB shape, enumerated and measured
+before it lands. P5 is a different gap: the `0x66` prefix and the high-byte
+register rule are absent from the v0 surface (`OD-10`). The rows return when
+that definition slice lands.
 
 
 ### AArch64 (directive §6.2)
@@ -151,7 +156,7 @@ return when that slice lands; `RV-P3` has the same blocker for
 |---|---|---|---|---|
 | A64-P1 | Register arithmetic | `add x0, x1, x2` (`shifted-register`, pinned `LSL #0`) | llvm-mc | **passing** — `aarch64/positive/A64-P1-add-register` |
 | A64-P2 | Immediate arithmetic | `add x0, x1, #imm12` and scaled variant | llvm-mc | **partly passing** — `add/x64-imm12-lsl0` (imm 0 and 4095) in `A64-P2-add-imm12`; the `-lsl12` form is absent, so naming it is `E-FORM-001` |
-| A64-P3 | Load/store addressing | unsigned-offset vs pre/post-index as distinct forms | llvm-mc | planned — no table row |
+| A64-P3 | Load/store addressing | unsigned-offset vs pre/post-index as distinct forms | llvm-mc | planned — needs the four addressing kinds as separate `form_id`s (`ADR-0008`, `OD-13`) |
 | A64-P4 | Conditional branch | `b.eq` imm19 | llvm-mc | planned — no table row |
 | A64-P5 | Unconditional branch/call | `bl` imm26 | llvm-mc + ld.lld | **passing** — `A64-P5-bl-local-symbol` (+4 and −4) |
 | A64-P6 | PC-relative pair | `adrp` + `add #:lo12:` with `pair_group` | llvm-mc + ld.lld + llvm-readobj | **passing** — `A64-P6-adrp-lo12-pair` |
@@ -174,7 +179,7 @@ relocation kinds were read with `llvm-readobj -r` before linking (see
 |---|---|---|---|---|
 | RV-P1 | Standard integer arithmetic | `add` (R-type) | llvm-mc | **passing** — `rv64/positive/RV-P1-add-register` |
 | RV-P2 | I-type immediate | `addi` imm12 | llvm-mc | **passing** — `RV-P2-addi-imm12` (both signed endpoints) |
-| RV-P3 | Load/store | `ld`/`sd` base+offset | llvm-mc | planned — no payload shape for `riscv.mem.base-offset` (`01_contract.md` §8.1) |
+| RV-P3 | Load/store | `ld`/`sd` base+offset, decomposed into `base` + `disp` | llvm-mc | **passing** — `rv64/positive/RV-P3-ld-sd-base-offset` (four instructions, signed imm12 endpoints) |
 | RV-P4 | Conditional branch | `beq` B-type scatter | llvm-mc | **passing** — `RV-P4-beq-btype` (+8 and −8) |
 | RV-P5 | Control transfer | `jal` J-type scatter | llvm-mc | **passing** — `RV-P5-jal-jtype` (+8 and −8) |
 | RV-P6 | Scattered fields | B-type and J-type bit placement verified byte-for-byte | llvm-mc | **passing** with `RV-P4`/`RV-P5`; `beq` uses four placements, `jal` four |
@@ -185,17 +190,23 @@ The source is pinned (`OD-12`, ADR-0007): the UDB resolved-spec nodes named in
 `check_rv64_source.py`, with `EXP-0009` deriving the B/J/RVC placements and
 matching fourteen `llvm-mc` byte strings. `EXP-0010` generated
 `definitions/rv64/0.1.0.json` (digest
-`sha256:8cd063a50db57179fc9ea027f1dab4de8820a7001242bc4046dc03fef1489ea2`)
-from five of those nodes and re-encoded the probe vectors from the table it had
-built; the five positive fixtures above are the independent gate, and four
-negative fixtures (`N01`, `N02`, `N03`, `N04`) pin the rejection paths.
+`sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083`)
+from seven of those nodes and re-encoded the probe vectors from the table it had
+built; the six positive fixtures above are the independent gate, and five
+negative fixtures (`N01`, `N02`, `N03`, `N04`, `N15`) pin the rejection paths.
 
-Two rows are blocked on the format, not the source. `RV-P7` needs `imm != 0` and
-`xd != 0`, and `fmp-def/0.1` cannot express that. `RV-P3` needs an
-`riscv.mem.base-offset` payload shape, and `fmp/0.1` fixes only `{reg}`,
-`{value}`, `{symbol_id}` and `{}`. `RV-P8`'s pair half needs the psABI's
-`R_RISCV_PCREL_HI20`/`LO12_I` relation, which the encoding blocks do not state.
-Naming any of those three forms is `E-FORM-001`.
+`RV-P3` is carried by two forms (`riscv:ld/rd-base-imm12`, `riscv:sd/rs-base-imm12`)
+built from the `RV64` encoding block of `I/ld.yaml` (sha256:a2afcd44…) and
+`I/sd.yaml` (sha256:f0b69996…). The address is three operands, not one memory
+payload (`ADR-0008`, `OD-13`): `dest`/`src`, `base` and `disp`. `sd` scatters its
+12-bit immediate over `[31:25]` and `[11:7]`, so the decomposition is also the
+reason the scatter is field-derived. `N15` pins the rejected alternative: a
+`{"mem": …}` payload is `E-OPERAND-003` at read time.
+
+Two rows are still blocked on the format, not the source. `RV-P7` needs
+`imm != 0` and `xd != 0`, and `fmp-def/0.1` cannot express that. `RV-P8`'s pair
+half needs the psABI's `R_RISCV_PCREL_HI20`/`LO12_I` relation, which the encoding
+blocks do not state. Naming either form is `E-FORM-001`.
 
 ## 5. Gate G3
 

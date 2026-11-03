@@ -209,7 +209,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 |---|---|---|
 | `definitions/x86_64/0.1.0.json` | `monasm.isa.x86` | `sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
-| `definitions/rv64/0.1.0.json` | `monasm.isa.riscv` | `sha256:8cd063a50db57179fc9ea027f1dab4de8820a7001242bc4046dc03fef1489ea2` |
+| `definitions/rv64/0.1.0.json` | `monasm.isa.riscv` | `sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083` |
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
@@ -323,37 +323,55 @@ until a format decision adds one.
 | `riscv:beq/rs1-rs2-imm12` | `63000000` | src: `riscv.xreg`/`xreg` → `[15,5]`; src2: `riscv.xreg`/`xreg` → `[20,5]`; target: `riscv.rel`/`imm12` → `[31,1]`, `[7,1]`, `[25,6]`, `[8,4]` | 4 | `RV-P4`, `RV-P6` |
 | `riscv:jal/rd-imm20` | `6f000000` | dest: `riscv.xreg`/`xreg` → `[7,5]`; target: `riscv.rel`/`imm20` → `[31,1]`, `[12,8]`, `[20,1]`, `[21,10]` | 4 | `RV-P5`, `RV-P6` |
 | `riscv:auipc/rd-imm20` | `17000000` | dest: `riscv.xreg`/`xreg` → `[7,5]`; target: `riscv.rel`/`imm20` → `[12,20]` | 4 | `RV-P8` (field half) |
+| `riscv:ld/rd-base-imm12` | `03300000` | dest: `riscv.xreg`/`xreg` → `[7,5]`; base: `riscv.xreg`/`xreg` → `[15,5]`; disp: `riscv.imm`/`imm12` → `[20,12]` | 4 | `RV-P3` |
+| `riscv:sd/rs-base-imm12` | `23300000` | src: `riscv.xreg`/`xreg` → `[20,5]`; base: `riscv.xreg`/`xreg` → `[15,5]`; disp: `riscv.imm`/`imm12` → `[25,7]`, `[7,5]` | 4 | `RV-P3` |
 
 The source is the pinned UDB resolved spec (ADR-0007), not a hand-written table.
 `research/evidence/experiments/EXP-0010/generate_rv64.py` reads
 `encoding.match` and each `encoding.variables[].location` from
-`inst/I/{add,addi,beq,jal,auipc}.yaml`, turns every `location` into the
+`inst/I/{add,addi,beq,jal,auipc,ld,sd}.yaml`, turns every `location` into the
 placements above, and refuses to emit unless every one of the 32 bits is covered
 exactly once by a fixed bit or a slot placement and the bits `match` calls
 variable are exactly the bits the placements own. `EXP-0009` §5 records the same
 derivation; the table is its product.
 
-The document declares `enabled_extensions: ["rv64i"]` because all five nodes are
-`definedBy.extension.name: I`, which the generator asserts per node. One set
-covers the whole document and is compared exactly with the plan's
-(`01_contract.md` §4); the table is never filtered per plan. A plan that enables
-a different set is `E-TARGET-001`, not silently accepted.
+`ld.yaml` and `sd.yaml` carry one `encoding:` block per xlen. The generator reads
+the `RV64` block by name, because the `RV32` block states a `not:` list on `xd`
+and `xs2` (the Zilsd pair rule) that the RV64 form does not have. Selecting the
+block, rather than taking the first one, is what keeps a 32-bit legality rule out
+of a 64-bit table.
 
-The three immediate-bearing forms are the scattered-field case: `beq`'s 12-bit
-field is `imm[12]|imm[10:5]|imm[4:1]|imm[11]` over four placements, `jal`'s
-20-bit field is `imm[20]|imm[10:1]|imm[11]|imm[19:12]`, and `auipc`'s field is
-contiguous. The placements are derived from the source `location`, so no scatter
-is written by hand. The slots keep `align_bits: 0` and hold field content; a
-byte offset is the fixup path with `transform_shift` 1 (`beq`, `jal`) or 12
-(`auipc`), as §8.3 requires. `RV-P8`'s associated-reference half is deliberately
-absent: the psABI `R_RISCV_PCREL_HI20`/`R_RISCV_PCREL_LO12_I` pairing is not in
-the encoding blocks and is not yet pinned (ADR-0007 §Decision 9).
+The document declares `enabled_extensions: ["rv64i"]` because all seven nodes are
+defined by the base `I` extension either unconditionally or under `xlen: 64`,
+which the generator asserts per node. One set covers the whole document and is
+compared exactly with the plan's (`01_contract.md` §4); the table is never
+filtered per plan. A plan that enables a different set is `E-TARGET-001`, not
+silently accepted.
 
-Two `06_validation_matrix.md` rows have no form here, for reasons that are not
-source questions. `RV-P3` (`ld`/`sd`) needs an `riscv.mem.base-offset` payload
-shape, which `fmp/0.1` does not define (`01_contract.md` §8.1 fixes only four
-shapes). `RV-P7` (`c.addi`) needs `imm != 0` and `xd != 0`, which
-`fmp-def/0.1` cannot express. Naming either form is `E-FORM-001`.
+The three immediate-bearing arithmetic forms are the scattered-field case:
+`beq`'s 12-bit field is `imm[12]|imm[10:5]|imm[4:1]|imm[11]` over four
+placements, `jal`'s 20-bit field is `imm[20]|imm[10:1]|imm[11]|imm[19:12]`, and
+`auipc`'s field is contiguous. `sd` is scattered over two placements
+(`[31,25]`, `[11,7]`), `ld` is contiguous. The placements are derived from the
+source `location`, so no scatter is written by hand. The slots keep
+`align_bits: 0` and hold field content; a byte offset is the fixup path with
+`transform_shift` 1 (`beq`, `jal`) or 12 (`auipc`), as §8.3 requires. `RV-P8`'s
+associated-reference half is deliberately absent: the psABI
+`R_RISCV_PCREL_HI20`/`R_RISCV_PCREL_LO12_I` pairing is not in the encoding blocks
+and is not yet pinned (ADR-0007 §Decision 9).
+
+`ld`/`sd` are the memory slice, and they are decomposed into `base` + `disp`
+rather than a composite payload (ADR-0008, `OD-13`): the base is a 5-bit
+register field, the displacement is a 12-bit signed field, and a fixup covering
+one does not cover the other. RV64 does not scale the load/store immediate, so
+`disp` is the byte displacement and no transform is involved. `ld` has one form
+because it has one encoding form; a later x86 or AArch64 memory slice will need
+one `form_id` per addressing variant for the same reason.
+
+`RV-P7` (`c.addi`) is the only remaining RV64 `06_validation_matrix.md` row
+without a form, and it is a format question, not a source question: it needs
+`imm != 0` and `xd != 0`, which `fmp-def/0.1` cannot express. Naming it is
+`E-FORM-001`.
 
 ## 9. Load-time checks
 
