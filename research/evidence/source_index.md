@@ -29,7 +29,8 @@ Verified 2026-11-03 on the development host:
 |---|---|---|---|---|---|---|---|
 | XirAsm | https://github.com/xir-kuku/XirAsm | `3ee8a439f5ba` (`main`) | repo `0.3.5` | Apache-2.0 | 2026-11-03 | Boundary audit, knowledge, oracle cross-check | **built and executed** 2026-11-03; snapshot in gitignored `research/external/XirAsm` |
 | XirAsm-lib | same repo, `deps/xirasm-lib` | `3ee8a439f5ba` | `0.1.5` | Apache-2.0 | 2026-11-03 | Encoder audit; Zig `0.17.0` minimum | audited, not adopted (see `docs/fmp-v0/91_reuse_matrix.md`) |
-| Arm MRS 2026-06 A-profile FAT | Arm download (account-gated); local drop `research/external/arm-mrs/` | `2026-06_rel`, build 818, schema 2.9.5 (declared in `_meta.version`) | 2026-06 | **Arm proprietary notice**: no reproduction without prior written permission; use/distribution bound to the recipient's Arm agreement | 2026-11-04 | Licence evidence for `OD-07` | read; **not redistributable as shipped**; `Instructions.json` not obtained (`EXP-0006`) |
+| Arm MRS 2026-06 OPENSOURCE A-profile FAT (**pinned**) | Arm download; archive `AARCHMRS_OPENSOURCE_A_profile_FAT-2026-06.tar.gz`, local drop `research/external/arm-mrs/` | archive `sha256:fe458c52…`; `Instructions.json` `a1ad2c65…`; `Features.json` `63325900…`; release `2026-06_rel`, build 818, schema 2.9.5 | 2026-06 | **BSD-3-Clause**: `_meta.license.info` = "licensed under the BSD 3-clause license"; `docs/notice.html` = three conditions + disclaimer | 2026-11-04 | Source of `definitions/aarch64/`; notice ships beside the table | read; hashes match XirAsm's manifest exactly; gate is `python tools/check_mrs.py` (`EXP-0007`, ADR-0006) |
+| Arm MRS 2026-06 A-profile FAT (**rejected**) | same release, different packaging, `AARCHMRS_A_profile_FAT-2026-06` | `Features.json` only, `1590274` B, `sha256:6d5c19e7…` | 2026-06 | **Arm proprietary notice**: no reproduction without prior written permission; use/distribution bound to the recipient's Arm agreement | 2026-11-04 | Licence evidence for `OD-07` | **not usable**: fails the hash and licence gate (`EXP-0006`, ADR-0006) |
 | LLVM | https://github.com/llvm/llvm-project | `llvmorg-23.1.2` | 23.1.2 | Apache-2.0 WITH LLVM-exception | 2026-11-03 | Oracle, encoding knowledge | installed (`C:\Users\hanni\Tools\llvm`) |
 | GNU binutils | — | not installed | — | GPL | — | Secondary oracle | deferred (LLVM tools cover v0) |
 
@@ -125,8 +126,9 @@ experiment:   <command or fixture, if any>
 | EV-11 | Is AArch64 reachable without the macro include? | `--isa aarch64` + `add x0,x1,x2` | No: "instruction text emission is not supported for this target ISA" | observed (experiment) |
 | EV-12 | Do duplicate RISC-V specs create ambiguity? | parse all 1,700 specs | No: 1,363 distinct names at xlen 64, zero duplicates per xlen | observed (experiment) |
 | EV-13 | Where does AArch64 encoding knowledge originate? | `include/arm/a64/generated/latest/NOTICE`, `manifest.json` | Arm Architecture Machine Readable Specification 2026-06; 4,350 instructions, 292 aliases | observed (source) |
-| EV-14 | What licence does the upstream MRS package declare? | read `Features.json` `_meta.license` and `docs/notice.html` | Proprietary notice: no reproduction without prior written permission; distribution bound to the recipient's Arm agreement. The BSD-3 text XirAsm reproduces is not in the upstream package | observed (source, `EXP-0006`) |
-| EV-15 | Do XirAsm's manifest hashes identify the public MRS files? | hash the 2026-06 and 2026-09 `Features.json`; compare with `source_lock.files` | No: 2026-06 is `6d5c19e7…`, 2026-09 is `d4bc3952…`, manifest says `63325900…`; canonicalisation does not close the gap | observed (experiment, `EXP-0006`) |
+| EV-14 | What licence does the upstream MRS package declare? | read `_meta.license` and `docs/notice.html` in both measured archives | Two answers, because there are two packagings: the OPENSOURCE archive declares BSD-3-Clause (per-file and in the notice); the other `AARCHMRS_A_profile_FAT-2026-06` archive forbids reproduction without prior written permission | observed (source, `EXP-0006`, `EXP-0007`) |
+| EV-15 | Do XirAsm's manifest hashes identify a public MRS drop? | hash both archives' files; compare with `source_lock.files` | Yes for the OPENSOURCE packaging — `a1ad2c65…` and `63325900…` match byte for byte. No for the other packaging (`6d5c19e7…`) nor for 2026-09 (`d4bc3952…`) | observed (experiment, `EXP-0007`) |
+| EV-16 | Does the release block distinguish the two packagings? | compare `_meta.version` of both archives | No: both declare `vFATAp1-A`/818/`2026-06_rel`/2.9.5. A pin that names only the release accepts the non-redistributable archive | observed (experiment, `EXP-0007` §3) |
 
 Full commands and byte-level output: `experiments/EXP-0001-xirasm-boundary-probes.md`.
 Findings and interpretations: `docs/fmp-v0/90_boundary_audit.md`.
@@ -135,13 +137,14 @@ Findings and interpretations: `docs/fmp-v0/90_boundary_audit.md`.
 
 - LLVM was verified as an oracle only; no LLVM source has been read, so the
   `MCAssembler` vs `MCCodeEmitter` relaxation boundary stays `unverified`.
-- The AArch64 licence question changed shape: the 2026-06 FAT package's own
-  notice forbids reproduction without prior written permission and binds
-  use/distribution to the recipient's Arm agreement. The BSD-3 text XirAsm
-  reproduces was not found upstream, and its manifest file hashes do not match
-  the public files (`EXP-0006`). The `Instructions.json` package was not
-  downloaded, so its terms stay `unverified`. `ADR-0005` must be superseded
-  before any AArch64 table is generated from MRS data.
+- The AArch64 licence question has two answers, one per packaging. The pinned
+  archive (`AARCHMRS_OPENSOURCE_A_profile_FAT-2026-06.tar.gz`, `fe458c52…`) is
+  BSD-3-Clause and matches XirAsm's manifest hashes; the other 2026-06 FAT
+  package forbids reproduction without Arm's prior written permission
+  (`EXP-0006`, `EXP-0007`). Only the pinned archive may feed
+  `definitions/aarch64/`, and ADR-0006 makes the archive hash, both file hashes
+  and the licence string the gate. Unverified: the `schema/` tree hash XirAsm
+  records, and whether an embedded (non-JSON) table satisfies notice condition 2.
 - RISC-V relocation pairs (`auipc` + `lo12`) were not exercised; `AC-05` needs
   them in Phase 3.
 - Cross-host determinism (EXP-R3) is untested and must stay marked `unverified`.

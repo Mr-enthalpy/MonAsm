@@ -4,6 +4,13 @@
 - Subject: the licence and release identity of the Arm MRS drop behind `OD-07`
 - Basis: **experiment** for every hash and every quoted string below
 - Reproduce: `python tools/check_mrs.py` in the repository root
+- Amended by: `EXP-0007` — every finding below holds **only** for the
+  `AARCHMRS_A_profile_FAT-2026-06` packaging. The later
+  `AARCHMRS_OPENSOURCE_A_profile_FAT-2026-06.tar.gz` declares BSD-3-Clause and
+  matches the manifest hashes exactly, so §3's "not the public upstream file" and
+  §4's "the BSD text was not found upstream" are false for that packaging. Read
+  the two records together: the licence and the bytes are properties of an
+  archive, not of a release.
 
 ## 1. What was read
 

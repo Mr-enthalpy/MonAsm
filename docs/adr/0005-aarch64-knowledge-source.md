@@ -3,6 +3,7 @@
 - Status: accepted
 - Date: 2026-11-04
 - Settles: OD-07
+- Amended by: ADR-0006 (which packaging is pinned, and how the pin is checked)
 - Supersedes: none
 - Superseded by: none
 
@@ -110,12 +111,12 @@ licences. Only the data is needed for a definition table.
 | The A64 data derives from Arm MRS 2026-06 | both `NOTICE` files, read | high |
 | The data is under a three-clause BSD notice | `NOTICE` lines 4–27, read | high |
 | MPL-2.0 covers the enumerated adaptation scripts, not the `.inc` data | `NOTICE` lines 29–31, read | high |
-| Arm's download/website terms match the reproduced notice | not read; the notice is the only upstream text in the snapshot | **unverified** |
+| Arm's download/website terms match the reproduced notice | `EXP-0007` §4 read the OPENSOURCE archive's `_meta.license` and `docs/notice.html` | high for that packaging; **not general** — `EXP-0006` measured another packaging whose terms forbid reproduction |
 
-The last row is the residual risk. Before a table is published outside this
-repository, the MRS archive's own licence file is read and compared with the
-notice above. If they differ, this ADR is revisited rather than silently
-reinterpreted.
+The last row was the residual risk. It is now closed for the OPENSOURCE
+packaging and, per ADR-0006, only that packaging may be used: the terms are a
+property of the archive, so the archive is pinned by hash rather than by release
+identity.
 
 ## Review triggers
 
