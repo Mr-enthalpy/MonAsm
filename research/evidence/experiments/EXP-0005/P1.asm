@@ -1,0 +1,2 @@
+.text
+movq %rbx, %rax

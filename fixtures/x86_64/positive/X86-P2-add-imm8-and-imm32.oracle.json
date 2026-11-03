@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj P2.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "616aeb637765672a0d1614aab015055e98259760304f84f772051a8b70e13f2f",
+  "output_sha256": "ce93aad356b46e897c3d585d2b975501384169c0feb1add45ddf87914fcb5c13",
+  "size": 11,
+  "records": 0,
+  "notes": "83 /0 ib for the imm8 form, 81 /0 id for the imm32 form; both measured."
+}

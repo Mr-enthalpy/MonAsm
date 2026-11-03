@@ -199,6 +199,9 @@ Fragment rules:
   it MUST carry `fill_byte`.
 - Fragments MUST be sorted by `offset`, contiguous, non-overlapping, and cover
   `[0, declared_size)` exactly (`E-LAYOUT-001`, `E-LAYOUT-002`).
+- A section with `image_backed: false` occupies no file bytes, so it MUST have no
+  fragments; its `declared_size` is virtual and is not a file layout. A fragment
+  there asks for bytes the image will not contain (`E-LAYOUT-002`).
 - An `instruction` fragment MUST reference exactly one planned instruction whose
   `offset` and size match the fragment (`E-LAYOUT-003`).
 - Alignment MUST be expressed as a `fill` fragment by the planner. The
@@ -348,6 +351,34 @@ its own addressing kinds, because the addressing semantics differ:
 Legality of an operand is owned by the definition, not by the schema. A schema
 that accepts an operand does not imply the definition accepts it (`N02`, `N03`).
 
+### 8.1 Payload shapes in `fmp/0.1`
+
+`payload` is a JSON object. `fmp/0.1` fixes four shapes, and a payload that is
+none of them is `E-OPERAND-003`:
+
+| Shape | Meaning | Legal when |
+|---|---|---|
+| `{ "reg": <u64> }` | Register number in the target's own numbering | the slot's `from` is `reg_number` |
+| `{ "value": <integer> }` | The numeric value the operand encodes | the slot's `from` is `operand_value` and no fixup covers those bits |
+| `{ "symbol_id": "<id>" }` | A symbolic target, carried as a guard only | a `target` role whose bits a fixup covers; it MUST equal `fixup.target.symbol_id` (`E-FIXUP-001`) |
+| `{}` | No value: the fixup named for these bits is the only writer | the slot's bits are covered by a fixup (`E-OPERAND-003` otherwise) |
+
+Exactly one key is allowed. `{ "reg": 0, "value": 0 }` states two values for one
+field; it is not resolved by precedence, it is `E-OPERAND-003`.
+
+The split is what keeps `E-FIXUP-006` decidable rather than a policy:
+
+- An operand that carries `value` for a field a fixup covers gives one patch two
+  writers. The plan cannot say which it meant, and "the fixup wins" would be a
+  silent repair.
+- An operand that carries `{}` for a field no fixup covers leaves the field at
+  the template's base value. That is a default, not a decision (`INV-07`).
+
+Counterexample: `{ "reg": 9 }` in a slot whose `from` is `operand_value` would
+otherwise be read as the immediate `9`, because the payload key names the
+register file and the slot names the field. Rejecting the mismatch is why the
+shape is checked against the slot and not against the operand alone.
+
 ## 9. Symbols
 
 | Field | Required | Meaning | Why it must be frozen | Counterexample if absent | Status |
@@ -399,6 +430,37 @@ transform, the range and the pair relation. Level 1 would add serialization, and
 for RV64 it would add a synthesized local symbol per `hi` site, because
 `R_RISCV_PCREL_LO12_I` names the `auipc`, not the target. `artifact: sections`
 stays legal in the schema so a later slice can opt in without a format bump.
+
+### 11.1 The Level 0 artifact
+
+With `artifact: bytes`, `include_symbol_table: false` and `emit_fixups: true`, the
+materializer produces one document:
+
+```json
+{
+  "format_version": "fmp/0.1",
+  "level": 0,
+  "bytes_hex": "4889d8",
+  "size": 3,
+  "fixups": [],
+  "fingerprint": "sha256:…",
+  "materializer_version": "0.0.0"
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `format_version` | The plan's `format_version`, echoed after the gate |
+| `level` | `0`; the only level this build emits |
+| `bytes_hex` | Lowercase hex, no separator, `size` bytes; sections concatenated in `section_order`, fragments by `offset` |
+| `size` | `len(bytes_hex) / 2`, stated so a consumer need not count |
+| `fixups` | The `03_fixup_model.md` §8 records, in `fixup_record_order` |
+| `fingerprint` | §12's fingerprint over the plan, the definition identity, and nothing else |
+| `materializer_version` | Audit only; never part of `bytes_hex` or the fingerprint |
+
+The envelope is deterministic: no timestamps, hostnames, absolute paths or tool
+versions other than the build's own constant. `E-BYTE-001` is checked before the
+envelope is assembled, so an artifact is either complete and correct or absent.
 
 ## 12. Canonicalization, ordering, fingerprint
 

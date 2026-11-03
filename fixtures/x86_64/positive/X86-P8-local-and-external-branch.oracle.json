@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj P8.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "3a986733fd75b65182bdb28a5940331b3db22ab36b911a956b9df2732852f81d",
+  "output_sha256": "24814cbb7f68bd12224b8985946e48837f90273b198ce0157079318dd978ac4d",
+  "size": 217,
+  "records": 1,
+  "notes": "`jmp L1` resolves in place (e9 cb 00 00 00; L1 is 203 bytes after the end of the instruction). `jmp ext` assembles to e9 00 00 00 00 with R_X86_64_PLT32 ext -4; our pcrel_end with addend 0 is the same value.",
+  "relocation_check": "llvm-readobj --relocations reports '0xD5 R_X86_64_PLT32 ext 0xFFFFFFFFFFFFFFFC'"
+}

@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-SIZE-001", "path": "/instructions/0/expected_size", "detail_keys": ["instruction_id", "expected", "actual"] }
+  ]
+}

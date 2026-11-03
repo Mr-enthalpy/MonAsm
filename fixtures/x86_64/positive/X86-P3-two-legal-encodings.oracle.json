@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj P3.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "099fc2a3156631838d6c8649faa824b20852e06c7adc611ff2704d6d16990c56",
+  "output_sha256": "4e4e84ba922eb3f201b9c4be4e7cc81115138de2282b3d396e85b9bffe234cd8",
+  "size": 13,
+  "records": 0,
+  "notes": "The same operation in two legal encodings: 05 id (the rax form) and 81 /0 id. The encoder never chooses between them; the plan names the form. llvm-mc always picks the rax short form when the destination is rax, so the 81 /0 half is measured on rbx; the 81 /0 encoding with rax is decode-verified in EXP-0004."
+}

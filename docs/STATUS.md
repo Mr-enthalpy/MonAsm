@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-04
-Phase: **3 in progress (x86 slice): the definition table is frozen and verified; the materializer is the next artifact**
+Phase: **3 in progress (x86 slice): definition table, materializer and fixture gate are in place; AArch64/RV64 block on OD-07**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -14,7 +14,7 @@ this file plus `AGENTS.md` alone.
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86 slice**; AArch64/RV64 surfaces block on OD-07 |
-| 3 | Three-ISA vertical prototype | **in progress** on x86: definition table frozen (`07_definition_format.md`, `EXP-0004`); encoder/validator not written |
+| 3 | Three-ISA vertical prototype | **in progress** on x86: definition table frozen (`07_definition_format.md`, `EXP-0004`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; 5 positive and 12 negative fixtures pass the two-source gate (`EXP-0005`) |
 | 4 | Invariants, negative tests, replay | not started |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
@@ -25,7 +25,7 @@ this file plus `AGENTS.md` alone.
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
 | G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: the x86 slice rows are frozen (EC-01/02/03/04/06/07/27/28); 10 rows are still `draft` |
-| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | not started |
+| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **x86 satisfied** (5 positive, 12 negative); AArch64/RV64 blocked on OD-07 |
 
 ## Decisions
 
@@ -65,24 +65,32 @@ weaker size check; it is now settled, and `EXP-0004` §4 measures both halves.
 
 ## Next action
 
-1. Write the x86 materializer in `prototype/`: plan model and parser (`fmp-model`),
-   static checks (`fmp-validate`), definition loading + encoding + fixup execution
-   (`fmp-materialize`), and the `fmp` CLI.
-2. Order inside that work: definition load with the digest check, exact-integer
-   fixup engine (OD-02 modes, OD-09 arithmetic), then the `N01`, `N02`, `N03`,
-   `N04`, `N05`, `N07`, `N08`, `N10`, `N13`, `N14` fixtures and the `X86-P1`–`P8`
-   positive fixtures with their oracle records.
+1. Unblock OD-07 (licence review) before starting AArch64/RV64: both definition
+   tables, their `EC-*` rows and their slices are blocked on a knowledge source.
+2. While OD-07 is open, close the remaining x86 contract debt:
+   - `OD-05` (unknown fields/extensions) and `OD-08` (canonical wire form);
+   - the Level 1 artifact envelope, which is deferred by `OD-03` and is not
+     needed by the Level 0 gate;
+   - `X86-P4`/`P5`/`P6`, which need an `x86.mem` payload shape before they can
+     be planned (`fixtures/x86_64/README.md`).
 3. Keep `python tools/check_ids.py` and `python tools/check_definition.py` green
-   after every change.
-4. Unblock OD-07 (licence review) before starting AArch64. OD-05 and OD-08 are the
-   remaining contract decisions; neither blocks the x86 slice.
+   after every change, and keep `cargo test --workspace` green: it is the
+   fixture gate, not a smoke test.
 
-Phase 3 output so far: `07_definition_format.md` (the definition artifact and its
-load-time checks), `definitions/x86_64/0.1.0.json` (the seven v0 forms, digest
-`sha256:c6bfa9…`), `EXP-0004` (223 decoded byte strings across all seven rows,
-plus the `OD-06` digest measurement), `E-OPERAND-004`/`N14` (an operand wider than
-its field is rejected, not truncated), and `tools/check_definition.py`, which
-fails if the document and the JSON table disagree.
+Phase 3 output so far: the Rust workspace under `prototype/` (`fmp-model` for the
+strict JSON reader and the plan/definition binders, `fmp-validate` for contract
+§13 steps 2–7, `fmp-materialize` for encoding and the two fixup modes,
+`fmp-cli` with exit codes 0/1/2); the frozen table
+`definitions/x86_64/0.1.0.json` (seven forms, digest `sha256:c6bfa9…`);
+`EXP-0004` (223 decoded byte strings across all seven rows, plus the `OD-06`
+digest measurement); `EXP-0005` (5 positive fixtures against LLVM 23.1.2, with
+the two decode-only caveats); and 12 negative fixtures whose complete diagnostic
+sets — code, JSON Pointer, detail keys — are compared for exact equality.
+`E-OPERAND-004`/`N14` (an operand wider than its field) is one of them.
+
+The materializer is deliberately not a bridge to LLVM: it reads only the plan
+and the pinned definition, writes bytes and RELA-shaped records, and has no
+fallback when a form, field or symbol is missing.
 
 Phase 2 output: `EXP-0002` (OD-01, OD-03), `EXP-0003` (the alias pairs behind
 OD-11/ADR-0004), the `pcrel_end` fix in `03_fixup_model.md` §4, the observed

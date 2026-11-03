@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj P7.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "b36f21317e2fc85845cdc8910f971bc14202f07a29b8f7c25add69011a6bae98",
+  "output_sha256": "2b94f3e864a21fcea6efff66ab0f9a4149e691b9b701760b4ac246b8cd362543",
+  "size": 7,
+  "records": 0,
+  "notes": "`jmp .+0x81` -> eb 7f, `jmp .+0x82` -> e9 7d 00 00 00. llvm-mc promotes to rel32 when rel8 does not fit; the plan states each form explicitly, so the fixture pairs the two forms rather than proving promotion."
+}

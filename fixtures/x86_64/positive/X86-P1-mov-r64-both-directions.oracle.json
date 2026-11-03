@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj P1.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "manual+disassembly",
+  "input_sha256": "c905ab910bbe7662628a1e10a14ae39a1a7f20fcd42d582cacb862de9f3b18bc",
+  "output_sha256": "7efbe1faf348240e3aa2c423d8f2939a14c6c3f2e03803ff86259995738c14a4",
+  "size": 6,
+  "records": 0,
+  "notes": "First instruction is emitted by llvm-mc (`movq %rbx, %rax` -> 48 89 d8). The second is the 8B /r encoding of the same move, which llvm-mc will not select from a mnemonic; its bytes are verified by `llvm-mc -disassemble`, which prints `movq %rbx, %rax`.",
+  "disassembly": ""
+}

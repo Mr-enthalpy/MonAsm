@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-LAYOUT-001", "path": "/sections/0/fragments/1", "detail_keys": ["first", "second"] }
+  ]
+}

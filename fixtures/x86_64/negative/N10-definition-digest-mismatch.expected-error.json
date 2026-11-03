@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-DEF-001", "path": "/definition_identity/digest", "detail_keys": ["declared", "actual", "reason"] }
+  ]
+}

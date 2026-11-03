@@ -43,9 +43,13 @@ into selection (`INV-01`, `INV-02`).
 | `forms` | yes | The closed form set | An empty table would accept nothing but claim to be a definition. |
 
 `target_identity` is compared field by field with the plan's, excluding
-`feature_constraints` (which the contract already requires to be empty). Any
-difference is `E-TARGET-001`/`002`/`004`. The table is never filtered per plan: a
-definition covers exactly one target.
+`feature_constraints` (which the contract already requires to be empty). A
+difference in `isa_family`, `isa_variant,` or `enabled_extensions` is
+`E-TARGET-001`, in `execution_mode` `E-TARGET-002`, and in `byte_order` or
+`address_width` `E-TARGET-004`. `E-TARGET-003` has no trigger here because a row
+carries no extension requirement of its own: the table declares one
+`enabled_extensions` set for the whole document. The table is never filtered per
+plan: a definition covers exactly one target.
 
 There is **no digest field inside the definition**. The digest is computed over
 the document and compared with `definition_identity.digest` (`E-DEF-001`); a

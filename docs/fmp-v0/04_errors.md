@@ -32,11 +32,12 @@ Rules:
 | Code | Trigger | Fixed detail keys | Related test |
 |---|---|---|---|
 | E-PLAN-001 | Unknown or unsupported `format_version` | `found`, `supported` | — |
-| E-PLAN-002 | Non-integer numeric value, or value outside the declared integer domain | `path_type`, `found_kind` | — |
+| E-PLAN-002 | Value has the wrong type or literal form (a non-integer number, a malformed hex byte string), or lies outside the declared domain for its path | `path_type`, `found_kind` | — |
 | E-PLAN-003 | Unknown field in a strict object | `field`, `object` | — |
 | E-PLAN-004 | Document is not parseable, or has duplicate keys | `reason` | — |
 | E-PLAN-005 | Canonical-form violation that changes bytes (e.g. float, BOM, CRLF-dependent content) | `reason` | EXP-R4 |
-| E-TARGET-001 | Unsupported `isa_family` or `isa_variant` | `found` | — |
+| E-PLAN-006 | Required field absent from a strict object | `field`, `object` | — |
+| E-TARGET-001 | Unsupported or mismatched `isa_family`, `isa_variant`, or `enabled_extensions` | `found` | — |
 | E-TARGET-002 | Invalid or missing `execution_mode` for the family | `found`, `required` | — |
 | E-TARGET-003 | Form requires an extension that is not enabled | `extension`, `form_id` | N06 |
 | E-TARGET-004 | Unsupported `byte_order` or `address_width` | `found` | — |
@@ -55,19 +56,28 @@ Rules:
 | E-LAYOUT-003 | Instruction offset/size does not match its fragment | `instruction_id`, `fragment` | N05 |
 | E-LAYOUT-004 | List order violates the contract's declared order | `list`, `index` | — |
 | E-LAYOUT-005 | Layout requires the materializer to compute padding or alignment | `section_id`, `offset`, `required_align` | N11 |
+| E-LAYOUT-006 | Duplicate `section_id`, or `section_order` is not a permutation of `sections[]` | `section_id`, `problem` | — |
+| E-LAYOUT-007 | Duplicate `instruction_id`, or two instructions at the same `(section_id, offset)` | `instruction_id`, `section_id`, `offset` | — |
 | E-SYMBOL-001 | A reference names a `symbol_id` that `symbols[]` does not declare | `symbol_id`, `mode` | N08 |
 | E-SYMBOL-002 | Duplicate `symbol_id`, or duplicate emitted name with conflicting binding | `symbol_id` | — |
-| E-SYMBOL-003 | Defined symbol without a location | `symbol_id` | — |
+| E-SYMBOL-003 | Defined symbol without a resolvable location: `section_id`/`offset` missing, or `section_id` names no section | `symbol_id` | — |
 | E-FIXUP-001 | Fixup is incompatible with the form, the descriptor, or the instruction's operands: the fixup kind does not fit the form; the descriptor widths do not sum to `range_constraint.bits`; a target operand and `fixup.target` disagree | `kind`, `form_id`, `field` | N07 |
-| E-FIXUP-002 | Target has no address in a `resolve_in_place` fixup: an undefined or external symbol, or a cross-section reference whose section has no `base_address` | `fixup_id`, `target` | N08 |
+| E-FIXUP-002 | Target has no address in a `resolve_in_place` fixup: an undefined or external symbol, a cross-section reference whose section has no `base_address`, or an `absolute` target under a PC rule whose site section has no `base_address` | `fixup_id`, `target` | N08 |
 | E-FIXUP-003 | Computed fixup value outside `range_constraint` | `fixup_id`, `min`, `max`, `value` | N04 |
-| E-FIXUP-005 | Field descriptor out of bounds or self-overlapping | `fixup_id`, `descriptor` | — |
+| E-FIXUP-005 | Field descriptor out of bounds or self-overlapping, or the site is not the first byte of a planned instruction | `fixup_id`, `descriptor` | — |
 | E-FIXUP-006 | Two writers patch overlapping bits — two fixups, or an operand-supplied field and a fixup | `first`, `second` | — |
 | E-FIXUP-007 | Pair group incomplete, duplicated role, or target mismatch | `pair_group`, `problem` | N12 |
+| E-FIXUP-008 | Duplicate `fixup_id` | `fixup_id`, `offset` | — |
 | E-SIZE-001 | Encoded length != `expected_size` | `instruction_id`, `expected`, `actual` | N05 |
 | E-BYTE-001 | Emitted bytes do not match `expected_digest` | `instruction_id`, `declared`, `actual` | N13 |
 | E-VERSION-001 | Materializer cannot honor a declared plan feature | `feature`, `format_version` | — |
 | E-INTERNAL-001 | Internal invariant violated (bug); never used for user input | `invariant` | — |
+
+`E-PLAN-002`'s two detail keys describe one fault from two sides: `path_type` is
+what the path requires (`integer`, `u64`, `i64`, `address`), and `found_kind` is
+what the document supplied (`string`, `float`, `boolean`, `integer -1`). The
+pair is enough to reproduce the failure without the free-text message, which is
+why the code keeps both.
 
 ### 2.1 Counterexamples behind specific codes
 
@@ -117,7 +127,11 @@ rejection; `derived` means it follows from a measured byte sequence.
   external `call` target and `resolve_in_place`. There is no `S` to compute, so
   the only honest outcomes are "refuse" (this code) or "emit zero", and zero
   turns the call into a branch to itself. Level 1 would write the record instead;
-  that is `emit_relocation`, a different mode the plan must name.
+  that is `emit_relocation`, a different mode the plan must name. The same code
+  covers the missing-origin cases: a cross-section reference whose section has no
+  `base_address`, and an `absolute` target under `pcrel_begin`/`pcrel_end`/
+  `pcrel_page` whose *site* section has none. Reading either missing base as zero
+  would silently place the section at address 0 (`03_fixup_model.md` §4).
 - `E-SYMBOL-001` — derived, N08: the plan references `symbol_id: "S9"` with no
   entry in `symbols[]`. This is not a resolution policy question, because no
   policy can supply an identity the plan never defined.
@@ -129,6 +143,35 @@ rejection; `derived` means it follows from a measured byte sequence.
   `value_transform: "got_pcrel"`. `fmp/0.1` has no such member, so the plan
   declares a feature the format version cannot honour; treating it as a plain
   PC-relative record would silently drop the GOT indirection.
+- `E-PLAN-006` — derived, contract §13 step 1: an instruction that omits
+  `expected_size`. Without this code the absence has to be read as "no
+  constraint", and the size check then passes vacuously — a defaulted field in
+  the one place `INV-03` depends on it. The strict-object check therefore reports
+  a missing field instead of letting the field's consumer see `None`. The same
+  code covers the one conditional requirement in `fmp/0.1`: contract §7 says a
+  plan that carries any `expected_digest` MUST name its derivation source in
+  `provenance.generated_by`. A digest whose provenance is unknown is
+  indistinguishable from one the encoder under test produced, which is the case
+  `E-BYTE-001` exists to catch, so the field is reported as required rather than
+  read as "no source".
+- `E-LAYOUT-006` — derived, contract §12: a plan with two sections whose
+  `section_id` is both `.text`. A fixup naming `.text` then has two candidate
+  sites and the materializer must pick one, which is a choice it has no authority
+  to make. The same code covers `section_order` naming a subset of `sections[]`:
+  the unnamed section's bytes would vanish from the image with no diagnostic.
+- `E-LAYOUT-007` — derived, contract §7 against §12. Two instructions both named
+  `I0001`, at offsets 0 and 4: the fragment whose `instruction_id` is `I0001`
+  resolves to the first, so the second is fully validated and then never emitted.
+  Two instructions at the same `(section_id, offset)` are the same fault from the
+  other side — one fragment names one of them, and which one wins is list order,
+  the implicit tie-break §3 forbids. `instruction_id` is therefore required to be
+  unique, and `(section_id, offset)` to be unique, before emission is ordered.
+- `E-FIXUP-008` — derived, `03_fixup_model.md` §8: two fixups both named `F0001`
+  at different sites. `fixup_record_order` still sorts them, but the emitted
+  records are addressed by `fixup_id`; a consumer applying records by id applies
+  one twice or drops one, and the plan says nothing about which. `pair_group`
+  does not help, because it groups a `hi` and a `lo` that are deliberately
+  different fixups.
 
 ### 2.2 Retired codes
 
@@ -141,6 +184,22 @@ reused for a different condition.
 | E-CHOICE-002 | 2026-11-04 | the same | E-FORM-001 / E-OPERAND-002 |
 | E-CHOICE-003 | 2026-11-04 | the same; a value outside the form's set is a form or range error | E-FORM-001 / E-RANGE-001 |
 | E-FIXUP-004 | 2026-11-04 | `fmp/0.1` emits one record shape for every `emit_relocation` fixup and every fixup shape has one, so the trigger ("output contract cannot carry the record") is unreachable. A request for a relocation kind the format does not define is a declared-feature failure | E-VERSION-001 / E-FIXUP-001 |
+
+### 2.3 Codes with no `fmp/0.1` trigger
+
+Two codes are declared and implemented but no plan can reach them yet. They stay
+in the registry because the condition they name is real in the model, and a
+silent omission would make a later slice look like it had always been covered.
+
+- `E-TARGET-003` — a definition has no per-form extension requirement
+  (`07_definition_format.md` §2), so there is no `form_id` to name. Each table
+  declares one `enabled_extensions` set, and a mismatch with the plan is
+  `E-TARGET-001`. The code becomes reachable when a table gains a form that an
+  extension gates (`N06`).
+- `E-LAYOUT-005` — no plan field requests alignment: fragments carry no alignment
+  attribute, and a `fill` fragment is the only padding. A plan that wants padding
+  and omits the fragment produces a gap, which is `E-LAYOUT-002`. The code
+  becomes reachable if a fragment ever gains `align_to`.
 
 ## 3. Rules
 

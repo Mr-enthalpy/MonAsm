@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-SYMBOL-001", "path": "/fixups/0/target/symbol_id", "detail_keys": ["symbol_id", "mode"] }
+  ]
+}

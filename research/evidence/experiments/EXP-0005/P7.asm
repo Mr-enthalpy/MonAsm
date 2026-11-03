@@ -1,0 +1,3 @@
+.text
+jmp .+0x81
+jmp .+0x82

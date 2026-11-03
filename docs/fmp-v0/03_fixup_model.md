@@ -44,6 +44,26 @@ raw bytes and then patches them — is scheme C, which `OD-01`/ADR-0004 already
 excludes at the level of `form_id` and operands. Recorded here so the removal is
 traceable rather than a silent schema drift.
 
+### 2.1 Target kinds
+
+`target.kind` is a closed set of three. Each names a different source of `S`, and
+the difference matters because only two of them need a bound section:
+
+| `target.kind` | `S` | `base_address` needed |
+|---|---|---|
+| `symbol` | the symbol's address: `base_address(section) + offset` when the rule needs an absolute address, or `offset` alone for a same-section PC-relative rule | in effect only |
+| `absolute` | `target.address`, used exactly as written | no |
+| `section_relative` | `base_address` of `target.section_id` | yes |
+
+For `symbol` the location comes from `symbols[]`, never from a name lookup in
+`sections[]`. `absolute` is the only kind that does not consult the layout at
+all. `section_relative` is `inference`: `01_contract.md` names the kind, no v0
+fixture exercises it, and §5.1's five cases do not need it. It is implemented as
+"the named section's base address, plus the addend", refused `E-FIXUP-002` when
+that section has no `base_address`, and stays `unverified` until a slice uses it.
+A plan that wants an address *inside* a section names a `symbol`, because that is
+the only form that carries an offset.
+
 ## 3. Field descriptors
 
 ```json
@@ -65,6 +85,12 @@ Rules:
   reason.
 - `lsb` is relative to the instruction's first byte in the section, not to the
   plan's byte buffer.
+- `offset` MUST be that first byte, so the site and the descriptor base are the
+  same point. A site inside an instruction would make `lsb` ambiguous — "relative
+  to the instruction's first byte" and "relative to the site" would disagree —
+  and is rejected `E-FIXUP-005`. For x86 `rel32` the site is the instruction
+  start and the descriptor is `[{ "lsb": 8, "width": 32 }]`; the displacement
+  starts one byte in, and the descriptor says so.
 - `width` is in bits; bits MUST lie inside the instruction's `expected_size`.
 - Overlapping descriptors within one fixup are rejected (`E-FIXUP-005`).
 - Overlapping fixups in the same byte are rejected (`E-FIXUP-006`).
@@ -110,6 +136,20 @@ fixed after `EXP-0002` §6.1 exposed the off-by-one.
 
 A definition MAY declare additional named rules (`definition:<id>`), but the
 string must be resolved by the pinned definition, never by convention.
+
+An `absolute` target is an address on the same number line as `P`, so a rule
+other than `none` needs the site's section `base_address`; without one the fixup
+is `E-FIXUP-002` under `resolve_in_place`. A `section_relative` target is itself
+a section address, so it needs that section's `base_address` under
+`resolve_in_place` whatever the rule. A same-section `symbol` target under
+`pcrel_begin`/`pcrel_end` is the one exempt case: the displacement is a
+difference of two offsets and is translation-invariant, so offsets alone are
+exact. `pcrel_page` is not exempt — it takes the page base of each address, and
+moving the section changes which page an offset lands in.
+
+A missing `base_address` is never read as zero. Zero is an address, and choosing
+it would turn "the plan did not say where this section lives" into "the section
+lives at 0", which is the implicit default `INV-05` forbids.
 
 ## 5. Resolution modes (OD-02)
 
@@ -168,6 +208,26 @@ that says `emit_relocation` MUST NOT be silently resolved into bytes with no
 record.
 
 ## 6. Target-specific semantics (v0 candidates)
+
+`value_transform` is applied to `D`, the value `pc_reference_rule` produced. The
+five transforms `fmp/0.1` defines, and nothing else:
+
+| Transform | Applied as | Where it comes from |
+|---|---|---|
+| `identity` | `v = D` | — |
+| `scale` | `v = D >> transform_shift`, arithmetic | `scale(2)` for AArch64 `b` below |
+| `page` | `v = (page(S + A) - page(P)) >> 12`, with `page(x) = x & !0xFFF` | `adrp` below |
+| `lo12_i` | `v = (S + A) & 0xFFF` — a mask, never range-checked | `add :lo12:` below |
+| `pcrel_hi20` | `v = (D + 0x800) >> 12` | RV64 `auipc` below |
+
+`hi20` and `lo12_s` are named in the schema's `value_transform` enum, but this
+document defines no semantics for them and no v0 fixture uses them. A plan that
+names one is `E-VERSION-001` (`feature: value_transform:hi20`): `fmp/0.1` cannot
+express what the plan means, and inventing a definition at materialization time
+would be a decision, not a validation. They are reserved for the AArch64 and RV64
+tables, which add their definitions together with the slice that needs them.
+
+The ISA table:
 
 | Case | Encoding facts | What the plan must pin |
 |---|---|---|
@@ -254,6 +314,26 @@ such field exists in `01_contract.md` §11, and adding one would create a second
 byte-affecting switch on a record that already carries the addend. The record
 shape is a property of `format_version`, and changing it is a format change, not
 a per-plan option.
+
+The record itself is the fixup, minus the mode that produced it:
+
+| Record field | Source | Why it is in the record |
+|---|---|---|
+| `fixup_id` | `fixups[].fixup_id` | Record identity and `fixup_record_order` |
+| `section_id`, `offset` | the fixup site | Where the consumer patches |
+| `field_descriptor` | verbatim, in value order | Which bits, and how they are reassembled |
+| `target` | verbatim | `symbol` / `absolute` / `section_relative`; a consumer must not have to guess |
+| `addend` | verbatim | RELA-shaped: the addend is data, never read back from the bits |
+| `pc_reference_rule`, `value_transform`, `transform_shift` | verbatim; `transform_shift` omitted when absent | The computation a consumer redoes |
+| `range_constraint` | verbatim | `emit_relocation` cannot check the value, so the check travels with the record |
+| `pair_group`, `pair_role` | verbatim; omitted when absent | AArch64/RV64 pairing is data, not adjacency |
+
+`resolution_mode` is absent because every record means `emit_relocation`; a
+record that could also mean "already resolved" would be the forbidden third
+mode. Nothing else is added: a record with a timestamp, a host name or a
+materializer version would make two identical plans produce different output
+(`INV-05`). The materializer version lives in the artifact envelope
+(`01_contract.md` §11.1), which is not part of the byte comparison.
 
 ## 9. Execution order and determinism
 
