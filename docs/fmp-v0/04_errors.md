@@ -67,8 +67,9 @@ Rules:
 | E-FIXUP-003 | Computed fixup value outside `range_constraint` | `fixup_id`, `min`, `max`, `value` | N04 |
 | E-FIXUP-005 | Field descriptor out of bounds or self-overlapping, or the site is not the first byte of a planned instruction | `fixup_id`, `descriptor` | — |
 | E-FIXUP-006 | Two writers patch overlapping bits — two fixups, or an operand-supplied field and a fixup | `first`, `second` | — |
-| E-FIXUP-007 | Pair group incomplete, duplicated role, or target mismatch | `pair_group`, `problem` | N12 |
+| E-FIXUP-007 | Pair group incomplete or inconsistent: no `hi`, more than one `hi`, no `lo`, a target mismatch, a `pcrel_hi` member whose `hi` is in another section, or `pair_role` without `pair_group` | `pair_group`, `problem` | N12, N17b, N17c |
 | E-FIXUP-008 | Duplicate `fixup_id` | `fixup_id`, `offset` | — |
+| E-FIXUP-009 | Fixup addend not allowed by its kind: an RV64 `pcrel_lo12` low half with a non-zero `addend` | `fixup_id`, `addend`, `value_transform` | N17a |
 | E-SIZE-001 | Encoded length != `expected_size` | `instruction_id`, `expected`, `actual` | N05 |
 | E-BYTE-001 | Emitted bytes do not match `expected_digest` | `instruction_id`, `declared`, `actual` | N13 |
 | E-VERSION-001 | Materializer cannot honor a declared plan feature | `feature`, `format_version` | — |
@@ -175,12 +176,31 @@ rejection; `derived` means it follows from a measured byte sequence.
   other side — one fragment names one of them, and which one wins is list order,
   the implicit tie-break §3 forbids. `instruction_id` is therefore required to be
   unique, and `(section_id, offset)` to be unique, before emission is ordered.
+- `E-FIXUP-007` — derived, `03_fixup_model.md` §7 (ADR-0010): a fixup that names
+  `pcrel_hi` but has no `pair_role: lo`. Its `P` has no source, and the tempting
+  fallback is `pcrel_begin`, which measures from the `addi` itself: with the
+  `auipc` at 0 and the `addi` at 4 the reference comes out 4 bytes too high and
+  still looks like a valid address. N17's `N17b` pins that shape. The
+  complementary shape is a group with two `hi` members (`N12a`): the same target
+  has two candidate reference points and nothing says which one a `lo` meant.
+  A third shape is a `lo` in a different section from its `hi` (`N17c`): `S` and
+  `P_hi` would then be offsets into two unrelated origins, and their difference is
+  arithmetic on two coordinate systems — a small, plausible, wrong number rather
+  than a wrap. The group is therefore confined to one section.
 - `E-FIXUP-008` — derived, `03_fixup_model.md` §8: two fixups both named `F0001`
   at different sites. `fixup_record_order` still sorts them, but the emitted
   records are addressed by `fixup_id`; a consumer applying records by id applies
   one twice or drops one, and the plan says nothing about which. `pair_group`
   does not help, because it groups a `hi` and a `lo` that are deliberately
   different fixups.
+- `E-FIXUP-009` — source, psABI `riscv-elf.adoc:1184`/`:1186` (ADR-0010): a
+  `pcrel_lo12` low half carrying `addend: 4`. The `hi` already folded its addend
+  into the shared displacement: with the `auipc` at 0 and a symbol at `0x1000`,
+  `hi20 = (0x1000 + 4 + 0x800) >> 12 = 1` and the low half needs
+  `(0x1004 - 0) & 0xFFF = 4`. A second addend on the low half yields 8, which is
+  the address of a byte past the symbol — a plausible, wrong reference, and the
+  plan would have stated the same addend twice with no way to tell which one the
+  author meant.
 
 ### 2.2 Retired codes
 

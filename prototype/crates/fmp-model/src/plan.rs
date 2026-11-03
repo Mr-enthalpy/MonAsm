@@ -214,6 +214,8 @@ pub enum PcRule {
     PcrelBegin,
     PcrelEnd,
     PcrelPage,
+    /// `P` is the paired `hi` member's site, not this fixup's (ADR-0010).
+    PcrelHi,
     Unknown(String),
 }
 
@@ -226,6 +228,8 @@ pub enum Transform {
     Lo12I,
     Lo12S,
     PcrelHi20,
+    /// Low 12 bits of the value displaced from the paired `hi` (ADR-0010).
+    PcrelLo12,
     Unknown(String),
 }
 
@@ -824,6 +828,7 @@ fn bind_fixup(value: &json::Json, path: String) -> Result<Fixup, Diagnostic> {
         "pcrel_begin" => PcRule::PcrelBegin,
         "pcrel_end" => PcRule::PcrelEnd,
         "pcrel_page" => PcRule::PcrelPage,
+        "pcrel_hi" => PcRule::PcrelHi,
         other => PcRule::Unknown(other.to_string()),
     };
     let transform = match bind::string(transform, obj.child("value_transform"))? {
@@ -834,6 +839,7 @@ fn bind_fixup(value: &json::Json, path: String) -> Result<Fixup, Diagnostic> {
         "lo12_i" => Transform::Lo12I,
         "lo12_s" => Transform::Lo12S,
         "pcrel_hi20" => Transform::PcrelHi20,
+        "pcrel_lo12" => Transform::PcrelLo12,
         other => Transform::Unknown(other.to_string()),
     };
     let mode = match bind::string(mode, obj.child("resolution_mode"))? {

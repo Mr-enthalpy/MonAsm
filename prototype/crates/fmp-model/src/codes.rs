@@ -80,6 +80,8 @@ pub const E_FIXUP_006: &str = "E-FIXUP-006";
 pub const E_FIXUP_007: &str = "E-FIXUP-007";
 /// Duplicate `fixup_id`.
 pub const E_FIXUP_008: &str = "E-FIXUP-008";
+/// Fixup addend not allowed by its kind (RV64 `pcrel_lo12` low half).
+pub const E_FIXUP_009: &str = "E-FIXUP-009";
 /// Encoded length != `expected_size`.
 pub const E_SIZE_001: &str = "E-SIZE-001";
 /// Emitted bytes do not match `expected_digest`.
@@ -132,6 +134,7 @@ pub const ALL: &[&str] = &[
     E_FIXUP_006,
     E_FIXUP_007,
     E_FIXUP_008,
+    E_FIXUP_009,
     E_SIZE_001,
     E_BYTE_001,
     E_VERSION_001,

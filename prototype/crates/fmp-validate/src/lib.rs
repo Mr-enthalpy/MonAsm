@@ -992,7 +992,7 @@ fn check_fixup_target(model: &Model, fixup: &Fixup, errors: &mut Vec<Diagnostic>
             let offsets_are_enough = same_section
                 && matches!(
                     fixup.pc_reference_rule,
-                    PcRule::PcrelBegin | PcRule::PcrelEnd
+                    PcRule::PcrelBegin | PcRule::PcrelEnd | PcRule::PcrelHi
                 );
             if !offsets_are_enough {
                 let bound = symbol
@@ -1101,6 +1101,43 @@ fn check_fixup_kind(fixup: &Fixup, errors: &mut Vec<Diagnostic>) {
         ),
         _ => {}
     }
+    // ADR-0010: `pcrel_hi` and `pcrel_lo12` are one decision split across two
+    // fields. A plan that names one without the other describes a displacement
+    // whose reference point and mask disagree, so it is not a resolvable kind.
+    if matches!(fixup.value_transform, Transform::PcrelLo12)
+        && !matches!(fixup.pc_reference_rule, PcRule::PcrelHi)
+    {
+        errors.push(
+            Diagnostic::new(codes::E_FIXUP_001, fixup.path.clone() + "/value_transform")
+                .with("kind", "value_transform:pcrel_lo12")
+                .with("form_id", "")
+                .with("field", "pcrel_lo12 requires pc_reference_rule pcrel_hi"),
+        );
+    }
+    if matches!(fixup.pc_reference_rule, PcRule::PcrelHi)
+        && !matches!(fixup.value_transform, Transform::PcrelLo12)
+    {
+        errors.push(
+            Diagnostic::new(
+                codes::E_FIXUP_001,
+                fixup.path.clone() + "/pc_reference_rule",
+            )
+            .with("kind", "pc_reference_rule:pcrel_hi")
+            .with("form_id", "")
+            .with("field", "pcrel_hi requires value_transform pcrel_lo12"),
+        );
+    }
+    // The high half already carried the addend into the shared displacement
+    // (`03_fixup_model.md` §6.1), so a second one on the low half would be
+    // added twice.
+    if matches!(fixup.value_transform, Transform::PcrelLo12) && fixup.addend != 0 {
+        errors.push(
+            Diagnostic::new(codes::E_FIXUP_009, fixup.path.clone() + "/addend")
+                .with("fixup_id", fixup.fixup_id.as_str())
+                .with("addend", fixup.addend)
+                .with("value_transform", "pcrel_lo12"),
+        );
+    }
     let needs_shift = matches!(fixup.value_transform, Transform::Scale);
     if needs_shift && fixup.transform_shift.is_none() {
         errors.push(
@@ -1208,28 +1245,48 @@ fn check_fixup_pairs(model: &Model, errors: &mut Vec<Diagnostic>) {
         groups.push(fixup);
     }
     for (group, members) in groups {
-        let hi = members
+        let highs: Vec<&Fixup> = members
             .iter()
+            .copied()
             .filter(|fixup| matches!(fixup.pair_role, Some(fmp_model::plan::PairRole::Hi)))
-            .count();
-        let lo = members
+            .collect();
+        let lows: Vec<&Fixup> = members
             .iter()
+            .copied()
             .filter(|fixup| matches!(fixup.pair_role, Some(fmp_model::plan::PairRole::Lo)))
-            .count();
-        if hi != 1 || lo != 1 || members.len() != 2 {
+            .collect();
+        // ADR-0010: one high part may serve several low parts (psABI
+        // `riscv-elf.adoc:1580-1605`), so the count is 1:N, not 1:1.
+        if highs.len() != 1 || lows.is_empty() {
             errors.push(
                 Diagnostic::new(codes::E_FIXUP_007, members[0].path.clone())
                     .with("pair_group", group)
-                    .with("problem", "a pair needs exactly one hi and one lo"),
+                    .with("problem", "a pair needs exactly one hi and at least one lo"),
             );
             continue;
         }
-        if !same_target(members[0].target.clone(), members[1].target.clone()) {
+        let hi = highs[0];
+        if members
+            .iter()
+            .any(|fixup| !same_target(fixup.target.clone(), hi.target.clone()))
+        {
             errors.push(
                 Diagnostic::new(codes::E_FIXUP_007, members[0].path.clone())
                     .with("pair_group", group)
-                    .with("problem", "the two members reference different targets"),
+                    .with("problem", "the group members reference different targets"),
             );
+        }
+        for lo in &lows {
+            if matches!(lo.pc_reference_rule, PcRule::PcrelHi) && lo.section_id != hi.section_id {
+                errors.push(
+                    Diagnostic::new(codes::E_FIXUP_007, lo.path.clone() + "/pc_reference_rule")
+                        .with("pair_group", group)
+                        .with(
+                            "problem",
+                            "a pcrel_hi low half must be in its high half's section",
+                        ),
+                );
+            }
         }
     }
     for fixup in &model.plan.fixups {
@@ -1238,6 +1295,18 @@ fn check_fixup_pairs(model: &Model, errors: &mut Vec<Diagnostic>) {
                 Diagnostic::new(codes::E_FIXUP_007, fixup.path.clone() + "/pair_role")
                     .with("pair_group", "")
                     .with("problem", "pair_role without pair_group"),
+            );
+        }
+        if matches!(fixup.pc_reference_rule, PcRule::PcrelHi)
+            && !matches!(fixup.pair_role, Some(fmp_model::plan::PairRole::Lo))
+        {
+            errors.push(
+                Diagnostic::new(
+                    codes::E_FIXUP_007,
+                    fixup.path.clone() + "/pc_reference_rule",
+                )
+                .with("pair_group", fixup.pair_group.as_deref().unwrap_or(""))
+                .with("problem", "pcrel_hi is only legal on a lo member"),
             );
         }
     }

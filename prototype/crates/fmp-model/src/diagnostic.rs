@@ -214,6 +214,7 @@ fn describe(code: &str) -> &'static str {
         crate::codes::E_FIXUP_006 => "two writers patch the same bits",
         crate::codes::E_FIXUP_007 => "fixup pair is incomplete or inconsistent",
         crate::codes::E_FIXUP_008 => "fixup identity collides",
+        crate::codes::E_FIXUP_009 => "fixup addend is not allowed by its kind",
         crate::codes::E_SIZE_001 => "encoded length differs from expected_size",
         crate::codes::E_BYTE_001 => "emitted bytes differ from expected_digest",
         crate::codes::E_VERSION_001 => "the format version cannot honour this feature",

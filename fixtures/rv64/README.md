@@ -22,6 +22,8 @@ Both are generated from the pinned UDB resolved spec by
 | `RV-P5-jal-jtype` | `riscv:jal/rd-imm20` | `RV-P5`, `RV-P6`, forward and backward |
 | `RV-P7-caddi` | `riscv:c.addi/rd-imm6` | `RV-P7`, four immediates; the 4-byte `addi` sits beside the 2-byte form |
 | `RV-P8-auipc-imm20` | `riscv:auipc/rd-imm20` | `RV-P8` field half only |
+| `RV-P8-pcrel-pair` | `riscv:auipc/rd-imm20`, `riscv:addi/rd-rs1-imm12`, `riscv:sd/rs-base-imm12` | `RV-P8` pair half: one `hi`, two `lo`, three records, unlinked |
+| `RV-P8-pcrel-pair-resolved` | `riscv:auipc/rd-imm20`, `riscv:addi/rd-rs1-imm12` | `RV-P8` pair arithmetic against a linked binary |
 | `RV-P3-ld-sd-base-offset` | `riscv:ld/rd-base-imm12`, `riscv:sd/rs-base-imm12` | `RV-P3`, four instructions, signed imm12 endpoints |
 
 Oracle: `llvm-mc 23.1.2 -triple=riscv64 -filetype=obj`, then
@@ -45,8 +47,31 @@ relocation record, are what the fixture checks.
 
 `RV-P8-auipc-imm20` has no fixup. `llvm-mc` accepts only the unsigned literal in
 `[0, 1048575]`, so the plan states the third vector as the signed field value `-1`
-and the oracle line is `auipc a0, 1048575`; both describe the same 20 bits. The
-`%pcrel_hi`/`%pcrel_lo` pair is **not** covered here (see below).
+and the oracle line is `auipc a0, 1048575`; both describe the same 20 bits.
+
+`RV-P8-pcrel-pair` is the pair half (`ADR-0010`, `OD-15`). One `auipc a0,
+%pcrel_hi(blob)` and two low halves — `addi a0, a0, %pcrel_lo(.L0)` and
+`sd a1, %pcrel_lo(.L0)(a0)` — point at the same external symbol, and the three
+fixups form `pair_group: P8`: `F0001` is the `hi` with `pcrel_begin` +
+`pcrel_hi20`, and `F0002`/`F0003` are `lo` members with `pcrel_hi` +
+`pcrel_lo12`. That is the psABI's 1:N shape, and it is the fixture for ADR-0010
+decision 3: the S-type low half keeps the same transform and differs only in its
+`field_descriptor` (`[31:25]` then `[11:7]`, versus `[31:20]` for the I-type).
+All three fixups are `emit_relocation`, so Level 0 zeroes the immediate fields
+and the bytes are `17 05 00 00 13 05 05 00 23 30 b5 00`; the second source is
+`llvm-readobj -r`, which prints `R_RISCV_PCREL_HI20 blob 0x0`,
+`R_RISCV_PCREL_LO12_I .L0 0x4` and `R_RISCV_PCREL_LO12_S .L0 0x8` on the same
+object. The label `.L0` sits on the `auipc`, which is exactly the "low half names
+a label in the same section" relation `pcrel_hi` expresses.
+
+`RV-P8-pcrel-pair-resolved` measures the arithmetic the first fixture cannot:
+both fixups are `resolve_in_place`, the `auipc` sits at 4 and `blob` at 0x1000,
+so `P_hi` is not page-aligned. The linked words are `17 15 00 00`
+(`0x00001517`) and `13 05 c5 ff` (`0xFFC50513`), i.e. high half
+`(0x1000 - 4 + 0x800) >> 12 = 1` and low half `(0x1000 - 4) & 0xFFF = 0xFFC`.
+Three plausible alternatives each produce a different word — `lo12_i` 0x000,
+`pcrel_begin` on the `lo` 0xFF8, no `+0x800` 0 — so the fixture separates the
+rule from its neighbours instead of merely matching a number.
 
 `RV-P7-caddi` pins the compressed-versus-standard choice: the first instruction
 is `riscv:c.addi/rd-imm6` (`05 05`, 2 B) and the second is
@@ -69,12 +94,15 @@ encoded: both are inside the declared ranges and produce reserved HINTs
 | `N15-composite-memory-payload` | `E-OPERAND-003` | a `{"mem": {base, disp}}` payload is not one of the four `fmp/0.1` shapes, so the reader rejects it before the definition is looked up |
 | `N16a-caddi-imm-zero` | `E-RANGE-004` | `c.addi` with `imm = 0` is inside `[-32, 31]` but excluded: the bytes would mean a HINT |
 | `N16b-caddi-rd-zero` | `E-RANGE-004` | `c.addi` with `dest = 0` is inside `0..31` but excluded: the bytes would mean `c.nop` |
+| `N17a-lo12-addend-nonzero` | `E-FIXUP-009` | a `pcrel_lo12` low half with `addend: 4`: the `hi` already folded the addend into the shared displacement, so a second one would be added twice |
+| `N17b-pcrel-hi-without-lo-role` | `E-FIXUP-007` | `pcrel_hi` on a fixup with no `pair_role: lo`: there is no `P` to measure from, and no fallback to `pcrel_begin` |
+| `N17c-lo-in-other-section` | `E-FIXUP-007` | a `pcrel_hi` low half in `.text2` whose `hi` is in `.text`: `P_hi` would be an offset into a different origin, so the subtraction would silently mix two sections |
 
 ## Not covered
 
-- `RV-P8`'s pair half needs the psABI `R_RISCV_PCREL_HI20`/`R_RISCV_PCREL_LO12_I`
-  relation pinned; the encoding blocks do not state it.
-
-Naming that pair is `E-FORM-001` until it is pinned.
+- The 1:N half is proven only at the record level: `RV-P8-pcrel-pair` stops at
+  `emit_relocation`, so a group with two low halves is not compared against a
+  linked binary. The single-`lo` arithmetic is covered by
+  `RV-P8-pcrel-pair-resolved`.
 
 See `../README.md` for naming and oracle rules.

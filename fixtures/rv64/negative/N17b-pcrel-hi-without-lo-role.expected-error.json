@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-FIXUP-007", "path": "/fixups/0/pc_reference_rule", "detail_keys": ["pair_group", "problem"] }
+  ]
+}

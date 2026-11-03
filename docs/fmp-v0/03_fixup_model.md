@@ -30,8 +30,8 @@ for me" bugs.
 | `field_descriptor` | yes | Ordered list of `{lsb, width}` bit ranges relative to `offset`, most significant value bits first | Some fields are split across the instruction | RISC-V B-type immediate is split into `imm[12\|10:5]` and `imm[4:1\|11]`; a contiguous write cannot express it. | frozen |
 | `target` | yes | `{kind: symbol \| absolute \| section_relative, ...}` | The value source | An absolute patch with no target is a silent zero. | frozen |
 | `addend` | yes | Signed integer, explicit, even when zero | The addend is part of the computed value; `fmp/0.1` records are RELA-shaped so it is never read from the field | Inferring the addend from the field's current contents makes output depend on prior bytes, and a zero field becomes indistinguishable from a deliberate addend. | frozen |
-| `pc_reference_rule` | yes | `none` \| `pcrel_begin` \| `pcrel_end` \| `pcrel_page` \| `definition:<id>` | `P` is not universal | x86 uses the end of the instruction; RISC-V branches use the instruction address. | frozen |
-| `value_transform` | yes | `identity`, `scale(shift)`, `page`, `hi20`, `lo12_i`, `lo12_s`, `pcrel_hi20`, … | Encodes range and scaling semantics | AArch64 page/scaled immediates are not plain displacements. | frozen |
+| `pc_reference_rule` | yes | `none` \| `pcrel_begin` \| `pcrel_end` \| `pcrel_page` \| `pcrel_hi` \| `definition:<id>` | `P` is not universal | x86 uses the end of the instruction; RISC-V branches use the instruction address; an RV64 `lo` half uses its paired `hi`'s address, which is neither. | frozen |
+| `value_transform` | yes | `identity`, `scale(shift)`, `page`, `hi20`, `lo12_i`, `lo12_s`, `pcrel_hi20`, `pcrel_lo12`, … | Encodes range and scaling semantics | AArch64 page/scaled immediates are not plain displacements; an absolute low 12 bits and a paired low 12 bits differ whenever the `hi` is not page-aligned. | frozen |
 | `range_constraint` | yes | `{signed, bits, align_bits}` | Determines legality, not just formatting | A rel8 with a 200-byte target must be rejected, not truncated. | frozen |
 | `resolution_mode` | yes | `resolve_in_place` \| `emit_relocation` | Chooses "write the value now" from "write a record for later" | A mode inferred from whether the target happens to be defined makes bytes depend on symbol liveness; an unresolved patch written with no record loses the reference silently. | frozen |
 | `pair_group` | no | Id shared by associated fixups | Some patches only make sense as a pair | `adrp`+`add` and `auipc`+`addi` are pairs; applying one alone yields a wrong address. | frozen |
@@ -127,12 +127,21 @@ defaulted.
 | `pcrel_begin` | address of the fixup site | RISC-V B-type and J-type, AArch64 `b`/`bl` |
 | `pcrel_end` | address immediately after the instruction that contains the site | x86-64 `rel32` |
 | `pcrel_page` | page base of `P` | AArch64 `adrp` |
+| `pcrel_hi` | address of the paired `hi` member's site | RV64 `addi`/load/store low half (`pcrel_lo12`) |
 
 For `pcrel_end` the containing instruction is found through the section's
 fragments, not by arithmetic on the site offset: the site may sit several bytes
 into the instruction (x86 `rel32` starts at byte 1), so "site + size" would be
 wrong by exactly that much. An earlier draft of this table said that; it was
 fixed after `EXP-0002` §6.1 exposed the off-by-one.
+
+`pcrel_hi` is the one rule that reads another fixup: its `P` is the paired `hi`
+member's site, so it is legal only on a fixup with `pair_role: lo`, and the `hi`
+must be in the same section. The psABI states the same constraint for the label
+("an instruction in the same section with a high-part relocation entry",
+`riscv-elf.adoc:1584-1590`). A `lo` whose group has no `hi` is `E-FIXUP-007`;
+there is no fallback to `pcrel_begin`, because that would silently measure from
+the wrong instruction (ADR-0010).
 
 A definition MAY declare additional named rules (`definition:<id>`), but the
 string must be resolved by the pinned definition, never by convention.
@@ -210,7 +219,7 @@ record.
 ## 6. Target-specific semantics (v0 candidates)
 
 `value_transform` is applied to `D`, the value `pc_reference_rule` produced. The
-five transforms `fmp/0.1` defines, and nothing else:
+six transforms `fmp/0.1` defines, and nothing else:
 
 | Transform | Applied as | Where it comes from |
 |---|---|---|
@@ -219,6 +228,7 @@ five transforms `fmp/0.1` defines, and nothing else:
 | `page` | `v = (page(S + A) - page(P)) >> 12`, with `page(x) = x & !0xFFF` | `adrp` below |
 | `lo12_i` | `v = (S + A) & 0xFFF` — a mask, never range-checked | `add :lo12:` below |
 | `pcrel_hi20` | `v = (D + 0x800) >> 12` | RV64 `auipc` below |
+| `pcrel_lo12` | `v = D & 0xFFF` — a mask, never range-checked | RV64 `addi`/load/store low half below |
 
 `hi20` and `lo12_s` are named in the schema's `value_transform` enum, but this
 document defines no semantics for them and no v0 fixture uses them. A plan that
@@ -226,6 +236,11 @@ names one is `E-VERSION-001` (`feature: value_transform:hi20`): `fmp/0.1` cannot
 express what the plan means, and inventing a definition at materialization time
 would be a decision, not a validation. They are reserved for the AArch64 and RV64
 tables, which add their definitions together with the slice that needs them.
+`lo12_s` stays reserved on purpose (ADR-0010): the `_i`/`_s` suffix names the
+instruction form, which `form_id` already carries, so an S-type low half is
+`pcrel_lo12` with an S-type `field_descriptor`. `pcrel_lo12` is *not* a synonym
+for `lo12_i`: it masks the displaced value `S + A - P_hi`, while `lo12_i` masks
+the absolute `S + A`, and the two differ whenever the `hi` is not page-aligned.
 
 The ISA table:
 
@@ -238,8 +253,8 @@ The ISA table:
 | AArch64 `add :lo12:` | imm12 = `(S+A) & 0xFFF`, optional `lsl #12` | `value_transform = lo12_i`, pair `lo`, same `pair_group` |
 | RV64 B-type | imm12…imm1 scattered; `P` = instruction address; ±4 KiB, 2-byte aligned | `pcrel_begin`, `range.bits = 12`, `align_bits = 1` |
 | RV64 J-type (`jal`) | imm20…imm1 scattered; ±1 MiB | `pcrel_begin`, `range.bits = 20`, `align_bits = 1` |
-| RV64 `auipc` hi20 | `hi20 = (S + A + 0x800) >> 12` in exact arithmetic, relative to the `auipc` PC | pair `hi`, `pcrel_hi20` |
-| RV64 `addi` lo12 | `lo12 = (S + A)` sign-extended 12 bits | pair `lo`, same `pair_group`, references the **auipc** site |
+| RV64 `auipc` hi20 | `hi20 = (S + A - P + 0x800) >> 12` in exact arithmetic, `P` = the `auipc`'s address | pair `hi`, `pcrel_begin`, `pcrel_hi20` |
+| RV64 `addi`/load/store lo12 | `lo12 = (S + A - P_hi) & 0xFFF`, `P_hi` = the paired `auipc`'s address | pair `lo`, `pcrel_hi`, `pcrel_lo12`, `addend` MUST be 0 |
 
 The RISC-V `%pcrel_lo` semantics are the sharpest case: the low fixup references
 the *high instruction*, not the symbol directly, because the linker needs the
@@ -272,6 +287,15 @@ Three facts this pins down:
    writes `S + A - P` with `P` at the displacement field; the plan writes `P`
    after the instruction and leaves `A` at zero. The two are the same value.
 
+Fact 1 is no longer only an observation. The pinned psABI states it normatively
+(`riscv-elf.adoc:1584-1590`, read at tag `v2.0-rc0`): the low-part relocation's
+symbol is "a label pointing to an instruction in the same section with a
+high-part relocation entry that points to the target symbol". The same section
+adds that the value is `symbol_address - hi20_reloc_offset`, that "the addend must
+be 0", and that one high part may serve "one or more" low parts that are "not
+necessarily sequential" (`:1600-1605`, `:1184`, `:1186`). ADR-0010 turns those four
+statements into `pcrel_hi`, `pcrel_lo12`, `E-FIXUP-009` and a 1:N group.
+
 Consequence for output level (`OD-03`): a Level 0 record expresses all three
 shapes directly. A Level 1 emitter for RISC-V would have to synthesize a local
 symbol per `hi` site to fill the relocation, which is extra state, not extra
@@ -279,12 +303,17 @@ information.
 
 ## 7. Pairing rules
 
-- Every fixup with `pair_group` MUST have exactly one `hi` and one `lo` member
-  (`E-FIXUP-007`, N12).
-- Both members MUST reference the same logical target.
+- Every fixup with `pair_group` MUST have exactly one `hi` and at least one `lo`
+  member (`E-FIXUP-007`, `N12`). One high part may serve several low parts, and
+  the members are not assumed to be adjacent (`ADR-0010`).
+- All members MUST reference the same logical target. The group is coherent
+  through `pair_group`; each member's `target` names the same symbol, and the
+  different ELF spellings (§6.1: RISC-V's low record names the `hi` site,
+  AArch64's names the symbol) are serialization details rather than plan data.
 - The `lo` member's `section_id`/`offset` MUST be a valid site inside the same
-  output; its `offset` MAY be in a different section only if the definition
-  allows it.
+  output. A `pcrel_hi` member MUST be in its `hi`'s section, because the psABI
+  requires the label to point at an instruction in the same section; any other
+  `lo` MAY be in a different section only if the definition allows it.
 - Membership and roles are data. The materializer never infers a pair from
   adjacency, ordering, or symbol names.
 - A `lo` member's transform is never derived from its `hi` member's. Both

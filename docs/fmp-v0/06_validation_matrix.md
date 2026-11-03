@@ -21,11 +21,12 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 | N09 | Two layout fragments overlap | Reject | E-LAYOUT-001 | all (layout is ISA-independent) | `x86_64/negative/N09-overlapping-fragments.fmp.json` | x86 passing |
 | N10 | Definition digest does not match | Reject | E-DEF-001 | all | `x86_64/negative/N10-definition-digest-mismatch.fmp.json` | x86 passing |
 | N11 | Plan implies implicit alignment or padding | Reject | E-LAYOUT-002 / E-LAYOUT-005 | all | `x86_64/negative/N11-fragment-gap.fmp.json` | x86 passing (`E-LAYOUT-002`; `E-LAYOUT-005` unreachable in v0, `04_errors.md` §2.3) |
-| N12 | Associated relocation pair is incomplete or inconsistent | Reject | E-FIXUP-007 | aarch64 (`adrp`+`lo12`), rv64 (`auipc`+`lo12`) | `aarch64/negative/N12a-pair-without-lo.fmp.json` | aarch64 passing (two `hi`, no `lo`); not applicable to x86 v0 (single-site `rel32`) |
+| N12 | Associated relocation pair is incomplete or inconsistent: no `hi`, more than one `hi`, no `lo`, a target mismatch, or a `pair_role` with no `pair_group` | Reject | E-FIXUP-007 | aarch64 (`adrp`+`lo12`), rv64 (`auipc`+`lo12`) | `aarch64/negative/N12a-pair-without-lo.fmp.json` | aarch64 passing (two `hi`, no `lo`); not applicable to x86 v0 (single-site `rel32`) |
 | N13 | `expected_digest` is present and the emitted bytes hash to a different value | Reject, never re-encode to match | E-BYTE-001 | x86, aarch64, rv64 | `x86_64/negative/N13-expected-digest-mismatch.fmp.json` | x86 passing |
 | N14 | Operand value does not fit the slot's encoded field: `r9` in a 3-bit `ModRM` field, or `x32` in a 5-bit AArch64 register field | Reject, never truncate to another register | E-OPERAND-004 | x86, aarch64 | `x86_64/negative/N14-register-wider-than-field.fmp.json`, `aarch64/negative/N14-register-wider-than-field.fmp.json` | x86 and aarch64 passing |
 | N15 | Operand payload is a composite memory operand (`{"mem": {"base": …, "disp": …}}`), not one of the four `fmp/0.1` shapes | Reject at read time, never split it into operands | E-OPERAND-003 | all | `rv64/negative/N15-composite-memory-payload.fmp.json` | rv64 passing |
 | N16 | Operand value is inside the slot's field range but excluded by the form (`c.addi` zero immediate, `c.addi` zero destination) | Reject, never encode the HINT the bytes would mean | E-RANGE-004 | rv64 | `rv64/negative/N16a-caddi-imm-zero.fmp.json`, `rv64/negative/N16b-caddi-rd-zero.fmp.json` | rv64 passing |
+| N17 | RV64 pair half is inconsistent: `N17a` a `pcrel_lo12` low half with a non-zero `addend`, `N17b` a `pcrel_hi` fixup with no `pair_role: lo`, `N17c` a `pcrel_hi` low half in a different section than its `hi` | Reject, never fold the addend in, fall back to `pcrel_begin`, or measure across sections | E-FIXUP-009 / E-FIXUP-007 | rv64 | `rv64/negative/N17a-lo12-addend-nonzero.fmp.json`, `rv64/negative/N17b-pcrel-hi-without-lo-role.fmp.json`, `rv64/negative/N17c-lo-in-other-section.fmp.json` | rv64 passing |
 
 N13's counterexample is `EXP-0002` W2: a same-length encoder defect turns
 `48 89 d8` (`mov rax, rbx`) into `49 89 d8` (`mov r8, rbx`), both 3 bytes and
@@ -185,7 +186,7 @@ relocation kinds were read with `llvm-readobj -r` before linking (see
 | RV-P5 | Control transfer | `jal` J-type scatter | llvm-mc | **passing** — `RV-P5-jal-jtype` (+8 and −8) |
 | RV-P6 | Scattered fields | B-type and J-type bit placement verified byte-for-byte | llvm-mc | **passing** with `RV-P4`/`RV-P5`; `beq` uses four placements, `jal` four |
 | RV-P7 | Compressed vs standard | `c.addi` (2 bytes) vs `addi` (4 bytes), never chosen by the encoder | llvm-mc | **passing** — `RV-P7-caddi` (four immediates), with `N16a`/`N16b` rejecting the zero cases |
-| RV-P8 | Associated reference | `auipc`+`addi` pair with `hi20`/`lo12` | llvm-mc + readelf | **partly passing** — `RV-P8-auipc-imm20` covers the form's field; the `%pcrel_hi`/`%pcrel_lo` pair needs the psABI relation |
+| RV-P8 | Associated reference | `auipc`+`addi` pair with `hi20`/`lo12` | llvm-mc + llvm-readobj + ld.lld | **passing** — `RV-P8-auipc-imm20` covers the form's field; `RV-P8-pcrel-pair` the 1:N group (three records); `RV-P8-pcrel-pair-resolved` the arithmetic against a linked binary |
 
 The source is pinned (`OD-12`, ADR-0007): the UDB resolved-spec nodes named in
 `check_rv64_source.py`, with `EXP-0009` deriving the B/J/RVC placements and
@@ -195,9 +196,9 @@ matching fourteen `llvm-mc` byte strings. `EXP-0010` generated
 and `0.2.0` (the same seven plus `c.addi`, digest
 `sha256:8329a38faa964f9c69207a48e3bfb45c13fb0ddbaeb829ddcc0dbd1cffa8de10`)
 from eight of those nodes and re-encoded the probe vectors from each table it
-built; the seven positive fixtures above are the independent gate, and the
-negative fixtures (`N01`, `N01c`, `N02`, `N03`, `N04`, `N15`, `N16a`/`N16b`) pin
-the rejection paths.
+built; the positive fixtures above are the independent gate, and the
+negative fixtures (`N01`, `N01c`, `N02`, `N03`, `N04`, `N15`, `N16a`/`N16b`,
+`N17a`/`N17b`/`N17c`) pin the rejection paths.
 
 `RV-P3` is carried by two forms (`riscv:ld/rd-base-imm12`, `riscv:sd/rs-base-imm12`)
 built from the `RV64` encoding block of `I/ld.yaml` (sha256:a2afcd44…) and
@@ -215,9 +216,24 @@ both slots, and `EXP-0012` §2 measured the alternative — `c.addi a0, 0` encod
 reserved HINTs. `N16a`/`N16b` pin `E-RANGE-004`; `N01c` pins that naming the form
 against `0.1.0` is `E-FORM-001`, not a silent fallback to `addi`.
 
-One row is still blocked on the format, not the source: `RV-P8`'s pair half needs
-the psABI's `R_RISCV_PCREL_HI20`/`LO12_I` relation, which the encoding blocks do
-not state. Naming the pair is `E-FORM-001` until it is pinned.
+`RV-P8`'s pair half was blocked on the format, not the source. The psABI states
+the `R_RISCV_PCREL_HI20`/`LO12_I` relation and the encoding blocks do not; ADR-0010
+turns the four normative statements (`riscv-elf.adoc:1578-1605`, `:1184`, `:1186`)
+into `pc_reference_rule: pcrel_hi`, `value_transform: pcrel_lo12`, `E-FIXUP-009`
+and a 1:N group. Two fixtures carry it. `RV-P8-pcrel-pair` is the unlinked gate:
+one `auipc`, one `addi` and one `sd`, all `emit_relocation`, so the group is one
+`hi` and two `lo`, and the oracle is the object file's three records. The S-type
+member also measures ADR-0010 decision 3 — `llvm-mc` emits `R_RISCV_PCREL_LO12_S`
+for the same `pcrel_lo12` value. `RV-P8-pcrel-pair-resolved` is the arithmetic
+gate: `auipc` at 4, `blob` at 0x1000, both fixups `resolve_in_place`, and the
+linked words `0x00001517` / `0xFFC50513` equal `(0x1000 - 4 + 0x800) >> 12 = 1`
+and `(0x1000 - 4) & 0xFFF = 0xFFC`. The three alternatives give three different
+words (`lo12_i` → 0x000, `pcrel_begin` on the `lo` → 0xFF8, no `+0x800` → 0), so
+the fixture distinguishes the rule rather than merely agreeing with it. `N17a`
+pins the rejected low-half addend, `N17b` the rejected `pcrel_hi` without a `lo`
+role, and `N17c` the rejected `lo` in another section: `S` and `P_hi` would then
+be offsets into unrelated origins, so the mask would hide a coordinate-system
+error instead of reporting it.
 
 ## 5. Gate G3
 

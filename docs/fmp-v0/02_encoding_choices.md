@@ -154,13 +154,18 @@ what keeps an encoder from choosing `mod` from the displacement's value.
 `EC-19` is carried by `riscv:c.addi/rd-imm6`: `0.2.0` names the compressed form,
 `0.1.0` does not, and a plan that asks for it against `0.1.0` is `E-FORM-001`
 (`N01c`). Its `not: 0` is the `excluded` field of ADR-0009/`OD-14`; naming either
-zero is `E-RANGE-004` (`N16a`, `N16b`), never a silent `c.nop`/HINT. `EC-20`
-stays without a carrier because v0 has no 3-bit compressed register field
-(`c.lw`-style CL/CS forms are not in either table); its example is `c.lw`. `EC-21`
-is decided but only half carried: the `auipc` form fixes the PC-relative
-instruction, and `pcrel_hi20`/`lo12` exist as fixup transforms, but the psABI
-pairing that ties the two halves together is not pinned, so no fixture claims the
-pair yet.
+zero is `E-RANGE-004` (`N16a`, `N16b`), never a silent `c.nop`/HINT.
+
+`EC-21` is now carried on its PC-relative side. The `auipc` form fixes the
+instruction, `pcrel_hi20`/`pcrel_lo12` carry the transform, ADR-0010 pins the
+psABI relation as `pc_reference_rule: pcrel_hi` plus a 1:N `pair_group`, and two
+fixtures claim it — `RV-P8-pcrel-pair` on the record side and
+`RV-P8-pcrel-pair-resolved` against a linked binary. What EC-21 still does not
+decide is the *absolute* alternative `lui`+`addi`: no v0 form carries `lui`, so
+the choice is embodied by which form the plan names and cannot yet be measured
+against both sides. `EC-20` stays without a carrier because v0 has no 3-bit
+compressed register field (`c.lw`-style CL/CS forms are not in either table); its
+example is `c.lw`.
 
 ## Evidence
 

@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy + llvm-readobj",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -filetype=obj RV-P8-pcrel-pair.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin && llvm-readobj -r out.o",
+  "kind": "assembler",
+  "input_sha256": "9b09dfc8ff3e23eed94c2630aa78e4ecb9eff97ffdfe0942021d4cf7b843194f",
+  "output_sha256": "6ce131c1848b82414bb16dbd82f5c11259dce0259599af92d502c0a8a02b845f",
+  "size": 12,
+  "records": 3,
+  "notes": "Input, one line each (LF, trailing newline): `.L0:` / `  auipc a0, %pcrel_hi(blob)` / `  addi a0, a0, %pcrel_lo(.L0)` / `  sd a1, %pcrel_lo(.L0)(a0)`. `blob` is undefined, so nothing links away. `llvm-readobj -r` prints three records on the same object: `R_RISCV_PCREL_HI20 blob 0x0`, `R_RISCV_PCREL_LO12_I .L0 0x4` and `R_RISCV_PCREL_LO12_S .L0 0x8`. That is the psABI's 1:N shape: one `auipc` and two low halves that both name the label on the `auipc`, one I-type and one S-type. The plan mirrors it with one `hi` member and two `lo` members in `pair_group: P8`; the S-type member keeps `value_transform: pcrel_lo12` and differs only in its `field_descriptor` (UDB placements `[31:25]` then `[11:7]`), which is ADR-0010 decision 3. All three fixups are `emit_relocation`, so their fields are zero by contract and the bytes are the three templates with zero immediates. This is the pre-link oracle only; the arithmetic `(S + A - P_hi) & 0xFFF` is not compared here (ADR-0010, consequences).",
+  "source": "RISC-V psABI tag v2.0-rc0 (`riscv-elf.adoc:1578-1605`); RISC-V UDB I/auipc.yaml, I/addi.yaml and I/sd.yaml for the field placements"
+}

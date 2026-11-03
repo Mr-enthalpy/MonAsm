@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-FIXUP-009", "path": "/fixups/1/addend", "detail_keys": ["fixup_id", "addend", "value_transform"] }
+  ]
+}

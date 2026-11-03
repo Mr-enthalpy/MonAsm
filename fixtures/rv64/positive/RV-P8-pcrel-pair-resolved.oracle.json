@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + ld.lld 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -filetype=obj RV-P8-pcrel-pair-resolved.s -o out.o && ld.lld --image-base=0 -Ttext=0 -o out.elf out.o && llvm-objcopy -O binary --only-section=.text out.elf out.bin",
+  "kind": "assembler + linker",
+  "input_sha256": "bb674aa2fa581868de7b9b6a06f547011686af65f3a351de1d803caf6f41e374",
+  "output_sha256": "e8cae164408e3c08ce132313956837b8910d47028d75b41a2f77844a75de9774",
+  "size": 4096,
+  "records": 0,
+  "notes": "Input (LF, trailing newline): `  .org 0x4` / `.L0:` / `  auipc a0, %pcrel_hi(blob)` / `  addi a0, a0, %pcrel_lo(.L0)` / `  .org 0x1000` / `blob:`. The `auipc` is at 4 and `blob` at 0x1000, so the reference point is deliberately not page-aligned and the pair is not 8-byte adjacent to the symbol. Hand derivation: high half = (0x1000 - 4 + 0x800) >> 12 = 0x17FC >> 12 = 1; low half = (0x1000 - 4) & 0xFFF = 0xFFC, i.e. addi imm = -4. The linked words are 0x00001517 and 0xFFC50513 (`17 15 00 00 13 05 c5 ff`). Three alternatives give different bytes, which is why the fixture can tell the rule apart: `lo12_i` (absolute) would write 0x000, `pcrel_begin` on the low half would write 0xFF8 (0x1000 - 8), and omitting the `+0x800` would write high half 0. Both fixups are `resolve_in_place`, so no record is emitted. Rest of the section is `.org` fill, zero.",
+  "source": "RISC-V psABI tag v2.0-rc0 (`riscv-elf.adoc:1578-1605`, `:1184`, `:1186`); RISC-V UDB I/auipc.yaml and I/addi.yaml for the placements"
+}

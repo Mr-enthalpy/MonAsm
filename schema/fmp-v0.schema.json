@@ -289,7 +289,7 @@
           "maximum": 9223372036854775807
         },
         "pc_reference_rule": {
-          "enum": ["none", "pcrel_begin", "pcrel_end", "pcrel_page"]
+          "enum": ["none", "pcrel_begin", "pcrel_end", "pcrel_page", "pcrel_hi"]
         },
         "value_transform": {
           "enum": [
@@ -299,7 +299,8 @@
             "hi20",
             "lo12_i",
             "lo12_s",
-            "pcrel_hi20"
+            "pcrel_hi20",
+            "pcrel_lo12"
           ]
         },
         "transform_shift": { "type": "integer", "minimum": 0, "maximum": 63 },

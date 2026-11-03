@@ -194,6 +194,7 @@ fn pc_rule_name(rule: &PcRule) -> &str {
         PcRule::PcrelBegin => "pcrel_begin",
         PcRule::PcrelEnd => "pcrel_end",
         PcRule::PcrelPage => "pcrel_page",
+        PcRule::PcrelHi => "pcrel_hi",
         PcRule::Unknown(name) => name,
     }
 }
@@ -207,6 +208,7 @@ fn transform_name(transform: &Transform) -> &str {
         Transform::Lo12I => "lo12_i",
         Transform::Lo12S => "lo12_s",
         Transform::PcrelHi20 => "pcrel_hi20",
+        Transform::PcrelLo12 => "pcrel_lo12",
         Transform::Unknown(name) => name,
     }
 }
@@ -443,6 +445,13 @@ fn apply(
                 PcRule::None => None,
                 PcRule::PcrelBegin | PcRule::PcrelPage => Some(fixup.offset as i128),
                 PcRule::PcrelEnd => Some(fixup.offset as i128 + instruction.expected_size as i128),
+                // ADR-0010: the low half measures from the paired `hi`'s site.
+                // The validator required that member to exist and to sit in this
+                // same section, so the offset is on the same origin as `S`.
+                PcRule::PcrelHi => match paired_hi_offset(fixup, plan) {
+                    Some(offset) => Some(offset),
+                    None => return Err(internal("validated pcrel_hi pair disappeared")),
+                },
                 PcRule::Unknown(_) => None,
             };
             // `S` and `P` must be measured from the same origin. A relative `S`
@@ -504,6 +513,9 @@ fn apply(
                 }
                 Transform::Lo12I => value & 0xFFF,
                 Transform::PcrelHi20 => (displaced + 0x800) >> 12,
+                // A mask, never range-checked — the same class as `lo12_i`,
+                // applied to the displaced value (ADR-0010).
+                Transform::PcrelLo12 => displaced & 0xFFF,
                 // `fmp/0.1` has no semantics for these; `check_fixup_kind`
                 // rejected the plan before emission.
                 Transform::Hi20 | Transform::Lo12S | Transform::Unknown(_) => {
@@ -511,7 +523,10 @@ fn apply(
                 }
             };
 
-            if !matches!(fixup.value_transform, Transform::Lo12I) {
+            if !matches!(
+                fixup.value_transform,
+                Transform::Lo12I | Transform::PcrelLo12
+            ) {
                 let constraint = &fixup.range_constraint;
                 let (min, max) = if constraint.signed {
                     (
@@ -535,6 +550,22 @@ fn apply(
         }
         Mode::Unknown(_) => Err(internal("validated resolution_mode disappeared")),
     }
+}
+
+/// `P` for `pcrel_hi`: the site offset of the group's single `hi` member.
+///
+/// `check_fixup_pairs` already required exactly one `hi` in the group and kept
+/// it in the low half's section, so a `None` here is an internal inconsistency,
+/// never a plan that should resolve some other way.
+fn paired_hi_offset(fixup: &Fixup, plan: &Plan) -> Option<i128> {
+    let group = fixup.pair_group.as_deref()?;
+    plan.fixups
+        .iter()
+        .find(|other| {
+            other.pair_group.as_deref() == Some(group)
+                && matches!(other.pair_role, Some(fmp_model::plan::PairRole::Hi))
+        })
+        .map(|hi| hi.offset as i128)
 }
 
 /// `S`: the target's value, plus whether it is an absolute address.
@@ -574,10 +605,12 @@ fn source(fixup: &Fixup, plan: &Plan, site: &Section) -> Result<(i128, bool), Di
                     .find(|section| section.section_id == section_id)
             });
             let same_section = symbol.section_id.as_deref() == Some(site.section_id.as_str());
+            // `pcrel_hi`'s reference point is in the same section by
+            // construction (ADR-0010), so offsets alone stay exact.
             let offsets_are_enough = same_section
                 && matches!(
                     fixup.pc_reference_rule,
-                    PcRule::PcrelBegin | PcRule::PcrelEnd
+                    PcRule::PcrelBegin | PcRule::PcrelEnd | PcRule::PcrelHi
                 );
             match section.and_then(|section| section.base_address) {
                 Some(base) if !offsets_are_enough => Ok((base as i128 + offset, true)),
