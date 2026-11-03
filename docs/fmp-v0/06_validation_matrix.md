@@ -10,7 +10,7 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 
 | ID | Input condition | Expected | Code | ISAs | Fixture | Status |
 |---|---|---|---|---|---|---|
-| N01 | A required encoding choice is absent | Reject | E-CHOICE-001 | x86, aarch64, rv64 | TBD | planned |
+| N01 | Plan names a form that leaves a byte-affecting decision open (`x86:mov/r64-r64`, `x86:add/rm64-imm`), or names a variant the definition does not contain | Reject, never append a default variant | E-FORM-001 | x86, aarch64, rv64 | TBD | planned |
 | N02 | Operand register class does not match the form | Reject | E-OPERAND-001 | x86, aarch64, rv64 | TBD | planned |
 | N03 | Immediate exceeds the field's range | Reject | E-RANGE-001 | x86, aarch64, rv64 | TBD | planned |
 | N04 | Branch displacement exceeds the form's range | Reject, never expand | E-RANGE-002 / E-FIXUP-003 | x86, aarch64, rv64 | TBD | planned |
@@ -33,6 +33,11 @@ immediate is edited must be rejected, not re-encoded around).
 Applicability notes: N12 is not applicable to x86-64 in v0 because the selected
 x86 slice uses a single-site `rel32`; if an x86 pair case is added, the row must
 be revisited.
+
+N01 was written against `encoding_choices`. After ADR-0004 the decision is
+carried by `form_id`, so the directive's N01 input ("missing required encoding
+choice") is exactly a plan whose form under-specifies the encoding. The test must
+also confirm the id is not repaired by appending a width or direction suffix.
 
 ### Phase 1 evidence for N03 and N04
 
@@ -69,9 +74,9 @@ host" is the honest result.
 | AC-01 | Contract complete enough to guide implementation | `01_contract.md` with no `TBD` on fields used by the three slices | in progress |
 | AC-02 | Key fields justified | Each frozen field cites a counterexample or source evidence | in progress |
 | AC-03 | Three-ISA vertical slices | One closed loop per ISA: plan → validate → encode → fixup → oracle compare | planned |
-| AC-04 | Encoding ambiguity proven absent | x86 `imm8`/`imm32` and `rel8`/`rel32`; RV64 `c.*` vs standard, both explicit | planned |
+| AC-04 | Encoding ambiguity proven absent | x86 `imm8`/`imm32`, `rel8`/`rel32`, `89`/`8B` and RV64 `c.*` vs standard are distinct `form_id`s; per-`EC` negative test per `02_encoding_choices.md`, "Validation obligation" | planned |
 | AC-05 | Fixups validated | x86 `rel32`; AArch64 `adrp`+`:lo12:`; RV64 `auipc`+`lo12` or B-type scatter | planned |
-| AC-06 | Strict rejection | All applicable N01–N12 with recorded codes | planned |
+| AC-06 | Strict rejection | All applicable N01–N13 with recorded codes | planned |
 | AC-07 | Deterministic replay | EXP-R1, EXP-R2, EXP-R4, EXP-R5 | planned |
 | AC-08 | Reuse boundary backed by source evidence | `90_boundary_audit.md` with revision, file, symbol, line range | **done** for XirAsm; LLVM internals deferred (see audit §8) |
 | AC-09 | Unresolved problems stated | `05_open_decisions.md` with blocking impact, no "later" hand-waving | in progress |
@@ -87,15 +92,22 @@ Each vector needs **two independent sources**: our materializer, and an oracle
 
 | ID | Requirement | Candidate form | Oracle | Status |
 |---|---|---|---|---|
-| X86-P1 | Register-to-register transfer | `mov r64, r64` (`REX.W 89 /r`) | llvm-mc | planned |
-| X86-P2 | Arithmetic with immediate | `add r64, imm32` and `add r64, imm8` as separate forms | llvm-mc | planned |
-| X86-P3 | Same operation, different legal encodings | `add rax, 1` in `imm8` form; `mov eax, imm32` vs `C7 /0` | llvm-mc | planned |
+| X86-P1 | Register-to-register transfer | `x86:mov/rm-r64/legacy` (`REX.W 89 /r`) and `x86:mov/r64-rm/legacy` (`REX.W 8B /r`) | llvm-mc | planned |
+| X86-P2 | Arithmetic with immediate | `x86:add/rm64-imm8/legacy` and `x86:add/rm64-imm32/legacy` as separate forms | llvm-mc | planned |
+| X86-P3 | Same operation, different legal encodings | `x86:add/rax-imm32/legacy` vs `x86:add/rm64-imm32/legacy`; `x86:mov/rm-r64` vs `x86:mov/r64-rm` | llvm-mc | planned |
 | X86-P4 | Displacement width | `mov rax, [rbp-8]` (disp8) vs (disp32) | llvm-mc | planned |
 | X86-P5 | Prefix rules | 16-bit operand with `0x66`; REX + high-byte rejection | llvm-mc | planned |
 | X86-P6 | RIP-relative reference | `mov rax, [rip+disp32]` with a fixup | llvm-mc + readelf | planned |
-| X86-P7 | Short vs near branch | `jmp rel8` and `jmp rel32` as explicit plans | llvm-mc | planned |
+| X86-P7 | Short vs near branch | `x86:jmp/rel8/legacy` and `x86:jmp/rel32/legacy` as explicit plans | llvm-mc | planned |
 | X86-P8 | External call fixup | `call rel32` to an undefined symbol, record emitted | llvm-mc + readelf | planned |
 | X86-P9 | Explicit encoding family | SSE vs VEX vs EVEX for one operation | llvm-mc | deferred (OD-10) |
+
+Oracle note for X86-P7, measured 2026-11-04: llvm-mc does not accept a bare
+numeric branch target (`jmp 0x12`, `0x7f`, `0x80`, `0x1000`, `5` all emit
+`e9 00 00 00 00` under `-filetype=obj`). Use a label or a `.+N` expression:
+`jmp .+0x81` → `eb 7f`, `jmp .+0x82` → `e9 7d 00 00 00`. The disassembler prints
+the displacement, not the resolved target, so the vector is compared as bytes and
+the target is computed from the plan.
 
 ### AArch64 (directive §6.2)
 

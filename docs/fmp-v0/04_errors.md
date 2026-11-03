@@ -42,10 +42,7 @@ Rules:
 | E-TARGET-004 | Unsupported `byte_order` or `address_width` | `found` | — |
 | E-DEF-001 | `definition_identity.digest` does not match the loaded definition | `declared`, `actual` | N10 |
 | E-DEF-002 | Namespace or version not available in this materializer | `namespace`, `version` | EXP-R5 |
-| E-FORM-001 | `form_id` is not present in the pinned definition | `form_id`, `namespace`, `version` | — |
-| E-CHOICE-001 | Required encoding choice missing | `form_id`, `choice` | N01 |
-| E-CHOICE-002 | Unexpected or duplicate encoding choice | `form_id`, `choice` | — |
-| E-CHOICE-003 | Choice value outside the form's allowed set | `choice`, `allowed` | — |
+| E-FORM-001 | `form_id` is not present in the pinned definition | `form_id`, `namespace`, `version` | N01 |
 | E-OPERAND-001 | Operand kind or register class does not match the form | `expected`, `found` | N02 |
 | E-OPERAND-002 | Operand count or role sequence mismatch | `expected`, `found` | — |
 | E-OPERAND-003 | Operand payload malformed for its kind | `kind`, `reason` | — |
@@ -71,6 +68,49 @@ Rules:
 | E-BYTE-001 | Emitted bytes do not match `expected_digest` | `instruction_id`, `declared`, `actual` | N13 |
 | E-VERSION-001 | Materializer cannot honor a declared plan feature | `feature`, `format_version` | — |
 | E-INTERNAL-001 | Internal invariant violated (bug); never used for user input | `invariant` | — |
+
+### 2.1 Counterexamples behind specific codes
+
+A code without a concrete failure is decoration. This list records the observed
+failure each code exists to prevent, or says `planned` when no observation
+exists yet. `observed` means a built assembler produced the failure or the
+rejection; `derived` means it follows from a measured byte sequence.
+
+- `E-RANGE-002` — observed, F-06: XirAsm emits `eb 80` for `jmp short 0x82`,
+  silently truncating a target that does not fit. Measured 2026-11-04: llvm-mc
+  shortens `jmp .+0x81` to `eb 7f` (2 B) but promotes `jmp .+0x82` to
+  `e9 7d 00 00 00` (5 B). A materializer that computes a displacement and then
+  truncates it, or re-forms the branch, is rejected here.
+- `E-FIXUP-003` — observed, F-06 (label path): XirAsm rejects an out-of-range
+  label with "does not fit the signed 8-bit displacement". The same condition on
+  a planned fixup is this code.
+- `E-RANGE-001` — observed, F-10: XirAsm rejects `addi a0, a1, 2048` and
+  `addi a0, a1, -2049`. The RV64 slice reproduces the boundary.
+- `E-OPERAND-001` — observed, F-10: `c.addi a6, 5` (x16) is rejected because the
+  compressed register class is `x8..x15`. A register-class violation is a
+  legality rule, never a widening opportunity.
+- `E-SIZE-001` — observed, `EXP-0002` W1: a definition drift that changes the
+  encoded length is caught by `expected_size` alone.
+- `E-BYTE-001` — observed, `EXP-0002` W2: a same-length encoder defect emits
+  `49 89 d8` where the plan meant `48 89 d8`. Both are 3 bytes and both are
+  legal; only the digest distinguishes them. In `EXP-0002`'s generator the digest
+  is hashed from the oracle's bytes, not from the materializer's output.
+- `E-FORM-001` — derived, ADR-0004: the v0 x86 slice has no coarse form such as
+  `x86:mov/r64-r64`. A plan naming one must be rejected, not resolved to a
+  default variant. The test is N01; it runs in Phase 3.
+- `E-DEF-001` — `planned` (EXP-R5). No observation yet; it must not be cited as
+  evidenced.
+
+### 2.2 Retired codes
+
+A mechanism that is removed takes its codes with it. Retired codes are never
+reused for a different condition.
+
+| Code | Retired | Reason | Replacement |
+|---|---|---|---|
+| E-CHOICE-001 | 2026-11-04 | `encoding_choices` removed by ADR-0004; a missing decision is a missing or under-specified form | E-FORM-001 |
+| E-CHOICE-002 | 2026-11-04 | the same | E-FORM-001 / E-OPERAND-002 |
+| E-CHOICE-003 | 2026-11-04 | the same; a value outside the form's set is a form or range error | E-FORM-001 / E-RANGE-001 |
 
 ## 3. Rules
 

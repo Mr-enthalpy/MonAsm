@@ -41,12 +41,11 @@
       "instruction_id": "I0001",
       "section_id": ".text",
       "offset": 0,
-      "form_id": "aarch64:adrp/x64/pcrel-page",
+      "form_id": "aarch64:adrp/x64",
       "operands": [
         { "role": "dest", "kind": "aarch64.xreg", "target_type": "xreg", "payload": { "reg": 0 }, "modifiers": [] },
         { "role": "target", "kind": "aarch64.symbol", "target_type": "symbol", "payload": { "symbol_id": "S1" }, "modifiers": [] }
       ],
-      "encoding_choices": [],
       "expected_size": 4
     },
     {
@@ -59,7 +58,6 @@
         { "role": "src", "kind": "aarch64.xreg", "target_type": "xreg", "payload": { "reg": 0 }, "modifiers": [] },
         { "role": "imm", "kind": "aarch64.lo12", "target_type": "lo12", "payload": { "value": 0 }, "modifiers": [] }
       ],
-      "encoding_choices": [],
       "expected_size": 4
     }
   ],

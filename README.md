@@ -12,11 +12,13 @@ The materializer has no planning authority. That is the whole point.
 
 ## Status
 
-**Phase 1 complete; Phase 2 next.** Gate G0 (oracle toolchain) and G1 (encoder
-boundary audit) passed. The audit found that XirAsm's x86 path makes four
-independent encoding decisions the caller cannot address, that its RISC-V path is
-the only form-addressable entry point, and that AArch64 exists solely as a
-40.9 MB interpreted Meta-language tree. No encoder of ours is implemented yet.
+**Phase 2 in progress.** Gate G0 (oracle toolchain) and G1 (encoder boundary
+audit) passed. The audit found that XirAsm's x86 path makes four independent
+encoding decisions the caller cannot address, that its RISC-V path is the only
+form-addressable entry point, and that AArch64 exists solely as a 40.9 MB
+interpreted Meta-language tree. Four contract-level decisions are settled
+(OD-01, OD-03, OD-10, OD-11); ADR-0004 makes `form_id` the only encoding
+selector. No encoder of ours is implemented yet.
 
 | Area | State |
 |---|---|

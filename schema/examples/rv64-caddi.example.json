@@ -38,12 +38,11 @@
       "instruction_id": "I0001",
       "section_id": ".text",
       "offset": 0,
-      "form_id": "riscv:c.addi/rd-eq-rs1/quadrant1",
+      "form_id": "riscv:c.addi/rd-eq-rs1",
       "operands": [
         { "role": "dest", "kind": "riscv.xreg", "target_type": "creg_x8_x15", "payload": { "reg": 10 }, "modifiers": [] },
         { "role": "imm", "kind": "riscv.imm", "target_type": "imm6_nonzero", "payload": { "value": 5 }, "modifiers": [] }
       ],
-      "encoding_choices": [],
       "expected_size": 2
     }
   ],

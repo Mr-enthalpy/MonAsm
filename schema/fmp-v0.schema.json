@@ -170,7 +170,6 @@
         "offset",
         "form_id",
         "operands",
-        "encoding_choices",
         "expected_size"
       ],
       "properties": {
@@ -184,10 +183,6 @@
         "operands": {
           "type": "array",
           "items": { "$ref": "#/$defs/operand" }
-        },
-        "encoding_choices": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/encoding_choice" }
         },
         "expected_size": { "type": "integer", "minimum": 0 },
         "expected_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
@@ -230,15 +225,6 @@
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "value": { "type": ["integer", "string", "boolean"] }
-      }
-    },
-    "encoding_choice": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "value"],
-      "properties": {
-        "id": { "type": "string", "pattern": "^EC-[0-9]{2}$" },
-        "value": { "type": "string", "minLength": 1 }
       }
     },
     "symbol": {

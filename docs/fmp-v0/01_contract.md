@@ -29,7 +29,7 @@ before it is marked verified; the test column is filled in Phase 4.
 | ID | Statement | Enforced by | Test |
 |---|---|---|---|
 | INV-01 | Every planned instruction names one definition-bound machine form; no selection happens at materialization time. | `form_id` resolution + `E-FORM-001` | TBD |
-| INV-02 | Every byte-affecting choice not implied by `form_id + operands + target` is explicit (`EC-*`). | choice-set exactness check + `E-CHOICE-001` | TBD |
+| INV-02 | Every observable encoding of the same semantic operation has a distinct `form_id`; the materializer never selects among them. | exact form lookup (`E-FORM-001`) + operand signature (`E-OPERAND-*`); definition has one byte template per key | TBD |
 | INV-03 | One planned instruction produces exactly the bytes of that form; expansion is forbidden. | `expected_size` + `E-SIZE-001` | TBD |
 | INV-04 | Layout is fixed by fragments; no padding, relaxation, trampolines, or reordering. | fragment containment + `E-LAYOUT-*` | TBD |
 | INV-05 | Same plan + definition + materializer version + options yields identical bytes, fixup records, or identical normalized error. | canonicalization + fingerprint + replay tests | TBD |
@@ -95,8 +95,9 @@ Rules:
 - `namespace + version` MUST map to exactly one `digest` for a given materializer
   build. A mismatch is `E-DEF-001`, a hard rejection (N10).
 - The digest MUST cover every rule that can change emitted bytes: field layouts,
-  operand constraints, range checks, fixup transforms, and defaults that select
-  among forms. It must not cover comments or ordering of unused metadata.
+  operand constraints, range checks, and fixup transforms. It must not cover
+  comments or ordering of unused metadata. A rule that selects among forms is
+  not a coverage question: ADR-0004 forbids it from existing.
 - A definition change MUST be either byte-identical for the plan or rejected;
   there is no "best effort" compatibility mode (OD-06).
 
@@ -145,10 +146,15 @@ Fragment rules:
 | `offset` | yes | Byte offset within the section | Must match the owning fragment | A mismatch silently shifts every following fragment. | frozen |
 | `form_id` | yes | Definition-bound encoding form identifier | This is INV-01's whole mechanism | A mnemonic alone admits several encodings with different sizes. | frozen |
 | `operands` | yes | Ordered typed operands (§8) | Determines field values and legality | Untyped operands force the encoder to guess operand kind. | frozen |
-| `encoding_choices` | yes | Ordered list of `EC-*` selections; may be empty | INV-02's whole mechanism | Empty when a choice exists means the encoder picks silently. | frozen |
 | `expected_size` | yes | Bytes this instruction MUST emit | Detects definition drift and forces rejection | A definition update changing size corrupts layout silently (`N05`). | frozen |
 | `expected_digest` | no | `sha256:<hex>` over the exact bytes this instruction MUST emit, derived independently of the materializer (OD-01) | Detects a same-length encoder defect that `expected_size` cannot see | A materializer whose `REX.B` comes from the wrong operand bit emits `49 89 d8` (`mov r8, rbx`) where the plan meant `48 89 d8` (`mov rax, rbx`). Both are 3 bytes, both legal, and no other field contradicts the output. `EXP-0002` W2. | frozen |
 | `source_trace` | no | Planner-side origin (file, line, node) | Audit only | Must never affect output; if it does, replay breaks (INV-05). | draft |
+
+`encoding_choices` is not part of `fmp/0.1`. ADR-0004 moved every byte-affecting
+decision onto `form_id` or a typed operand: the registry in
+`02_encoding_choices.md` names the carrier of each `EC-*` row. A plan states a
+machine form; it does not state a form plus a list that restates which form it
+meant.
 
 `form_id` format (draft):
 
@@ -156,24 +162,35 @@ Fragment rules:
 <form_id> := <isa_family> ":" <mnemonic> "/" <variant> [ "/" <encoding_family> ]
 ```
 
-Examples: `x86:add/r64-imm32/legacy`, `aarch64:add/x64-imm12-scaled`,
-`riscv:c.addi/rd-eq-rs1/quadrant1`.
+Examples: `x86:add/rm64-imm32/legacy`, `aarch64:add/x64-imm12-scaled`,
+`riscv:c.addi/rd-eq-rs1`.
 
 Rules:
 
 - `form_id` names an encoding form, not a semantic operation and not a
   library-internal opcode integer (Q2, OD-04).
+- The `<variant>` component names the operand signature as the pinned definition
+  spells it (`rm64-imm8`, `rel32`, `r64-rm`), not a mnemonic-level summary. This
+  is what makes `mov r64, r64` and `mov r64, imm`-style aliases distinguishable
+  without a second selector (EC-27, EC-04).
+- `<encoding_family>` is REQUIRED for `isa_family: x86` and MUST be `legacy` for
+  the one-byte-map family; `vex` and `evex` appear only when a slice needs them.
+  It MUST be absent for `aarch64` and `riscv` in `fmp/0.1`, whose variant names
+  are already exhaustive (a compressed RISC-V instruction is a different
+  mnemonic, not a family).
 - Two forms that can produce different bytes MUST have different `form_id`s.
 - Two `form_id`s that always produce identical bytes for a given definition are
   a definition bug, not a plan choice.
-- Resolution of `form_id` MUST be a pure lookup. "Closest match" or fallback is
-  forbidden (`E-FORM-001`).
+- Resolution of `form_id` MUST be a pure lookup. "Closest match", appending a
+  missing width or direction suffix, or any fallback is forbidden
+  (`E-FORM-001`). An id the definition does not contain is a plan error; the
+  definition is never extended at materialization time.
 
 `expected_digest` rules (OD-01, measured in `EXP-0002`):
 
 - It is a **check**, never an input. The materializer MUST encode from
-  `form_id + operands + encoding_choices`, then compare, then reject
-  (`E-BYTE-001`). It MUST NOT derive emitted bytes from the digest.
+  `form_id + operands`, then compare, then reject (`E-BYTE-001`). It MUST NOT
+  derive emitted bytes from the digest.
 - The plan MUST carry a hash. Raw expected bytes are forbidden: bytes can be
   emitted and a hash cannot, so a hash cannot silently become the source of
   truth. Variant C (byte template + patch fields) was rejected for exactly this
@@ -283,8 +300,8 @@ sha256("fmp/0.1\0" || canonical_plan_bytes || "\0" ||
 3. Definition digest check (`E-DEF-*`).
 4. Section/fragment consistency (`E-LAYOUT-*`, `N09`, `N11`).
 5. Symbol table consistency (`E-SYMBOL-*`, `N08`).
-6. Static instruction checks: form lookup, operand legality, ranges, choice-set
-   exactness (`E-FORM-*`, `E-OPERAND-*`, `E-RANGE-*`, `E-CHOICE-*`).
+6. Static instruction checks: form lookup, operand legality, ranges
+   (`E-FORM-*`, `E-OPERAND-*`, `E-RANGE-*`).
 7. Fixup compatibility (`E-FIXUP-*`).
 8. Emission: encode, compare `expected_size`, compare `expected_digest`, apply or
    record fixups (`E-SIZE-*`, `E-BYTE-*`, `E-FIXUP-*`).

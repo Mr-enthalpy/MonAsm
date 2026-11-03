@@ -44,6 +44,12 @@ fixed part cannot flatter or penalise a variant. Sizes are canonical JSON
 | B: A + `expected_digest` | 2907 | 823 | 2084 | 521.0 |
 | C: byte template + patches | 1438 | 823 | 615 | 153.8 |
 
+Measurement note (2026-11-04): these numbers were taken with the then-required
+empty `encoding_choices` list in variants A and B. ADR-0004 removed that field,
+so current canonical sizes are about 22 B per instruction smaller in both
+variants; the 92-byte digest overhead and the direction of the A-vs-B comparison
+are unchanged. The raw plan files here are kept as measured and are not rewritten.
+
 Readings:
 
 - `expected_digest` costs exactly **92 bytes per instruction** (368 / 4): 17 for
