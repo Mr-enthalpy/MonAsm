@@ -1,0 +1,56 @@
+NOTICE — RV64 definition tables
+
+definitions/rv64/0.1.0.json is generated from the RISC-V Unified Database (UDB)
+resolved specification. No UDB file is copied into the product; the table holds
+derived encoding facts (fixed bits, field placements, signedness, scaling).
+
+Source archive : resolved_spec.tar.gz
+Archive size   : 2694443 bytes
+Archive SHA-256: be184986ce3c0cacdf06d975de92aa8948b1a9a267a1c9d75d60afa285bd828f
+SPDX identifier: BSD-3-Clause-Clear
+
+Instruction nodes read (paths under gen/resolved_spec/_/inst/):
+
+  path            size (B)  SHA-256
+  I/add.yaml          5484  f0c718f33b5394eaa7f3828bc02fbeb8fed0a5dca0d21e9b30fa16662f8b4812
+  I/addi.yaml         5475  f8f3099bbbde3120a7d7c796debe3ab30a42f195849208713139f9f3a525e8a6
+  I/auipc.yaml        4585  e1cfdacb153cdcbc2d89c1f65005279bb2aa8cde2e30856223886105f6979fa8
+  I/beq.yaml          7846  bb8084dbfb7b4a88f9f42e49f316702f39b435576000d3b4d4299212abb3ee40
+  I/jal.yaml          6524  3028bcf4bfefca77a50a4bf1bd27353c2d817abac58235af0745b1bfb739ac3e
+  I/ld.yaml          27033  a2afcd44fd54f5de7a9a9226f66f273b92c4e868a3519782a06c0f0fe3cc4c35
+  I/sd.yaml          26947  f0b69996f811f7ae206f9219cf6057318eb908d6f04af70e83e403606c71390e
+  C/c.addi.yaml       8225  584daae38d4e830b88be6474f5420d39d858a6c1ca94acd70ce4f5c300348e75
+
+The licence text below is reproduced from
+https://github.com/riscv/riscv-unified-db/blob/main/LICENSE-BSD-3-Clause-Clear.txt
+(1700 bytes, sha256 e3f4d72ac78db3ee135dc76442e165e75f644ed93dfc4103acce65e9d7af8f4d).
+Each node above carries the same SPDX identifier in its header.
+
+--- BEGIN BSD-3-Clause-Clear ---
+SPDX-License-Identifier: BSD-3-Clause-Clear
+
+Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted
+(subject to the limitations in the disclaimer below) provided that the following conditions are
+met:
+
+* Redistributions of source code must retain the above copyright notice, this list of conditions
+  and the following disclaimer.
+* Redistributions in binary form must reproduce the above copyright notice, this list of
+  conditions and the following disclaimer in the documentation and/or other materials provided
+  with the distribution.
+* Neither the name of Qualcomm Innovation Center, Inc. nor the names of its contributors may be used
+  to endorse or promote products derived from this software without specific prior written
+  permission.
+
+NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS LICENSE. THIS
+SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS
+BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+--- END BSD-3-Clause-Clear ---

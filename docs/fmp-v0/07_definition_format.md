@@ -118,8 +118,10 @@ in the table.
 `align_bits` is checked on the value as planned: `align_bits = 0` means no check,
 and a non-zero value that is not a multiple is `E-RANGE-003`. No v0 x86 slot
 declares a non-zero `align_bits`, because x86 branch displacements are
-byte-granular; the field exists for the AArch64 and RV64 branch fields, which are
-scaled by 4.
+byte-granular; the field exists for scaled branch fixups — AArch64 `bl`
+(`align_bits = 2`) and RV64 `beq`/`jal` (`align_bits = 1`) — where the
+pre-transform displacement must be instruction-aligned. The slot itself keeps
+`align_bits = 0`, because it holds field content (§8.3).
 
 ### 4.1 Placements
 
@@ -246,7 +248,7 @@ across its whole encoded range.
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
-| `aarch64:add/x64-x64-x64-lsl0` | `0000008b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-13`, `A64-P1` |
+| `aarch64:add/x64-x64-x64-lsl0` | `0000008b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-11`, `EC-13`, `A64-P1` |
 | `aarch64:add/x64-imm12-lsl0` | `00000091` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; imm: `aarch64.imm`/`imm12` → `[10,12]` | 4 | `EC-11`, `EC-12`, `A64-P2` |
 | `aarch64:bl/imm26` | `00000094` | target: `aarch64.rel`/`imm26` → `[0,26]` | 4 | `A64-P5` |
 | `aarch64:adrp/x64-imm21` | `00000090` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; target: `aarch64.rel`/`imm21` → `[5,19]`, `[29,2]` | 4 | `EC-15`, `EC-17`, `A64-P6` |
@@ -300,6 +302,16 @@ This keeps `INV-04` intact: nothing is relaxed, and a plan that omits the
 transform emits the field value it stated, which is a wrong program rather than a
 repaired one. The alternative — a slot that silently scales — was rejected
 because the same number would then mean different things on `add` and `bl`.
+
+RV64 follows the same rule with different shift amounts (ADR-0007, `EXP-0009`):
+the source states `left_shift: 1` for `beq`/`jal` and `left_shift: 12` for
+`auipc`, so a byte offset is a `scale` fixup with `transform_shift` 1 or 12,
+while the slot keeps `align_bits: 0` and holds field content. The B- and J-type
+slots have several placements each (`beq`: `[31,1]`, `[7,1]`, `[25,6]`, `[8,4]`;
+`jal`: `[31,1]`, `[12,8]`, `[20,1]`, `[21,10]`), which is the scattered-field
+case directive §6.3 item 6 asks for. `c.addi` also needs `imm != 0` and
+`xd != 0`; since `fmp-def/0.1` has no non-zero constraint, it stays outside v0
+until a format decision adds one.
 
 ## 9. Load-time checks
 

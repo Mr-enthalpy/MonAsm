@@ -31,6 +31,8 @@ Verified 2026-11-03 on the development host:
 | XirAsm-lib | same repo, `deps/xirasm-lib` | `3ee8a439f5ba` | `0.1.5` | Apache-2.0 | 2026-11-03 | Encoder audit; Zig `0.17.0` minimum | audited, not adopted (see `docs/fmp-v0/91_reuse_matrix.md`) |
 | Arm MRS 2026-06 OPENSOURCE A-profile FAT (**pinned**) | Arm download; archive `AARCHMRS_OPENSOURCE_A_profile_FAT-2026-06.tar.gz`, local drop `research/external/arm-mrs/` | archive `sha256:fe458c52…`; `Instructions.json` `a1ad2c65…`; `Features.json` `63325900…`; release `2026-06_rel`, build 818, schema 2.9.5 | 2026-06 | **BSD-3-Clause**: `_meta.license.info` = "licensed under the BSD 3-clause license"; `docs/notice.html` = three conditions + disclaimer | 2026-11-04 | Source of `definitions/aarch64/`; notice ships beside the table | read; hashes match XirAsm's manifest exactly; gate is `python tools/check_mrs.py` (`EXP-0007`, ADR-0006) |
 | Arm MRS 2026-06 A-profile FAT (**rejected**) | same release, different packaging, `AARCHMRS_A_profile_FAT-2026-06` | `Features.json` only, `1590274` B, `sha256:6d5c19e7…` | 2026-06 | **Arm proprietary notice**: no reproduction without prior written permission; use/distribution bound to the recipient's Arm agreement | 2026-11-04 | Licence evidence for `OD-07` | **not usable**: fails the hash and licence gate (`EXP-0006`, ADR-0006) |
+| RISC-V UDB resolved spec (**pinned**) | `resolved_spec` export of https://github.com/riscv/riscv-unified-db, local drop `research/external/rv64-udb/` | archive `sha256:be184986…` (`2694443` B); 8 nodes hashed in `EXP-0009` §4; revision **unverified** (`.stamp` empty) | no revision embedded | **BSD-3-Clause-Clear**, per-file SPDX header; text `sha256:e3f4d72a…` (1,700 B, UDB `LICENSE-BSD-3-Clause-Clear.txt`) | 2026-11-04 | Source for `definitions/rv64/` (table pending); notice ships beside the table | read; 14 vectors match `llvm-mc`; gate is `python tools/check_rv64_source.py` (`EXP-0009`, ADR-0007) |
+| riscv-opcodes (**cross-check**) | https://github.com/riscv/riscv-opcodes | `f24ac23ec9fa947011781a09cd6fd25a7c36dc45`, 2026-10-14 | `main` | BSD-3-Clause (`LICENSE` `sha256:ea19b748…`) | 2026-11-04 | Upstream cross-check for RV64 fixed bits, register ranges, and the `EC-19`/`EC-20` claims | read; **not a source of the table**: it gives field ranges but no B/J/RVC value-bit scatter (`EXP-0009` §7) |
 | LLVM | https://github.com/llvm/llvm-project | `llvmorg-23.1.2` | 23.1.2 | Apache-2.0 WITH LLVM-exception | 2026-11-03 | Oracle, encoding knowledge | installed (`C:\Users\hanni\Tools\llvm`) |
 | GNU binutils | — | not installed | — | GPL | — | Secondary oracle | deferred (LLVM tools cover v0) |
 
@@ -129,6 +131,8 @@ experiment:   <command or fixture, if any>
 | EV-14 | What licence does the upstream MRS package declare? | read `_meta.license` and `docs/notice.html` in both measured archives | Two answers, because there are two packagings: the OPENSOURCE archive declares BSD-3-Clause (per-file and in the notice); the other `AARCHMRS_A_profile_FAT-2026-06` archive forbids reproduction without prior written permission | observed (source, `EXP-0006`, `EXP-0007`) |
 | EV-15 | Do XirAsm's manifest hashes identify a public MRS drop? | hash both archives' files; compare with `source_lock.files` | Yes for the OPENSOURCE packaging — `a1ad2c65…` and `63325900…` match byte for byte. No for the other packaging (`6d5c19e7…`) nor for 2026-09 (`d4bc3952…`) | observed (experiment, `EXP-0007`) |
 | EV-16 | Does the release block distinguish the two packagings? | compare `_meta.version` of both archives | No: both declare `vFATAp1-A`/818/`2026-06_rel`/2.9.5. A pin that names only the release accepts the non-redistributable archive | observed (experiment, `EXP-0007` §3) |
+| EV-17 | Does riscv-opcodes state the B/J/RVC immediate scatter? | read `arg_lut.csv`, `extensions/rv_i`, `extensions/rv_c` at `f24ac23e…` | No: it gives ranges (`bimm12hi 31..25`, `bimm12lo 11..7`, `jimm20 31..12`) and field names, but never which value bits go where | observed (source, `EXP-0009` §7) |
+| EV-18 | Does the UDB resolved spec state field positions and scaling? | read `inst/I/{beq,jal,auipc,add,addi,ld,sd}.yaml`, `inst/C/c.addi.yaml` | Yes: `location` is a value-order bit-group list (e.g. `beq`: `"31|7|30-25|11-8"`), with `left_shift`, `sign_extend`, `not`; 14 vectors encoded from it match `llvm-mc` byte for byte | observed (experiment, `EXP-0009` §4–§6) |
 
 Full commands and byte-level output: `experiments/EXP-0001-xirasm-boundary-probes.md`.
 Findings and interpretations: `docs/fmp-v0/90_boundary_audit.md`.
@@ -146,7 +150,15 @@ Findings and interpretations: `docs/fmp-v0/90_boundary_audit.md`.
   and the licence string the gate. Unverified: the `schema/` tree hash XirAsm
   records, and whether an embedded (non-JSON) table satisfies notice condition 2.
 - RISC-V relocation pairs (`auipc` + `lo12`) were not exercised; `AC-05` needs
-  them in Phase 3.
+  them in Phase 3. The UDB encoding blocks do not state the
+  `R_RISCV_PCREL_HI20`/`R_RISCV_PCREL_LO12_I` relation, so the psABI must be
+  pinned before `RV-P8` (`EXP-0009` §9).
+- The UDB resolved-spec archive records no revision: its `.stamp` is empty and the
+  `$source` map names only a CI workspace. The RV64 pin is therefore by archive
+  and file hashes (`sha256:be184986…`), not by commit; the revision stays
+  `unverified` (ADR-0007).
+- `c.addi` needs `imm != 0` and `xd != 0`; `fmp-def/0.1` cannot express `not: 0`,
+  so `RV-P7` waits on a format decision, not on the source.
 - Cross-host determinism (EXP-R3) is untested and must stay marked `unverified`.
 - The LLVM archive hash is recorded from the download, not cross-checked against
   an upstream digest (the `.jsonl` asset downloaded empty and the API request was

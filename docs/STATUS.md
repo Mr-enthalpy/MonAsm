@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-04
-Phase: **3 in progress (x86 and AArch64 slices): both definition tables, the materializer and the fixture gate are in place; RV64 and four AArch64 coverage rows remain**
+Phase: **3 in progress (x86 and AArch64 slices): both definition tables, the materializer and the fixture gate are in place; the RV64 source is pinned, its table is next; four AArch64 coverage rows remain**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -13,8 +13,8 @@ this file plus `AGENTS.md` alone.
 |---|---|---|
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
-| 2 | FMP v0 contract, schema, error model | **complete for the x86 and AArch64 slices**; RV64 waits on its table (`OD-07` settled by ADR-0005, pinned by ADR-0006) |
-| 3 | Three-ISA vertical prototype | **in progress** on x86 and AArch64: two definition tables frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 5 positive and 12 negative fixtures, AArch64 has 4 positive and 4 negative, all passing the two-source gate |
+| 2 | FMP v0 contract, schema, error model | **complete for the x86 and AArch64 slices**; RV64 waits on its table (source settled by ADR-0007, scatter verified by `EXP-0009`) |
+| 3 | Three-ISA vertical prototype | **in progress** on x86 and AArch64: two definition tables frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 5 positive and 12 negative fixtures, AArch64 has 4 positive and 4 negative, all passing the two-source gate; RV64 has a pinned source, a gate and no table yet |
 | 4 | Invariants, negative tests, replay | not started |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
@@ -37,6 +37,7 @@ this file plus `AGENTS.md` alone.
 | ADR-0004 | `form_id` carries every encoding decision; `encoding_choices` removed | accepted 2026-11-04 |
 | ADR-0005 | AArch64 knowledge comes from the Arm MRS 2026-06; no XirAsm file is copied, the Arm notice ships with the table | accepted 2026-11-04 |
 | ADR-0006 | The AArch64 source is pinned by MRS *packaging*: archive hash + both file hashes + the BSD-3-Clause licence sentence; the release block alone is not a pin | accepted 2026-11-04 |
+| ADR-0007 | RV64 knowledge comes from the UDB resolved spec, pinned by archive hash + eight node hashes + the BSD-3-Clause-Clear header; `left_shift` is a fixup transform, and `not: 0` keeps `c.addi` out of v0 | accepted 2026-11-04 |
 
 ## Settled decisions (contract level)
 
@@ -51,6 +52,7 @@ this file plus `AGENTS.md` alone.
 | OD-09 | Exact integers with declared domains, no wrap, one range check per value after the transform | `01_contract.md` §3.1–§3.2 |
 | OD-10 | v0 ships only the forms the slices use; the definition table is the feature surface and absence is `E-FORM-001` | `02_encoding_choices.md`, "v0 surface"; ADR-0004 |
 | OD-11 | A byte-affecting decision is carried by `form_id`, a typed operand, a fixup field or a target field — never by a separate choice list | ADR-0004; `02_encoding_choices.md` |
+| OD-12 | RV64 facts come from the UDB resolved spec (`sha256:be184986…`), pinned per node; riscv-opcodes is the upstream cross-check and `llvm-mc` the oracle | ADR-0007; `EXP-0009`; `definitions/rv64/NOTICE` |
 
 ## Open decisions
 
@@ -66,31 +68,43 @@ pinned by ADR-0006, and the AArch64 table it authorised now exists: four MRS
 nodes generated the four forms in `definitions/aarch64/0.1.0.json`, matched
 against `llvm-mc` by four fixtures (`EXP-0008`). What remains is coverage, not a
 decision: `A64-P3`/`P4`/`P7`/`P8` and the `-lsl12` half of `A64-P2` have no
-table row yet. OD-06 was load-bearing because `EXP-0002` W1 shows that a
-definition drift the digest does not cover is caught only by the weaker size
-check; it is now settled, and `EXP-0004` §4 measures both halves.
+table row yet. OD-12 is settled by ADR-0007: the RV64 source is the UDB resolved
+spec, pinned by archive and node hashes, and `EXP-0009` verified the B/J/RVC
+scatter against `llvm-mc`. The RV64 table is not written, so `riscv:` has no form
+yet and naming one is `E-FORM-001`. OD-06 was load-bearing because `EXP-0002` W1
+shows that a definition drift the digest does not cover is caught only by the
+weaker size check; it is now settled, and `EXP-0004` §4 measures both halves.
 
 ## Next action
 
-1. Extend the AArch64 coverage, one vertical slice at a time:
+1. Build `definitions/rv64/0.1.0.json` from the pinned UDB nodes, one vertical
+   slice at a time:
+   - `RV-P1` `add` and `RV-P2` `addi` first; then `RV-P3` `ld`/`sd`,
+     `RV-P4`/`P6` `beq`, `RV-P5` `jal`, and `RV-P8` `auipc` + `addi`;
+   - the generator reads `encoding.match` and `encoding.variables[].location`,
+     requires every bit to be covered exactly once, and refuses to emit
+     otherwise (prototype: `research/evidence/experiments/EXP-0009/rv64_fields.py`);
+   - every form needs a positive fixture matching `llvm-mc` and a negative
+     fixture with a registry code, before the table is called frozen.
+   `RV-P7` (`c.addi`) waits on a format decision for `not: 0`, and `RV-P8` waits
+   on the psABI `R_RISCV_PCREL_HI20`/`LO12_I` pairing. Neither blocker is a
+   reason to widen the table; naming those forms is `E-FORM-001` until they land.
+2. Extend the AArch64 coverage, one vertical slice at a time:
    - add the `-lsl12` half of `A64-P2`. This needs a decision about slot-level
      scaling, because a definition slot has no transform and `sh = 1` multiplies
      the immediate by 4096. It is a format change with its own ADR, not a
      generator tweak (`07_definition_format.md` §8.3);
    - then `A64-P4` (`b.eq`, imm19), `A64-P3` (load/store), `A64-P7` and `A64-P8`,
      each with its own MRS node, fixture and oracle record.
-   Naming any of them today is `E-FORM-001`, which is the correct behaviour.
-2. Close the remaining contract debt:
+3. Close the remaining contract debt:
    - `OD-05` (unknown fields/extensions) and `OD-08` (canonical wire form);
    - the Level 1 artifact envelope, which is deferred by `OD-03` and is not
      needed by the Level 0 gate;
    - `X86-P4`/`P5`/`P6`, which need an `x86.mem` payload shape before they can
      be planned (`fixtures/x86_64/README.md`).
-3. Build the RV64 table from its own pinned source, then its fixture set. No
-   `riscv:` form exists yet, so `E-FORM-001` is the whole surface.
-4. Keep `python tools/check_ids.py` and `python tools/check_definition.py` green
-   after every change, and keep `cargo test --workspace` green: it is the
-   fixture gate, not a smoke test.
+4. Keep `python tools/check_ids.py`, `python tools/check_definition.py` and
+   `python tools/check_rv64_source.py` green after every change, and keep
+   `cargo test --workspace` green: it is the fixture gate, not a smoke test.
 
 Phase 3 output so far: the Rust workspace under `prototype/` (`fmp-model` for the
 strict JSON reader and the plan/definition binders, `fmp-validate` for contract
@@ -111,6 +125,13 @@ fixtures. A64-P5/P6 use `llvm-mc` → `ld.lld` → `llvm-objcopy` because `llvm-
 leaves AArch64 branch and `adrp` fields as relocations. The fixture gate now
 scans every `fixtures/<isa>/<kind>/` directory, so a new table's vectors are
 gated the moment they land.
+
+The RV64 slice is pinned, not built. ADR-0007 fixes the source as the UDB
+resolved spec (`sha256:be184986…`), `EXP-0009` measures eight instruction nodes
+and reproduces fourteen `llvm-mc` byte strings from their `location` fields, and
+`tools/check_rv64_source.py` gates the drop, the SPDX headers and
+`definitions/rv64/NOTICE`. The table itself is the next work item; until it
+lands, every `riscv:` name is `E-FORM-001`.
 
 The materializer is deliberately not a bridge to LLVM: it reads only the plan
 and the pinned definition, writes bytes and RELA-shaped records, and has no

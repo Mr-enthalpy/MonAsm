@@ -87,7 +87,7 @@ host" is the honest result.
 
 | ID | Requirement | Evidence form | Status |
 |---|---|---|---|
-| AC-01 | Contract complete enough to guide implementation | `01_contract.md` with no `TBD` on fields used by the three slices | **clear for the x86 slice**: OD-02, OD-04 and OD-09 settled; every field the seven x86 forms use is `frozen`. The AArch64 and RV64 surfaces still block on OD-07 |
+| AC-01 | Contract complete enough to guide implementation | `01_contract.md` with no `TBD` on fields used by the three slices | **clear for the x86 and AArch64 slices**: OD-02, OD-04, OD-07 and OD-09 settled; the fields those tables use have frozen rows in `01_contract.md`, `03_fixup_model.md` and `07_definition_format.md`. The RV64 surface has no table yet (`OD-12` settles its source, ADR-0007), so AC-01 stays open until `definitions/rv64/` lands |
 | AC-02 | Key fields justified | Each frozen field cites a counterexample or source evidence | in progress — every field the x86 slice uses now cites one (OD-02/04/09); the remaining `draft` fields are optional or Level 1 |
 | AC-03 | Three-ISA vertical slices | One closed loop per ISA: plan → validate → encode → fixup → oracle compare | planned |
 | AC-04 | Encoding ambiguity proven absent | x86 `imm8`/`imm32`, `rel8`/`rel32`, `89`/`8B` and RV64 `c.*` vs standard are distinct `form_id`s; per-`EC` negative test per `02_encoding_choices.md`, "Validation obligation" | planned |
@@ -141,8 +141,7 @@ contains only the seven register and immediate forms. Adding a memory form is a
 definition-slice decision, not a fixture decision: the plan schema would need a
 `{mem: {base, index, scale, disp}}` payload, and `01_contract.md` §8.1 currently
 fixes the payload shapes to `{reg}`, `{value}`, `{symbol_id}` and `{}`. The rows
-return when that slice lands, together with the AArch64/RV64 tables under
-`OD-07`.
+return when that slice lands, together with the RV64 table under `OD-12`.
 
 
 ### AArch64 (directive §6.2)
@@ -180,6 +179,14 @@ relocation kinds were read with `llvm-readobj -r` before linking (see
 | RV-P6 | Scattered fields | B-type and J-type bit placement verified byte-for-byte | llvm-mc | planned |
 | RV-P7 | Compressed vs standard | `c.addi` (2 bytes) vs `addi` (4 bytes), never chosen by the encoder | llvm-mc | planned |
 | RV-P8 | Associated reference | `auipc`+`addi` pair with `hi20`/`lo12` | llvm-mc + readelf | planned |
+
+The source is pinned (`OD-12`, ADR-0007): the UDB resolved-spec nodes named in
+`check_rv64_source.py`, with `EXP-0009` deriving the B/J/RVC placements and
+matching fourteen `llvm-mc` byte strings. The table is not written yet, so every
+row stays `planned`. `RV-P7` has a second blocker: the source states `not: 0` for
+`c.addi`'s `imm` and `xd`, and `fmp-def/0.1` cannot express that, so the row can
+only land after a format decision. `RV-P8` also needs the psABI's
+`R_RISCV_PCREL_HI20`/`LO12_I` pairing, which the encoding blocks do not state.
 
 ## 5. Gate G3
 
