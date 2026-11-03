@@ -69,10 +69,19 @@ and `EXP-0004` §4 measures both halves.
 
 ## Next action
 
-1. Build the AArch64 table under ADR-0005: generate `definitions/aarch64/0.1.0.json`
-   from MRS data, ship the Arm notice beside it, and verify `A64-P1` (`add`),
-   `A64-P5` (`bl`) and `A64-P6` (`adrp` + `add #:lo12:`) against `llvm-mc`
-   before calling the table frozen. No MPL-2.0 script is copied.
+1. Build the AArch64 table under ADR-0005, once the MRS data is present:
+   - drop `Instructions.json` and `Features.json` from the 2026-06 MRS
+     (`2026-06_rel`, schema 2.9.5) into `research/external/arm-mrs/`
+     (gitignored); the expected hashes and release identity are in that
+     directory's `README.md`, and `python tools/check_mrs.py` verifies the
+     drop — `Instructions.json` `a1ad2c65…`, `Features.json` `63325900…`;
+   - generate `definitions/aarch64/0.1.0.json` from those nodes, ship the Arm
+     notice beside it, and verify `A64-P1` (`add`), `A64-P5` (`bl`) and
+     `A64-P6` (`adrp` + `add #:lo12:`) against `llvm-mc` before calling the
+     table frozen. No MPL-2.0 script is copied.
+   The MRS archive is not in the repository and Arm's download is
+   account-gated, so this step waits on the user-supplied files; it is not a
+   decision that is still open.
 2. Close the remaining x86 contract debt:
    - `OD-05` (unknown fields/extensions) and `OD-08` (canonical wire form);
    - the Level 1 artifact envelope, which is deferred by `OD-03` and is not

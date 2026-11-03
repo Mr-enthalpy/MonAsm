@@ -1,10 +1,11 @@
 # Definition Format
 
 Status: **frozen for `x86-64` `0.1.0`**; the same format is intended for the
-other targets but their tables wait on `OD-07`. This document defines the
-artifact a pinned `definition_identity` names. It is the operational form of
-`OD-10`: the table *is* the feature surface, and a `form_id` the table does not
-contain is `E-FORM-001`.
+other targets, whose tables wait on source data, not on an open decision
+(`OD-07` is settled by ADR-0005). This document defines the artifact a pinned
+`definition_identity` names. It is the operational form of `OD-10`: the table
+*is* the feature surface, and a `form_id` the table does not contain is
+`E-FORM-001`.
 
 A definition is **data**. It is not a library, a plugin, or a table of callbacks
 (`INV-06`). The materializer reads it, checks it, and encodes from it.
@@ -268,8 +269,11 @@ without a plan error: the input is the definition.
 
 - `OD-06` (digest coverage) is settled for this document shape by §6; the
   measurement that confirms both halves is the digest test in `EXP-0004` §4.
-- `OD-07` (AArch64 knowledge source) blocks the AArch64 table. The format does not
-  need to change for it: `adrp`'s split `immhi:immlo` and RV64's B-type scatter
-  are both expressible as multiple placements of one slot.
+- `OD-07` (AArch64 knowledge source) is settled by ADR-0005: the facts come
+  from the Arm MRS 2026-06, and the Arm notice ships with the generated table.
+  The format does not need to change for it: `adrp`'s split `immhi:immlo` and
+  RV64's B-type scatter are both expressible as multiple placements of one
+  slot. What is missing is the data, not the design: the archive is not
+  vendored, so the table waits on the drop that `tools/check_mrs.py` verifies.
 - `X86-P9` (explicit encoding family) stays deferred; no `/vex` or `/evex` row
   exists, so naming one is `E-FORM-001`.
