@@ -14,7 +14,7 @@ offset".
 | Fixup site | Where are the bits to change? | `section_id` + `offset` |
 | Field descriptor | Which bits, and in what order? | `field_descriptor` |
 | Fixup kind | What computation is performed? | `pc_reference_rule` + `value_transform` |
-| Relocation representation | How is an unresolved patch recorded? | `resolution_mode` + output contract |
+| Relocation representation | How is an unresolved patch recorded? | `resolution_mode` + the one record shape `fmp/0.1` defines (§8) |
 | Resolution policy | What happens if the value is unknown? | `resolution_mode` |
 
 Collapsing any two of these is the classic source of "the assembler resolved it
@@ -27,16 +27,22 @@ for me" bugs.
 | `fixup_id` | yes | Unique id | Deterministic ordering and diagnostics | Record order becomes unstable. | frozen |
 | `section_id` | yes | Section of the site | Locates the bytes | Cross-section patches need an address model. | frozen |
 | `offset` | yes | Byte offset of the site within the section | Exact patch location | One byte of drift corrupts the instruction. | frozen |
-| `field_descriptor` | yes | Ordered list of `{lsb, width}` bit ranges relative to `offset`, plus `bit_order` | Some fields are split across the instruction | RISC-V B-type immediate is split into `imm[12\|10:5]` and `imm[4:1\|11]`; a contiguous write cannot express it. | frozen |
+| `field_descriptor` | yes | Ordered list of `{lsb, width}` bit ranges relative to `offset`, most significant value bits first | Some fields are split across the instruction | RISC-V B-type immediate is split into `imm[12\|10:5]` and `imm[4:1\|11]`; a contiguous write cannot express it. | frozen |
 | `target` | yes | `{kind: symbol \| absolute \| section_relative, ...}` | The value source | An absolute patch with no target is a silent zero. | frozen |
-| `addend` | yes | Signed integer, explicit, even when zero | REL and RELA differ in where the addend lives | Inferring the addend from the field's current contents makes output depend on prior bytes. | frozen |
+| `addend` | yes | Signed integer, explicit, even when zero | The addend is part of the computed value; `fmp/0.1` records are RELA-shaped so it is never read from the field | Inferring the addend from the field's current contents makes output depend on prior bytes, and a zero field becomes indistinguishable from a deliberate addend. | frozen |
 | `pc_reference_rule` | yes | `none` \| `pcrel_begin` \| `pcrel_end` \| `pcrel_page` \| `definition:<id>` | `P` is not universal | x86 uses the end of the instruction; RISC-V branches use the instruction address. | frozen |
 | `value_transform` | yes | `identity`, `scale(shift)`, `page`, `hi20`, `lo12_i`, `lo12_s`, `pcrel_hi20`, … | Encodes range and scaling semantics | AArch64 page/scaled immediates are not plain displacements. | frozen |
 | `range_constraint` | yes | `{signed, bits, align_bits}` | Determines legality, not just formatting | A rel8 with a 200-byte target must be rejected, not truncated. | frozen |
-| `resolution_mode` | yes | `resolve_in_place` \| `emit_relocation` \| `reject_if_unresolved` | Distinguishes "patch now" from "record for a linker" | Emitting bytes without a relocation record loses the reference silently. | frozen |
+| `resolution_mode` | yes | `resolve_in_place` \| `emit_relocation` | Chooses "write the value now" from "write a record for later" | A mode inferred from whether the target happens to be defined makes bytes depend on symbol liveness; an unresolved patch written with no record loses the reference silently. | frozen |
 | `pair_group` | no | Id shared by associated fixups | Some patches only make sense as a pair | `adrp`+`add` and `auipc`+`addi` are pairs; applying one alone yields a wrong address. | frozen |
 | `pair_role` | no | `hi` \| `lo` | Selects the member's transform | Swapping roles produces a plausible but wrong address. | frozen |
-| `overwrite_bytes` | yes | Boolean, MUST be false in v0 | Prevents template-style patching from hiding encoding decisions | A plan that writes raw bytes then patches them is scheme C (OD-01). | draft |
+
+`overwrite_bytes` was removed from `fmp/0.1`. It was required and pinned to
+`false`, so it could not be true without already being rejected and carried no
+information when false. The condition it was meant to prevent — a plan writes
+raw bytes and then patches them — is scheme C, which `OD-01`/ADR-0004 already
+excludes at the level of `form_id` and operands. Recorded here so the removal is
+traceable rather than a silent schema drift.
 
 ## 3. Field descriptors
 
@@ -47,21 +53,42 @@ for me" bugs.
     { "lsb": 25, "width": 6 },
     { "lsb": 8,  "width": 4 },
     { "lsb": 7,  "width": 1 }
-  ],
-  "bit_order": "value_msb_first" }
+  ] }
 ```
 
 Rules:
 
 - `field_descriptor` entries are in **value order**: the first entry receives the
-  most significant bits of the value when `bit_order` is `value_msb_first`.
+  most significant bits of the value. There is no separate `bit_order` field:
+  the list order is the order, and a one-value enum with a schema `default`
+  would be a defaulted field. It was removed with `overwrite_bytes` for the same
+  reason.
 - `lsb` is relative to the instruction's first byte in the section, not to the
   plan's byte buffer.
 - `width` is in bits; bits MUST lie inside the instruction's `expected_size`.
 - Overlapping descriptors within one fixup are rejected (`E-FIXUP-005`).
 - Overlapping fixups in the same byte are rejected (`E-FIXUP-006`).
+- The sum of the `width`s MUST equal `range_constraint.bits` (`E-FIXUP-001`).
+  Otherwise a plan could declare a narrower range than the field it writes, and
+  the range check would never fire.
 - Bits not covered by any descriptor are left untouched; the encoder, not the
   fixup, produced them.
+
+One writer per bit (OD-02). A field covered by a fixup is written by that fixup
+and by nothing else:
+
+- The form's template leaves the covered bits zero.
+- An operand MUST NOT supply a numeric value for a covered field. If it does,
+  the plan states two different values for one field and the fixup silently wins
+  (`E-FIXUP-006`). The site is `section_id` + `offset` + `field_descriptor`, so
+  the materializer cannot tell a deliberate placeholder from a mistake.
+- An operand may still name the same target as the fixup, as a signature guard.
+  The target operand and `fixup.target` MUST then agree, or the fixup is
+  incompatible with the form (`E-FIXUP-001`).
+
+The rule matters because "operand value overwritten by a fixup" is the same
+silent repair the rest of the contract forbids, one layer down: the plan would
+be accepted while one of its fields is ignored.
 
 ## 4. `pc_reference_rule`
 
@@ -84,13 +111,57 @@ fixed after `EXP-0002` §6.1 exposed the off-by-one.
 A definition MAY declare additional named rules (`definition:<id>`), but the
 string must be resolved by the pinned definition, never by convention.
 
-## 5. Resolution modes
+## 5. Resolution modes (OD-02)
 
-| Mode | Behavior when the target is known | Behavior when unknown |
-|---|---|---|
-| `resolve_in_place` | compute, range-check, write bits | reject `E-FIXUP-002` |
-| `emit_relocation` | optionally write a resolved value, and emit a record | emit a record with the declared addend; if the output contract cannot carry it, reject `E-FIXUP-004` |
-| `reject_if_unresolved` | compute and write | reject `E-FIXUP-002` |
+`resolution_mode` has exactly two values. The plan chooses the mode per fixup;
+the materializer never infers it from whether the target happens to be defined.
+
+| Mode | Value written | Record emitted | Target unknown |
+|---|---|---|---|
+| `resolve_in_place` | computed value, range-checked, masked into the descriptor bits | none | `E-FIXUP-002` |
+| `emit_relocation` | zero in every descriptor bit | one normalized record | record emitted; nothing to resolve |
+
+Consequences:
+
+- **One fixup has exactly one effect.** "Resolved bytes plus a record" is not a
+  third mode: it would need two fixups on the same bits (`E-FIXUP-006`), and it
+  leaves open which of the two a consumer should trust.
+- **The mode is a function of the plan alone.** Making it depend on whether the
+  target is local would make the same plan emit different bytes after a symbol
+  moves from `undefined` to `defined`. That is an implicit decision over
+  resolution state (`INV-02`, `INV-05`).
+- **`emit_relocation` never computes `S + A - P`, so it cannot range-check the
+  value.** The record carries `range_constraint` and the consumer performs the
+  check. A plan that needs the value checked here must say `resolve_in_place`.
+- **`reject_if_unresolved` was removed, not repurposed.** For a known target it
+  was byte-identical to `resolve_in_place`; for an unknown target it was
+  byte-identical too, because both reject `E-FIXUP-002`. A third name for one
+  behaviour is a schema invitation to disagree about it.
+
+`E-FIXUP-002` and `E-SYMBOL-001` are different failures:
+
+- `E-SYMBOL-001` — `fixup.target.symbol_id` names no entry in `symbols[]`. The
+  plan is internally inconsistent. A `defined` symbol with no location is
+  `E-SYMBOL-003`, not this.
+- `E-FIXUP-002` — the symbol exists but carries no address (it is `undefined` or
+  `external`), the fixup is `resolve_in_place`, and there is nothing to write.
+
+### 5.1 The directive's five cases
+
+`00_directive.md` §5.2 requires a position on five cases. They are not five
+modes; they are five target states mapped onto the two modes:
+
+| Case | Known here? | Legal plan | If the plan asks to resolve |
+|---|---|---|---|
+| same-section reference | yes | `resolve_in_place` or `emit_relocation` | — |
+| known absolute address | yes (`target.kind: absolute`) | `resolve_in_place` or `emit_relocation` | — |
+| unresolved external symbol | no | `emit_relocation` | `E-FIXUP-002` |
+| cross-section, expressible | yes if both sections are bound | either mode; the record names the symbol | `E-FIXUP-002` if a section has no `base_address` |
+| out of the encoding range | yes | `resolve_in_place` | `E-FIXUP-003` |
+
+Cross-section is not a separate mode. `S - P` is well defined as soon as both
+sections have a `base_address`; without one, a same-section reference still
+resolves from offsets alone, and a cross-section reference is unresolvable.
 
 "Record a relocation" and "resolve a symbol" are different operations. A plan
 that says `emit_relocation` MUST NOT be silently resolved into bytes with no
@@ -101,13 +172,13 @@ record.
 | Case | Encoding facts | What the plan must pin |
 |---|---|---|
 | x86-64 `rel32` | `R_X86_64_PC32`-style: value = `S + A - P`, `P` = end of instruction | `pc_reference_rule = pcrel_end`, range `i32` |
-| x86-64 PLT/GOT | semantics depend on link-time policy | v0: `E-FIXUP-004` unsupported; see OD-02 |
-| AArch64 `b`/`bl` | imm26, signed, scaled by 4, `P` = instruction address, ±128 MB | `pcrel_begin`, `scale(2)`, `range.bits = 26`, `align_bits = 2` |
+| x86-64 PLT/GOT | semantics depend on link-time policy | v0: not expressible; a plan that names it is `E-VERSION-001` (§10) |
+| AArch64 `b`/`bl` | imm26, signed, scaled by 4, `P` = instruction address, ±128 MiB | `pcrel_begin`, `scale(2)`, `range.bits = 26`, `align_bits = 2` |
 | AArch64 `adrp` | immhi:immlo = `(page(S+A) - page(P)) >> 12`, signed 21 bits | `pcrel_page`, `value_transform = page`, pair `hi` |
 | AArch64 `add :lo12:` | imm12 = `(S+A) & 0xFFF`, optional `lsl #12` | `value_transform = lo12_i`, pair `lo`, same `pair_group` |
 | RV64 B-type | imm12…imm1 scattered; `P` = instruction address; ±4 KiB, 2-byte aligned | `pcrel_begin`, `range.bits = 12`, `align_bits = 1` |
 | RV64 J-type (`jal`) | imm20…imm1 scattered; ±1 MiB | `pcrel_begin`, `range.bits = 20`, `align_bits = 1` |
-| RV64 `auipc` hi20 | `hi20 = (S + A + 0x800) >> 12`, relative to the `auipc` PC | pair `hi`, `pcrel_hi20` |
+| RV64 `auipc` hi20 | `hi20 = (S + A + 0x800) >> 12` in exact arithmetic, relative to the `auipc` PC | pair `hi`, `pcrel_hi20` |
 | RV64 `addi` lo12 | `lo12 = (S + A)` sign-extended 12 bits | pair `lo`, same `pair_group`, references the **auipc** site |
 
 The RISC-V `%pcrel_lo` semantics are the sharpest case: the low fixup references
@@ -156,32 +227,63 @@ information.
   allows it.
 - Membership and roles are data. The materializer never infers a pair from
   adjacency, ordering, or symbol names.
+- A `lo` member's transform is never derived from its `hi` member's. Both
+  members declare `value_transform` explicitly, even when the pair makes one
+  look redundant (OD-02, "one writer per bit").
 
-## 8. REL vs RELA
+## 8. REL vs RELA (OD-02)
 
-- v0 always carries an explicit `addend` in the plan.
-- For REL-style output, the materializer writes the addend into the field.
-- For RELA-style output, the materializer emits the addend in the record and
-  writes zero (or the resolved value) according to the output contract.
-- The choice of REL/RELA belongs to `output_contract`, never to the plan's
-  convenience.
+`fmp/0.1` has exactly one record shape, and it is RELA-shaped:
+
+- `addend` is always present in the record, even when zero;
+- for `emit_relocation` the descriptor bits are zero and the addend is not
+  written into them.
+
+There is no `output_contract` switch and no plan field for it. REL semantics —
+"the addend lives in the field" — are not expressible, and v0 does not need
+them:
+
+- A REL emitter would write the addend into the same bits a later consumer
+  reads, so the field would be both an input and a record payload. A field that
+  is zero would then be indistinguishable from a deliberate addend of zero.
+- A plan that wants the addend folded into the bytes says `resolve_in_place`;
+  there the computation includes `addend` explicitly and no record exists.
+
+An earlier draft said the REL/RELA choice "belongs to `output_contract`". No
+such field exists in `01_contract.md` §11, and adding one would create a second
+byte-affecting switch on a record that already carries the addend. The record
+shape is a property of `format_version`, and changing it is a format change, not
+a per-plan option.
 
 ## 9. Execution order and determinism
 
-1. Validate all fixups statically (site, overlap, descriptor bounds, pairing).
-2. Compute `S`, `P`, `A`, apply `value_transform`, apply `pc_reference_rule`.
-3. Range-check after transform, before writing (`E-FIXUP-003`).
-4. Write masked bits.
-5. Emit records in `(section_id, offset, fixup_id)` order.
+1. Validate all fixups statically (site, overlap, descriptor bounds, pairing,
+   one writer per bit).
+2. For each fixup in `(section_id, offset, fixup_id)` order, apply exactly one
+   mode:
+   - `resolve_in_place` — compute `S`, `P`, `A` exactly, apply
+     `pc_reference_rule` then `value_transform`, check `align_bits` on the
+     pre-transform value (`E-RANGE-003`) and `signed`/`bits` on the
+     post-transform value (`E-FIXUP-003`), then write the masked bits.
+   - `emit_relocation` — zero the descriptor bits and append one record. Do not
+     compute a value.
+3. Emit records in `(section_id, offset, fixup_id)` order.
 
-Steps 2–4 MUST be independent of iteration order. Because overlap is rejected,
-the masked writes commute; the check exists so that this stays true.
+Step 2 MUST be independent of iteration order. Because overlap is rejected, the
+masked writes commute; the check exists so that this stays true. The two modes
+also commute, because `resolve_in_place` writes only bits inside its descriptor
+and `emit_relocation` writes only zeroes to its own.
 
 ## 10. Out of scope for v0 (with rejection tests)
 
-- GOT/PLT/TLS and other link-time-policy relocations → `E-FIXUP-004`.
+- GOT/PLT/TLS and other link-time-policy relocations → `E-VERSION-001`, because
+  no `fmp/0.1` field names them: `target.kind` is a closed set and
+  `value_transform` has no `got`-like member. A plan that invents one declares a
+  feature this format version cannot honour; it is not silently turned into a
+  PC-relative record.
 - Relaxation of any kind, including "convert `jal` to `c.j` to fit".
 - Implicit addend extraction from existing bytes.
 - Symbol preemption or visibility policy.
+- REL output shape (§8).
 
 Each exclusion needs a negative fixture that must be rejected, per AC-05.

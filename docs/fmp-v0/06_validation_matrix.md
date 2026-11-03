@@ -10,14 +10,14 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 
 | ID | Input condition | Expected | Code | ISAs | Fixture | Status |
 |---|---|---|---|---|---|---|
-| N01 | Plan names a form that leaves a byte-affecting decision open (`x86:mov/r64-r64`, `x86:add/rm64-imm`), or names a variant the definition does not contain | Reject, never append a default variant | E-FORM-001 | x86, aarch64, rv64 | TBD | planned |
+| N01 | Plan names a form that leaves a byte-affecting decision open (`x86:mov/r64-r64`, `x86:add/rm64-imm`), a form missing a required component (`x86:mov/rm-r64` without `/legacy`), a renamed variant, or names a variant the definition does not contain | Reject, never append a default variant or match a near neighbour | E-FORM-001 | x86, aarch64, rv64 | TBD | planned |
 | N02 | Operand register class does not match the form | Reject | E-OPERAND-001 | x86, aarch64, rv64 | TBD | planned |
 | N03 | Immediate exceeds the field's range | Reject | E-RANGE-001 | x86, aarch64, rv64 | TBD | planned |
 | N04 | Branch displacement exceeds the form's range | Reject, never expand | E-RANGE-002 / E-FIXUP-003 | x86, aarch64, rv64 | TBD | planned |
 | N05 | `expected_size` disagrees with the encoded length | Reject | E-SIZE-001 / E-LAYOUT-003 | x86, aarch64, rv64 | TBD | planned |
 | N06 | Form requires a disabled target extension | Reject | E-TARGET-003 | rv64 (C), x86 (AVX), aarch64 (optional feature) | TBD | planned |
 | N07 | Fixup kind is incompatible with the field | Reject | E-FIXUP-001 | x86, aarch64, rv64 | TBD | planned |
-| N08 | Reference to a symbol that does not exist | Reject per resolution mode | E-SYMBOL-001 / E-FIXUP-002 | x86, aarch64, rv64 | TBD | planned |
+| N08 | Reference names a `symbol_id` absent from `symbols[]`; or `resolve_in_place` is asked to patch a symbol that exists but has no address | Reject the identity error in every mode; reject only the mode that needs an address | E-SYMBOL-001 / E-FIXUP-002 | x86, aarch64, rv64 | TBD | planned |
 | N09 | Two layout fragments overlap | Reject | E-LAYOUT-001 | all (layout is ISA-independent) | TBD | planned |
 | N10 | Definition digest does not match | Reject | E-DEF-001 | all | TBD | planned |
 | N11 | Plan implies implicit alignment or padding | Reject | E-LAYOUT-002 / E-LAYOUT-005 | all | TBD | planned |
@@ -37,7 +37,14 @@ be revisited.
 N01 was written against `encoding_choices`. After ADR-0004 the decision is
 carried by `form_id`, so the directive's N01 input ("missing required encoding
 choice") is exactly a plan whose form under-specifies the encoding. The test must
-also confirm the id is not repaired by appending a width or direction suffix.
+also confirm the id is not repaired by appending a width, direction or encoding
+family suffix, and that a renamed variant fails instead of matching its
+neighbour (`OD-04`).
+
+N08 splits by repair path: a `symbol_id` that names no entry in `symbols[]` is
+`E-SYMBOL-001` (the plan is internally inconsistent), while a symbol that exists
+but has no address and is asked to resolve in place is `E-FIXUP-002`. A plan that
+wants a record instead is legal and emits one (`OD-02`).
 
 ### Phase 1 evidence for N03 and N04
 
@@ -71,11 +78,11 @@ host" is the honest result.
 
 | ID | Requirement | Evidence form | Status |
 |---|---|---|---|
-| AC-01 | Contract complete enough to guide implementation | `01_contract.md` with no `TBD` on fields used by the three slices | in progress |
-| AC-02 | Key fields justified | Each frozen field cites a counterexample or source evidence | in progress |
+| AC-01 | Contract complete enough to guide implementation | `01_contract.md` with no `TBD` on fields used by the three slices | **clear for the x86 slice**: OD-02, OD-04 and OD-09 settled; every field the seven x86 forms use is `frozen`. The AArch64 and RV64 surfaces still block on OD-07 |
+| AC-02 | Key fields justified | Each frozen field cites a counterexample or source evidence | in progress — every field the x86 slice uses now cites one (OD-02/04/09); the remaining `draft` fields are optional or Level 1 |
 | AC-03 | Three-ISA vertical slices | One closed loop per ISA: plan → validate → encode → fixup → oracle compare | planned |
 | AC-04 | Encoding ambiguity proven absent | x86 `imm8`/`imm32`, `rel8`/`rel32`, `89`/`8B` and RV64 `c.*` vs standard are distinct `form_id`s; per-`EC` negative test per `02_encoding_choices.md`, "Validation obligation" | planned |
-| AC-05 | Fixups validated | x86 `rel32`; AArch64 `adrp`+`:lo12:`; RV64 `auipc`+`lo12` or B-type scatter | planned |
+| AC-05 | Fixups validated | x86 `rel32`; AArch64 `adrp`+`:lo12:`; RV64 `auipc`+`lo12` or B-type scatter | planned — the mode decision is settled (OD-02: two modes, one effect each), so the fixtures can be written |
 | AC-06 | Strict rejection | All applicable N01–N13 with recorded codes | planned |
 | AC-07 | Deterministic replay | EXP-R1, EXP-R2, EXP-R4, EXP-R5 | planned |
 | AC-08 | Reuse boundary backed by source evidence | `90_boundary_audit.md` with revision, file, symbol, line range | **done** for XirAsm; LLVM internals deferred (see audit §8) |

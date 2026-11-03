@@ -41,7 +41,7 @@
       "offset": 0,
       "form_id": "x86:mov/rm-r64/legacy",
       "operands": [
-        { "role": "dest", "kind": "x86.gpr64", "target_type": "r64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "dest", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
         { "role": "src", "kind": "x86.gpr64", "target_type": "r64", "payload": { "reg": 1 }, "modifiers": [] }
       ],
       "expected_size": 3

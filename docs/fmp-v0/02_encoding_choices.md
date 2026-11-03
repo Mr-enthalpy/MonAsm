@@ -184,6 +184,7 @@ These are computed by the definition and MUST NOT be stored or requested:
 - `REX.W` for a 64-bit x86 form;
 - register number encoding from an operand's `target_type`;
 - immediate bit placement implied by the form (including B-type/J-type scatter);
+- the value of a fixup-covered field, which that fixup writes alone (OD-02);
 - byte order, which comes from `target_identity.byte_order`;
 - alignment and padding, which are `fill` fragments, not instruction properties.
 
@@ -204,7 +205,9 @@ Plan side, in contract §13 order:
 4. Encoded length equals `expected_size` (`E-SIZE-001`).
 5. If present, the hash of the emitted bytes equals `expected_digest`
    (`E-BYTE-001`).
-6. Fixup fields are all present; nothing is defaulted (`E-FIXUP-*`).
+6. Fixup fields are all present; nothing is defaulted. Each fixup has exactly one
+   writer and one effect: `resolve_in_place` writes, `emit_relocation` zeroes
+   and records (`E-FIXUP-*`, OD-02).
 
 Definition side:
 

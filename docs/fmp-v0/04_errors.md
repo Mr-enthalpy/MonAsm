@@ -54,15 +54,14 @@ Rules:
 | E-LAYOUT-003 | Instruction offset/size does not match its fragment | `instruction_id`, `fragment` | N05 |
 | E-LAYOUT-004 | List order violates the contract's declared order | `list`, `index` | — |
 | E-LAYOUT-005 | Layout requires the materializer to compute padding or alignment | `section_id`, `offset`, `required_align` | N11 |
-| E-SYMBOL-001 | Reference cannot be resolved under the declared resolution policy | `symbol_id`, `mode` | N08 |
+| E-SYMBOL-001 | A reference names a `symbol_id` that `symbols[]` does not declare | `symbol_id`, `mode` | N08 |
 | E-SYMBOL-002 | Duplicate `symbol_id`, or duplicate emitted name with conflicting binding | `symbol_id` | — |
 | E-SYMBOL-003 | Defined symbol without a location | `symbol_id` | — |
-| E-FIXUP-001 | Fixup kind is incompatible with the field descriptor or form | `kind`, `form_id`, `field` | N07 |
-| E-FIXUP-002 | Unresolved target in a resolve-in-place fixup | `fixup_id`, `target` | N08 |
+| E-FIXUP-001 | Fixup is incompatible with the form, the descriptor, or the instruction's operands: the fixup kind does not fit the form; the descriptor widths do not sum to `range_constraint.bits`; a target operand and `fixup.target` disagree | `kind`, `form_id`, `field` | N07 |
+| E-FIXUP-002 | Target has no address in a `resolve_in_place` fixup: an undefined or external symbol, or a cross-section reference whose section has no `base_address` | `fixup_id`, `target` | N08 |
 | E-FIXUP-003 | Computed fixup value outside `range_constraint` | `fixup_id`, `min`, `max`, `value` | N04 |
-| E-FIXUP-004 | Relocation kind unsupported by the output contract | `kind`, `artifact` | — |
 | E-FIXUP-005 | Field descriptor out of bounds or self-overlapping | `fixup_id`, `descriptor` | — |
-| E-FIXUP-006 | Two fixups patch overlapping bits | `first`, `second` | — |
+| E-FIXUP-006 | Two writers patch overlapping bits — two fixups, or an operand-supplied field and a fixup | `first`, `second` | — |
 | E-FIXUP-007 | Pair group incomplete, duplicated role, or target mismatch | `pair_group`, `problem` | N12 |
 | E-SIZE-001 | Encoded length != `expected_size` | `instruction_id`, `expected`, `actual` | N05 |
 | E-BYTE-001 | Emitted bytes do not match `expected_digest` | `instruction_id`, `declared`, `actual` | N13 |
@@ -100,6 +99,26 @@ rejection; `derived` means it follows from a measured byte sequence.
   default variant. The test is N01; it runs in Phase 3.
 - `E-DEF-001` — `planned` (EXP-R5). No observation yet; it must not be cited as
   evidenced.
+- `E-RANGE-003` — derived, OD-09: an AArch64 `b` targets `.text+2`. The
+  displacement is not a multiple of 4, and `imm26 = D >> 2` would silently drop
+  the low two bits, branching 2 bytes before the requested address. Reject
+  rather than round.
+- `E-FIXUP-002` — derived, OD-02 (`03_fixup_model.md` §5.1): a plan names an
+  external `call` target and `resolve_in_place`. There is no `S` to compute, so
+  the only honest outcomes are "refuse" (this code) or "emit zero", and zero
+  turns the call into a branch to itself. Level 1 would write the record instead;
+  that is `emit_relocation`, a different mode the plan must name.
+- `E-SYMBOL-001` — derived, N08: the plan references `symbol_id: "S9"` with no
+  entry in `symbols[]`. This is not a resolution policy question, because no
+  policy can supply an identity the plan never defined.
+- `E-FIXUP-006` — derived, OD-02 (`03_fixup_model.md` §3): an `add` fixup covers
+  `imm12` and the same instruction's `lo12` operand also carries `value: 5`. Two
+  writers, one field; whichever wins, the plan contained a number that was
+  discarded without a diagnostic.
+- `E-VERSION-001` — derived, OD-02 (`03_fixup_model.md` §10): a plan writes
+  `value_transform: "got_pcrel"`. `fmp/0.1` has no such member, so the plan
+  declares a feature the format version cannot honour; treating it as a plain
+  PC-relative record would silently drop the GOT indirection.
 
 ### 2.2 Retired codes
 
@@ -111,6 +130,7 @@ reused for a different condition.
 | E-CHOICE-001 | 2026-11-04 | `encoding_choices` removed by ADR-0004; a missing decision is a missing or under-specified form | E-FORM-001 |
 | E-CHOICE-002 | 2026-11-04 | the same | E-FORM-001 / E-OPERAND-002 |
 | E-CHOICE-003 | 2026-11-04 | the same; a value outside the form's set is a form or range error | E-FORM-001 / E-RANGE-001 |
+| E-FIXUP-004 | 2026-11-04 | `fmp/0.1` emits one record shape for every `emit_relocation` fixup and every fixup shape has one, so the trigger ("output contract cannot carry the record") is unreachable. A request for a relocation kind the format does not define is a declared-feature failure | E-VERSION-001 / E-FIXUP-001 |
 
 ## 3. Rules
 

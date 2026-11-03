@@ -228,6 +228,13 @@ reading):
  "target":{"kind":"symbol","symbol_id":"S0001"},"value_transform":"identity"}
 ```
 
+Measurement note (2026-11-04): this record was written against the draft schema,
+which still required `overwrite_bytes: false` and
+`bit_order: "value_msb_first"`. Both were removed by the OD-02 schema pass: the
+first was pinned to `false`, and the second was a one-value enum with a schema
+`default`, so neither carried information. The record is kept as measured, so the
+current shape is 54 bytes smaller. The rest of the record is unchanged.
+
 LLVM's own record for the same instruction:
 
 ```text
