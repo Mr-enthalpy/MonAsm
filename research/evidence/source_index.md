@@ -29,7 +29,7 @@ Verified 2026-11-03 on the development host:
 |---|---|---|---|---|---|---|---|
 | XirAsm | https://github.com/xir-kuku/XirAsm | `3ee8a439f5ba` (`main`) | repo `0.3.5` | Apache-2.0 | 2026-11-03 | Boundary audit, knowledge, oracle cross-check | **built and executed** 2026-11-03; snapshot in gitignored `research/external/XirAsm` |
 | XirAsm-lib | same repo, `deps/xirasm-lib` | `3ee8a439f5ba` | `0.1.5` | Apache-2.0 | 2026-11-03 | Encoder audit; Zig `0.17.0` minimum | audited, not adopted (see `docs/fmp-v0/91_reuse_matrix.md`) |
-| AArch64 MRS (via XirAsm) | Arm Architecture Machine Readable Specification 2026-06 | recorded in `include/arm/a64/generated/latest/manifest.json` | 2026-06 | Arm BSD-style notice + MPL-2.0 tooling | 2026-11-03 (indirect) | Candidate knowledge source for `OD-07` | **provenance read, licence unverified** |
+| Arm MRS 2026-06 A-profile FAT | Arm download (account-gated); local drop `research/external/arm-mrs/` | `2026-06_rel`, build 818, schema 2.9.5 (declared in `_meta.version`) | 2026-06 | **Arm proprietary notice**: no reproduction without prior written permission; use/distribution bound to the recipient's Arm agreement | 2026-11-04 | Licence evidence for `OD-07` | read; **not redistributable as shipped**; `Instructions.json` not obtained (`EXP-0006`) |
 | LLVM | https://github.com/llvm/llvm-project | `llvmorg-23.1.2` | 23.1.2 | Apache-2.0 WITH LLVM-exception | 2026-11-03 | Oracle, encoding knowledge | installed (`C:\Users\hanni\Tools\llvm`) |
 | GNU binutils | — | not installed | — | GPL | — | Secondary oracle | deferred (LLVM tools cover v0) |
 
@@ -125,6 +125,8 @@ experiment:   <command or fixture, if any>
 | EV-11 | Is AArch64 reachable without the macro include? | `--isa aarch64` + `add x0,x1,x2` | No: "instruction text emission is not supported for this target ISA" | observed (experiment) |
 | EV-12 | Do duplicate RISC-V specs create ambiguity? | parse all 1,700 specs | No: 1,363 distinct names at xlen 64, zero duplicates per xlen | observed (experiment) |
 | EV-13 | Where does AArch64 encoding knowledge originate? | `include/arm/a64/generated/latest/NOTICE`, `manifest.json` | Arm Architecture Machine Readable Specification 2026-06; 4,350 instructions, 292 aliases | observed (source) |
+| EV-14 | What licence does the upstream MRS package declare? | read `Features.json` `_meta.license` and `docs/notice.html` | Proprietary notice: no reproduction without prior written permission; distribution bound to the recipient's Arm agreement. The BSD-3 text XirAsm reproduces is not in the upstream package | observed (source, `EXP-0006`) |
+| EV-15 | Do XirAsm's manifest hashes identify the public MRS files? | hash the 2026-06 and 2026-09 `Features.json`; compare with `source_lock.files` | No: 2026-06 is `6d5c19e7…`, 2026-09 is `d4bc3952…`, manifest says `63325900…`; canonicalisation does not close the gap | observed (experiment, `EXP-0006`) |
 
 Full commands and byte-level output: `experiments/EXP-0001-xirasm-boundary-probes.md`.
 Findings and interpretations: `docs/fmp-v0/90_boundary_audit.md`.
@@ -133,8 +135,13 @@ Findings and interpretations: `docs/fmp-v0/90_boundary_audit.md`.
 
 - LLVM was verified as an oracle only; no LLVM source has been read, so the
   `MCAssembler` vs `MCCodeEmitter` relaxation boundary stays `unverified`.
-- The AArch64 licence question is open: the NOTICE and `MPL-2.0.txt` were read,
-  but which files fall under which licence was not determined (`OD-07`).
+- The AArch64 licence question changed shape: the 2026-06 FAT package's own
+  notice forbids reproduction without prior written permission and binds
+  use/distribution to the recipient's Arm agreement. The BSD-3 text XirAsm
+  reproduces was not found upstream, and its manifest file hashes do not match
+  the public files (`EXP-0006`). The `Instructions.json` package was not
+  downloaded, so its terms stay `unverified`. `ADR-0005` must be superseded
+  before any AArch64 table is generated from MRS data.
 - RISC-V relocation pairs (`auipc` + `lo12`) were not exercised; `AC-05` needs
   them in Phase 3.
 - Cross-host determinism (EXP-R3) is untested and must stay marked `unverified`.
