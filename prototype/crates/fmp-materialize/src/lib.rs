@@ -726,6 +726,7 @@ mod tests {
             from: SlotFrom::OperandValue,
             range: None,
             modifiers: Vec::new(),
+            excluded: Vec::new(),
             placements: vec![
                 fmp_model::definition::Placement {
                     bit_offset: 12,

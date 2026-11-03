@@ -94,6 +94,7 @@ Rules:
 | `target_type` | yes | The slot constraint the plan operand must name | A `r64` operand fills a `rm64` slot; the check has nothing to compare. |
 | `from` | yes | `reg_number` \| `operand_value` | The loader would have to guess whether `payload.reg` or `payload.value` is the number. |
 | `range` | only for `operand_value` | `{signed, bits, align_bits}` | `imm8 = 300` is truncated to `0x2c` and becomes `44`. |
+| `excluded` | no | Closed, strictly increasing list of exact values the slot may not carry; absent means no exclusion | `c.addi a0, 0` is inside `[-32, 31]` and encodes as `01 05`, which `llvm-objdump` calls a HINT, not the addition the plan names. |
 | `placements` | yes | Ordered bit ranges, most significant operand bits first | The bit order of a split field would be a convention, not data. |
 | `modifiers` | yes | The closed set of `{name, value}` pairs this slot permits; `[]` means none | An ignored `lock` emits `0xf0`-less bytes with different semantics and no error. |
 
@@ -122,6 +123,17 @@ byte-granular; the field exists for scaled branch fixups — AArch64 `bl`
 (`align_bits = 2`) and RV64 `beq`/`jal` (`align_bits = 1`) — where the
 pre-transform displacement must be instruction-aligned. The slot itself keeps
 `align_bits = 0`, because it holds field content (§8.3).
+
+`excluded` is the one place a slot may be **non-convex**, and it is data, not a
+predicate (`ADR-0009`, `OD-14`). It is a closed list of exact integers, strictly
+increasing, each inside the slot's representable domain: `range` for
+`operand_value`, and the placements' summed width for `reg_number`. A value in
+the list is rejected with `E-RANGE-004` even though `range` accepts it; an
+absent key means no value is excluded, and an empty list is a definition error
+because it is not a statement. The check is a lookup, never an expression
+(`INV-06`), so "legal" remains decidable by inspection. No v0 x86 or AArch64
+slot declares one; `riscv:c.addi/rd-imm6` is the first, excluding `0` on both
+slots (§8.5).
 
 ### 4.1 Placements
 
@@ -197,6 +209,8 @@ table by digest alone.
 4. Each operand's `modifiers` MUST be a subset of the slot's permitted set
    (`E-OPERAND-003`, reason `modifier not permitted`).
 5. Each operand's payload shape MUST match `from` (`E-OPERAND-003`).
+6. Each operand's value MUST be inside the slot's domain (`E-RANGE-001`/`002`/
+   `003`/`004`); an `excluded` entry is rejected even when `range` contains it.
 
 Only after these pass is a byte written.
 
@@ -210,6 +224,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.1.0.json` | `monasm.isa.x86` | `sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/rv64/0.1.0.json` | `monasm.isa.riscv` | `sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083` |
+| `definitions/rv64/0.2.0.json` | `monasm.isa.riscv` | `sha256:8329a38faa964f9c69207a48e3bfb45c13fb0ddbaeb829ddcc0dbd1cffa8de10` |
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
@@ -310,9 +325,8 @@ the source states `left_shift: 1` for `beq`/`jal` and `left_shift: 12` for
 while the slot keeps `align_bits: 0` and holds field content. The B- and J-type
 slots have several placements each (`beq`: `[31,1]`, `[7,1]`, `[25,6]`, `[8,4]`;
 `jal`: `[31,1]`, `[12,8]`, `[20,1]`, `[21,10]`), which is the scattered-field
-case directive §6.3 item 6 asks for. `c.addi` also needs `imm != 0` and
-`xd != 0`; since `fmp-def/0.1` has no non-zero constraint, it stays outside v0
-until a format decision adds one.
+case directive §6.3 item 6 asks for. `c.addi` needs `imm != 0` and `xd != 0`;
+that is the `excluded` rule of §4, not a scaling rule, and §8.5 records it.
 
 ### 8.4 `rv64` `0.1.0`
 
@@ -348,6 +362,13 @@ compared exactly with the plan's (`01_contract.md` §4); the table is never
 filtered per plan. A plan that enables a different set is `E-TARGET-001`, not
 silently accepted.
 
+That exact comparison is why `c.addi` is not a row here. Its node is
+`definedBy: Zca`, and `ext/C.yaml` puts `Zca` in C's `requirements.allOf`, so it
+needs `rv64c` enabled — which would change this document's extension set and
+therefore its digest. `0.2.0` is that change (§8.5); `0.1.0` keeps its bytes and
+its digest, and a plan that names `riscv:c.addi/rd-imm6` against `0.1.0` is
+`E-FORM-001` (`N01c`).
+
 The three immediate-bearing arithmetic forms are the scattered-field case:
 `beq`'s 12-bit field is `imm[12]|imm[10:5]|imm[4:1]|imm[11]` over four
 placements, `jal`'s 20-bit field is `imm[20]|imm[10:1]|imm[11]|imm[19:12]`, and
@@ -368,10 +389,31 @@ one does not cover the other. RV64 does not scale the load/store immediate, so
 because it has one encoding form; a later x86 or AArch64 memory slice will need
 one `form_id` per addressing variant for the same reason.
 
-`RV-P7` (`c.addi`) is the only remaining RV64 `06_validation_matrix.md` row
-without a form, and it is a format question, not a source question: it needs
-`imm != 0` and `xd != 0`, which `fmp-def/0.1` cannot express. Naming it is
-`E-FORM-001`.
+`RV-P7` (`c.addi`) is not in this table for the extension-set reason above; it
+is the first row of `0.2.0`.
+
+### 8.5 `rv64` `0.2.0`
+
+`0.2.0` contains every row of §8.4 unchanged, plus:
+
+| `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
+|---|---|---|---|---|
+| `riscv:c.addi/rd-imm6` | `0100` | dest: `riscv.xreg`/`xreg` → `[7,5]` (excl 0); imm: `riscv.imm`/`imm6` → `[12,1]`, `[2,5]` (excl 0) | 2 | `RV-P7` |
+
+The node is `inst/C/c.addi.yaml`; its `encoding.match` is `000-----------01`, so
+the fixed word is `0x0001` and the file template is `0100` (little-endian). `imm`
+is `location: "12|6-2"`, which is one bit at 12 plus five bits at 6–2, and `xd` is
+`11-7`. Both variables carry `not: 0`, which the generator turns into the
+`excluded: [0]` on each slot (ADR-0009). Encoding either zero would still produce
+two bytes — `01 05` is `c.addi a0, 0x0` to `llvm-objdump`, and `05 00` is
+`c.nop 0x1` — so the plan is rejected with `E-RANGE-004` (`N16a`, `N16b`) rather
+than silently materialized as a HINT.
+
+The document's `enabled_extensions` is `["rv64i","rv64c"]`. The generator asserts
+the node's `definedBy.extension.name` (`Zca`) maps to a plan token through the
+same table that produced §8.4's assertions; `ext/C.yaml` states the relation
+(`C` requires `Zca`). A plan that pins `0.2.0` must declare exactly that set
+(`E-TARGET-001` otherwise), and a plan that pins `0.1.0` never sees the form.
 
 ## 9. Load-time checks
 

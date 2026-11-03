@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate `definitions/rv64/0.1.0.json` from the pinned UDB resolved spec.
+"""Generate `definitions/rv64/{0.1.0,0.2.0}.json` from the pinned UDB resolved spec.
 
 This is disposable research tooling (ADR-0007 §Decision 7). The shipped artifact
 is the JSON document plus its digest; this script is how that document was
@@ -18,14 +18,21 @@ What it does, per form:
 3. Refuses to emit unless every bit of the word is covered exactly once by a
    fixed bit or a slot placement, and unless the bits `match` calls variable are
    exactly the bits the placements own.
-4. Refuses to emit a form whose source states `not:` — `fmp-def/0.1` has no
-   non-zero constraint, so `c.addi` stays out of v0 (ADR-0007 §Decision 5).
+4. Turns a variable's `not:` into the slot's `excluded` list (ADR-0009). A
+   `not:` this generator cannot express fails instead of being dropped.
 5. Re-encodes a small set of probe vectors from the table it just built and
-   compares them with the `llvm-mc 23.1.2` bytes recorded in EXP-0009 §6.
+   compares them with the `llvm-mc 23.1.2` bytes recorded in EXP-0009 §6,
+   EXP-0011 §3 and EXP-0012 §2.
+
+Two documents are emitted because the document's `enabled_extensions` is part
+of its identity (`07_definition_format.md` §2): `0.1.0` is base-`I`, and
+`0.2.0` adds `riscv:c.addi/rd-imm6` and declares `rv64i` + `rv64c`. The base
+forms and the `0.1.0` bytes must not move when `0.2.0` gains a form.
 
 Reads:  research/external/rv64-udb/gen/resolved_spec/_/inst/...  (pinned by
         tools/check_rv64_source.py)
 Writes: definitions/rv64/0.1.0.json
+        definitions/rv64/0.2.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0010/generate_rv64.py
@@ -44,25 +51,46 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
 SPEC_ROOT = os.path.join(
     ROOT, "research", "external", "rv64-udb", "gen", "resolved_spec", "_", "inst"
 )
-OUT = os.path.join(ROOT, "definitions", "rv64", "0.1.0.json")
+OUT_DIR = os.path.join(ROOT, "definitions", "rv64")
 
 DOCUMENT = {
     "definition_format": "fmp-def/0.1",
     "namespace": "monasm.isa.riscv",
-    "version": "0.1.0",
+    "version": None,
     "target_identity": {
         "isa_family": "riscv",
         "isa_variant": "rv64",
         "execution_mode": "n/a",
-        # Every v0 form is a base-ISA `I` node (asserted per node below), so the
-        # document declares the base extension set. The contract's own example
-        # is ["rv64i","rv64m","rv64c"]; one set covers the whole document and is
-        # compared exactly with the plan's (07_definition_format.md §2).
-        "enabled_extensions": ["rv64i"],
+        # One set covers the whole document and is compared exactly with the
+        # plan's (07_definition_format.md §2), so a form that needs a different
+        # extension set means a different document version.
+        "enabled_extensions": None,
         "byte_order": "little",
         "address_width": 64,
     },
 }
+
+# UDB `definedBy.extension.name` -> plan `enabled_extensions` token. The mapping
+# is not invented: `ext/C.yaml` states "Zca is the non-FP subset of C" and puts
+# `extension: Zca` in C's `requirements.allOf`, so a `Zca` node is enabled by
+# `rv64c`.
+PLAN_EXTENSION = {"I": "rv64i", "Zca": "rv64c"}
+
+# Documents to emit, in version order. `forms` names the list below.
+DOCUMENTS = [
+    {
+        "version": "0.1.0",
+        "enabled_extensions": ["rv64i"],
+        "forms": ["BASE_FORMS"],
+        "doc_section": "8.4",
+    },
+    {
+        "version": "0.2.0",
+        "enabled_extensions": ["rv64i", "rv64c"],
+        "forms": ["BASE_FORMS", "COMPRESSED_FORMS"],
+        "doc_section": "8.5",
+    },
+]
 
 # One entry per row of 07_definition_format.md §8.4.
 #
@@ -70,7 +98,7 @@ DOCUMENT = {
 # asserts it instead of inferring it. `operands` is in plan operand order. Each
 # entry names the UDB variable that carries it; the placement list is derived
 # from that variable's `location`.
-FORMS = [
+BASE_FORMS = [
     {
         "form_id": "riscv:add/rd-rs1-rs2",
         "node": "I/add.yaml",
@@ -173,6 +201,27 @@ FORMS = [
     },
 ]
 
+# One entry per row of 07_definition_format.md §8.5. These forms need an
+# extension beyond base `I`, so they live in `0.2.0` (ADR-0009 §4).
+COMPRESSED_FORMS = [
+    {
+        "form_id": "riscv:c.addi/rd-imm6",
+        "node": "C/c.addi.yaml",
+        "udb_name": "c.addi",
+        # `ext/C.yaml` places `extension: Zca` in C's requirements, so the
+        # plan-level token is `rv64c`.
+        "udb_extension": "Zca",
+        "operands": [
+            # `c.addi`'s assembly order is `xd, imm`; both variables carry
+            # `not: 0`, which the generator turns into `excluded: [0]`.
+            ("dest", "riscv.xreg", "xreg", "reg_number", "xd", None, 0),
+            # 6-bit sign-extended immediate split as bit 12 plus bits 6..2.
+            ("imm", "riscv.imm", "imm6", "operand_value", "imm", True, 0),
+        ],
+        "covers": "`RV-P7`",
+    },
+]
+
 # (form_id, {variable: field value}, oracle bytes, assembler text). The bytes
 # were produced by `llvm-mc 23.1.2 -triple=riscv64`; for `auipc a0, -1` the
 # assembler wants the unsigned spelling of the same 20-bit field, so the oracle
@@ -202,6 +251,16 @@ VECTORS = [
      "23 b4 c5 00", "sd a2, 8(a1)"),
     ("riscv:sd/rs-base-imm12", {"src": 12, "base": 11, "disp": 2047},
      "a3 bf c5 7e", "sd a2, 2047(a1)"),
+    # EXP-0012 §2. The two zero cases are deliberately absent: they are the
+    # rejected values, not vectors (N16a/N16b).
+    ("riscv:c.addi/rd-imm6", {"dest": 10, "imm": 1},
+     "05 05", "c.addi a0, 1"),
+    ("riscv:c.addi/rd-imm6", {"dest": 10, "imm": -32},
+     "01 15", "c.addi a0, -32"),
+    ("riscv:c.addi/rd-imm6", {"dest": 10, "imm": 31},
+     "7d 05", "c.addi a0, 31"),
+    ("riscv:c.addi/rd-imm6", {"dest": 10, "imm": -1},
+     "7d 15", "c.addi a0, -1"),
 ]
 
 NAME_LINE = re.compile(r"^(\s*)-\s+name:\s*(\S+)\s*$")
@@ -313,9 +372,11 @@ def parse_node(path, block):
 
     variables = {}
     current = None
+    collecting = None
     for line in body:
         found = NAME_LINE.match(line)
         if found:
+            collecting = None
             current = found.group(2)
             if current in variables:
                 raise SystemExit("{0}: duplicate variable {1}".format(path, current))
@@ -324,11 +385,17 @@ def parse_node(path, block):
                 "location": None,
                 "left_shift": 0,
                 "sign_extend": False,
-                "not": False,
+                "not": [],
             }
             continue
         if current is None:
             continue
+        if collecting is not None:
+            item = re.match(r"^\s+-\s+(-?\d+)\s*$", line)
+            if item:
+                variables[collecting]["not"].append(int(item.group(1)))
+                continue
+            collecting = None
         found = PROP_LINE.match(line)
         if not found:
             continue
@@ -340,7 +407,20 @@ def parse_node(path, block):
         elif key == "sign_extend":
             variables[current]["sign_extend"] = unquote(value) == "true"
         elif key == "not":
-            variables[current]["not"] = True
+            # `not:` is either a scalar (`not: 0`) or a block list of scalars
+            # (`not:` followed by `- 1`, `- 3`, ...). Nothing else is expressible
+            # as `excluded`, so it fails instead of being dropped (ADR-0009 §5).
+            text = unquote(value)
+            if text:
+                if not re.match(r"^-?\d+$", text):
+                    raise SystemExit(
+                        "{0}: variable {1} has non-integer `not: {2}`".format(
+                            path, current, text
+                        )
+                    )
+                variables[current]["not"].append(int(text))
+            else:
+                collecting = current
 
     for variable in variables.values():
         if variable["location"] is None:
@@ -392,6 +472,12 @@ def build(spec, node):
                 spec["form_id"], branches, spec["udb_extension"]
             )
         )
+    if spec["udb_extension"] not in PLAN_EXTENSION:
+        raise SystemExit(
+            "{0}: UDB extension {1!r} has no plan-level token".format(
+                spec["form_id"], spec["udb_extension"]
+            )
+        )
 
     match = node["match"]
     if len(match) != width:
@@ -427,17 +513,34 @@ def build(spec, node):
             raise SystemExit(
                 "{0}: variable {1!r} is not in the node".format(spec["form_id"], name)
             )
-        if variable["not"]:
-            raise SystemExit(
-                "{0}: variable {1!r} states `not:`, which fmp-def/0.1 cannot "
-                "express; the form stays out of v0 (ADR-0007)".format(
-                    spec["form_id"], name
-                )
-            )
 
         groups = groups_of(variable["location"])
         placements = [{"bit_offset": lo, "width": w} for _hi, lo, w in groups]
         total = sum(w for _hi, _lo, w in groups)
+
+        # `not:` becomes the slot's closed `excluded` list (ADR-0009). It must be
+        # strictly increasing and inside the domain the slot can actually
+        # represent; an entry outside it would describe a rejection that can
+        # never happen.
+        excluded = list(variable["not"])
+        if excluded:
+            if sorted(set(excluded)) != excluded:
+                raise SystemExit(
+                    "{0}/{1}: source `not:` is not strictly increasing".format(
+                        spec["form_id"], role
+                    )
+                )
+            if source == "reg_number" or not signed:
+                low, high = 0, (1 << total) - 1
+            else:
+                low, high = -(1 << (total - 1)), (1 << (total - 1)) - 1
+            for value in excluded:
+                if value < low or value > high:
+                    raise SystemExit(
+                        "{0}/{1}: excluded value {2} is outside [{3}, {4}]".format(
+                            spec["form_id"], role, value, low, high
+                        )
+                    )
 
         if source == "reg_number":
             if signed is not None or shift:
@@ -496,6 +599,8 @@ def build(spec, node):
         }
         if source == "operand_value":
             slot["range"] = {"signed": signed, "bits": total, "align_bits": 0}
+        if excluded:
+            slot["excluded"] = excluded
         slot["modifiers"] = []
         slot["placements"] = placements
         slots.append(slot)
@@ -585,6 +690,12 @@ def render(document, forms):
                         span["align_bits"],
                     )
                 )
+            if "excluded" in slot:
+                lines.append(
+                    '          "excluded": [{0}],'.format(
+                        ", ".join(str(value) for value in slot["excluded"])
+                    )
+                )
             lines.append('          "modifiers": [],')
             placements = ", ".join(
                 '{{ "bit_offset": {0}, "width": {1} }}'.format(
@@ -616,11 +727,14 @@ def doc_rows(forms):
                 "`[{0},{1}]`".format(p["bit_offset"], p["width"])
                 for p in slot["placements"]
             )
-            cells.append(
-                "{0}: `{1}`/`{2}` \u2192 {3}".format(
-                    slot["role"], slot["kind"], slot["target_type"], placements
-                )
+            cell = "{0}: `{1}`/`{2}` \u2192 {3}".format(
+                slot["role"], slot["kind"], slot["target_type"], placements
             )
+            if "excluded" in slot:
+                cell += " (excl {0})".format(
+                    ", ".join(str(value) for value in slot["excluded"])
+                )
+            cells.append(cell)
         print(
             "| `{0}` | `{1}` | {2} | {3} | {4} |".format(
                 form["form_id"],
@@ -632,55 +746,87 @@ def doc_rows(forms):
         )
 
 
+def document_for(spec):
+    document = {
+        "definition_format": DOCUMENT["definition_format"],
+        "namespace": DOCUMENT["namespace"],
+        "version": spec["version"],
+        "target_identity": dict(DOCUMENT["target_identity"]),
+    }
+    document["target_identity"]["enabled_extensions"] = list(spec["enabled_extensions"])
+    return document
+
+
 def main():
     nodes = {}
-    forms = []
-    for spec in FORMS:
-        path = os.path.join(SPEC_ROOT, spec["node"])
-        if not os.path.isfile(path):
-            raise SystemExit(
-                "missing pinned node {0}; restore the ADR-0007 drop".format(path)
-            )
-        key = (spec["node"], spec.get("block"))
-        node = nodes.get(key)
-        if node is None:
-            node = parse_node(path, spec.get("block"))
-            nodes[key] = node
-        built = build(spec, node)
-        built["covers"] = spec["covers"]
-        forms.append(built)
+    built = {}
+    for list_name in ("BASE_FORMS", "COMPRESSED_FORMS"):
+        for spec in globals()[list_name]:
+            path = os.path.join(SPEC_ROOT, spec["node"])
+            if not os.path.isfile(path):
+                raise SystemExit(
+                    "missing pinned node {0}; restore the ADR-0007 drop".format(path)
+                )
+            key = (spec["node"], spec.get("block"))
+            node = nodes.get(key)
+            if node is None:
+                node = parse_node(path, spec.get("block"))
+                nodes[key] = node
+            form = build(spec, node)
+            form["covers"] = spec["covers"]
+            form["plan_extension"] = PLAN_EXTENSION[spec["udb_extension"]]
+            if form["form_id"] in built:
+                raise SystemExit("duplicate form_id {0}".format(form["form_id"]))
+            built[form["form_id"]] = form
 
-        print("{0}".format(built["form_id"]))
-        print("  node {0} ({1}-bit), template {2}".format(
-            spec["node"], built["width"], built["template"]))
-        for slot in built["slots"]:
-            placements = ", ".join(
-                "[{0},{1}]".format(p["bit_offset"], p["width"])
-                for p in slot["placements"]
-            )
-            print("    {0:<6} {1:<11} {2:<12} {3}".format(
-                slot["role"], slot["kind"], slot["target_type"], placements))
+            print("{0}".format(form["form_id"]))
+            print("  node {0} ({1}-bit), template {2}".format(
+                spec["node"], form["width"], form["template"]))
+            for slot in form["slots"]:
+                placements = ", ".join(
+                    "[{0},{1}]".format(p["bit_offset"], p["width"])
+                    for p in slot["placements"]
+                )
+                print("    {0:<6} {1:<11} {2:<12} {3}".format(
+                    slot["role"], slot["kind"], slot["target_type"], placements))
 
-    document = dict(DOCUMENT)
-    document["forms"] = [
-        {"form_id": f["form_id"], "template": f["template"], "slots": f["slots"]}
-        for f in forms
-    ]
+    emitted = []
+    for definition in DOCUMENTS:
+        form_ids = []
+        for list_name in definition["forms"]:
+            form_ids.extend(spec["form_id"] for spec in globals()[list_name])
+        forms = [built[form_id] for form_id in form_ids]
+        for form in forms:
+            if form["plan_extension"] not in definition["enabled_extensions"]:
+                raise SystemExit(
+                    "{0}: form {1} needs {2}, document enables {3}".format(
+                        definition["version"],
+                        form["form_id"],
+                        form["plan_extension"],
+                        definition["enabled_extensions"],
+                    )
+                )
+        document = document_for(definition)
+        document["forms"] = [
+            {"form_id": f["form_id"], "template": f["template"], "slots": f["slots"]}
+            for f in forms
+        ]
 
-    text = render(DOCUMENT, forms)
-    parsed = json.loads(text)
-    if parsed != document:
-        raise SystemExit("renderer and builder disagree; refusing to write")
-    if canonical_digest(parsed) != canonical_digest(document):
-        raise SystemExit("digest mismatch after rendering")
+        text = render(document, forms)
+        parsed = json.loads(text)
+        if parsed != document:
+            raise SystemExit("renderer and builder disagree; refusing to write")
+        if canonical_digest(parsed) != canonical_digest(document):
+            raise SystemExit("digest mismatch after rendering")
+        emitted.append((definition, document, forms, text))
 
     print("== probe vectors, encoded from the table above")
     failures = 0
-    by_id = {form["form_id"]: form for form in forms}
     for form_id, values, expected, asm in VECTORS:
-        if form_id not in by_id:
+        form = built.get(form_id)
+        if form is None:
             continue
-        actual = encode(by_id[form_id], values)
+        actual = encode(form, values)
         status = "ok  " if actual == expected else "FAIL"
         if actual != expected:
             failures += 1
@@ -689,18 +835,22 @@ def main():
     if failures:
         raise SystemExit("FAIL: probe vectors disagree with llvm-mc")
 
-    directory = os.path.dirname(OUT)
-    if not os.path.isdir(directory):
-        os.makedirs(directory)
-    with io.open(OUT, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(text)
+    if not os.path.isdir(OUT_DIR):
+        os.makedirs(OUT_DIR)
+    for definition, document, _forms, text in emitted:
+        out = os.path.join(OUT_DIR, definition["version"] + ".json")
+        with io.open(out, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
 
     print("")
-    print("wrote {0}".format(os.path.relpath(OUT, ROOT).replace("\\", "/")))
-    print("definition digest {0}".format(canonical_digest(document)))
-    print("")
-    print("07_definition_format.md §8.4 rows:")
-    doc_rows(forms)
+    for definition, document, _forms, _text in emitted:
+        out = os.path.join(OUT_DIR, definition["version"] + ".json")
+        print("wrote {0}".format(os.path.relpath(out, ROOT).replace("\\", "/")))
+        print("definition digest {0}".format(canonical_digest(document)))
+    for definition, _document, forms, _text in emitted:
+        print("")
+        print("07_definition_format.md §{0} rows:".format(definition["doc_section"]))
+        doc_rows(forms)
     return 0
 
 

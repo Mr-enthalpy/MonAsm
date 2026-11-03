@@ -44,6 +44,8 @@ pub const E_RANGE_001: &str = "E-RANGE-001";
 pub const E_RANGE_002: &str = "E-RANGE-002";
 /// Alignment requirement not met.
 pub const E_RANGE_003: &str = "E-RANGE-003";
+/// Operand value is excluded by the slot's declared domain.
+pub const E_RANGE_004: &str = "E-RANGE-004";
 /// Fragments overlap.
 pub const E_LAYOUT_001: &str = "E-LAYOUT-001";
 /// Fragment gap, or fragment sum != `declared_size`.
@@ -112,6 +114,7 @@ pub const ALL: &[&str] = &[
     E_RANGE_001,
     E_RANGE_002,
     E_RANGE_003,
+    E_RANGE_004,
     E_LAYOUT_001,
     E_LAYOUT_002,
     E_LAYOUT_003,

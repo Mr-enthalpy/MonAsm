@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -mattr=+c -filetype=obj RV-P7-caddi.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "3be4bf6e4825ecb83c31d67fb6ce8ad531e960c1f7a7da9d1977cd22dc1c63c6",
+  "output_sha256": "213f5727fed78ca94f4082078d87e223b0263a96e94dc793f07645d3e6423563",
+  "size": 12,
+  "records": 0,
+  "notes": "Input, one line each (LF, trailing newline): `c.addi a0, 1` / `addi a0, a1, 1` / `c.addi a0, -32` / `c.addi a0, 31` / `c.addi a0, -1`. The second line is the 4-byte standard form on the same immediate, to show the plan never gets a short form it did not name. `addi a0, a0, 1` is deliberately absent: with `-mattr=+c` llvm-mc auto-compresses it to `05 05`, which is exactly the implicit selection the plan-side `form_id` prevents (EXP-0012 §2).",
+  "source": "RISC-V UDB C/c.addi.yaml (sha256:584daae38d4e830b88be6474f5420d39d858a6c1ca94acd70ce4f5c300348e75), `match` 000-----------01, `location` 12|6-2 / 11-7, `not: 0` on both"
+}

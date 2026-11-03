@@ -60,6 +60,7 @@ SLOT_KEYS = {
     "target_type",
     "from",
     "range",
+    "excluded",
     "modifiers",
     "placements",
 }
@@ -155,7 +156,7 @@ def check_definition(path: Path, errors):
             if not isinstance(slot, dict):
                 fail(errors, slot_spot, "slot must be an object")
                 continue
-            required = SLOT_KEYS - {"range"}
+            required = SLOT_KEYS - {"range", "excluded"}
             missing = required - set(slot)
             if missing:
                 fail(errors, slot_spot, "missing keys %s" % sorted(missing))
@@ -220,19 +221,67 @@ def check_definition(path: Path, errors):
                         slot_spot,
                         "placements sum to %d bits, range.bits is %d" % (total, bits),
                     )
+            if "excluded" in slot:
+                check_excluded(slot, slot_spot, total, errors)
     return document
+
+
+def check_excluded(slot, spot, width_bits, errors):
+    """`excluded` is a closed, strictly increasing list inside the slot's domain
+    (ADR-0009). An empty list is not a statement; the key is omitted instead."""
+    values = slot["excluded"]
+    if not isinstance(values, list) or not values:
+        fail(errors, spot, "excluded must be a non-empty array")
+        return
+    previous = None
+    for value in values:
+        if not isinstance(value, int) or isinstance(value, bool):
+            fail(errors, spot, "excluded values must be integers")
+            return
+        if previous is not None and value <= previous:
+            fail(errors, spot, "excluded must be strictly increasing")
+            return
+        previous = value
+
+    if "range" in slot:
+        span = slot["range"]
+        bits = span.get("bits")
+        signed = span.get("signed")
+        if not isinstance(bits, int) or isinstance(bits, bool):
+            return
+        if signed is True:
+            low, high = -(1 << (bits - 1)), (1 << (bits - 1)) - 1
+        elif signed is False:
+            low, high = 0, (1 << bits) - 1
+        else:
+            fail(errors, spot, "range.signed must be a boolean")
+            return
+    else:
+        low, high = 0, (1 << width_bits) - 1
+
+    for value in values:
+        if value < low or value > high:
+            fail(
+                errors,
+                spot,
+                "excluded value %d is outside the slot domain [%d, %d]"
+                % (value, low, high),
+            )
 
 
 def render_slot_cell(slot) -> str:
     placements = ", ".join(
         "`[%d,%d]`" % (p["bit_offset"], p["width"]) for p in slot["placements"]
     )
-    return "%s: `%s`/`%s` \u2192 %s" % (
+    cell = "%s: `%s`/`%s` \u2192 %s" % (
         slot["role"],
         slot["kind"],
         slot["target_type"],
         placements,
     )
+    if "excluded" in slot:
+        cell += " (excl %s)" % ", ".join(str(value) for value in slot["excluded"])
+    return cell
 
 
 def check_doc_table(documents, errors):

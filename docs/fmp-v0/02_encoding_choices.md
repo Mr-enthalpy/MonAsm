@@ -78,8 +78,8 @@ not be moved to `frozen` on the strength of an argument alone.
 | EC-16 | AArch64 | `mov` alias family: `movz` / `movn` / `orr` immediate / register | Different opcodes | `form variant` (`movz` / `movn` / `orr-imm` / `reg`) | `mov x0,#1` can be `movz` or `orr`; both are legitimate and differ in bytes. | draft |
 | EC-17 | AArch64 | `adr` (±1 MB) vs `adrp` (page) for a symbol address | Different instruction and fixup kind | `form variant` + `fixup field` (`kind`) | Choosing `adrp` when the target is in range changes both bytes and relocation semantics. | frozen |
 | EC-18 | AArch64 | `b.cond` vs `cbz/cbnz` vs `tbz/tbnz` for a conditional transfer | Different forms and operand sets | `form variant` | A planner that says only "branch if zero" has not chosen a form. | draft |
-| EC-19 | RV64 | Compressed (`c.*`, 2 bytes) vs standard (4 bytes) | 2 vs 4 bytes | `form variant` (the `c.` mnemonic is a different form) | `c.addi` and `addi` are distinct forms; an encoder that compresses `addi` violates INV-02. | frozen |
-| EC-20 | RV64 | Compressed register class `x8–x15` (3-bit field) vs full 5-bit register | Legality | `operand type` + definition rule | `c.addi x16, 1` is not encodable; the encoder must reject, not widen. | frozen |
+| EC-19 | RV64 | Compressed (`c.*`, 2 bytes) vs standard (4 bytes) | 2 vs 4 bytes | `form variant` (the `c.` mnemonic is a different form; `riscv:c.addi/rd-imm6` in `0.2.0`) | With `-mattr=+c`, `addi a0, a0, 1` assembles to `05 05`; the same immediate with `a1` stays `13 85 15 00`, and `c.addi a0, 1` is `05 05` only because it was named. An encoder that picks by register/operand shape violates INV-02. | frozen |
+| EC-20 | RV64 | Compressed register class `x8–x15` (3-bit field) vs full 5-bit register | Legality | `operand type` + definition rule | `c.lw a6, 0(a0)` is rejected ("register must be a GPR from x8 to x15"); `c.lw a2, 0(a0)` is `10 41`. `c.addi a6, 5` is legal (`15 08`): its `xd` is a 5-bit field, so the rule is per form, not per mnemonic prefix. | frozen |
 | EC-21 | RV64 | Absolute vs PC-relative symbol materialization: `lui`+`addi` vs `auipc`+`addi` | Instruction pair and relocation kind | `form variant` + `fixup field` (`kind`) | Choosing PC-relative changes both instructions and the fixup pair. | frozen |
 | EC-22 | RV64 | B-type/J-type immediate scatter is fixed by form, but the PC base is not | Fixup value | `fixup field` (`pc_reference_rule`) | Same form, different `P`, different bytes: a contract bug. | frozen |
 | EC-23 | RV64 | `jal` vs `jalr` for a call; `c.j` vs `jal` for a jump | Different instruction, range, link behavior | `form variant` | A "call" that becomes `jalr` needs a base register the plan never provided. | draft |
@@ -130,30 +130,37 @@ naming them is `E-FORM-001`.
 `EC-05`, `EC-09` and `EC-10` are out of v0. `X86-P9` (explicit encoding family)
 stays deferred, so `vex`/`evex` never appear in a v0 `form_id`.
 
-The RV64 slice is seven forms generated from the pinned UDB nodes (ADR-0007,
-`definitions/rv64/0.1.0.json`):
+The RV64 slice is eight forms across two documents, generated from the pinned UDB
+nodes (ADR-0007, ADR-0009). Seven base-`I` forms are in `0.1.0`; `c.addi` joins
+them in `0.2.0`, because it needs `rv64c` and the document's extension set is part
+of its identity:
 
-| `form_id` | Encoding | Operand signature | Covers |
-|---|---|---|---|
-| `riscv:add/rd-rs1-rs2` | `ADD` R-type, `funct7=0`, `funct3=0` | dest `xreg`, src `xreg`, src2 `xreg` | `RV-P1` |
-| `riscv:addi/rd-rs1-imm12` | `ADDI`, `funct3=0` | dest `xreg`, src `xreg`, imm `imm12` | `RV-P2` |
-| `riscv:beq/rs1-rs2-imm12` | `BEQ` B-type, `funct3=0` | src `xreg`, src2 `xreg`, `imm12` target | `RV-P4`, `EC-22` |
-| `riscv:jal/rd-imm20` | `JAL` J-type | dest `xreg`, `imm20` target | `RV-P5`, `EC-22` |
-| `riscv:auipc/rd-imm20` | `AUIPC` U-type | dest `xreg`, `imm20` target | `RV-P8` (field half), `EC-21` (instruction half) |
-| `riscv:ld/rd-base-imm12` | `LOAD` I-type, `funct3=011` | dest `xreg`, base `xreg`, disp `imm12` | `RV-P3` |
-| `riscv:sd/rs-base-imm12` | `STORE` S-type, `funct3=011` | src `xreg`, base `xreg`, disp `imm12` | `RV-P3` |
+| `form_id` | Encoding | Operand signature | Table | Covers |
+|---|---|---|---|---|
+| `riscv:add/rd-rs1-rs2` | `ADD` R-type, `funct7=0`, `funct3=0` | dest `xreg`, src `xreg`, src2 `xreg` | `0.1.0` | `RV-P1` |
+| `riscv:addi/rd-rs1-imm12` | `ADDI`, `funct3=0` | dest `xreg`, src `xreg`, imm `imm12` | `0.1.0` | `RV-P2` |
+| `riscv:beq/rs1-rs2-imm12` | `BEQ` B-type, `funct3=0` | src `xreg`, src2 `xreg`, `imm12` target | `0.1.0` | `RV-P4`, `EC-22` |
+| `riscv:jal/rd-imm20` | `JAL` J-type | dest `xreg`, `imm20` target | `0.1.0` | `RV-P5`, `EC-22` |
+| `riscv:auipc/rd-imm20` | `AUIPC` U-type | dest `xreg`, `imm20` target | `0.1.0` | `RV-P8` (field half), `EC-21` (instruction half) |
+| `riscv:ld/rd-base-imm12` | `LOAD` I-type, `funct3=011` | dest `xreg`, base `xreg`, disp `imm12` | `0.1.0` | `RV-P3` |
+| `riscv:sd/rs-base-imm12` | `STORE` S-type, `funct3=011` | src `xreg`, base `xreg`, disp `imm12` | `0.1.0` | `RV-P3` |
+| `riscv:c.addi/rd-imm6` | `C.ADDI` CI-format, 16-bit | dest `xreg` (`excl 0`), imm `imm6` (`excl 0`) | `0.2.0` | `RV-P7`, `EC-19`, `OD-14` |
 
 The two memory forms decompose the address into `base` + `disp` rather than one
 payload operand, and the addressing form is the `form_id` (ADR-0008, `OD-13`).
 That is the same carrier `EC-02` names for x86's disp8/disp32 split, and it is
 what keeps an encoder from choosing `mod` from the displacement's value.
 
-`EC-19` and `EC-20` stay without a carrier in v0: both describe `c.addi`, and the
-source's `not: 0` has no `fmp-def/0.1` spelling (ADR-0007 §Decision 5). Naming
-that form is `E-FORM-001`. `EC-21` is decided but only half carried: the `auipc`
-form fixes the PC-relative instruction, and `pcrel_hi20`/`lo12` exist as fixup
-transforms, but the psABI pairing that ties the two halves together is not
-pinned, so no fixture claims the pair yet.
+`EC-19` is carried by `riscv:c.addi/rd-imm6`: `0.2.0` names the compressed form,
+`0.1.0` does not, and a plan that asks for it against `0.1.0` is `E-FORM-001`
+(`N01c`). Its `not: 0` is the `excluded` field of ADR-0009/`OD-14`; naming either
+zero is `E-RANGE-004` (`N16a`, `N16b`), never a silent `c.nop`/HINT. `EC-20`
+stays without a carrier because v0 has no 3-bit compressed register field
+(`c.lw`-style CL/CS forms are not in either table); its example is `c.lw`. `EC-21`
+is decided but only half carried: the `auipc` form fixes the PC-relative
+instruction, and `pcrel_hi20`/`lo12` exist as fixup transforms, but the psABI
+pairing that ties the two halves together is not pinned, so no fixture claims the
+pair yet.
 
 ## Evidence
 
@@ -173,10 +180,13 @@ agreed where it could express the case.
   tools; `81 /0 id` is equally legal and unreachable.
 - `EC-16` — EXP-0001 §5: AArch64 `mov x13, #1` assembled to `movz` bytes
   (`2d 00 80 d2`) inside the macro layer.
-- `EC-19` — F-11: `addi a0, a0, 1` stays 4 bytes; `c.addi a4, 5` is 2 bytes only
-  when written explicitly.
-- `EC-20` — F-10: `c.addi a6, 5` rejected; the `x8..x15` range is enforced at
-  `encode.zig:1109-1112`.
+- `EC-19` — F-11, `EXP-0012` §2: `addi a0, a0, 1` stays 4 bytes without `+c`; with
+  `-mattr=+c` llvm-mc assembles the same line to `05 05`, and `c.addi a4, 5` is
+  2 bytes only when written explicitly. The plan-side `form_id` is the carrier.
+- `EC-20` — F-10, `EXP-0012` §2: `c.lw a6, 0(a0)` is rejected; `c.lw a2, 0(a0)`
+  is `10 41`. The earlier example (`c.addi a6, 5`) was wrong: measured, `c.addi`
+  accepts it as `15 08`, because its `xd` is a 5-bit field. The `x8..x15` rule is
+  per form, not per `c.` prefix.
 
 ### Measured 2026-11-04 (llvm-mc 23.1.2)
 

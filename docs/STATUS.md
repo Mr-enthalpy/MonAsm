@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-04
-Phase: **3 in progress (x86, AArch64 and RV64 slices): three definition tables, the materializer and the fixture gate are in place; four AArch64 coverage rows remain, and RV64's compressed/pair rows are blocked on format decisions**
+Phase: **3 in progress (x86, AArch64 and RV64 slices): four definition documents, the materializer and the fixture gate are in place; four AArch64 coverage rows remain, and RV64's pair row is blocked on a psABI decision**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -13,8 +13,8 @@ this file plus `AGENTS.md` alone.
 |---|---|---|
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
-| 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the remaining RV64 rows need a non-zero constraint or a psABI pairing, which are format questions, not contract gaps |
-| 3 | Three-ISA vertical prototype | **in progress**: three definition tables frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 5 positive and 12 negative fixtures, AArch64 has 4 positive and 4 negative, RV64 has 6 positive and 5 negative, all passing the two-source gate |
+| 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the remaining RV64 row needs a psABI pairing, which is a format question, not a contract gap |
+| 3 | Three-ISA vertical prototype | **in progress**: four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 5 positive and 15 negative fixtures, AArch64 has 4 positive and 4 negative, RV64 has 7 positive and 8 negative, all passing the two-source gate |
 | 4 | Invariants, negative tests, replay | not started |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
@@ -25,7 +25,7 @@ this file plus `AGENTS.md` alone.
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
 | G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: the x86 slice rows are frozen (EC-01/02/03/04/06/07/27/28); 10 rows are still `draft` |
-| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 5 positive, 12 negative; AArch64: 4 positive, 4 negative; RV64: 6 positive, 5 negative) |
+| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 5 positive, 15 negative; AArch64: 4 positive, 4 negative; RV64: 7 positive, 8 negative) |
 
 ## Decisions
 
@@ -37,8 +37,9 @@ this file plus `AGENTS.md` alone.
 | ADR-0004 | `form_id` carries every encoding decision; `encoding_choices` removed | accepted 2026-11-04 |
 | ADR-0005 | AArch64 knowledge comes from the Arm MRS 2026-06; no XirAsm file is copied, the Arm notice ships with the table | accepted 2026-11-04 |
 | ADR-0006 | The AArch64 source is pinned by MRS *packaging*: archive hash + both file hashes + the BSD-3-Clause licence sentence; the release block alone is not a pin | accepted 2026-11-04 |
-| ADR-0007 | RV64 knowledge comes from the UDB resolved spec, pinned by archive hash + eight node hashes + the BSD-3-Clause-Clear header; `left_shift` is a fixup transform, and `not: 0` keeps `c.addi` out of v0 | accepted 2026-11-04 |
+| ADR-0007 | RV64 knowledge comes from the UDB resolved spec, pinned by archive hash + eight node hashes + the BSD-3-Clause-Clear header; `left_shift` is a fixup transform, and its `not: 0` rule was the reason `c.addi` stayed out of v0 until ADR-0009 gave the slot an `excluded` list | accepted 2026-11-04 |
 | ADR-0008 | A memory operand is one operand per encoded field (`base`/`disp`/`index`/`scale`); the addressing form is a `form_id` variant, never a payload shape or a value-driven choice | accepted 2026-11-04 |
+| ADR-0009 | A slot may declare `excluded`: a closed, strictly increasing list of exact integers inside its domain; absent means none, a hit is `E-RANGE-004`, and the check is a lookup, never a predicate | accepted 2026-11-04 |
 
 ## Settled decisions (contract level)
 
@@ -55,6 +56,7 @@ this file plus `AGENTS.md` alone.
 | OD-11 | A byte-affecting decision is carried by `form_id`, a typed operand, a fixup field or a target field — never by a separate choice list | ADR-0004; `02_encoding_choices.md` |
 | OD-12 | RV64 facts come from the UDB resolved spec (`sha256:be184986…`), pinned per node; riscv-opcodes is the upstream cross-check and `llvm-mc` the oracle | ADR-0007; `EXP-0009`; `EXP-0010`; `definitions/rv64/NOTICE` |
 | OD-13 | A memory operand is field-level: `base`/`disp` are separate operands and the addressing form is a `form_id` variant; a composite `{"mem": …}` payload is `E-OPERAND-003` | ADR-0008; `EXP-0011`; `N15` |
+| OD-14 | A slot may exclude a closed list of exact values inside its domain; the rejection is `E-RANGE-004`, the check is a lookup, and an absent key means no exclusion | ADR-0009; `EXP-0012`; `N16a`/`N16b` |
 
 ## Open decisions
 
@@ -72,32 +74,34 @@ against `llvm-mc` by four fixtures (`EXP-0008`). What remains is coverage, not a
 decision: `A64-P3`/`P4`/`P7`/`P8` and the `-lsl12` half of `A64-P2` have no
 table row yet. OD-12 is settled by ADR-0007: the RV64 source is the UDB resolved
 spec, pinned by archive and node hashes, `EXP-0009` verified the B/J/RVC scatter
-against `llvm-mc`, and `EXP-0010` generated
-`definitions/rv64/0.1.0.json` (seven forms) from seven of those nodes. OD-13 is
+against `llvm-mc`, and `EXP-0010` generated `definitions/rv64/0.1.0.json` (seven
+forms) and `0.2.0.json` (eight) from eight of those nodes. OD-13 is
 settled by ADR-0008: `EXP-0011` measured that a memory operand spans fields with
 different ranges (RV64 `xs1`/`imm`/`xd`), that the x86 encoding form changes with
 the displacement value (`48 8b 41 08` vs `48 8b 81 00 10 00 00`), and that the
 AArch64 `imm12` is already a scaled field value (`ldr x0, [x1, #16]` →
 `imm12 = 2`). `ld`/`sd` are therefore three operands, and `N15` pins the rejected
-composite payload. RV64's `c.addi` row still needs a non-zero constraint, and its
-`auipc`+`lo12` pair needs the psABI relation; each is a new format decision, not
-a missing source. OD-06 was load-bearing because `EXP-0002`
+composite payload. OD-14 is settled by ADR-0009: `EXP-0012` §2 measured that
+`c.addi a0, 0` (`01 05`) and `c.addi x0, 1` (`05 00`) are reserved HINTs despite
+being inside the declared range, so the slot excludes `0` and
+`riscv:c.addi/rd-imm6` lands in `rv64/0.2.0.json` (`RV-P7`, `N16a`/`N16b`). RV64's
+`auipc`+`lo12` pair still needs the psABI relation; that is a new format decision,
+not a missing source. OD-06 was load-bearing because `EXP-0002`
 W1 shows that a definition drift the digest does not cover is caught only by the
 weaker size check; it is now settled, and `EXP-0004` §4 measures both halves.
 
 ## Next action
 
 1. Decide the next format question, one ADR each, before widening any table:
-   - a closed non-zero constraint for `fmp-def/0.1`. It unblocks `RV-P7`
-     (`c.addi`), whose source states `not: 0` on `imm` and `xd`;
    - the psABI `R_RISCV_PCREL_HI20`/`R_RISCV_PCREL_LO12_I` pairing. It unblocks
      `RV-P8`'s pair half; the `auipc` form already exists.
    Each lands with a counterexample, an error code where rejection is the answer,
-   and a fixture that shows the exclusion today (`E-FORM-001` or the new code).
+   and a fixture that shows the rejection (`E-FORM-001` or the new code).
    The memory-operand question is closed: `OD-13`/ADR-0008 chose one operand per
    field, `RV-P3` now passes, and `X86-P4`/`P6` and `A64-P3` carry a precondition
    (enumerate and measure one `form_id` per addressing variant) rather than an
-   open question.
+   open question. The non-zero question is closed too: `OD-14`/ADR-0009 added
+   `excluded`, and `RV-P7` now passes (`EXP-0012`).
 2. Extend the AArch64 coverage, one vertical slice at a time:
    - add the `-lsl12` half of `A64-P2`. This needs a decision about slot-level
      scaling, because a definition slot has no transform and `sh = 1` multiplies
@@ -133,21 +137,29 @@ leaves AArch64 branch and `adrp` fields as relocations. The fixture gate now
 scans every `fixtures/<isa>/<kind>/` directory, so a new table's vectors are
 gated the moment they land.
 
-The RV64 slice adds `definitions/rv64/0.1.0.json` (seven forms: `add`, `addi`,
-`beq`, `jal`, `auipc`, `ld`, `sd`; digest `sha256:6afb2bf4…`) with the
-BSD-3-Clause-Clear notice beside it. ADR-0007 fixes the source as the UDB
+The RV64 slice adds two documents. `definitions/rv64/0.1.0.json` holds seven
+base-`I` forms (`add`, `addi`, `beq`, `jal`, `auipc`, `ld`, `sd`; digest
+`sha256:6afb2bf4…`); `definitions/rv64/0.2.0.json` adds `riscv:c.addi/rd-imm6`
+and declares `["rv64i","rv64c"]` (eight forms; digest `sha256:8329a38f…`). Both
+carry the BSD-3-Clause-Clear notice. ADR-0007 fixes the source as the UDB
 resolved spec (`sha256:be184986…`); `EXP-0009` measures eight instruction nodes
 and reproduces fourteen `llvm-mc` byte strings from their `location` fields;
-`EXP-0010` generates the table from seven of those nodes, asserts full-bit
+`EXP-0010` generates both documents from the same eight nodes, asserts full-bit
 coverage, selects the `RV64` encoding block of `ld`/`sd` so the `RV32` Zilsd
-`not:` list cannot leak, and re-encodes twelve probe vectors from the table it
-built. `tools/check_rv64_source.py` gates the drop, the SPDX headers and
-`definitions/rv64/NOTICE`. The six positive fixtures exercise `add`, both `addi`
-endpoints, the B-type scatter forward and backward, the J-type scatter forward
-and backward, the `auipc` field, and `ld`/`sd` at both signed imm12 endpoints;
-the five negatives pin `E-FORM-001`, `E-OPERAND-001`, `E-RANGE-001`,
-`E-RANGE-002` and (read time) `E-OPERAND-003`. `c.addi` and the `auipc`+`lo12`
-pair stay out, each for a recorded format reason rather than a missing source.
+`not:` list cannot leak, turns each `not:` into the slot's `excluded` list
+(ADR-0009), and re-encodes sixteen probe vectors from the tables it built.
+`tools/check_rv64_source.py` gates the drop, the SPDX headers and
+`definitions/rv64/NOTICE`.
+
+The seven positive fixtures exercise `add`, both `addi` endpoints, the B-type
+scatter forward and backward, the J-type scatter forward and backward, the
+`auipc` field, `ld`/`sd` at both signed imm12 endpoints, and `c.addi` (four
+immediates, with the 4-byte `addi` on the same immediate beside it). The eight
+negatives pin `E-FORM-001` (including `N01c`, the same form named against
+`0.1.0`), `E-OPERAND-001`, `E-RANGE-001`, `E-RANGE-002`, `E-RANGE-004`
+(`N16a`/`N16b`, the excluded zeroes), and (read time) `E-OPERAND-003`. Only the
+`auipc`+`lo12` pair stays out, for a recorded format reason — the psABI relation
+is not pinned — rather than a missing source.
 
 The materializer is deliberately not a bridge to LLVM: it reads only the plan
 and the pinned definition, writes bytes and RELA-shaped records, and has no

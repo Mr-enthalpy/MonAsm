@@ -115,6 +115,12 @@ handled below rather than ignored:
    generated table before it is called frozen, exactly as the AArch64 slice did
    (`EXP-0008`).
 
+> Status note 2026-11-04: item 5's condition was met by ADR-0009. The slot-level
+> `excluded` list, `E-RANGE-004` and `EXP-0012` admit `c.addi` as
+> `riscv:c.addi/rd-imm6` in `definitions/rv64/0.2.0.json`, which declares
+> `["rv64i","rv64c"]`; `0.1.0` keeps its seven forms and its digest. Every pinned
+> byte and every fact above still holds, so this ADR is not superseded.
+
 ## Consequences
 
 - The scatter is data. `beq`, `jal` and the RVC forms can be generated from

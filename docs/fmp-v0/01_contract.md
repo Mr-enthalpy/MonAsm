@@ -237,7 +237,7 @@ meant.
 ```
 
 Examples: `x86:add/rm64-imm32/legacy`, `aarch64:add/x64-imm12-lsl0`,
-`riscv:c.addi/rd-eq-rs1`. The `-lsl0` suffix is load-bearing, not decoration: the
+`riscv:c.addi/rd-imm6`. The `-lsl0` suffix is load-bearing, not decoration: the
 MRS node leaves AArch64 `shift`/`imm6`/`sh` variable, and the form name states the
 pinned value so the operand list does not have to (`07_definition_format.md`
 §8.2, ADR-0004).
@@ -325,7 +325,7 @@ fixes its shape, its load-time checks, its digest coverage and the v0 tables
 |---|---|---|---|---|---|
 | `role` | yes | `dest` \| `src` \| `src2` \| `base` \| `index` \| `disp` \| `imm` \| `target` \| `pred` \| `list` \| `modifier` | Position-dependent encoding | Swapping `src`/`src2` changes a RISC-V R-type field order with no error. | frozen |
 | `kind` | yes | Target-namespaced operand kind | Selects the field encoder and legality rules | A `gpr8` value in a `gpr64` field silently truncates. | frozen |
-| `target_type` | yes | Definition-declared constraint name for this operand slot | Binds the operand to the constraint the definition checks | `kind` names a storage class (`riscv.xreg`), not the class the field can hold. `c.addi` encodes 3 register bits; without `creg_x8_x15` a plan could supply `x16`, which the 3-bit field would silently truncate to `x8` (`EC-20`, F-10). Likewise a `lo12` transform masks by definition: a value planned as `imm12` would be silently truncated to its low 12 bits instead of rejected. | frozen |
+| `target_type` | yes | Definition-declared constraint name for this operand slot | Binds the operand to the constraint the definition checks | `kind` names a storage class (`riscv.xreg`), not the class the field can hold. `c.addi`'s `xd` is a 5-bit field that accepts every register except `x0` (measured: `c.addi a6, 5` → `15 08`), while `c.lw`'s 3-bit `rd'` accepts only `x8`–`x15` (measured: `c.lw a6, 0(a0)` rejected, `c.lw a2, 0(a0)` → `10 41`); without a per-form constraint a plan could supply `x16` to the narrow field and the encoder would truncate it to `x8` (`EC-20`, F-10, `EXP-0012` §2). Likewise a `lo12` transform masks by definition: a value planned as `imm12` would be silently truncated to its low 12 bits instead of rejected. | frozen |
 | `payload` | yes | Kind-specific data | Carries the actual value | — | frozen |
 | `modifiers` | yes | Sorted `{name, value}` list | Small observable variations (shift, extend, scale) | An ignored `lock` emits an unlocked read-modify-write (`F0` missing) with different semantics and no error; an unsorted list makes two plans for the same instruction hash differently (`EC-10`, `INV-05`). Unknown names are `E-OPERAND-003`. | frozen |
 

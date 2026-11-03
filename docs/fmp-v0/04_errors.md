@@ -51,6 +51,7 @@ Rules:
 | E-RANGE-001 | Immediate outside the legal encoding range | `min`, `max`, `value`, `target_type` | N03 |
 | E-RANGE-002 | Displacement or branch offset outside the legal range | `min`, `max`, `value`, `bits`, `align_bits` | N04 |
 | E-RANGE-003 | Alignment requirement not met | `required_align`, `value` | — |
+| E-RANGE-004 | Operand value is excluded by the slot's declared domain | `target_type`, `value`, `excluded` | N16a, N16b |
 | E-LAYOUT-001 | Fragments overlap | `first`, `second` | N09 |
 | E-LAYOUT-002 | Fragment gap, or fragment sum != `declared_size` | `declared`, `covered` | N11 |
 | E-LAYOUT-003 | Instruction offset/size does not match its fragment | `instruction_id`, `fragment` | N05 |
@@ -123,6 +124,14 @@ rejection; `derived` means it follows from a measured byte sequence.
   displacement is not a multiple of 4, and `imm26 = D >> 2` would silently drop
   the low two bits, branching 2 bytes before the requested address. Reject
   rather than round.
+- `E-RANGE-004` — observed, `EXP-0012` §2: `c.addi a0, 0` is accepted by
+  `llvm-mc 23.1.2` and encodes `01 05`, which `llvm-objdump` prints as
+  `c.addi a0, 0x0`; `c.addi x0, 1` encodes `05 00` and prints as `c.nop 0x1`.
+  Both values are inside the declared field range (`imm` is `[-32, 31]`, `rd` is
+  `0..31`), so `E-RANGE-001` cannot fire, and both encodings are reserved HINTs
+  rather than the addition the plan names. The slot's `excluded: [0]` rejects
+  them; the check is a lookup, not a predicate (ADR-0009, `OD-14`). The test is
+  N16 (`N16a` and `N16b`).
 - `E-FIXUP-002` — derived, OD-02 (`03_fixup_model.md` §5.1): a plan names an
   external `call` target and `resolve_in_place`. There is no `S` to compute, so
   the only honest outcomes are "refuse" (this code) or "emit zero", and zero

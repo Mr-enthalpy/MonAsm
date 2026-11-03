@@ -55,6 +55,9 @@ pub struct Slot {
     pub range: Option<Range>,
     pub modifiers: Vec<Modifier>,
     pub placements: Vec<Placement>,
+    /// Exact values the slot's field may not carry, strictly increasing.
+    /// Subtract from `range` (or the placements' width for `reg_number`).
+    pub excluded: Vec<i128>,
     /// `sum(width)` over `placements`.
     pub width_bits: u32,
 }
@@ -131,6 +134,7 @@ const SLOT_FIELDS: &[&str] = &[
     "target_type",
     "from",
     "range",
+    "excluded",
     "modifiers",
     "placements",
 ];
@@ -377,6 +381,27 @@ fn bind_slot(value: &json::Json, path: String) -> Result<Slot, Diagnostic> {
         _ => {}
     }
 
+    let excluded = match obj.optional("excluded") {
+        Some((value, path)) => {
+            let items = bind::array(value, path.clone()).map_err(|fault| fault.definition())?;
+            if items.is_empty() {
+                return Err(load_error(
+                    "slot.excluded",
+                    "an empty list is not a statement; omit the key instead",
+                ));
+            }
+            let mut out = Vec::with_capacity(items.len());
+            for (index, item) in items.iter().enumerate() {
+                out.push(
+                    bind::integer(item, bind::pointer_index(&path, index))
+                        .map_err(|fault| fault.definition())?,
+                );
+            }
+            out
+        }
+        None => Vec::new(),
+    };
+
     let modifiers = {
         let (value, path) = obj
             .required("modifiers")
@@ -418,6 +443,32 @@ fn bind_slot(value: &json::Json, path: String) -> Result<Slot, Diagnostic> {
             ));
         }
     }
+    // The excluded set is subtracted from the slot's domain, so an entry outside
+    // it would be dead weight: it would suggest a rejection that can never
+    // happen. Reject it at load time rather than carry a misleading row.
+    for (index, value) in excluded.iter().enumerate() {
+        if index > 0 && excluded[index - 1] >= *value {
+            return Err(load_error(
+                "slot.excluded",
+                "values must be strictly increasing and unique",
+            ));
+        }
+        let (min, max) = match range {
+            Some(range) if range.signed => (
+                -(1i128 << (range.bits - 1)),
+                (1i128 << (range.bits - 1)) - 1,
+            ),
+            Some(range) => (0, (1i128 << range.bits) - 1),
+            None if width_bits >= 127 => (0, i128::MAX),
+            None => (0, (1i128 << width_bits) - 1),
+        };
+        if *value < min || *value > max {
+            return Err(load_error(
+                "slot.excluded",
+                &format!("{value} is outside the slot's domain [{min}, {max}]"),
+            ));
+        }
+    }
     Ok(Slot {
         role,
         kind,
@@ -426,6 +477,7 @@ fn bind_slot(value: &json::Json, path: String) -> Result<Slot, Diagnostic> {
         range,
         modifiers,
         placements: bound,
+        excluded,
         width_bits,
     })
 }

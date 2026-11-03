@@ -364,7 +364,9 @@ Not settled:
   before `RV-P8`.
 - **Non-zero constraints.** `not: 0` on `c.addi`'s `imm` and `xd` has no
   representation in `fmp-def/0.1`. `c.addi` stays out of the v0 surface until a
-  format decision adds a closed non-zero constraint and an error code.
+  format decision adds a closed non-zero constraint and an error code. *(Settled
+  2026-11-04 by ADR-0009: the slot's `excluded` list, `E-RANGE-004`, and
+  `EXP-0012`; the form is in `rv64/0.2.0.json`.)*
 - **Whether UDB is right for every future row.** Only eight nodes were read; a
   later slice re-reads the source and extends the pin, or lands a new ADR.
 

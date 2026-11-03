@@ -1,0 +1,99 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "riscv",
+    "isa_variant": "rv64",
+    "execution_mode": "n/a",
+    "enabled_extensions": ["rv64i", "rv64c"],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.riscv",
+    "version": "0.2.0",
+    "digest": "sha256:8329a38faa964f9c69207a48e3bfb45c13fb0ddbaeb829ddcc0dbd1cffa8de10"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [".text"],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": 12,
+      "fragments": [
+        { "offset": 0, "size": 2, "kind": "instruction", "instruction_id": "I0001" },
+        { "offset": 2, "size": 4, "kind": "instruction", "instruction_id": "I0002" },
+        { "offset": 6, "size": 2, "kind": "instruction", "instruction_id": "I0003" },
+        { "offset": 8, "size": 2, "kind": "instruction", "instruction_id": "I0004" },
+        { "offset": 10, "size": 2, "kind": "instruction", "instruction_id": "I0005" }
+      ]
+    }
+  ],
+  "symbols": [],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "riscv:c.addi/rd-imm6",
+      "operands": [
+        { "role": "dest", "kind": "riscv.xreg", "target_type": "xreg", "payload": { "reg": 10 }, "modifiers": [] },
+        { "role": "imm", "kind": "riscv.imm", "target_type": "imm6", "payload": { "value": 1 }, "modifiers": [] }
+      ],
+      "expected_size": 2
+    },
+    {
+      "instruction_id": "I0002",
+      "section_id": ".text",
+      "offset": 2,
+      "form_id": "riscv:addi/rd-rs1-imm12",
+      "operands": [
+        { "role": "dest", "kind": "riscv.xreg", "target_type": "xreg", "payload": { "reg": 10 }, "modifiers": [] },
+        { "role": "src", "kind": "riscv.xreg", "target_type": "xreg", "payload": { "reg": 11 }, "modifiers": [] },
+        { "role": "imm", "kind": "riscv.imm", "target_type": "imm12", "payload": { "value": 1 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0003",
+      "section_id": ".text",
+      "offset": 6,
+      "form_id": "riscv:c.addi/rd-imm6",
+      "operands": [
+        { "role": "dest", "kind": "riscv.xreg", "target_type": "xreg", "payload": { "reg": 10 }, "modifiers": [] },
+        { "role": "imm", "kind": "riscv.imm", "target_type": "imm6", "payload": { "value": -32 }, "modifiers": [] }
+      ],
+      "expected_size": 2
+    },
+    {
+      "instruction_id": "I0004",
+      "section_id": ".text",
+      "offset": 8,
+      "form_id": "riscv:c.addi/rd-imm6",
+      "operands": [
+        { "role": "dest", "kind": "riscv.xreg", "target_type": "xreg", "payload": { "reg": 10 }, "modifiers": [] },
+        { "role": "imm", "kind": "riscv.imm", "target_type": "imm6", "payload": { "value": 31 }, "modifiers": [] }
+      ],
+      "expected_size": 2
+    },
+    {
+      "instruction_id": "I0005",
+      "section_id": ".text",
+      "offset": 10,
+      "form_id": "riscv:c.addi/rd-imm6",
+      "operands": [
+        { "role": "dest", "kind": "riscv.xreg", "target_type": "xreg", "payload": { "reg": 10 }, "modifiers": [] },
+        { "role": "imm", "kind": "riscv.imm", "target_type": "imm6", "payload": { "value": -1 }, "modifiers": [] }
+      ],
+      "expected_size": 2
+    }
+  ],
+  "fixups": []
+}

@@ -196,6 +196,7 @@ fn describe(code: &str) -> &'static str {
         crate::codes::E_RANGE_001 => "immediate outside the legal range",
         crate::codes::E_RANGE_002 => "displacement outside the legal range",
         crate::codes::E_RANGE_003 => "alignment requirement not met",
+        crate::codes::E_RANGE_004 => "operand value is excluded by the slot's domain",
         crate::codes::E_LAYOUT_001 => "fragments overlap",
         crate::codes::E_LAYOUT_002 => "fragment gap or declared_size mismatch",
         crate::codes::E_LAYOUT_003 => "instruction does not match its fragment",

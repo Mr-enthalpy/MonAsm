@@ -617,6 +617,27 @@ fn check_instructions(model: &Model, errors: &mut Vec<Diagnostic>) {
     }
 }
 
+/// `E-RANGE-004`: the slot's domain is an interval minus a closed list of exact
+/// values (ADR-0009). This is a lookup, never a predicate, and the path names the
+/// payload leaf that carried the value.
+fn excluded_diagnostic(
+    operand: &fmp_model::plan::Operand,
+    slot: &Slot,
+    value: i128,
+    leaf: &str,
+) -> Diagnostic {
+    let list = slot
+        .excluded
+        .iter()
+        .map(|item| item.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    Diagnostic::new(codes::E_RANGE_004, operand.path.clone() + leaf)
+        .with("target_type", slot.target_type.as_str())
+        .with("value", value)
+        .with("excluded", list)
+}
+
 fn check_operand(
     _model: &Model,
     form: &Form,
@@ -684,6 +705,17 @@ fn check_operand(
                         .with("field_bits", field_bits),
                     );
                 }
+                // `E-RANGE-004`: the slot may exclude exact register numbers even
+                // though they fit the field (`c.addi`'s `rd != 0`).
+                let register_number = i128::from(*register);
+                if slot.excluded.iter().any(|item| *item == register_number) {
+                    errors.push(excluded_diagnostic(
+                        operand,
+                        slot,
+                        register_number,
+                        "/payload/reg",
+                    ));
+                }
             }
             other => errors.push(
                 Diagnostic::new(codes::E_OPERAND_003, operand.path.clone() + "/payload")
@@ -748,6 +780,10 @@ fn check_operand(
                         }
                         errors.push(diagnostic);
                     }
+                }
+                // `E-RANGE-004`: inside the interval, outside the legal set.
+                if slot.excluded.iter().any(|item| *item == *value) {
+                    errors.push(excluded_diagnostic(operand, slot, *value, "/payload/value"));
                 }
             }
             Payload::Empty => {

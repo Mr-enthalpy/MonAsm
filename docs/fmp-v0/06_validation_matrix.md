@@ -10,7 +10,7 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 
 | ID | Input condition | Expected | Code | ISAs | Fixture | Status |
 |---|---|---|---|---|---|---|
-| N01 | Plan names a form that leaves a byte-affecting decision open (`x86:mov/r64-r64`, `x86:add/rm64-imm`), a form missing a required component (`x86:mov/rm-r64` without `/legacy`), a renamed variant, or names a variant the definition does not contain | Reject, never append a default variant or match a near neighbour | E-FORM-001 | x86, aarch64, rv64 | `x86_64/negative/N01-absent-form.fmp.json`, `aarch64/negative/N01-absent-scaled-form.fmp.json` | x86 and aarch64 passing |
+| N01 | Plan names a form that leaves a byte-affecting decision open (`x86:mov/r64-r64`, `x86:add/rm64-imm`), a form missing a required component (`x86:mov/rm-r64` without `/legacy`), a renamed variant, or names a variant the definition does not contain | Reject, never append a default variant or match a near neighbour | E-FORM-001 | x86, aarch64, rv64 | `x86_64/negative/N01-absent-form.fmp.json`, `aarch64/negative/N01-absent-scaled-form.fmp.json`, `rv64/negative/N01c-caddi-against-0.1.0.fmp.json` | x86, aarch64 and rv64 passing |
 | N02 | Operand register class does not match the form | Reject | E-OPERAND-001 | x86, aarch64, rv64 | `x86_64/negative/N02-operand-kind-mismatch.fmp.json` | x86 passing |
 | N03 | Immediate exceeds the field's range | Reject | E-RANGE-001 | x86, aarch64, rv64 | `x86_64/negative/N03-imm8-out-of-range.fmp.json`, `aarch64/negative/N03-imm12-out-of-range.fmp.json` | x86 and aarch64 passing |
 | N04 | Branch displacement exceeds the form's range | Reject, never expand | E-RANGE-002 / E-FIXUP-003 | x86, aarch64, rv64 | `x86_64/negative/N04a-rel8-out-of-range.fmp.json`, `N04b-rel32-absolute-out-of-range.fmp.json` | x86 passing |
@@ -25,6 +25,7 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 | N13 | `expected_digest` is present and the emitted bytes hash to a different value | Reject, never re-encode to match | E-BYTE-001 | x86, aarch64, rv64 | `x86_64/negative/N13-expected-digest-mismatch.fmp.json` | x86 passing |
 | N14 | Operand value does not fit the slot's encoded field: `r9` in a 3-bit `ModRM` field, or `x32` in a 5-bit AArch64 register field | Reject, never truncate to another register | E-OPERAND-004 | x86, aarch64 | `x86_64/negative/N14-register-wider-than-field.fmp.json`, `aarch64/negative/N14-register-wider-than-field.fmp.json` | x86 and aarch64 passing |
 | N15 | Operand payload is a composite memory operand (`{"mem": {"base": …, "disp": …}}`), not one of the four `fmp/0.1` shapes | Reject at read time, never split it into operands | E-OPERAND-003 | all | `rv64/negative/N15-composite-memory-payload.fmp.json` | rv64 passing |
+| N16 | Operand value is inside the slot's field range but excluded by the form (`c.addi` zero immediate, `c.addi` zero destination) | Reject, never encode the HINT the bytes would mean | E-RANGE-004 | rv64 | `rv64/negative/N16a-caddi-imm-zero.fmp.json`, `rv64/negative/N16b-caddi-rd-zero.fmp.json` | rv64 passing |
 
 N13's counterexample is `EXP-0002` W2: a same-length encoder defect turns
 `48 89 d8` (`mov rax, rbx`) into `49 89 d8` (`mov r8, rbx`), both 3 bytes and
@@ -183,17 +184,20 @@ relocation kinds were read with `llvm-readobj -r` before linking (see
 | RV-P4 | Conditional branch | `beq` B-type scatter | llvm-mc | **passing** — `RV-P4-beq-btype` (+8 and −8) |
 | RV-P5 | Control transfer | `jal` J-type scatter | llvm-mc | **passing** — `RV-P5-jal-jtype` (+8 and −8) |
 | RV-P6 | Scattered fields | B-type and J-type bit placement verified byte-for-byte | llvm-mc | **passing** with `RV-P4`/`RV-P5`; `beq` uses four placements, `jal` four |
-| RV-P7 | Compressed vs standard | `c.addi` (2 bytes) vs `addi` (4 bytes), never chosen by the encoder | llvm-mc | planned — the source states `not: 0`, which `fmp-def/0.1` cannot express |
+| RV-P7 | Compressed vs standard | `c.addi` (2 bytes) vs `addi` (4 bytes), never chosen by the encoder | llvm-mc | **passing** — `RV-P7-caddi` (four immediates), with `N16a`/`N16b` rejecting the zero cases |
 | RV-P8 | Associated reference | `auipc`+`addi` pair with `hi20`/`lo12` | llvm-mc + readelf | **partly passing** — `RV-P8-auipc-imm20` covers the form's field; the `%pcrel_hi`/`%pcrel_lo` pair needs the psABI relation |
 
 The source is pinned (`OD-12`, ADR-0007): the UDB resolved-spec nodes named in
 `check_rv64_source.py`, with `EXP-0009` deriving the B/J/RVC placements and
 matching fourteen `llvm-mc` byte strings. `EXP-0010` generated
-`definitions/rv64/0.1.0.json` (digest
+`definitions/rv64/0.1.0.json` (seven base-`I` forms, digest
 `sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083`)
-from seven of those nodes and re-encoded the probe vectors from the table it had
-built; the six positive fixtures above are the independent gate, and five
-negative fixtures (`N01`, `N02`, `N03`, `N04`, `N15`) pin the rejection paths.
+and `0.2.0` (the same seven plus `c.addi`, digest
+`sha256:8329a38faa964f9c69207a48e3bfb45c13fb0ddbaeb829ddcc0dbd1cffa8de10`)
+from eight of those nodes and re-encoded the probe vectors from each table it
+built; the seven positive fixtures above are the independent gate, and the
+negative fixtures (`N01`, `N01c`, `N02`, `N03`, `N04`, `N15`, `N16a`/`N16b`) pin
+the rejection paths.
 
 `RV-P3` is carried by two forms (`riscv:ld/rd-base-imm12`, `riscv:sd/rs-base-imm12`)
 built from the `RV64` encoding block of `I/ld.yaml` (sha256:a2afcd44…) and
@@ -203,10 +207,17 @@ payload (`ADR-0008`, `OD-13`): `dest`/`src`, `base` and `disp`. `sd` scatters it
 reason the scatter is field-derived. `N15` pins the rejected alternative: a
 `{"mem": …}` payload is `E-OPERAND-003` at read time.
 
-Two rows are still blocked on the format, not the source. `RV-P7` needs
-`imm != 0` and `xd != 0`, and `fmp-def/0.1` cannot express that. `RV-P8`'s pair
-half needs the psABI's `R_RISCV_PCREL_HI20`/`LO12_I` relation, which the encoding
-blocks do not state. Naming either form is `E-FORM-001`.
+`RV-P7` is carried by `riscv:c.addi/rd-imm6` in `0.2.0`, built from
+`inst/C/c.addi.yaml` (sha256 pinned by `check_rv64_source.py`). The node states
+`not: 0` on `imm` and `xd`; `ADR-0009`/`OD-14` turn that into `excluded: [0]` on
+both slots, and `EXP-0012` §2 measured the alternative — `c.addi a0, 0` encodes
+`01 05` (`c.addi a0, 0x0`) and `c.addi x0, 1` encodes `05 00` (`c.nop 0x1`), both
+reserved HINTs. `N16a`/`N16b` pin `E-RANGE-004`; `N01c` pins that naming the form
+against `0.1.0` is `E-FORM-001`, not a silent fallback to `addi`.
+
+One row is still blocked on the format, not the source: `RV-P8`'s pair half needs
+the psABI's `R_RISCV_PCREL_HI20`/`LO12_I` relation, which the encoding blocks do
+not state. Naming the pair is `E-FORM-001` until it is pinned.
 
 ## 5. Gate G3
 
