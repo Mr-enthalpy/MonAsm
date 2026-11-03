@@ -22,4 +22,18 @@ Wrap independent authorities used to check our bytes:
 
 ## State
 
-Empty. Blocked on gate G0 (toolchain installation). See `docs/STATUS.md`.
+LLVM 23.1.2 is installed at `C:\Users\hanni\Tools\llvm\bin` and on the user
+`PATH` (gate G0 passed). Wrappers are added per fixture in Phase 3.
+
+Canonical invocation for the oracle records:
+
+```bash
+# x86-64: Intel operand order is explicit
+llvm-mc -triple=x86_64 -x86-asm-syntax=intel -show-encoding
+
+# AArch64
+llvm-mc -triple=aarch64 -show-encoding
+
+# RV64
+llvm-mc -triple=riscv64 -show-encoding
+```

@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-03
-Phase: **0 — documentation baseline**
+Phase: **0 complete (G0 passed); Phase 1 next**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -11,8 +11,8 @@ this file plus `AGENTS.md` alone.
 
 | Phase | Scope | State |
 |---|---|---|
-| 0 | Environment, evidence baseline, docs skeleton | **in progress** |
-| 1 | Encoder boundary audit (XirAsm, LLVM) | not started |
+| 0 | Environment, evidence baseline, docs skeleton | **complete** |
+| 1 | Encoder boundary audit (XirAsm, LLVM) | **next** |
 | 2 | FMP v0 contract, schema, error model | not started |
 | 3 | Three-ISA vertical prototype | not started |
 | 4 | Invariants, negative tests, replay | not started |
@@ -22,7 +22,7 @@ this file plus `AGENTS.md` alone.
 
 | Gate | Condition | State |
 |---|---|---|
-| G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **blocked** (LLVM not installed) |
+| G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | not started |
 | G2 | Every `encoding_choice` in `EC-*` has a counterexample | not started |
 | G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | not started |
@@ -48,11 +48,12 @@ See `docs/fmp-v0/05_open_decisions.md`. Blocking items currently:
 
 ## Next action
 
-1. Install the oracle toolchain (G0): LLVM prebuilt + Zig 0.17 for the XirAsm
-   audit. Record versions in `research/evidence/source_index.md`.
-2. Run the XirAsm build/test spike against pinned commit `3ee8a439f5ba`.
-3. Start Phase 1 with the x86 relaxation path (`size.zig`, `EncodeContext`) and
+1. Run the XirAsm build/test spike against pinned commit `3ee8a439f5ba`
+   with `C:\Users\hanni\Tools\zig\zig.exe`.
+2. Start Phase 1 with the x86 relaxation path (`size.zig`, `EncodeContext`) and
    the RISC-V mnemonic-to-form resolution (`tables.zig`).
+3. Capture the first oracle bytes for `X86-P1`, `A64-P1`, and `RV-P1` under
+   `research/evidence/experiments/`.
 
 ## Known environment facts (verified 2026-11-03)
 
@@ -60,8 +61,9 @@ See `docs/fmp-v0/05_open_decisions.md`. Blocking items currently:
 |---|---|
 | Host | Windows, `C:\Users\hanni\Projects\MonAsm` |
 | Git remote | `git@github.com:Mr-enthalpy/MonAsm.git` (SSH, authenticated) |
-| Zig | not installed |
-| LLVM / binutils | not installed |
+| Zig | 0.17.0 at `C:\Users\hanni\Tools\zig` |
+| LLVM | 23.1.2 at `C:\Users\hanni\Tools\llvm` (`llvm-mc` verified on x86-64, AArch64, RV64) |
+| GNU binutils | not installed (llvm-objdump/llvm-readobj cover v0 needs) |
 | Rust | 1.96.0 (`stable-x86_64-pc-windows-msvc`) |
 | Visual Studio | 2022 present |
 | Python | 3.8 |

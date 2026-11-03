@@ -12,7 +12,9 @@ The materializer has no planning authority. That is the whole point.
 
 ## Status
 
-**Phase 0 — documentation baseline.** No encoder is implemented yet.
+**Phase 0 complete; Phase 1 next.** Gate G0 passed: LLVM 23.1.2 provides the
+oracle, Zig 0.17.0 is available for the XirAsm audit. No encoder is implemented
+yet.
 
 | Area | State |
 |---|---|
