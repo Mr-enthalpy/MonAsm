@@ -141,7 +141,8 @@ contains only the seven register and immediate forms. Adding a memory form is a
 definition-slice decision, not a fixture decision: the plan schema would need a
 `{mem: {base, index, scale, disp}}` payload, and `01_contract.md` §8.1 currently
 fixes the payload shapes to `{reg}`, `{value}`, `{symbol_id}` and `{}`. The rows
-return when that slice lands, together with the RV64 table under `OD-12`.
+return when that slice lands; `RV-P3` has the same blocker for
+`riscv.mem.base-offset`.
 
 
 ### AArch64 (directive §6.2)
@@ -171,22 +172,30 @@ relocation kinds were read with `llvm-readobj -r` before linking (see
 
 | ID | Requirement | Candidate form | Oracle | Status |
 |---|---|---|---|---|
-| RV-P1 | Standard integer arithmetic | `add` (R-type) | llvm-mc | planned |
-| RV-P2 | I-type immediate | `addi` imm12 | llvm-mc | planned |
-| RV-P3 | Load/store | `ld`/`sd` base+offset | llvm-mc | planned |
-| RV-P4 | Conditional branch | `beq` B-type scatter | llvm-mc | planned |
-| RV-P5 | Control transfer | `jal` J-type scatter | llvm-mc | planned |
-| RV-P6 | Scattered fields | B-type and J-type bit placement verified byte-for-byte | llvm-mc | planned |
-| RV-P7 | Compressed vs standard | `c.addi` (2 bytes) vs `addi` (4 bytes), never chosen by the encoder | llvm-mc | planned |
-| RV-P8 | Associated reference | `auipc`+`addi` pair with `hi20`/`lo12` | llvm-mc + readelf | planned |
+| RV-P1 | Standard integer arithmetic | `add` (R-type) | llvm-mc | **passing** — `rv64/positive/RV-P1-add-register` |
+| RV-P2 | I-type immediate | `addi` imm12 | llvm-mc | **passing** — `RV-P2-addi-imm12` (both signed endpoints) |
+| RV-P3 | Load/store | `ld`/`sd` base+offset | llvm-mc | planned — no payload shape for `riscv.mem.base-offset` (`01_contract.md` §8.1) |
+| RV-P4 | Conditional branch | `beq` B-type scatter | llvm-mc | **passing** — `RV-P4-beq-btype` (+8 and −8) |
+| RV-P5 | Control transfer | `jal` J-type scatter | llvm-mc | **passing** — `RV-P5-jal-jtype` (+8 and −8) |
+| RV-P6 | Scattered fields | B-type and J-type bit placement verified byte-for-byte | llvm-mc | **passing** with `RV-P4`/`RV-P5`; `beq` uses four placements, `jal` four |
+| RV-P7 | Compressed vs standard | `c.addi` (2 bytes) vs `addi` (4 bytes), never chosen by the encoder | llvm-mc | planned — the source states `not: 0`, which `fmp-def/0.1` cannot express |
+| RV-P8 | Associated reference | `auipc`+`addi` pair with `hi20`/`lo12` | llvm-mc + readelf | **partly passing** — `RV-P8-auipc-imm20` covers the form's field; the `%pcrel_hi`/`%pcrel_lo` pair needs the psABI relation |
 
 The source is pinned (`OD-12`, ADR-0007): the UDB resolved-spec nodes named in
 `check_rv64_source.py`, with `EXP-0009` deriving the B/J/RVC placements and
-matching fourteen `llvm-mc` byte strings. The table is not written yet, so every
-row stays `planned`. `RV-P7` has a second blocker: the source states `not: 0` for
-`c.addi`'s `imm` and `xd`, and `fmp-def/0.1` cannot express that, so the row can
-only land after a format decision. `RV-P8` also needs the psABI's
-`R_RISCV_PCREL_HI20`/`LO12_I` pairing, which the encoding blocks do not state.
+matching fourteen `llvm-mc` byte strings. `EXP-0010` generated
+`definitions/rv64/0.1.0.json` (digest
+`sha256:8cd063a50db57179fc9ea027f1dab4de8820a7001242bc4046dc03fef1489ea2`)
+from five of those nodes and re-encoded the probe vectors from the table it had
+built; the five positive fixtures above are the independent gate, and four
+negative fixtures (`N01`, `N02`, `N03`, `N04`) pin the rejection paths.
+
+Two rows are blocked on the format, not the source. `RV-P7` needs `imm != 0` and
+`xd != 0`, and `fmp-def/0.1` cannot express that. `RV-P3` needs an
+`riscv.mem.base-offset` payload shape, and `fmp/0.1` fixes only `{reg}`,
+`{value}`, `{symbol_id}` and `{}`. `RV-P8`'s pair half needs the psABI's
+`R_RISCV_PCREL_HI20`/`LO12_I` relation, which the encoding blocks do not state.
+Naming any of those three forms is `E-FORM-001`.
 
 ## 5. Gate G3
 

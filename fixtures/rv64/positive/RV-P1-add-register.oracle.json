@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -filetype=obj RV-P1-add-register.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "b2ffa0a01ce57a011147c9fbf68f20661ad0c89fb7bc432c7c46a835d7cbcb3c",
+  "output_sha256": "5a523b8e558137e6f8af998872e0f4c6cac1219aff86b82a1cfb5c803bef101a",
+  "size": 12,
+  "records": 0,
+  "notes": "Input, one line each (LF, trailing newline): `add a0, a1, a2` / `add a5, a6, a7` / `add a0, zero, a1`. Registers are the target's own numbering, so a0=10, a1=11, a2=12, a5=15, a6=16, a7=17, zero=0.",
+  "source": "RISC-V UDB I/add.yaml (sha256:f0c718f3…), `location` 24-20/19-15/11-7, match `0000000----------000-----0110011`"
+}

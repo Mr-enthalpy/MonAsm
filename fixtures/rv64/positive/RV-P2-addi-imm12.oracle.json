@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -filetype=obj RV-P2-addi-imm12.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "9c94826ee168477af2f7083af6f64d39f72a4860e4cf7bf912199c9a2a3878f4",
+  "output_sha256": "0dccce41c58a549e70cac6958234ea9f5728c423e9bc0d7c292af8b1f4a669ea",
+  "size": 16,
+  "records": 0,
+  "notes": "Input, one line each (LF, trailing newline): `addi a0, a1, 1` / `addi a0, a1, -1` / `addi a0, a1, 2047` / `addi a0, a1, -2048`. The last two are the signed imm12 endpoints.",
+  "source": "RISC-V UDB I/addi.yaml (sha256:f8f3099b…), `location` 31-20, `sign_extend: true`"
+}

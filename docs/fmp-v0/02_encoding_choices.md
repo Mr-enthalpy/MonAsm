@@ -128,9 +128,27 @@ and `sh` variable; the table pins them and the name says so (`07_definition_form
 naming them is `E-FORM-001`.
 
 `EC-05`, `EC-09` and `EC-10` are out of v0. `X86-P9` (explicit encoding family)
-stays deferred, so `vex`/`evex` never appear in a v0 `form_id`. The RV64 slice is
-not yet defined; ADR-0007 pins its source and `EXP-0009` verifies the scatter, so
-its rows stay `draft` where marked until `definitions/rv64/0.1.0.json` lands.
+stays deferred, so `vex`/`evex` never appear in a v0 `form_id`.
+
+The RV64 slice is five forms generated from the pinned UDB nodes (ADR-0007,
+`definitions/rv64/0.1.0.json`):
+
+| `form_id` | Encoding | Operand signature | Covers |
+|---|---|---|---|
+| `riscv:add/rd-rs1-rs2` | `ADD` R-type, `funct7=0`, `funct3=0` | dest `xreg`, src `xreg`, src2 `xreg` | `RV-P1` |
+| `riscv:addi/rd-rs1-imm12` | `ADDI`, `funct3=0` | dest `xreg`, src `xreg`, imm `imm12` | `RV-P2` |
+| `riscv:beq/rs1-rs2-imm12` | `BEQ` B-type, `funct3=0` | src `xreg`, src2 `xreg`, `imm12` target | `RV-P4`, `EC-22` |
+| `riscv:jal/rd-imm20` | `JAL` J-type | dest `xreg`, `imm20` target | `RV-P5`, `EC-22` |
+| `riscv:auipc/rd-imm20` | `AUIPC` U-type | dest `xreg`, `imm20` target | `RV-P8` (field half), `EC-21` (instruction half) |
+
+`EC-19` and `EC-20` stay without a carrier in v0: both describe `c.addi`, and the
+source's `not: 0` has no `fmp-def/0.1` spelling (ADR-0007 §Decision 5). `RV-P3`
+(`ld`/`sd`) also has no row: `fmp/0.1` fixes four payload shapes and none is
+`riscv.mem.base-offset` (`01_contract.md` §8.1). Naming any of those forms is
+`E-FORM-001`. `EC-21` is decided but only half carried: the `auipc` form fixes the
+PC-relative instruction, and `pcrel_hi20`/`lo12` exist as fixup transforms, but
+the psABI pairing that ties the two halves together is not pinned, so no fixture
+claims the pair yet.
 
 ## Evidence
 

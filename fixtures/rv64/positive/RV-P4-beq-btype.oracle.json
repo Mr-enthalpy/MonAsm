@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -filetype=obj RV-P4-beq-btype.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "ca74a7f608c89acb6357475fd6350befe4beaa34e1fe5c399d0456c94e2c0475",
+  "output_sha256": "77f85918e1c93a41ed34eef95f243fb985544207b8818c709029f9c24e1d5019",
+  "size": 12,
+  "records": 0,
+  "notes": "Input, one line each (LF, trailing newline): `beq a0, a1, 8` / `addi a0, a1, 1` / `beq a0, a1, -8`. The two branches are PC-relative at offsets 0 and 8, so the second targets offset 0. The plan states the same bytes through two `scale` fixups with `transform_shift: 1`, which is the field-content rule of 07_definition_format.md §8.3. Both fixups use `resolve_in_place`, so no relocation record is emitted and `records` is 0, as in A64-P5.",
+  "source": "RISC-V UDB I/beq.yaml (sha256:bb8084db…), `location` \"31|7|30-25|11-8\", `left_shift: 1`"
+}

@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -filetype=obj RV-P5-jal-jtype.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "2cef4c0a58f2eb2a8f7cfbc95e8d3c88570feb0137b63ee51a18388c99eefe26",
+  "output_sha256": "272adb6bf363746e61a50c8e13259dce5822e52908cb70d1ed8b281b82123e73",
+  "size": 12,
+  "records": 0,
+  "notes": "Input, one line each (LF, trailing newline): `jal ra, 8` / `addi a0, a1, 1` / `jal ra, -8`. `ra` is x1. The two calls are PC-relative at offsets 0 and 8, so the second targets offset 0. The plan states the same bytes through two `scale` fixups with `transform_shift: 1`; both are `resolve_in_place`, so no relocation record is emitted and `records` is 0.",
+  "source": "RISC-V UDB I/jal.yaml (sha256:3028bcf4…), `location` \"31|19-12|20|30-21\", `left_shift: 1`"
+}

@@ -1,0 +1,51 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "riscv",
+    "isa_variant": "rv64",
+    "execution_mode": "n/a",
+    "enabled_extensions": ["rv64i"],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.riscv",
+    "version": "0.1.0",
+    "digest": "sha256:8cd063a50db57179fc9ea027f1dab4de8820a7001242bc4046dc03fef1489ea2"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [".text"],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": 4,
+      "fragments": [
+        { "offset": 0, "size": 4, "kind": "instruction", "instruction_id": "I0001" }
+      ]
+    }
+  ],
+  "symbols": [],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "riscv:addi/rd-rs1-imm12",
+      "operands": [
+        { "role": "dest", "kind": "riscv.xreg", "target_type": "xreg", "payload": { "reg": 10 }, "modifiers": [] },
+        { "role": "src", "kind": "riscv.xreg", "target_type": "xreg", "payload": { "reg": 11 }, "modifiers": [] },
+        { "role": "imm", "kind": "riscv.imm", "target_type": "imm12", "payload": { "value": 2048 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    }
+  ],
+  "fixups": []
+}

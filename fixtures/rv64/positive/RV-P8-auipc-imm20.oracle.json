@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -filetype=obj RV-P8-auipc-imm20.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "b484b1cb80ca547a8f4922b10d7c734ffbe90e1d9c690a9975323c70e122d006",
+  "output_sha256": "d230a9ce5646cda3d935d9890f8eeb445edd42d29292bed70860661fc7ce08b6",
+  "size": 12,
+  "records": 0,
+  "notes": "Input, one line each (LF, trailing newline): `auipc a0, 1` / `auipc a0, 524287` / `auipc a0, 1048575`. These are the 20-bit field contents 1, 0x7FFFF and 0xFFFFF. llvm-mc requires the literal in [0,1048575], so the plan states the third one as the signed field value -1; the bits are the same. There is no fixup: this fixture covers the form's field, not the %pcrel_hi/%pcrel_lo pair (RV-P8 stays open).",
+  "source": "RISC-V UDB I/auipc.yaml (sha256:e1cfdacb…), `location` 31-12, `left_shift: 12`, `sign_extend: true`"
+}
