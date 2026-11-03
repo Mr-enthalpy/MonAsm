@@ -1,0 +1,391 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://monasm.dev/schema/fmp-v0.schema.json",
+  "title": "Frozen Machine Plan v0",
+  "description": "Draft schema. Fields annotated x-status=draft are not frozen. See docs/fmp-v0/01_contract.md.",
+  "x-status": "draft",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "target_identity",
+    "definition_identity",
+    "output_contract",
+    "sections",
+    "symbols",
+    "instructions",
+    "fixups"
+  ],
+  "properties": {
+    "format_version": { "const": "fmp/0.1" },
+    "target_identity": { "$ref": "#/$defs/target_identity" },
+    "definition_identity": { "$ref": "#/$defs/definition_identity" },
+    "output_contract": { "$ref": "#/$defs/output_contract" },
+    "sections": { "type": "array", "items": { "$ref": "#/$defs/section" } },
+    "symbols": { "type": "array", "items": { "$ref": "#/$defs/symbol" } },
+    "instructions": { "type": "array", "items": { "$ref": "#/$defs/instruction" } },
+    "fixups": { "type": "array", "items": { "$ref": "#/$defs/fixup" } },
+    "provenance": { "$ref": "#/$defs/provenance" }
+  },
+  "$defs": {
+    "target_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "isa_family",
+        "isa_variant",
+        "execution_mode",
+        "enabled_extensions",
+        "feature_constraints",
+        "byte_order",
+        "address_width"
+      ],
+      "properties": {
+        "isa_family": { "enum": ["x86", "aarch64", "riscv"] },
+        "isa_variant": { "type": "string", "minLength": 1 },
+        "execution_mode": { "enum": ["16", "32", "64", "n/a"] },
+        "enabled_extensions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "feature_constraints": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "byte_order": { "enum": ["little", "big"] },
+        "address_width": { "enum": [32, 64] }
+      }
+    },
+    "definition_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "version", "digest"],
+      "properties": {
+        "namespace": { "type": "string", "minLength": 1 },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+        },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "source_ref": { "type": "string" }
+      }
+    },
+    "output_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact",
+        "section_order",
+        "fixup_record_order",
+        "include_symbol_table",
+        "emit_fixups"
+      ],
+      "properties": {
+        "artifact": { "enum": ["bytes", "sections"] },
+        "section_order": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "symbol_order": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "fixup_record_order": { "const": "section_id,offset,fixup_id" },
+        "include_symbol_table": { "type": "boolean" },
+        "emit_fixups": { "const": true }
+      }
+    },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "section_id",
+        "section_kind",
+        "image_backed",
+        "declared_size",
+        "fragments"
+      ],
+      "properties": {
+        "section_id": { "type": "string", "minLength": 1 },
+        "section_kind": { "enum": ["code", "data", "rodata", "bss"] },
+        "image_backed": { "type": "boolean" },
+        "base_address": { "type": "integer", "minimum": 0 },
+        "declared_size": { "type": "integer", "minimum": 0 },
+        "fragments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/fragment" }
+        }
+      }
+    },
+    "fragment": {
+      "oneOf": [
+        { "$ref": "#/$defs/fragment_instruction" },
+        { "$ref": "#/$defs/fragment_data" },
+        { "$ref": "#/$defs/fragment_fill" }
+      ]
+    },
+    "fragment_instruction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offset", "size", "kind", "instruction_id"],
+      "properties": {
+        "offset": { "type": "integer", "minimum": 0 },
+        "size": { "type": "integer", "minimum": 0 },
+        "kind": { "const": "instruction" },
+        "instruction_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "fragment_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offset", "size", "kind", "payload_hex"],
+      "properties": {
+        "offset": { "type": "integer", "minimum": 0 },
+        "size": { "type": "integer", "minimum": 0 },
+        "kind": { "const": "data" },
+        "payload_hex": { "type": "string", "pattern": "^([0-9a-f]{2})*$" }
+      }
+    },
+    "fragment_fill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offset", "size", "kind", "fill_byte"],
+      "properties": {
+        "offset": { "type": "integer", "minimum": 0 },
+        "size": { "type": "integer", "minimum": 0 },
+        "kind": { "const": "fill" },
+        "fill_byte": { "type": "integer", "minimum": 0, "maximum": 255 }
+      }
+    },
+    "instruction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instruction_id",
+        "section_id",
+        "offset",
+        "form_id",
+        "operands",
+        "encoding_choices",
+        "expected_size"
+      ],
+      "properties": {
+        "instruction_id": { "type": "string", "minLength": 1 },
+        "section_id": { "type": "string", "minLength": 1 },
+        "offset": { "type": "integer", "minimum": 0 },
+        "form_id": {
+          "type": "string",
+          "pattern": "^(x86|aarch64|riscv):[^/]+/.+$"
+        },
+        "operands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/operand" }
+        },
+        "encoding_choices": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/encoding_choice" }
+        },
+        "expected_size": { "type": "integer", "minimum": 0 },
+        "expected_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "source_trace": { "$ref": "#/$defs/source_trace" }
+      }
+    },
+    "operand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "kind", "target_type", "payload", "modifiers"],
+      "properties": {
+        "role": {
+          "enum": [
+            "dest",
+            "src",
+            "src2",
+            "base",
+            "index",
+            "disp",
+            "imm",
+            "target",
+            "pred",
+            "list",
+            "modifier"
+          ]
+        },
+        "kind": { "type": "string", "pattern": "^(x86|aarch64|riscv)\\.|^[a-z][a-z0-9_]*$" },
+        "target_type": { "type": "string", "minLength": 1 },
+        "payload": { "type": "object" },
+        "modifiers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/modifier" }
+        }
+      }
+    },
+    "modifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "value": { "type": ["integer", "string", "boolean"] }
+      }
+    },
+    "encoding_choice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "value"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^EC-[0-9]{2}$" },
+        "value": { "type": "string", "minLength": 1 }
+      }
+    },
+    "symbol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["symbol_id", "name", "kind", "binding"],
+      "properties": {
+        "symbol_id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["defined", "undefined", "external"] },
+        "binding": { "enum": ["local", "global", "weak"] },
+        "section_id": { "type": "string", "minLength": 1 },
+        "offset": { "type": "integer", "minimum": 0 },
+        "type": { "enum": ["func", "object", "notype"] },
+        "size": { "type": "integer", "minimum": 0 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "defined" } }, "required": ["kind"] },
+          "then": { "required": ["section_id", "offset"] }
+        }
+      ]
+    },
+    "fixup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixup_id",
+        "section_id",
+        "offset",
+        "field_descriptor",
+        "target",
+        "addend",
+        "pc_reference_rule",
+        "value_transform",
+        "range_constraint",
+        "resolution_mode",
+        "overwrite_bytes"
+      ],
+      "properties": {
+        "fixup_id": { "type": "string", "minLength": 1 },
+        "section_id": { "type": "string", "minLength": 1 },
+        "offset": { "type": "integer", "minimum": 0 },
+        "field_descriptor": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/field_range" }
+        },
+        "bit_order": { "enum": ["value_msb_first"], "default": "value_msb_first" },
+        "target": { "$ref": "#/$defs/fixup_target" },
+        "addend": { "type": "integer" },
+        "pc_reference_rule": {
+          "enum": ["none", "pcrel_begin", "pcrel_end", "pcrel_page"]
+        },
+        "value_transform": {
+          "enum": [
+            "identity",
+            "scale",
+            "page",
+            "hi20",
+            "lo12_i",
+            "lo12_s",
+            "pcrel_hi20"
+          ]
+        },
+        "transform_shift": { "type": "integer", "minimum": 0, "maximum": 63 },
+        "range_constraint": { "$ref": "#/$defs/range_constraint" },
+        "resolution_mode": {
+          "enum": ["resolve_in_place", "emit_relocation", "reject_if_unresolved"]
+        },
+        "pair_group": { "type": "string", "minLength": 1 },
+        "pair_role": { "enum": ["hi", "lo"] },
+        "overwrite_bytes": { "const": false }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["pair_group"] },
+          "then": { "required": ["pair_role"] }
+        }
+      ]
+    },
+    "field_range": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lsb", "width"],
+      "properties": {
+        "lsb": { "type": "integer", "minimum": 0, "maximum": 127 },
+        "width": { "type": "integer", "minimum": 1, "maximum": 64 }
+      }
+    },
+    "fixup_target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["symbol", "absolute", "section_relative"] },
+        "symbol_id": { "type": "string", "minLength": 1 },
+        "section_id": { "type": "string", "minLength": 1 },
+        "address": { "type": "integer", "minimum": 0 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "symbol" } }, "required": ["kind"] },
+          "then": { "required": ["symbol_id"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "absolute" } }, "required": ["kind"] },
+          "then": { "required": ["address"] }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "section_relative" } },
+            "required": ["kind"]
+          },
+          "then": { "required": ["section_id"] }
+        }
+      ]
+    },
+    "range_constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signed", "bits", "align_bits"],
+      "properties": {
+        "signed": { "type": "boolean" },
+        "bits": { "type": "integer", "minimum": 1, "maximum": 64 },
+        "align_bits": { "type": "integer", "minimum": 0, "maximum": 12 }
+      }
+    },
+    "source_trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "file": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "node": { "type": "string" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["materializer_version"],
+      "properties": {
+        "materializer_version": { "type": "string", "minLength": 1 },
+        "build_profile": { "type": "string" },
+        "generated_by": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

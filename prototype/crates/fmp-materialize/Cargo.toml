@@ -1,0 +1,10 @@
+[package]
+name = "fmp-materialize"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+fmp-model = { path = "../fmp-model" }
+fmp-validate = { path = "../fmp-validate" }

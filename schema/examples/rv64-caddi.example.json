@@ -1,0 +1,55 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "riscv",
+    "isa_variant": "rv64",
+    "execution_mode": "n/a",
+    "enabled_extensions": ["rv64c", "rv64i"],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.riscv",
+    "version": "0.1.0",
+    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [".text"],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": 2,
+      "fragments": [
+        { "offset": 0, "size": 2, "kind": "instruction", "instruction_id": "I0001" }
+      ]
+    }
+  ],
+  "symbols": [],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "riscv:c.addi/rd-eq-rs1/quadrant1",
+      "operands": [
+        { "role": "dest", "kind": "riscv.xreg", "target_type": "creg_x8_x15", "payload": { "reg": 10 }, "modifiers": [] },
+        { "role": "imm", "kind": "riscv.imm", "target_type": "imm6_nonzero", "payload": { "value": 5 }, "modifiers": [] }
+      ],
+      "encoding_choices": [],
+      "expected_size": 2
+    }
+  ],
+  "fixups": [],
+  "provenance": {
+    "materializer_version": "0.1.0-draft",
+    "notes": "Illustrative only: compressed form is explicit in form_id, never selected by the encoder."
+  }
+}

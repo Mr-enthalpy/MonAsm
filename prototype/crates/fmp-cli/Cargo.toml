@@ -1,0 +1,15 @@
+[package]
+name = "fmp-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "fmp"
+path = "src/main.rs"
+
+[dependencies]
+fmp-model = { path = "../fmp-model" }
+fmp-validate = { path = "../fmp-validate" }
+fmp-materialize = { path = "../fmp-materialize" }
