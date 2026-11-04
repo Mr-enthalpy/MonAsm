@@ -37,6 +37,7 @@ Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.9.0.json
         definitions/aarch64/0.10.0.json
         definitions/aarch64/0.11.0.json
+        definitions/aarch64/0.12.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -46,6 +47,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
@@ -55,7 +57,7 @@ MRS = os.path.join(ROOT, "research", "external", "arm-mrs", "Instructions.json")
 OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
 VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0",
-            "0.8.0", "0.9.0", "0.10.0", "0.11.0"]
+            "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0"]
 
 # Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
@@ -69,6 +71,7 @@ FROZEN_DIGESTS = {
     "0.8.0": "sha256:9f82b566af004aaa9f0471151497d65acb45c3a7b46e4240345d21f4e330bc35",
     "0.9.0": "sha256:99728cd9bd85b8b0768e700e15dd6263171d6261c385ac15ceeb5df6d2cafcff",
     "0.10.0": "sha256:e958d69b4ba93222e7621a1f5c3ebd056ce929e2974a961a03abb7b66f0b247b",
+    "0.11.0": "sha256:c5a9aec943f9b195c400380b8416bf63cba944da3fdf0203f90de5baff295002",
 }
 
 WIDTH = 32
@@ -1031,6 +1034,191 @@ def _ext_forms():
 
 FORMS.extend(_ext_forms())
 
+# `A64-P14` (ADR-0021). `cmp` and `cmn` are `subs`/`adds` with `Rd` fixed to
+# 31 and the destination dropped: each row is the `subs`/`adds` row of the same
+# layout and width with `Rd` pinned to 31 and the `dest` slot removed. The
+# alias nodes (`Instruction.InstructionAlias`) carry no `encoding`; they are
+# read only to verify the pairing — `operation_id` names the base node,
+# `condition` is `Rd == '11111'`, `preferred` is true — so the bytes stay the
+# base node's. The 32-bit extended alias rows stay out: the 32-bit extended
+# base rows are not in the table either (ADR-0021 decision 4).
+_ALIAS_FAMILIES = [
+    ("cmp", "CMP", "SUBS"),
+    ("cmn", "CMN", "ADDS"),
+]
+
+_ALIAS_WIDTHS = [("x64", "64"), ("w32", "32")]
+
+
+def _alias_register(width, mrs, role):
+    if width == "x64":
+        return {"mrs": [mrs], "role": role, "kind": "aarch64.gpr64",
+                "from": "reg_number", "target_type": "x64"}
+    return _w_register(mrs, role)
+
+
+def _alias_forms():
+    rows = []
+    for mnemonic, alias, base in _ALIAS_FAMILIES:
+        for width, base_width in _ALIAS_WIDTHS:
+            shift_node = "{0}_{1}_addsub_shift".format(base, base_width)
+            imm_node = "{0}_{1}S_addsub_imm".format(base, base_width)
+            for shape, shift_value, decision in _W_SHIFT_ROWS:
+                pinned = {"Rd": 31, "shift": shift_value}
+                slots = [_alias_register(width, "Rn", "src"),
+                         _alias_register(width, "Rm", "src2")]
+                if shape == "lsl0":
+                    pinned["imm6"] = 0
+                else:
+                    imm6 = {"mrs": ["imm6"], "role": "imm",
+                            "kind": "aarch64.imm", "from": "operand_value",
+                            "target_type": "imm6",
+                            "range": {"signed": False, "bits": 6,
+                                      "align_bits": 0}}
+                    if width == "w32":
+                        imm6["excluded"] = list(range(32, 64))
+                    slots.append(imm6)
+                rows.append({
+                    "form_id": "aarch64:{0}/{1}-{1}-{2}".format(
+                        mnemonic, width, shape),
+                    "mrs": shift_node,
+                    "decision": "Rd = 31 (the alias drops the destination); "
+                    "sf is the node's; {0}".format(decision),
+                    "pinned": pinned,
+                    "since": "0.12.0",
+                    "alias": alias,
+                    "alias_width": width,
+                    "slots": slots,
+                })
+            for shape, sh_value, decision in [
+                ("lsl0", 0, "sh = 0 (no LSL #12)"),
+                ("lsl12", 1, "sh = 1 (LSL #12), imm12 still field content"),
+            ]:
+                rows.append({
+                    "form_id": "aarch64:{0}/{1}-imm12-{2}".format(
+                        mnemonic, width, shape),
+                    "mrs": imm_node,
+                    "decision": "Rd = 31 (the alias drops the destination); "
+                    "sf is the node's; {0}".format(decision),
+                    "pinned": {"Rd": 31, "sh": sh_value},
+                    "since": "0.12.0",
+                    "alias": alias,
+                    "alias_width": width,
+                    "slots": [
+                        _alias_register(width, "Rn", "src"),
+                        {"mrs": ["imm12"], "role": "imm",
+                         "kind": "aarch64.imm", "from": "operand_value",
+                         "target_type": "imm12",
+                         "range": {"signed": False, "bits": 12,
+                                   "align_bits": 0}},
+                    ],
+                })
+        for keyword, option, source in _EXT_KEYWORDS:
+            kind = "aarch64.gpr32" if source == "w32" else "aarch64.gpr64"
+            rows.append({
+                "form_id": "aarch64:{0}/x64-x64-{1}-imm3-{2}".format(
+                    mnemonic, source, keyword),
+                "mrs": "{0}_64S_addsub_ext".format(base),
+                "decision": "Rd = 31 (the alias drops the destination); "
+                "option = {0} ({1}); imm3 is field content in 0..4, 5..7 "
+                "excluded".format(option, keyword.upper()),
+                "pinned": {"Rd": 31, "option": option},
+                "since": "0.12.0",
+                "alias": alias,
+                "alias_width": "x64",
+                "slots": [
+                    {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+                     "from": "reg_number", "target_type": "x64"},
+                    {"mrs": ["Rm"], "role": "src2", "kind": kind,
+                     "from": "reg_number", "target_type": source},
+                    {"mrs": ["imm3"], "role": "imm", "kind": "aarch64.imm",
+                     "from": "operand_value", "target_type": "imm3",
+                     "range": {"signed": False, "bits": 3, "align_bits": 0},
+                     "excluded": [5, 6, 7]},
+                ],
+            })
+    return rows
+
+
+FORMS.extend(_alias_forms())
+
+
+def _alias_stem(base):
+    stem = re.sub(r"_(32S?|64S?)_", "_", base)
+    if stem == base:
+        raise SystemExit("{0}: no width component to strip".format(base))
+    return stem
+
+
+def _alias_width(node):
+    encoded = (node.get("_meta") or {}).get("encoded_in") or {}
+    widths = set()
+    for key in encoded:
+        if key.startswith("<X"):
+            widths.add("x64")
+        elif key.startswith("<W"):
+            widths.add("w32")
+    if len(widths) != 1:
+        raise SystemExit(
+            "{0}/{1}: cannot tell the width from {2}".format(
+                node.get("name"), node.get("operation_id"), sorted(encoded)))
+    return widths.pop()
+
+
+def load_alias_nodes(document):
+    index = {}
+    for node in walk(document["instructions"]):
+        if not str(node.get("_type", "")).endswith(
+                "Instruction.InstructionAlias"):
+            continue
+        key = (node.get("name"), node.get("operation_id"))
+        index.setdefault(key, []).append(node)
+    return index
+
+
+def verify_alias(spec, node, index):
+    name = spec["alias"]
+    operation_id = "{0}_{1}".format(name, _alias_stem(spec["mrs"]))
+    candidates = index.get((name, operation_id), [])
+    if len(candidates) != 2:
+        raise SystemExit(
+            "{0}: expected two {1} alias nodes for {2}, found {3}".format(
+                spec["form_id"], name, operation_id, len(candidates)))
+    matching = [item for item in candidates
+                if _alias_width(item) == spec["alias_width"]]
+    if len(matching) != 1:
+        raise SystemExit(
+            "{0}: expected one {1} alias node for {2}, found {3}".format(
+                spec["form_id"], spec["alias_width"], operation_id,
+                len(matching)))
+    alias = matching[0]
+    if alias.get("encoding") is not None:
+        raise SystemExit(
+            "{0}: the alias node has an encoding; the row must come from the "
+            "base node".format(spec["form_id"]))
+    if (alias.get("preferred") or {}).get("value") is not True:
+        raise SystemExit(
+            "{0}: the alias node is not preferred".format(spec["form_id"]))
+    condition = alias.get("condition") or {}
+    if (str(condition.get("_type")) != "AST.BinaryOp"
+            or (condition.get("left") or {}).get("value") != "Rd"
+            or condition.get("op") != "=="
+            or (condition.get("right") or {}).get("value") != "'11111'"):
+        raise SystemExit(
+            "{0}: the alias condition is not Rd == '11111': {1}".format(
+                spec["form_id"], json.dumps(condition)))
+    sf = None
+    for field in encode_fields(node):
+        if field["name"] == "sf":
+            sf = field["value"]
+    if sf is not None:
+        expected = "1" if spec["alias_width"] == "x64" else "0"
+        if sf != expected:
+            raise SystemExit(
+                "{0}: base node {1} has sf = {2}, not {3}".format(
+                    spec["form_id"], spec["mrs"], sf, expected))
+
+
 
 def document_for(version):
     return {
@@ -1088,9 +1276,7 @@ def walk(node):
             yield item
 
 
-def load_nodes():
-    with io.open(MRS, "r", encoding="utf-8") as handle:
-        document = json.load(handle)
+def load_nodes(document):
     wanted = {spec["mrs"] for spec in FORMS}
     nodes = {}
     for node in walk(document["instructions"]):
@@ -1419,7 +1605,13 @@ def emit(version, nodes):
 
 
 def main():
-    nodes = load_nodes()
+    with io.open(MRS, "r", encoding="utf-8") as handle:
+        document = json.load(handle)
+    nodes = load_nodes(document)
+    aliases = load_alias_nodes(document)
+    for spec in FORMS:
+        if "alias" in spec:
+            verify_alias(spec, nodes[spec["mrs"]], aliases)
     for version in VERSIONS:
         emit(version, nodes)
 

@@ -11,8 +11,8 @@
   },
   "definition_identity": {
     "namespace": "monasm.isa.aarch64",
-    "version": "0.9.0",
-    "digest": "sha256:99728cd9bd85b8b0768e700e15dd6263171d6261c385ac15ceeb5df6d2cafcff"
+    "version": "0.11.0",
+    "digest": "sha256:c5a9aec943f9b195c400380b8416bf63cba944da3fdf0203f90de5baff295002"
   },
   "output_contract": {
     "artifact": "bytes",
@@ -38,7 +38,7 @@
       "instruction_id": "I0001",
       "section_id": ".text",
       "offset": 0,
-      "form_id": "aarch64:cmp/x64-x64",
+      "form_id": "aarch64:cmp/x64-x64-lsl0",
       "operands": [
         { "role": "src", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 1 }, "modifiers": [] },
         { "role": "src2", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 2 }, "modifiers": [] }

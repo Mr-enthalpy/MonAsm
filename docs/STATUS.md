@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-04
-Phase: **3 in progress (x86, AArch64 and RV64 slices): fourteen definition documents, the materializer and the fixture gate are in place; every x86, AArch64 and RV64 coverage row is now carried, so widening is coverage work with its own ADR per slice**
+Phase: **3 in progress (x86, AArch64 and RV64 slices): fifteen definition documents, the materializer and the fixture gate are in place; every x86, AArch64 and RV64 coverage row is now carried, so widening is coverage work with its own ADR per slice**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -14,7 +14,7 @@ this file plus `AGENTS.md` alone.
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
-| 3 | Three-ISA vertical prototype | **in progress**: fourteen definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 5 positive and 15 negative fixtures, AArch64 has 14 positive and 33 negative, RV64 has 9 positive and 11 negative, all passing the two-source gate |
+| 3 | Three-ISA vertical prototype | **in progress**: fifteen definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 5 positive and 15 negative fixtures, AArch64 has 15 positive and 35 negative, RV64 has 9 positive and 11 negative, all passing the two-source gate |
 | 4 | Invariants, negative tests, replay | not started |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
@@ -24,8 +24,8 @@ this file plus `AGENTS.md` alone.
 |---|---|---|
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
-| G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: 22 of 32 rows are frozen; the 10 rows still `draft` are EC-05, EC-08, EC-09, EC-10, EC-16, EC-18, EC-23, EC-24, EC-25 and EC-26, and none of them is needed by the three slices as they stand |
-| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 5 positive, 15 negative; AArch64: 14 positive, 33 negative; RV64: 9 positive, 11 negative) |
+| G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: 23 of 33 rows are frozen; the 10 rows still `draft` are EC-05, EC-08, EC-09, EC-10, EC-16, EC-18, EC-23, EC-24, EC-25 and EC-26, and none of them is needed by the three slices as they stand |
+| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 5 positive, 15 negative; AArch64: 15 positive, 35 negative; RV64: 9 positive, 11 negative) |
 
 ## Decisions
 
@@ -51,6 +51,7 @@ this file plus `AGENTS.md` alone.
 | ADR-0018 | An AArch64 flag-setting mnemonic is a form family and `S = 1` is the node's: `0.9.0` adds twelve rows, six `adds` and six `subs` (`-lsl0`, `-imm12-lsl0`/`-lsl12`, `-imm6-lsl`/`-lsr`/`-asr` each) from `ADDS_64_addsub_shift`/`ADDS_64S_addsub_imm`/`SUBS_64_addsub_shift`/`SUBS_64S_addsub_imm`, the four nodes already read with `S` at 29+1 fixed to `1`, so no plan field names the bit; every word is its `add`/`sub` twin with bit 29 set, the `sh`/`shift`/`imm6` treatment and slot shapes are inherited, register 31 is `xzr` (the extended S nodes are absent), `cmp`/`cmn` are a two-operand alias family and out (`N01i`), the `sf = 0` S nodes are out (`N01j`), and a literal outside the named `sh` half is `E-RANGE-001` (`N18e`) | accepted 2026-11-04 |
 | ADR-0019 | The AArch64 32-bit width is a form family and `sf = 0` is the node's: `0.10.0` adds twenty-four rows, the six `add`/`sub`/`adds`/`subs` shapes each repeated on the eight `*_32*` nodes, so `w32-…` vs `x64-…` in the `form_id` is the width and no plan field names the bit; every register slot is `aarch64.gpr32`/`w32` (an `x64` operand is `E-OPERAND-001`, `N02c`), register 31 stays a plain `reg_number` whose meaning is the node's role (no `sp` operand kind), the 32-bit `imm6` declares `bits: 6` with `excluded: [32…63]` (`imm6 = 32` is `E-RANGE-004`, `N16d`), `4096` on `-lsl0` stays `E-RANGE-001` (`N18f`), and the extended 32-bit nodes plus `cmp`/`cmn` stay out (`E-FORM-001`, `N01k`) | accepted 2026-11-04 |
 | ADR-0020 | The AArch64 extended-register mnemonic family repeats the `add` shapes on the `op = 1`/`S = 1` nodes: `0.11.0` adds twenty-four rows, the eight `option` rows each on `SUB_64_addsub_ext`, `ADDS_64S_addsub_ext` and `SUBS_64S_addsub_ext`, so the mnemonic is the form family and no plan field names `op` or `S`; the keyword still fixes `src2`'s width (six `[su]xt[bhw]` take `w32`, `uxtx`/`sxtx` take `x64`, `N02d`), `imm3` keeps `excluded: [5, 6, 7]` (`N16e`), register 31 stays a plain `reg_number` whose meaning is the node's role (`sp` only in `sub`'s `Rd`), and the 32-bit extended nodes plus `cmp`/`cmn` stay out (`E-FORM-001`, `N01l`) | accepted 2026-11-04 |
+| ADR-0021 | `cmp`/`cmn` are a separate two-operand alias family: `0.12.0` adds forty rows, each the `subs`/`adds` row of the same layout and width with `Rd` pinned to 31 and the `dest` slot removed, built from the base node because the MRS alias nodes carry no `encoding`; the alias node is the pairing check (`operation_id`, `condition` `Rd == '11111'`, `preferred`, width), so it never supplies a bit field; the 32-bit extended aliases stay out with their base rows (`N01l`), a `dest` on a `cmp`/`cmn` row is `E-OPERAND-002` (`N02e`), and `N01i`/`N01m` become version boundaries against `0.11.0` | accepted 2026-11-04 |
 
 ## Settled decisions (contract level)
 
@@ -95,12 +96,14 @@ mnemonic is the form family (`A64-P10`, ADR-0017), and `0.9.0.json` adds twelve
 `adds`/`subs` rows from the four `S = 1` nodes, whose `S` bit is fixed by the node
 in the same way (`A64-P11`, ADR-0018), `0.10.0.json` adds twenty-four `w`
 rows, the same six shapes on the eight `sf = 0` nodes, whose width is fixed by
-the node in the same way (`A64-P12`, ADR-0019), and `0.11.0.json` adds
+the node in the same way (`A64-P12`, ADR-0019), `0.11.0.json` adds
 twenty-four extended `sub`/`adds`/`subs` rows from the three `op = 1`/`S = 1`
-extended nodes (`A64-P13`, ADR-0020).
-Fourteen fixtures match `llvm-mc` (`EXP-0008`, `EXP-0013`, `EXP-0014`, `EXP-0015`,
+extended nodes (`A64-P13`, ADR-0020), and `0.12.0.json` adds forty `cmp`/`cmn`
+alias rows, each the base row with `Rd` pinned to 31 and the destination dropped
+(`A64-P14`, ADR-0021).
+Fifteen fixtures match `llvm-mc` (`EXP-0008`, `EXP-0013`, `EXP-0014`, `EXP-0015`,
 `EXP-0016`, `EXP-0017`, `EXP-0018`, `EXP-0019`, `EXP-0020`, `EXP-0021`,
-`EXP-0022`). Every directive §6.2 item now has a passing
+`EXP-0022`, `EXP-0023`). Every directive §6.2 item now has a passing
 row; what remains is widening, not a decision.
 OD-12 is settled by ADR-0007: the RV64 source is the UDB resolved
 spec, pinned by archive and node hashes, `EXP-0009` verified the B/J/RVC scatter
@@ -148,8 +151,6 @@ not cover is caught only by the weaker size check; it is now settled, and
 2. Extend the AArch64 coverage, one vertical slice at a time. All eight directive
    §6.2 items now pass; the next slices are widening, and each needs its own ADR
    (ADR-0011 decision 7's rule):
-   - the `cmp`/`cmn` alias family (`Rd = 31`, destination dropped, ADR-0018 kept
-     it out);
    - the load/store kinds still absent: register-offset, literal, and the store's
      `imm9` pre/post pair (ADR-0013 kept them out).
    `A64-P4` is closed by `0.3.0`: ADR-0012 made the condition an operand
@@ -181,7 +182,11 @@ not cover is caught only by the weaker size check; it is now settled, and
    `A64-P13` is closed by `0.11.0`: ADR-0020 repeated the eight extended rows on
    the `op = 1`/`S = 1` nodes, `A64-P13-ext-family` matches `llvm-mc`, and
    `N01l`/`N02d`/`N16e` pin the absent 32-bit extended node, the wrong `src2`
-   class and `imm3 = 5`. A `:lo12:` inside the
+   class and `imm3 = 5`. `A64-P14` is closed by `0.12.0`: ADR-0021 made
+   `cmp`/`cmn` a two-operand alias family whose bytes are the base node's and
+   whose alias node is only the pairing check, `A64-P14-cmp-cmn-family` matches
+   `llvm-mc`, and `N02e`/`N01i`/`N01m` pin the extra `dest` and the two version
+   boundaries. A `:lo12:` inside the
    `-lsl12` form is measured at the record level but is not a symbol address
    (`EXP-0013` §5); a slice that wants one must decide what its addend means
    first.
@@ -207,7 +212,7 @@ sets — code, JSON Pointer, detail keys — are compared for exact equality.
 The AArch64 slice adds `definitions/aarch64/0.1.0.json` (four forms: two `add`,
 `bl`, `adrp`; digest `sha256:96f87aa…`) with the Arm BSD-3-Clause notice beside
 it, `EXP-0008` (five MRS nodes, the all-32-bits-covered check, and the
-`immlo`-at-30:29 correction the oracle caught), and 14 positive + 33 negative
+`immlo`-at-30:29 correction the oracle caught), and 15 positive + 35 negative
 fixtures. `0.2.0` adds the fifth form, `aarch64:add/x64-imm12-lsl12` (digest
 `sha256:169e4bf6…`), which pins `sh = 1` and leaves the operand as `imm12`
 field content (ADR-0011, `EXP-0013`); `N18a`/`N18b` record the two literals that
@@ -251,10 +256,17 @@ extended `sub`/`adds`/`subs` rows (digest `sha256:c5a9aec9…`), the eight
 keyword still fixing `src2`'s width and `imm3` still excluded over `5…7`
 (ADR-0020, `EXP-0022`); `A64-P13-ext-family` is 108 bytes over twenty-seven
 instructions, and `N01l`/`N02d`/`N16e` pin the absent 32-bit extended node, the
-wrong `src2` class and `imm3 = 5`. A64-P5/P6 use `llvm-mc` →
+wrong `src2` class and `imm3 = 5`. `0.12.0` adds forty `cmp`/`cmn` alias rows
+(digest `sha256:8a428926…`), each the `subs`/`adds` base row with `Rd` pinned to
+31 and the `dest` slot removed, with the MRS alias node used only as the pairing
+check because it carries no `encoding` (ADR-0021, `EXP-0023`);
+`A64-P14-cmp-cmn-family` is 188 bytes over forty-seven instructions, and
+`N02e`/`N01i`/`N01m` pin the extra `dest` operand and the two version boundaries.
+A64-P5/P6 use `llvm-mc` →
 `ld.lld` → `llvm-objcopy`
 because `llvm-mc` leaves AArch64 branch and `adrp` fields as relocations; A64-P3,
-A64-P4, A64-P7, A64-P8, A64-P9, A64-P10, A64-P11, A64-P12 and A64-P13 need no
+A64-P4, A64-P7, A64-P8, A64-P9, A64-P10, A64-P11, A64-P12, A64-P13 and A64-P14
+need no
 linker
 because their
 operands are immediates or local labels in one section and `llvm-mc` resolves

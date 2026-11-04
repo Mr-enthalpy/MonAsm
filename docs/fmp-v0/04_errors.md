@@ -45,7 +45,7 @@ Rules:
 | E-DEF-002 | Namespace or version not available in this materializer | `namespace`, `version` | EXP-R5 |
 | E-FORM-001 | `form_id` is not present in the pinned definition | `form_id`, `namespace`, `version` | N01 |
 | E-OPERAND-001 | Operand kind or register class does not match the form | `expected`, `found` | N02 |
-| E-OPERAND-002 | Operand count or role sequence mismatch | `expected`, `found` | — |
+| E-OPERAND-002 | Operand count or role sequence mismatch | `expected`, `found` | N02e |
 | E-OPERAND-003 | Operand payload malformed for its kind | `kind`, `reason` | — |
 | E-OPERAND-004 | Operand value is not representable in the slot's field width (register number wider than the encoded field) | `target_type`, `value`, `field_bits` | N14 |
 | E-RANGE-001 | Immediate outside the legal encoding range | `min`, `max`, `value`, `target_type` | N03, N18a, N18b |
@@ -121,6 +121,14 @@ rejection; `derived` means it follows from a measured byte sequence.
 - `E-OPERAND-001` — observed, F-10: `c.addi a6, 5` (x16) is rejected because the
   compressed register class is `x8..x15`. A register-class violation is a
   legality rule, never a widening opportunity.
+- `E-OPERAND-002` — observed, `EXP-0023` §4: `aarch64:cmp/x64-x64-lsl0` has two
+  slots (`src`, `src2`), because the alias fixes `Rd = 31` and drops the
+  destination, and a plan that passes `dest` as well carries three operands.
+  Rejecting the count is the only honest outcome: ignoring the extra operand
+  would accept a plan that states a register the mnemonic cannot name, and
+  honouring it would make `Rd` depend on an operand value instead of the form
+  (`INV-01`, `INV-07`). The test is `N02e`, which reports `expected: 2`,
+  `found: 3` at `/instructions/0/operands`.
 - `E-OPERAND-004` — observed, `EXP-0004` §3: the v0 x86 `ModRM` field is 3 bits
   and the `REX` byte is pinned to `0x48`, so `r9` is not encodable. Truncating 9
   (`0b1001`) to 3 bits yields `0b001`, and `48 89 c8` decodes as

@@ -1,14 +1,14 @@
 # EXP-0008 — generating the AArch64 tables from the MRS nodes
 
-- Date: 2026-11-04 (documents `0.2.0` … `0.11.0` added the same day)
-- Subject: how `definitions/aarch64/0.1.0.json` … `0.11.0.json` were derived, and
+- Date: 2026-11-04 (documents `0.2.0` … `0.12.0` added the same day)
+- Subject: how `definitions/aarch64/0.1.0.json` … `0.12.0.json` were derived, and
   what they do and do not cover
 - Basis: **experiment** for every field range, template and byte quoted below
 - Reproduce:
   `python tools/check_mrs.py --archive <pinned .tar.gz>`, then
   `python research/evidence/experiments/EXP-0008/generate_aarch64.py`
 
-The script emits all eleven documents. `0.1.0` … `0.10.0` are frozen and their
+The script emits all twelve documents. `0.1.0` … `0.11.0` are frozen and their
 digests are asserted by the script, so a later edit that tries to move one fails
 instead of shipping. A form declares the version it starts in (`since`), so a
 later document is always a superset and cannot lose an earlier row.
@@ -27,10 +27,14 @@ sha256 a1ad2c6538a47cd97d8762791ac5af88bce1d5f6aff096c9b77aef853e76acfe
 BSD-3-Clause licence sentence before the drop may be used (ADR-0006). The file is
 not vendored; the shipped artifact is the JSON table plus its digest.
 
-The twenty-six nodes are named exactly as the MRS names them. The generator walks
-`instructions` recursively, matches the node's `name`, rejects duplicates and
-refuses to run if any node is missing. It does not read aliases, groups or
-descriptions.
+The twenty-nine encode nodes are named exactly as the MRS names them. The
+generator walks `instructions` recursively, matches the node's `name`, rejects
+duplicates and refuses to run if any node is missing. It does not read groups or
+descriptions. From `0.12.0` it also indexes the `Instruction.InstructionAlias`
+nodes, but only to verify the `cmp`/`cmn` pairing: an alias node has no
+`encoding`, so it cannot supply a bit field and is never a byte source
+(`ADR-0021` decision 3). Ten alias nodes are read; the two 32-bit extended
+aliases stay unread with their base nodes.
 
 ## 2. The MRS nodes and their encode fields
 
@@ -209,6 +213,28 @@ The keyword keeps choosing `src2`'s width — the six `[su]xt[bhw]` rows take a
 `XdOrXZR__6` on both S nodes, and `Rn` `XnSP_option` on all three, so the role
 decides whether 31 is `sp` or `xzr` and the slot never does (`EXP-0022` §1–§2).
 The four `*_32*_addsub_ext` nodes are still not read (`N01l`).
+
+### The ten `CMP`/`CMN` alias nodes → the forty `cmp`/`cmn` rows (verification only)
+
+`CMP` and `CMN` appear in the `Instruction.InstructionAlias` list, twelve nodes
+over the six `{imm, shift, ext}` × `{32, 64}` combinations. None of them has an
+`encoding` key, so they contribute no field range. Each carries:
+
+| Key | Value | What the generator checks |
+|---|---|---|
+| `operation_id` | `CMP_SUBS_addsub_shift`, `CMN_ADDS_addsub_ext`, … | exactly two nodes per `(name, operation_id)`, one per width; the row's base node is the id with `32S?`/`64S?` removed |
+| `condition` | `Rd == '11111'` | the AST is that binary comparison; anything else refuses to emit |
+| `preferred` | `true` | the alias is the printed spelling |
+| `_meta.encoded_in` | `<Xn>`/`<Wn>` keys | the width, read from the key prefix, matches the row's base node |
+
+The bytes stay the base node's: `0.12.0` builds `aarch64:cmp/x64-x64-lsl0` from
+`SUBS_64S_addsub_shift` with `Rd` at 0+5 pinned to `11111` and the `dest` slot
+removed, exactly as the `subs` row had it, and the alias node only confirms which
+base node and width that row must name (`ADR-0021` decision 2–3, `EXP-0023`
+§1–§2). Register 31 stays a plain `reg_number` in `Rn`/`Rm`, so `cmp sp, #5` and
+`cmp x1, xzr` are the same slot shape with different role meanings (`EXP-0023`
+§3). The 32-bit extended aliases (`CMP_SUBS_addsub_ext`/`CMN_ADDS_addsub_ext` at
+`sf = 0`) stay unread because their base rows are not in the table (`N01l`).
 
 ### `BL_only_branch_imm` → `aarch64:bl/imm26`
 
@@ -402,7 +428,7 @@ Templates are stored little-endian, the only byte order v0 definitions declare
 
 ## 4. Oracle
 
-`llvm-mc` 23.1.2 assembles all ninety-two forms. It does **not** resolve AArch64
+`llvm-mc` 23.1.2 assembles all one hundred and thirty-two forms. It does **not** resolve AArch64
 branches or `adrp` when the target is a symbol: it emits zeros plus
 `fixup_aarch64_pcrel_call26`, `fixup_aarch64_pcrel_adrp_imm21` or
 `fixup_aarch64_add_imm12`. For the forms whose bits a fixup owns, the oracle is
@@ -428,9 +454,10 @@ therefore the assembler's own, and the fixture records that as oracle metadata
 is an immediate, so there is no relocation in the first place. `A64-P8` and
 `A64-P9` are the same case again: registers and immediates only (`EXP-0017` §3,
 `EXP-0018` §3), and so is `A64-P10` (`EXP-0019` §3), `A64-P11` (`EXP-0020` §3),
-`A64-P12` (`EXP-0021` §3) and `A64-P13` (`EXP-0022` §3).
+`A64-P12` (`EXP-0021` §3), `A64-P13` (`EXP-0022` §3) and `A64-P14` (`EXP-0023`
+§3).
 
-The fourteen positive fixtures are:
+The fifteen positive fixtures are:
 
 | Fixture | Document | Bytes | What it proves |
 |---|---|---|---|
@@ -448,14 +475,15 @@ The fourteen positive fixtures are:
 | `A64-P11-adds-subs-family` | `0.9.0` | `200002ab 83fc3fb1 c58c44b1 070d09ab 6a1d4cab cdfd8fab 300212eb 93fe3ff1 d58e44f1 170f19eb 7a1f5ceb dd0700f1` | one instruction per `adds`/`subs` row: both mnemonics, `imm12` at 4095 and 291<<12, all three shift keywords with `imm6` at 3, 7 and 63, and distinct registers in every row |
 | `A64-P12-w-rows` | `0.10.0` | `2000020b 83fc3f11 c58c4411 070d090b 6a1d4c0b cd7d8f0b 3002124b 93fe3f51 d58e4451 170f194b 7a1f5c4b dd070051 2000022b 83fc3f31 c58c4431 070d092b 6a1d4c2b cd7d8f2b 3002126b 93fe3f71 d58e4471 170f196b 7a1f5c6b dd070071` | one instruction per `w` row across all four mnemonics: `imm12` at 4095 and 291<<12, all three shift keywords with `imm6` at 3, 7 and 31 (the top allocated amount), and distinct registers 0–30 in every row |
 | `A64-P13-ext-family` | `0.11.0` | `200022cb 833025cb e64c28cb 49652bcb ac912ecb 0faa31cb 72ce34cb d5e237cb 38073aab 9b333dab 1e4021ab 626824ab c58c27ab 28a12aab 8bd12dab eee530ab 510a33eb b42e36eb 175339eb 7a633ceb dd8720eb 41a823eb a4cc26eb 07f129eb 3f0c22cb e00321ab 3f0022eb` | one instruction per extended `sub`/`adds`/`subs` row: all eight `option` values on each mnemonic, `imm3` at 0–4, distinct registers 0–30, plus three register-31 rows (`sub` `Rd` = `sp`, `Rn` = `sp`, `subs` `Rd` = `xzr`) |
+| `A64-P14-cmp-cmn-family` | `0.12.0` | `3f0002eb 7f1404eb bf1c46eb ff2488eb 3f1500f1 5f8d44f1 7f010c6b bf3d0e6b ff45506b 3f4e926b 7f160071 9f8e4471 bf0236eb ff2638eb 3f4b3aeb 7f6f3ceb bf933eeb 1fa021eb 5fc423eb 9fe825eb df0007ab 1f1509ab 5f1d4bab 9f258dab df1500b1 ff8d44b1 1f02112b 5f3e132b 9f46552b df4e972b 1f170031 3f8f4431 5f033bab 9f273dab df4b20ab 3f6c22ab 7f9024ab bfa026ab dfc427ab 1fe929ab ff1700f1 ff170071 ff6322eb ff1700b1 ff6322ab 3f001feb 3f001f6b` | one instruction per `cmp`/`cmn` form: four shifted and two immediate rows on each width, all eight `option` values on `x64`, `imm3` at 0–4 and `imm6` at 5, 7, 9, 15, 17 and 19, plus seven register-31 rows (`sp`/`wsp` in `Rn`, `xzr`/`wzr` in `Rm`) |
 
 These were checked against our materializer, not generated by it
-(`AGENTS.md` rule 5). The materializer reproduces all fourteen byte-for-byte and the
-thirty-three negative fixtures (`N01`, `N01b`, `N01d`, `N01e`, `N01f`, `N01g`,
-`N01h`, `N01i`, `N01j`, `N01k`, `N01l`, `N02b`, `N02c`, `N02d`, `N03`,
-`N03-cond`, `N03-imm12-disp`, `N03-imm3`, `N03-imm6`, `N03-imm9-disp`, `N04c`,
-`N12a`, `N14`, `N16c`, `N16d`, `N16e`, `N18a`, `N18b`, `N18c`, `N18d`, `N18e`, `N18f`,
-`N19`) reject
+(`AGENTS.md` rule 5). The materializer reproduces all fifteen byte-for-byte and the
+thirty-five negative fixtures (`N01`, `N01b`, `N01d`, `N01e`, `N01f`, `N01g`,
+`N01h`, `N01i`, `N01j`, `N01k`, `N01l`, `N01m`, `N02b`, `N02c`, `N02d`, `N02e`,
+`N03`, `N03-cond`, `N03-imm12-disp`, `N03-imm3`, `N03-imm6`, `N03-imm9-disp`,
+`N04c`, `N12a`, `N14`, `N16c`, `N16d`, `N16e`, `N18a`, `N18b`, `N18c`, `N18d`,
+`N18e`, `N18f`, `N19`) reject
 exactly the registered diagnostic sets.
 `N18a`/`N18b` are the
 scaled form's other half: the first is `0x1000` stated on `-lsl0`, the second
@@ -483,8 +511,10 @@ ADR-0016, narrowed by ADR-0017). The `sub` rows add three: `N01g` is
 `aarch64:sub/w32-w32-w32-lsl0` (`sf = 0` is a different pair of nodes), and
 `N18d` is `4096` on `sub/x64-imm12-lsl0`, which only fits `-lsl12` and must be
 `E-RANGE-001` rather than a form switch (`EXP-0019` §2, ADR-0017). The
-`adds`/`subs` rows add three: `N01i` is `aarch64:cmp/x64-x64` (the alias fixes
-`Rd = 31` and drops the destination, so it is a two-operand family of its own),
+`adds`/`subs` rows add three: `N01i` is `aarch64:cmp/x64-x64-lsl0` against
+`0.11.0` (the alias fixes `Rd = 31` and drops the destination, so it is a
+two-operand family of its own; the row exists from `0.12.0`, which makes this a
+version boundary),
 `N01j` is `aarch64:adds/w32-w32-w32-lsl0` (`sf = 0` on the `S = 1` node is a
 different node), and `N18e` is `4096` on `adds/x64-imm12-lsl0`, the same
 value-driven switch one bit over (`EXP-0020` §2, ADR-0018). The `w` rows add
@@ -499,28 +529,38 @@ ADR-0019). The extended `sub`/`adds`/`subs` rows add three: `N01l` is
 that no document carries, `N02d` is an `x64` source on a `-uxtb` row
 (`E-OPERAND-001` on `kind` and `target_type`), and `N16e` is `imm3 = 5` on a
 `subs` row — inside the field, unallocated, so the closed `excluded` list
-rejects it exactly as `N16c` does on `add` (`EXP-0022` §2, ADR-0020).
+rejects it exactly as `N16c` does on `add` (`EXP-0022` §2, ADR-0020). The
+`cmp`/`cmn` rows add two: `N02e` is a `dest` operand on
+`aarch64:cmp/x64-x64-lsl0` (the alias row has two slots, so the plan has one
+operand too many and gets `E-OPERAND-002` with `expected: 2`, `found: 3` — the
+first shape in the table whose operand count differs from its base row), and
+`N01m` is `aarch64:cmn/x64-imm12-lsl0` against `0.11.0`, another version
+boundary (`EXP-0023` §4–§5, ADR-0021).
 
 ## 5. What this record does not claim
 
 - **Not exhaustive coverage of the nodes.** The table exercises the register and
   immediate fields at range ends, but it does not enumerate all 2^5 × 2^5 × 2^5
   register triples, nor every `bl`, `b.cond`, load/store, `movz`, shift, extend,
-  `sub`, `adds`, `subs`, `w` or extended `sub`/`adds`/`subs` value.
-  `EXP-0004` did that for the seven x86 rows; this slice has ninety-two rows and
-  fourteen positive fixtures, and `EXP-0014` §2 enumerates the sixteen condition
+  `sub`, `adds`, `subs`, `w`, extended `sub`/`adds`/`subs` or `cmp`/`cmn` value.
+  `EXP-0004` did that for the seven x86 rows; this slice has one hundred and
+  thirty-two rows and fifteen positive fixtures, and `EXP-0014` §2 enumerates the sixteen condition
   values but not their products with the 2^19 displacements; `EXP-0015` §2
   measures both ends of `imm12` and `imm9` but not every value in between,
   `EXP-0016` §2 measures all four `hw` values but two `imm16` values,
   `EXP-0017` §2 measures both ends of `imm6` on two of the three keywords,
   `EXP-0018` §2 measures `imm3` at 0 and 4 but not 1, 2 or 3 on every row,
   `EXP-0019` §3 measures one value per `sub` row, `EXP-0020` §3 measures one
-  value per `adds`/`subs` row, `EXP-0021` §3 measures one value per `w` row, and
-  `EXP-0022` §3 measures one value per extended `sub`/`adds`/`subs` row.
+  value per `adds`/`subs` row, `EXP-0021` §3 measures one value per `w` row,
+  `EXP-0022` §3 measures one value per extended `sub`/`adds`/`subs` row, and
+  `EXP-0023` §4 measures one value per `cmp`/`cmn` row plus seven register-31
+  rows.
 - **Not a statement about the other packagings.** Only the archive pinned by
   ADR-0006 was read (`EXP-0006`, `EXP-0007`).
-- **Not an encoding-selection mechanism.** Twenty-nine MRS nodes are read because
-  ninety-two forms exist in the table (`ADD_64_addsub_shift` is read four times,
+- **Not an encoding-selection mechanism.** Thirty-nine MRS nodes are read because
+  one hundred and thirty-two forms exist in the table (twenty-nine encode nodes,
+  most of them read more than once, plus ten `CMP`/`CMN` alias nodes read only for
+  verification; `ADD_64_addsub_shift` is read four times,
   `ADD_64_addsub_ext` eight times, `ADD_64_addsub_imm` twice,
   `MOVZ_64_movewide` four times, `SUB_64_addsub_shift` four times,
   `SUB_64_addsub_imm` twice, `ADDS_64_addsub_shift` and `SUBS_64_addsub_shift`
@@ -533,20 +573,20 @@ rejects it exactly as `N16c` does on `add` (`EXP-0022` §2, ADR-0020).
   times each). The generator is
   disposable research tooling; the materializer never reads MRS data, never looks
   a mnemonic up, and only resolves the exact `form_id` a plan names.
-- **The extended `sf = 0` nodes and the `cmp`/`cmn` aliases are absent.** They
-  are other nodes with their own `sf` and `Rd` pins, so naming one is
-  `E-FORM-001` (`N01l`, `N01i`). The
+- **The extended `sf = 0` nodes are absent.** They are other nodes with their own
+  `sf` pin, so naming one is `E-FORM-001` (`N01l`). The
   scaled `add`, `b.cond`, load/store, `movz`, shift, extend, `sub`,
-  `adds`/`subs`, `w` and extended `sub`/`adds`/`subs` rows are no
-  longer in this list: the first is a row in `0.2.0` (ADR-0011), the second a row
-  in `0.3.0` (ADR-0012), five are rows in `0.4.0` (ADR-0013), four are rows in
-  `0.5.0` (ADR-0014), three are rows in `0.6.0` (ADR-0015), eight are rows in
-  `0.7.0` (ADR-0016), six are rows in `0.8.0` (ADR-0017), twelve are rows in
-  `0.9.0` (ADR-0018), twenty-four are rows in `0.10.0` (ADR-0019) and
-  twenty-four more are rows in `0.11.0` (ADR-0020), none of them a
-  slot-level scaling rule or a value-driven form choice. `N01f`, `N01g`,
-  `N01h`, `N01j` and `N01k` name a row against a version that predates it, so
-  they stay version boundaries rather than absences.
+  `adds`/`subs`, `w`, extended `sub`/`adds`/`subs` and `cmp`/`cmn` rows are
+  rows in `0.2.0` (ADR-0011), `0.3.0` (ADR-0012), `0.4.0` (ADR-0013),
+  `0.5.0` (ADR-0014), `0.6.0` (ADR-0015), `0.7.0` (ADR-0016),
+  `0.8.0` (ADR-0017), `0.9.0` (ADR-0018), `0.10.0` (ADR-0019),
+  `0.11.0` (ADR-0020) and `0.12.0` (ADR-0021) respectively, none of them a
+  slot-level scaling rule or a value-driven form choice; the ten `cmp`/`cmn`
+  alias nodes are verification sources for those rows rather than byte sources,
+  and the two 32-bit extended aliases stay unread because their base rows do.
+  `N01f`, `N01g`,
+  `N01h`, `N01j`, `N01k`, `N01i` and `N01m` name a row against a version that
+  predates it, so they stay version boundaries rather than absences.
 - **The scaled `:lo12:` link path is unmeasured.** No fixture pairs `adrp` with
   `add ..., lsl #12`; only the `-lsl0` pair is linked (`A64-P6`).
 
@@ -618,13 +658,19 @@ namespace   monasm.isa.aarch64
 version     0.11.0
 forms       92
 digest      sha256:c5a9aec943f9b195c400380b8416bf63cba944da3fdf0203f90de5baff295002
+
+definition  definitions/aarch64/0.12.0.json
+namespace   monasm.isa.aarch64
+version     0.12.0
+forms       132
+digest      sha256:8a428926568b99f0674785cc674bc066adc452216131706d458b9e3390da03b6
 ```
 
 The digests are computed over the canonical form of each whole document
 (`01_contract.md` §12, `OD-06`) and printed by `tools/check_definition.py`,
 which also checks that the reading-aid table in `07_definition_format.md` §8.2
 matches the JSON row by row. `definitions/aarch64/NOTICE` reproduces the upstream
-BSD-3-Clause notice and names the archive hash; `0.2.0` … `0.11.0` need
+BSD-3-Clause notice and names the archive hash; `0.2.0` … `0.12.0` need
 no second notice because they are generated from the same drop and ship under the
 same terms.
 
@@ -640,8 +686,9 @@ earlier rows verbatim, the only difference from `0.7.0` is the six `sub` rows;
 because `0.9.0` repeats all thirty-two earlier rows verbatim, the only difference
 from `0.8.0` is the twelve `adds`/`subs` rows; because `0.10.0` repeats all
 forty-four earlier rows verbatim, the only difference from `0.9.0` is the
-twenty-four `w` rows; and because `0.11.0` repeats all sixty-eight earlier rows
+twenty-four `w` rows; because `0.11.0` repeats all sixty-eight earlier rows
 verbatim, the only difference from `0.10.0` is the twenty-four extended
-`sub`/`adds`/`subs` rows. The
+`sub`/`adds`/`subs` rows; and because `0.12.0` repeats all ninety-two earlier
+rows verbatim, the only difference from `0.11.0` is the forty `cmp`/`cmn` rows. The
 generator's frozen-digest assertions are what prove
 that no earlier row moved while a new one landed.

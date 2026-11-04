@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P14-cmp-cmn-family.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "0e02e49d69da9305f11edd10a78fd4636a05d366333147968c0a0490f6a04fe6",
+  "output_sha256": "d1568373925a65551e8b9fecc1308050f2387e0cd77de994c8e33c971a03ab4c",
+  "size": 188,
+  "records": 0,
+  "notes": "Input (1416 B, LF, trailing newline), one instruction per line with two leading spaces: the forty `cmp`/`cmn` rows, one per form, then seven register-31 role rows. Every row uses two distinct register numbers, so a register-field slip cannot hide; `imm3` cycles 0-4, `imm6` takes 5, 7, 9, 15, 17 and 19, and the two immediate rows use `#5` (`lsl0`) and `#291, lsl #12` (0x123000). The role rows put 31 in `Rn` (`cmp sp, #5`, `cmp wsp, #5`, `cmp sp, x2`, `cmn sp, #5`, `cmn sp, x2`) and in `Rm` (`cmp x1, xzr`, `cmp w1, wzr`). A 31 in `Rn` on a shifted row is not one of them: `cmp wsp, w2, lsl #3` assembles to the 32-bit extended word (bit 21 = 1), which the table does not carry, so that spelling is not used. `llvm-mc` prints `uxtb #0` and `sxth #0` back without the amount, the same word. Every operand is a register or an immediate, so `llvm-readobj -r` prints an empty relocation list and no linker is involved.",
+  "source": "Arm MRS CMP/CMN alias nodes naming SUBS_64S_addsub_shift, SUBS_64S_addsub_imm, ADDS_64S_addsub_shift, ADDS_64S_addsub_imm, SUBS_32_addsub_shift, SUBS_32S_addsub_imm, ADDS_32_addsub_shift, ADDS_32S_addsub_imm, SUBS_64S_addsub_ext and ADDS_64S_addsub_ext, with Rd at 0+5 pinned to 11111; measured in EXP-0023 section 2"
+}

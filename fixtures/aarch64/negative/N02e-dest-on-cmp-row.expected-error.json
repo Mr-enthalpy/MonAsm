@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-OPERAND-002", "path": "/instructions/0/operands", "detail_keys": ["expected", "found"] }
+  ]
+}

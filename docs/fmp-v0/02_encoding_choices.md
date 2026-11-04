@@ -92,6 +92,7 @@ not be moved to `frozen` on the strength of an argument alone.
 | EC-30 | AArch64 | `MOVZ` lane: `hw` selects which 16-bit lane of the 64-bit destination the `imm16` content lands in | Bits 22–21; the value the instruction builds is `imm16 << 16·hw` | `form variant` (`-lsl0` … `-lsl48`) | `llvm-mc` 23.1.2: `movz x0, #0x1234` is `0xd2824680` and `movz x0, #0x1234, lsl #16` is `0xd2a24680`. Both put the same `imm16 = 0x1234` at bits 20–5 and differ only in bits 22–21, so neither the operand value nor `expected_size` can tell them apart; two honest implementers of one `movz` row would emit different words (`ADR-0014`, `EXP-0016`). | frozen |
 | EC-31 | AArch64 | Shift on a register operand: `lsl` / `lsr` / `asr` with an amount `0…63` (`shift` at 23–22, `imm6` at 15–10) | Bits 23–22 and 15–10; the operand value is combined with a shifted register | `form variant` for the keyword (`-imm6-lsl` … `-imm6-asr`), `operand type` for the amount (`aarch64.imm` / `imm6`) | `llvm-mc` 23.1.2: `add x0, x1, x2, lsl #3` is `0x8b020c20` and `add x0, x1, x2, lsr #7` is `0x8b421c20`; every register field is identical, and a plan that stated only the registers could not distinguish the two words. The amount is a second reading of the same instruction: `lsl #0` and `lsl #63` differ only in `imm6`. The keyword has no numeric spelling (`ror` is rejected, `shift = 11` is unallocated), and a `modifiers` entry cannot carry it — the `-lsl0` row with `{"name": "lsl", "value": 3}` is `E-OPERAND-003` (`N19`), because the materializer would otherwise emit the unshifted word and report success (`ADR-0015`, `EXP-0017`). | frozen |
 | EC-32 | AArch64 | Extend keyword and amount on an extended-register source: `uxtb`/`uxth`/`uxtw`/`sxtb`/`sxth`/`sxtw` (a `w` source) or `uxtx`/`sxtx` (an `x` source), each with `imm3` in `0…4` (`option` at 15–13, `imm3` at 12–10, bit 21 = 1) | Bits 15–13 and 12–10, plus the register class the keyword implies | `form variant` for the keyword (`-imm3-uxtb` … `-imm3-sxtx`), `operand type` for the amount (`aarch64.imm` / `imm3`) | `llvm-mc` 23.1.2: `add x0, x1, w2, uxtb #0` is `0x8b220020` and `add x0, x1, w2, uxth #4` is `0x8b223020`; all three register fields are identical and only bits 15–13 and 12–10 differ, so a plan stating only the registers could not tell the rows apart. The register class is the second counterexample: `option = 3` (`uxtx`) consumes an `x` register, and the assembler rejects `uxtw` on an `x` source and `uxtx` on a `w` one, so a single row with a free `option` and a free register class would emit a legal word for an illegal plan. The amount is not a signed 3-bit range: values `5`, `6`, `7` fit the field but are unallocated, which is why `imm3` is a `0…4` domain plus a closed `excluded` list rather than a wider range (`ADR-0016`, `EXP-0018`). | frozen |
+| EC-33 | AArch64 | `cmp`/`cmn` alias vs the `subs`/`adds` row with `Rd = 31` | One fixed `Rd` field and a shorter operand list | `form variant` (`cmp/…` / `cmn/…` as two-operand rows) | `cmp x1, x2` is `0xeb02003f`, the same word as `subs xzr, x1, x2`, while `subs x0, x1, x2` is `0xeb020020`. A single `subs` row with a free `Rd` would emit `cmp`'s word or a `subs` word depending on an operand value, and would make the plan spell a destination register the mnemonic cannot name; the alias is its own two-operand form with `Rd` pinned (`ADR-0021`, `EXP-0023` §2). | frozen |
 
 ## v0 surface (OD-10)
 
@@ -117,8 +118,8 @@ is what makes the two `mov` forms and the two `add` immediate forms distinct
 without an extra choice field. A plan that names `x86:mov/r64-r64` or
 `x86:add/rm64-imm` is rejected: those ids are not in the v0 definition.
 
-The AArch64 slice is ninety-two forms across eleven documents, covering ten frozen
-`EC` rows:
+The AArch64 slice is one hundred and thirty-two forms across twelve documents,
+covering eleven frozen `EC` rows:
 
 | `form_id` | Encoding | Operand signature | Table | Covers |
 |---|---|---|---|---|
@@ -214,6 +215,46 @@ The AArch64 slice is ninety-two forms across eleven documents, covering ten froz
 | `aarch64:subs/x64-x64-w32-imm3-sxth` | `SUBS (extended register)`, `option=101` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
 | `aarch64:subs/x64-x64-w32-imm3-sxtw` | `SUBS (extended register)`, `option=110` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
 | `aarch64:subs/x64-x64-x64-imm3-sxtx` | `SUBS (extended register)`, `option=111` | dest `x64`, src `x64`, src2 `x64`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:cmp/x64-x64-lsl0` | `SUBS (shifted register)`, `Rd=31`, `shift=LSL`, `imm6=0` | src `x64`, src2 `x64` | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/x64-x64-imm6-lsl` | `SUBS (shifted register)`, `Rd=31`, `shift=LSL` | src `x64`, src2 `x64`, imm `imm6` (amount) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/x64-x64-imm6-lsr` | `SUBS (shifted register)`, `Rd=31`, `shift=LSR` | src `x64`, src2 `x64`, imm `imm6` (amount) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/x64-x64-imm6-asr` | `SUBS (shifted register)`, `Rd=31`, `shift=ASR` | src `x64`, src2 `x64`, imm `imm6` (amount) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/x64-imm12-lsl0` | `SUBS (immediate)`, `Rd=31`, `sh=0` | src `x64`, imm `imm12` | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/x64-imm12-lsl12` | `SUBS (immediate)`, `Rd=31`, `sh=1` | src `x64`, imm `imm12` (field content) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/w32-w32-lsl0` | `SUBS (shifted register)`, `Rd=31`, `shift=LSL`, `imm6=0` | src `w32`, src2 `w32` | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/w32-w32-imm6-lsl` | `SUBS (shifted register)`, `Rd=31`, `shift=LSL` | src `w32`, src2 `w32`, imm `imm6` (amount) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/w32-w32-imm6-lsr` | `SUBS (shifted register)`, `Rd=31`, `shift=LSR` | src `w32`, src2 `w32`, imm `imm6` (amount) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/w32-w32-imm6-asr` | `SUBS (shifted register)`, `Rd=31`, `shift=ASR` | src `w32`, src2 `w32`, imm `imm6` (amount) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/w32-imm12-lsl0` | `SUBS (immediate)`, `Rd=31`, `sh=0` | src `w32`, imm `imm12` | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/w32-imm12-lsl12` | `SUBS (immediate)`, `Rd=31`, `sh=1` | src `w32`, imm `imm12` (field content) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/x64-x64-w32-imm3-uxtb` | `SUBS (extended register)`, `Rd=31`, `option=000` | src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/x64-x64-w32-imm3-uxth` | `SUBS (extended register)`, `Rd=31`, `option=001` | src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/x64-x64-w32-imm3-uxtw` | `SUBS (extended register)`, `Rd=31`, `option=010` | src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/x64-x64-x64-imm3-uxtx` | `SUBS (extended register)`, `Rd=31`, `option=011` | src `x64`, src2 `x64`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/x64-x64-w32-imm3-sxtb` | `SUBS (extended register)`, `Rd=31`, `option=100` | src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/x64-x64-w32-imm3-sxth` | `SUBS (extended register)`, `Rd=31`, `option=101` | src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/x64-x64-w32-imm3-sxtw` | `SUBS (extended register)`, `Rd=31`, `option=110` | src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmp/x64-x64-x64-imm3-sxtx` | `SUBS (extended register)`, `Rd=31`, `option=111` | src `x64`, src2 `x64`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/x64-x64-lsl0` | `ADDS (shifted register)`, `Rd=31`, `shift=LSL`, `imm6=0` | src `x64`, src2 `x64` | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/x64-x64-imm6-lsl` | `ADDS (shifted register)`, `Rd=31`, `shift=LSL` | src `x64`, src2 `x64`, imm `imm6` (amount) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/x64-x64-imm6-lsr` | `ADDS (shifted register)`, `Rd=31`, `shift=LSR` | src `x64`, src2 `x64`, imm `imm6` (amount) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/x64-x64-imm6-asr` | `ADDS (shifted register)`, `Rd=31`, `shift=ASR` | src `x64`, src2 `x64`, imm `imm6` (amount) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/x64-imm12-lsl0` | `ADDS (immediate)`, `Rd=31`, `sh=0` | src `x64`, imm `imm12` | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/x64-imm12-lsl12` | `ADDS (immediate)`, `Rd=31`, `sh=1` | src `x64`, imm `imm12` (field content) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/w32-w32-lsl0` | `ADDS (shifted register)`, `Rd=31`, `shift=LSL`, `imm6=0` | src `w32`, src2 `w32` | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/w32-w32-imm6-lsl` | `ADDS (shifted register)`, `Rd=31`, `shift=LSL` | src `w32`, src2 `w32`, imm `imm6` (amount) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/w32-w32-imm6-lsr` | `ADDS (shifted register)`, `Rd=31`, `shift=LSR` | src `w32`, src2 `w32`, imm `imm6` (amount) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/w32-w32-imm6-asr` | `ADDS (shifted register)`, `Rd=31`, `shift=ASR` | src `w32`, src2 `w32`, imm `imm6` (amount) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/w32-imm12-lsl0` | `ADDS (immediate)`, `Rd=31`, `sh=0` | src `w32`, imm `imm12` | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/w32-imm12-lsl12` | `ADDS (immediate)`, `Rd=31`, `sh=1` | src `w32`, imm `imm12` (field content) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/x64-x64-w32-imm3-uxtb` | `ADDS (extended register)`, `Rd=31`, `option=000` | src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/x64-x64-w32-imm3-uxth` | `ADDS (extended register)`, `Rd=31`, `option=001` | src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/x64-x64-w32-imm3-uxtw` | `ADDS (extended register)`, `Rd=31`, `option=010` | src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/x64-x64-x64-imm3-uxtx` | `ADDS (extended register)`, `Rd=31`, `option=011` | src `x64`, src2 `x64`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/x64-x64-w32-imm3-sxtb` | `ADDS (extended register)`, `Rd=31`, `option=100` | src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/x64-x64-w32-imm3-sxth` | `ADDS (extended register)`, `Rd=31`, `option=101` | src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/x64-x64-w32-imm3-sxtw` | `ADDS (extended register)`, `Rd=31`, `option=110` | src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
+| `aarch64:cmn/x64-x64-x64-imm3-sxtx` | `ADDS (extended register)`, `Rd=31`, `option=111` | src `x64`, src2 `x64`, imm `imm3` (0–4) | `0.12.0`+ | EC-33, A64-P14 |
 
 The `-lsl0`/`-lsl12` suffix is part of the id because the MRS node leaves
 `shift`, `imm6` and `sh` variable; the table pins them and the name says so
@@ -241,8 +282,8 @@ mnemonic is not a field either. `ADDS_64_addsub_shift`, `ADDS_64S_addsub_imm`,
 with `S` at 29+1 fixed to `1`, so the bit belongs to the node and the `form_id`'s
 mnemonic component is again what carries it (`A64-P11`, ADR-0018). `sh`, the shift
 keyword and `imm6` are inherited unchanged, `0x1000` on `adds/x64-imm12-lsl0` is
-`E-RANGE-001` (`N18e`), and `cmp`/`cmn` stay out because each fixes `Rd = 31` and
-drops the destination — a two-operand shape, not a value of these rows (`N01i`).
+`E-RANGE-001` (`N18e`), and `cmp`/`cmn` are a separate two-operand shape that
+fixes `Rd = 31` and drops the destination (`ADR-0021`, `N01i`).
 
 The twenty-four `w` rows are the same devices on the `sf = 0` nodes.
 `ADD_32_addsub_shift`/`ADD_32_addsub_imm`, `SUB_32_*`, `ADDS_32_addsub_shift`/
@@ -307,10 +348,24 @@ node's role decides whether it denotes `sp` or `xzr` (`ADR-0020` decision 5).
 The `sf = 0` nodes are in `0.10.0` on the shifted and immediate layouts only;
 the extended ones are absent from every document, so
 `aarch64:sub/w32-w32-w32-imm3-uxtb` and its `add`/`adds`/`subs` twins are
-`E-FORM-001` (`N01l`), and `cmp`/`cmn` remain separate two-operand aliases
+`E-FORM-001` (`N01l`), and the `cmp`/`cmn` aliases are still out of `0.11.0`
 (`N01i`). `N01f`, `N01g`, `N01h`, `N01j` and `N01k` name a row against a version
 that predates it, so they now mark version boundaries rather than absence from
 the table.
+
+`0.12.0` adds the `cmp`/`cmn` alias family as its own two-operand shape
+(`ADR-0021`, `EC-33`). Each row is the `subs`/`adds` row of the same layout and
+width with `Rd` pinned to 31 and the destination dropped: four shifted rows and
+two immediate rows per mnemonic on `x64` and `w32`, plus the eight `option` rows
+on `x64`, for forty rows. The alias MRS nodes carry no `encoding`; their
+`operation_id` names the base node, their `condition` is `Rd == '11111'` and
+`preferred` is true, so the bytes stay the base node's and the node is the
+independent check. The shift and immediate rules transfer per width — including
+the `w32` `imm6` tail `32…63` — and the extend keyword still fixes `src2`'s width.
+Register 31 stays a plain `reg_number`: `cmp sp, #5` is `0xf10017ff` and
+`cmp wsp, w2, uxtb #0` is `0x6b2203ff`. A plan that names a `cmp`/`cmn` row and
+still passes `dest` has one operand too many and is `E-OPERAND-002` (`N02e`). The
+32-bit extended alias rows stay out because their base rows do (`N01l`).
 
 The five load/store rows carry `EC-14` and are the AArch64 half of `ADR-0008`:
 the address is `base` + `disp`, never one memory payload, and the addressing
