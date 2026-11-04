@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P9-extend-modifier.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "1ab62158f5b77e765e95434eb8949903431394666504bd277ca409bbd0b40c95",
+  "output_sha256": "545e77fc75fb8899b28c9ecfaefb31f9426ad1c58be56c1ca73a90eaa1b3e38e",
+  "size": 32,
+  "records": 0,
+  "notes": "Input (226 B, LF, trailing newline), one instruction per line with two leading spaces: `add x3, x4, w5, uxtb #0` / `uxth #4` / `uxtw #3` / `sxtb #4` / `sxth #0` / `sxtw #4` / `add x21, x22, x23, uxtx #0` / `add x24, x25, x26, sxtx #4`. Eight instructions, one per `option` value. Every row uses a distinct Rd/Rn/Rm, so a register-field slip cannot hide behind another row's registers; `imm3` appears at both ends (0 and 4) on both register classes. The six `[su]xt[bhw]` rows take a `w` source (kind `aarch64.gpr32`, target_type `w32`) and the two `[su]xtx` rows take an `x` source. Every operand is a register or an immediate, so `llvm-readobj -r` prints an empty relocation list and no linker is involved.",
+  "source": "Arm MRS ADD_64_addsub_ext (option at 13+3, imm3 at 10+3, bit 21 = 1); measured in EXP-0018 §3"
+}

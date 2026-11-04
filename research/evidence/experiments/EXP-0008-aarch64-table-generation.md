@@ -1,14 +1,14 @@
 # EXP-0008 — generating the AArch64 tables from the MRS nodes
 
-- Date: 2026-11-04 (documents `0.2.0` … `0.6.0` added the same day)
-- Subject: how `definitions/aarch64/0.1.0.json` … `0.6.0.json` were derived, and
+- Date: 2026-11-04 (documents `0.2.0` … `0.7.0` added the same day)
+- Subject: how `definitions/aarch64/0.1.0.json` … `0.7.0.json` were derived, and
   what they do and do not cover
 - Basis: **experiment** for every field range, template and byte quoted below
 - Reproduce:
   `python tools/check_mrs.py --archive <pinned .tar.gz>`, then
   `python research/evidence/experiments/EXP-0008/generate_aarch64.py`
 
-The script emits all six documents. `0.1.0` … `0.5.0` are frozen and their
+The script emits all seven documents. `0.1.0` … `0.6.0` are frozen and their
 digests are asserted by the script, so a later edit that tries to move one fails
 instead of shipping. A form declares the version it starts in (`since`), so a
 later document is always a superset and cannot lose an earlier row.
@@ -27,7 +27,7 @@ sha256 a1ad2c6538a47cd97d8762791ac5af88bce1d5f6aff096c9b77aef853e76acfe
 BSD-3-Clause licence sentence before the drop may be used (ADR-0006). The file is
 not vendored; the shipped artifact is the JSON table plus its digest.
 
-The eleven nodes are named exactly as the MRS names them. The generator walks
+The twelve nodes are named exactly as the MRS names them. The generator walks
 `instructions` recursively, matches the node's `name`, rejects duplicates and
 refuses to run if any node is missing. It does not read aliases, groups or
 descriptions.
@@ -62,6 +62,33 @@ keyword, and leaves `imm6` open as the amount: the keyword is a spelling with no
 numeric form (`ror` is rejected, `shift = 11` is unallocated), while the amount is
 just the field (`EXP-0017` §1–§2, ADR-0015). `shift = 0` with `imm6 = 0` is the
 same word as the `0.1.0` row, so both rows stay.
+
+### `ADD_64_addsub_ext` → the eight `aarch64:add/…-imm3-*` rows
+
+| Field | start+width | MRS value | Our use |
+|---|---|---|---|
+| `sf` | 31+1 | `1` | fixed |
+| `op` | 30+1 | `0` | fixed |
+| `S` | 29+1 | `0` | fixed |
+| `op1` | 28+1 | `0` | fixed |
+| — | 25+3 | `101` | fixed |
+| — | 24+1 | `1` | fixed |
+| `opt` | 22+2 | `00` | fixed — the shifted node's `shift` slot |
+| — | 21+1 | `1` | fixed — the bit that separates this node from the shifted one |
+| `Rm` | 16+5 | `xxxxx` | slot `src2`, width depends on the keyword |
+| `option` | 13+3 | `xxx` | **pinned** per row: `0`, `1`, `2`, `3`, `4`, `5`, `6`, `7` |
+| `imm3` | 10+3 | `xxx` | slot `imm`, unsigned, `0…4` with `5…7` excluded |
+| `Rn` | 5+5 | `xxxxx` | slot `src` |
+| `Rd` | 0+5 | `xxxxx` | slot `dest` |
+
+The node is one bit apart from `ADD_64_addsub_shift`: `opt` is pinned at `00` and
+bit 21 is `1`, where the shifted node leaves `shift` at 22+2 and fixes bit 21 to
+`0`. `0.7.0` reads it eight times, once per `option`, because the keyword also
+decides the width of the register it consumes: the six `[su]xt[bhw]` keywords
+take a `w` source and `uxtx`/`sxtx` take an `x` source (`EXP-0018` §2, ADR-0016).
+The amount is `imm3` field content, but only `0…4` are allocated, so the slot has
+`bits: 3` plus `excluded: [5, 6, 7]` (ADR-0009). `imm3 = 0` stays legal because
+the assembler prints `uxtb #0` back as `uxtb`, the same word.
 
 ### `ADD_64_addsub_imm` → `aarch64:add/x64-imm12-lsl0` and `.../x64-imm12-lsl12`
 
@@ -243,13 +270,21 @@ The generated templates are:
 | `aarch64:add/x64-x64-x64-imm6-lsl` | `0000008b` | `0x8b000000` |
 | `aarch64:add/x64-x64-x64-imm6-lsr` | `0000408b` | `0x8b400000` |
 | `aarch64:add/x64-x64-x64-imm6-asr` | `0000808b` | `0x8b800000` |
+| `aarch64:add/x64-x64-w32-imm3-uxtb` | `0000208b` | `0x8b200000` |
+| `aarch64:add/x64-x64-w32-imm3-uxth` | `0020208b` | `0x8b202000` |
+| `aarch64:add/x64-x64-w32-imm3-uxtw` | `0040208b` | `0x8b204000` |
+| `aarch64:add/x64-x64-x64-imm3-uxtx` | `0060208b` | `0x8b206000` |
+| `aarch64:add/x64-x64-w32-imm3-sxtb` | `0080208b` | `0x8b208000` |
+| `aarch64:add/x64-x64-w32-imm3-sxth` | `00a0208b` | `0x8b20a000` |
+| `aarch64:add/x64-x64-w32-imm3-sxtw` | `00c0208b` | `0x8b20c000` |
+| `aarch64:add/x64-x64-x64-imm3-sxtx` | `00e0208b` | `0x8b20e000` |
 
 Templates are stored little-endian, the only byte order v0 definitions declare
 (`07_definition_format.md` §4.1).
 
 ## 4. Oracle
 
-`llvm-mc` 23.1.2 assembles all eighteen forms. It does **not** resolve AArch64
+`llvm-mc` 23.1.2 assembles all twenty-six forms. It does **not** resolve AArch64
 branches or `adrp` when the target is a symbol: it emits zeros plus
 `fixup_aarch64_pcrel_call26`, `fixup_aarch64_pcrel_adrp_imm21` or
 `fixup_aarch64_add_imm12`. For the forms whose bits a fixup owns, the oracle is
@@ -272,10 +307,11 @@ labels in the same section, and `llvm-mc` resolved them itself —
 `llvm-readobj -r` on the object prints an empty relocation list. The bytes are
 therefore the assembler's own, and the fixture records that as oracle metadata
 (`EXP-0014` §3). `A64-P3` is the same case for a different reason: every operand
-is an immediate, so there is no relocation in the first place. `A64-P8` is the
-same case again: registers and immediates only (`EXP-0017` §3).
+is an immediate, so there is no relocation in the first place. `A64-P8` and
+`A64-P9` are the same case again: registers and immediates only (`EXP-0017` §3,
+`EXP-0018` §3).
 
-The nine positive fixtures are:
+The ten positive fixtures are:
 
 | Fixture | Document | Bytes | What it proves |
 |---|---|---|---|
@@ -288,12 +324,14 @@ The nine positive fixtures are:
 | `A64-P6-adrp-lo12-pair` | `0.1.0` | `…b0000000 91002000` at `0xff8`/`0xffc` | `adrp` split field plus the paired `add` |
 | `A64-P7-movz-lane` | `0.5.0` | `804682d2 8046a2d2 2200c0d2 e5ffffd2 000080d2` | all four `hw` values, with `imm16 = 0x1234` on the first two so only the lane differs |
 | `A64-P8-shift-modifier` | `0.6.0` | `200c028b 201c428b 20fc828b 83fc058b 2000028b 2000428b` | all three `shift` values, `imm6` at 0 and 63, and the `lsl #0` overlap with `-lsl0` |
+| `A64-P9-extend-modifier` | `0.7.0` | `8300258b e630288b 494d2b8b ac912e8b 0fa2318b 72d2348b d562378b 38f33a8b` | all eight `option` values, six `w` sources and two `x` sources, `imm3` at 0 and 4, and distinct `Rd`/`Rn`/`Rm` in every row |
 
 These were checked against our materializer, not generated by it
-(`AGENTS.md` rule 5). The materializer reproduces all nine byte-for-byte and the
-sixteen negative fixtures (`N01`, `N01b`, `N01d`, `N01e`, `N03`, `N03-cond`,
-`N03-imm12-disp`, `N03-imm6`, `N03-imm9-disp`, `N04c`, `N12a`, `N14`, `N18a`,
-`N18b`, `N18c`, `N19`) reject exactly the registered diagnostic sets.
+(`AGENTS.md` rule 5). The materializer reproduces all ten byte-for-byte and the
+twenty negative fixtures (`N01`, `N01b`, `N01d`, `N01e`, `N01f`, `N02b`, `N03`,
+`N03-cond`, `N03-imm12-disp`, `N03-imm3`, `N03-imm6`, `N03-imm9-disp`, `N04c`,
+`N12a`, `N14`, `N16c`, `N18a`, `N18b`, `N18c`, `N19`) reject exactly the
+registered diagnostic sets.
 `N18a`/`N18b` are the
 scaled form's other half: the first is `0x1000` stated on `-lsl0`, the second
 `0x123000` on `-lsl12`, and both must be `E-RANGE-001` instead of a form switch or
@@ -307,34 +345,42 @@ and `N01d` the `lsl #8` lane: `E-FORM-001`, not a reinterpreted load or a zeroed
 shift. The shift rows add three more: `N03-imm6` is an amount of `64` (the first
 value past the 6-bit field), `N19` is the same shift stated as a `modifiers`
 entry on `-lsl0` (`E-OPERAND-003`, because a modifier never writes a bit and
-accepting it would emit the unshifted word), and `N01e` is the extend family,
-which is a different node and therefore absent (`EXP-0017` §1–§2, ADR-0015).
+accepting it would emit the unshifted word), and `N01e` is an extend spelling
+against `0.6.0`, which predates the rows (`EXP-0017` §1–§2, ADR-0015). The extend
+rows add four: `N03-imm3` is an amount of `8` (the first value past the 3-bit
+field), `N16c` is `5` (inside the field, unallocated, so the closed `excluded`
+list rejects it rather than emitting the word), `N02b` is a `w32` operand on an
+`x`-source row (the class is the form's, `E-OPERAND-001`), and `N01f` is the
+`sub` node, which `0.7.0` does not carry (`EXP-0018` §2, ADR-0016).
 
 ## 5. What this record does not claim
 
 - **Not exhaustive coverage of the nodes.** The table exercises the register and
   immediate fields at range ends, but it does not enumerate all 2^5 × 2^5 × 2^5
-  register triples, nor every `bl`, `b.cond`, load/store, `movz` or shift value.
-  `EXP-0004` did that for the seven x86 rows; this slice has eighteen rows and
-  nine positive fixtures, and `EXP-0014` §2 enumerates the sixteen condition
+  register triples, nor every `bl`, `b.cond`, load/store, `movz`, shift or extend
+  value.
+  `EXP-0004` did that for the seven x86 rows; this slice has twenty-six rows and
+  ten positive fixtures, and `EXP-0014` §2 enumerates the sixteen condition
   values but not their products with the 2^19 displacements; `EXP-0015` §2
   measures both ends of `imm12` and `imm9` but not every value in between,
-  `EXP-0016` §2 measures all four `hw` values but two `imm16` values, and
-  `EXP-0017` §2 measures both ends of `imm6` on two of the three keywords.
+  `EXP-0016` §2 measures all four `hw` values but two `imm16` values,
+  `EXP-0017` §2 measures both ends of `imm6` on two of the three keywords, and
+  `EXP-0018` §2 measures `imm3` at 0 and 4 but not 1, 2 or 3 on every row.
 - **Not a statement about the other packagings.** Only the archive pinned by
   ADR-0006 was read (`EXP-0006`, `EXP-0007`).
-- **Not an encoding-selection mechanism.** Eleven MRS nodes are read because
-  eighteen forms exist in the table (`ADD_64_addsub_shift` is read four times,
-  `ADD_64_addsub_imm` twice, `MOVZ_64_movewide` four times). The generator is
+- **Not an encoding-selection mechanism.** Twelve MRS nodes are read because
+  twenty-six forms exist in the table (`ADD_64_addsub_shift` is read four times,
+  `ADD_64_addsub_ext` eight times, `ADD_64_addsub_imm` twice,
+  `MOVZ_64_movewide` four times). The generator is
   disposable research tooling; the materializer never reads MRS data, never looks
   a mnemonic up, and only resolves the exact `form_id` a plan names.
-- **The extend family is absent.** `ADD_64_addsub_ext` (`option`, `imm3`, a `w`
-  source for some options) is a different node from the shift rows, so naming it
-  is `E-FORM-001` (`N01e`, `EC-31`, ADR-0015). The scaled `add`, `b.cond`,
-  load/store and `movz` rows are no longer in this list: the first is a row in
-  `0.2.0` (ADR-0011), the second a row in `0.3.0` (ADR-0012), five are rows in
-  `0.4.0` (ADR-0013), four are rows in `0.5.0` (ADR-0014) and three are rows in
-  `0.6.0` (ADR-0015), none of them a slot-level scaling rule or a value-driven
+- **`sub`, `adds`/`subs` and the 32-bit node are absent.** They are other nodes
+  with their own `op`/`S`/`sf` pins, so naming one is `E-FORM-001` (`N01f`). The
+  scaled `add`, `b.cond`, load/store, `movz`, shift and extend rows are no longer
+  in this list: the first is a row in `0.2.0` (ADR-0011), the second a row in
+  `0.3.0` (ADR-0012), five are rows in `0.4.0` (ADR-0013), four are rows in
+  `0.5.0` (ADR-0014), three are rows in `0.6.0` (ADR-0015) and eight are rows in
+  `0.7.0` (ADR-0016), none of them a slot-level scaling rule or a value-driven
   form choice.
 - **The scaled `:lo12:` link path is unmeasured.** No fixture pairs `adrp` with
   `add ..., lsl #12`; only the `-lsl0` pair is linked (`A64-P6`).
@@ -377,13 +423,19 @@ namespace   monasm.isa.aarch64
 version     0.6.0
 forms       18
 digest      sha256:1151944e5855c08bd3d96074ace3ca787be6b7284c5d3e84654a257ab2055964
+
+definition  definitions/aarch64/0.7.0.json
+namespace   monasm.isa.aarch64
+version     0.7.0
+forms       26
+digest      sha256:1bb920356476cea20688b2d6596d787f3cf99aedebe7240b1af8227f64d29053
 ```
 
 The digests are computed over the canonical form of each whole document
 (`01_contract.md` §12, `OD-06`) and printed by `tools/check_definition.py`,
 which also checks that the reading-aid table in `07_definition_format.md` §8.2
 matches the JSON row by row. `definitions/aarch64/NOTICE` reproduces the upstream
-BSD-3-Clause notice and names the archive hash; `0.2.0` … `0.6.0` need
+BSD-3-Clause notice and names the archive hash; `0.2.0` … `0.7.0` need
 no second notice because they are generated from the same drop and ship under the
 same terms.
 
@@ -391,7 +443,9 @@ Because `0.3.0` repeats all five earlier rows verbatim, the only difference from
 `0.2.0` is the added `b.cond` row; because `0.4.0` repeats all six earlier rows
 verbatim, the only difference from `0.3.0` is the five load/store rows; because
 `0.5.0` repeats all eleven earlier rows verbatim, the only difference from `0.4.0`
-is the four `movz` rows; and because `0.6.0` repeats all fifteen earlier rows
-verbatim, the only difference from `0.5.0` is the three shift rows. The
+is the four `movz` rows; because `0.6.0` repeats all fifteen earlier rows
+verbatim, the only difference from `0.5.0` is the three shift rows; and because
+`0.7.0` repeats all eighteen earlier rows verbatim, the only difference from
+`0.6.0` is the eight extend rows. The
 generator's frozen-digest assertions are what prove
 that no earlier row moved while a new one landed.

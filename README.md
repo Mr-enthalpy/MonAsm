@@ -26,19 +26,21 @@ closed `excluded` list, ADR-0010 makes an RV64 low half name its high half,
 ADR-0011 makes AArch64 `add ..., lsl #12` a form rather than a slot scale,
 ADR-0012 makes an AArch64 condition a typed operand rather than sixteen forms,
 ADR-0013 makes AArch64 addressing kinds forms and the offset field content,
-ADR-0014 makes an AArch64 `movz` lane a form with `imm16` as field content, and
-ADR-0015 makes an AArch64 shift keyword a form with the amount as field content.
-Nine definition documents are frozen and oracle-verified; the materializer and
+ADR-0014 makes an AArch64 `movz` lane a form with `imm16` as field content,
+ADR-0015 makes an AArch64 shift keyword a form with the amount as field content,
+and ADR-0016 makes an AArch64 extend keyword a form with the amount as field
+content and a closed excluded tail.
+Ten definition documents are frozen and oracle-verified; the materializer and
 its fixture gate are implemented.
 
 | Area | State |
 |---|---|
 | Contract (`docs/fmp-v0/01_contract.md`) | draft, fields marked `TBD` where unproven |
 | Schema (`schema/fmp-v0.schema.json`) | draft, examples validate |
-| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms) and `0.6.0` (18 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
+| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms) and `0.7.0` (26 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
 | Prototype (`prototype/`) | workspace compiled; all three slices materialize from the plan |
 | Oracles (`tools/oracle/`) | planned; `llvm-mc` (± `ld.lld`) drives the experiments |
-| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0017 |
+| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0018 |
 
 Read `docs/STATUS.md` for the current phase, gate status, and next action.
 

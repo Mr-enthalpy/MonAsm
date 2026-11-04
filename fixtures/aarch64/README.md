@@ -1,6 +1,6 @@
 # AArch64 fixtures
 
-Vectors: `A64-P1` … `A64-P8` in `docs/fmp-v0/06_validation_matrix.md`.
+Vectors: `A64-P1` … `A64-P9` in `docs/fmp-v0/06_validation_matrix.md`.
 
 ## What is here
 
@@ -15,37 +15,40 @@ Vectors: `A64-P1` … `A64-P8` in `docs/fmp-v0/06_validation_matrix.md`.
 | `positive/A64-P6-adrp-lo12-pair` | `aarch64:adrp/x64-imm21` + `aarch64:add/x64-imm12-lsl0`, one `pair_group` | `llvm-mc` + `ld.lld`; relocation kinds read with `llvm-readobj` |
 | `positive/A64-P7-movz-lane` | `aarch64:movz/x64-imm16-lsl0` ×2, `-lsl16`, `-lsl32`, `-lsl48` (`0.5.0`); five instructions, 20 B | `llvm-mc` (no linker: immediates only, no relocations) |
 | `positive/A64-P8-shift-modifier` | `aarch64:add/x64-x64-x64-imm6-lsl`, `-imm6-lsr`, `-imm6-asr` (`0.6.0`); six instructions, 24 B | `llvm-mc` (no linker: registers and immediates only, no relocations) |
+| `positive/A64-P9-extend-modifier` | six `aarch64:add/x64-x64-w32-imm3-*` rows and `-x64-imm3-uxtx`/`-imm3-sxtx` (`0.7.0`); eight instructions, 32 B | `llvm-mc` (no linker: registers and immediates only, no relocations) |
 | `negative/N01-absent-scaled-form` | `aarch64:add/x64-imm12-lsl12` against `0.1.0`, which lacks it | `E-FORM-001` |
 | `negative/N01b-absent-register-offset-form` | `aarch64:ldr/x64-base-regoff` (`0.4.0` has no such form) | `E-FORM-001` |
 | `negative/N01d-absent-movz-lane` | `aarch64:movz/x64-imm16-lsl8` (`0.5.0` has four lanes, not eight) | `E-FORM-001` |
-| `negative/N01e-absent-extend-form` | `aarch64:add/x64-x64-w64-uxtw-imm3` (`0.6.0` has no extend row) | `E-FORM-001` |
+| `negative/N01e-absent-extend-form` | `aarch64:add/x64-x64-w64-uxtw-imm3`, an extend spelling against `0.6.0` | `E-FORM-001` |
+| `negative/N01f-absent-sub-ext` | `aarch64:sub/x64-x64-w32-imm3-uxtb` (`0.7.0` has `add`, not `sub`) | `E-FORM-001` |
+| `negative/N02b-w-source-in-shift-form` | a `w32` operand on the `x`-source `-imm6-lsl` row | `E-OPERAND-001` (kind and target_type) |
 | `negative/N03-imm12-out-of-range` | imm12 = 4096 | `E-RANGE-001` |
 | `negative/N03-imm12-disp-out-of-range` | `disp = 4096` on the load/store `imm12` field | `E-RANGE-001` |
 | `negative/N03-imm9-disp-out-of-range` | `disp = −257` on the `imm9` field | `E-RANGE-001` |
 | `negative/N03-cond-out-of-range` | `cond = 16` in a 4-bit field | `E-RANGE-001` |
 | `negative/N03-imm6-out-of-range` | `imm6 = 64`, one past the shift amount's 6-bit field | `E-RANGE-001` |
+| `negative/N03-imm3-out-of-range` | `imm3 = 8`, one past the extend amount's 3-bit field | `E-RANGE-001` |
 | `negative/N04c-bcond-imm19-out-of-range` | `imm19 = 262144`, one past the signed 19-bit field | `E-RANGE-002` |
 | `negative/N12a-pair-without-lo` | two `hi` members in one `pair_group` | `E-FIXUP-007` |
 | `negative/N14-register-wider-than-field` | register 32 in a 5-bit field | `E-OPERAND-004` |
 | `negative/N18a-no-form-switch` | `0x1000` stated on `-lsl0` (legal only as a scaled literal) | `E-RANGE-001` |
 | `negative/N18b-operand-is-field-content` | `0x123000` stated on `-lsl12` (a pre-scaled literal) | `E-RANGE-001` |
 | `negative/N18c-movz-pre-scaled-literal` | `0x12340000` stated on `movz/x64-imm16-lsl16` (a pre-scaled literal) | `E-RANGE-001` |
+| `negative/N16c-imm3-excluded` | `imm3 = 5`, inside the 3-bit field but not allocated to `add` extended | `E-RANGE-004` |
 | `negative/N19-modifier-is-not-a-carrier` | `{"name": "lsl", "value": 3}` in a `modifiers` entry on `aarch64:add/x64-x64-x64-lsl0` | `E-OPERAND-003` |
 
 `N01` is why the version split matters: a form exists, but not in an older
 document, so a plan bound to `0.1.0` still cannot reach `-lsl12`, a plan bound
 to `0.2.0` cannot reach `b.cond`, a plan bound to `0.3.0` cannot reach the
-load/store rows, a plan bound to `0.4.0` cannot reach the `movz` lanes, and a
-plan bound to `0.5.0` cannot reach the shift rows. Each fixture names the
-document it targets and that document's digest.
+load/store rows, a plan bound to `0.4.0` cannot reach the `movz` lanes, a plan
+bound to `0.5.0` cannot reach the shift rows, and a plan bound to `0.6.0` cannot
+reach the extend rows. Each fixture names the document it targets and that
+document's digest.
 
-The extend family (`add x0, x1, w2, uxtw #3`) is the one modifier-shaped
-spelling still absent: it is a different MRS node from the shift rows, with an
-`option` field and a `w` source operand, so it has no form in any document and
-`N01e` rejects it. `sub`, the `w`-width rows, the load/store register-offset and
-literal kinds, and the store's `imm9` kinds are absent for the same reason. A
-linked `:lo12:` inside the `-lsl12` form is measured at the record level
-(`EXP-0013` §5) but is not an address of the symbol, so no fixture links one.
+`sub`, the `w`-width rows, the load/store register-offset and literal kinds, and
+the store's `imm9` kinds are absent for the same reason. A linked `:lo12:` inside
+the `-lsl12` form is measured at the record level (`EXP-0013` §5) but is not an
+address of the symbol, so no fixture links one.
 
 ## Two things a reader of the plans should know
 
@@ -87,6 +90,15 @@ entry — a modifier is a guard in v0 — so the same shift stated as
 `{"name": "lsl", "value": 3}` on `-lsl0` is `E-OPERAND-003` (`N19`), and an amount
 of `64` is `E-RANGE-001` (`N03-imm6`). `lsl #0` and `-lsl0` are the same word
 (`0x8b020020`), so both rows stay (`ADR-0015`, `EXP-0017`).
+
+The extend rows are the sixth instance, and the one where the keyword also decides
+the source's width. `A64-P9` uses six `w`-source rows and two `x`-source rows;
+`imm3` is the field content (`0…4`), so `8` is `E-RANGE-001` (`N03-imm3`) and `5`
+is `E-RANGE-004` (`N16c`), because the values `5`–`7` fit the three-bit field but
+are unallocated. Because the encoded register is the same 5-bit number either way,
+the class cannot be a plan field: a `w32` operand on an `x`-source row is
+`E-OPERAND-001` (`N02b`), which is also what a shifted row says about a `w`
+source (`ADR-0016`, `EXP-0018`).
 
 **An operand whose bits a fixup owns has an empty payload.** `{"payload": {}}`,
 not a `symbol_id`: `01_contract.md` §8.1 only allows `symbol_id` on a `target`

@@ -1,0 +1,150 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "aarch64",
+    "isa_variant": "aarch64",
+    "execution_mode": "n/a",
+    "enabled_extensions": [],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.aarch64",
+    "version": "0.7.0",
+    "digest": "sha256:1bb920356476cea20688b2d6596d787f3cf99aedebe7240b1af8227f64d29053"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [".text"],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": 32,
+      "fragments": [
+        { "offset": 0, "size": 4, "kind": "instruction", "instruction_id": "I0001" },
+        { "offset": 4, "size": 4, "kind": "instruction", "instruction_id": "I0002" },
+        { "offset": 8, "size": 4, "kind": "instruction", "instruction_id": "I0003" },
+        { "offset": 12, "size": 4, "kind": "instruction", "instruction_id": "I0004" },
+        { "offset": 16, "size": 4, "kind": "instruction", "instruction_id": "I0005" },
+        { "offset": 20, "size": 4, "kind": "instruction", "instruction_id": "I0006" },
+        { "offset": 24, "size": 4, "kind": "instruction", "instruction_id": "I0007" },
+        { "offset": 28, "size": 4, "kind": "instruction", "instruction_id": "I0008" }
+      ]
+    }
+  ],
+  "symbols": [],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "aarch64:add/x64-x64-w32-imm3-uxtb",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 3 }, "modifiers": [] },
+        { "role": "src", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 4 }, "modifiers": [] },
+        { "role": "src2", "kind": "aarch64.gpr32", "target_type": "w32", "payload": { "reg": 5 }, "modifiers": [] },
+        { "role": "imm", "kind": "aarch64.imm", "target_type": "imm3", "payload": { "value": 0 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0002",
+      "section_id": ".text",
+      "offset": 4,
+      "form_id": "aarch64:add/x64-x64-w32-imm3-uxth",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 6 }, "modifiers": [] },
+        { "role": "src", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 7 }, "modifiers": [] },
+        { "role": "src2", "kind": "aarch64.gpr32", "target_type": "w32", "payload": { "reg": 8 }, "modifiers": [] },
+        { "role": "imm", "kind": "aarch64.imm", "target_type": "imm3", "payload": { "value": 4 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0003",
+      "section_id": ".text",
+      "offset": 8,
+      "form_id": "aarch64:add/x64-x64-w32-imm3-uxtw",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 9 }, "modifiers": [] },
+        { "role": "src", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 10 }, "modifiers": [] },
+        { "role": "src2", "kind": "aarch64.gpr32", "target_type": "w32", "payload": { "reg": 11 }, "modifiers": [] },
+        { "role": "imm", "kind": "aarch64.imm", "target_type": "imm3", "payload": { "value": 3 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0004",
+      "section_id": ".text",
+      "offset": 12,
+      "form_id": "aarch64:add/x64-x64-w32-imm3-sxtb",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 12 }, "modifiers": [] },
+        { "role": "src", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 13 }, "modifiers": [] },
+        { "role": "src2", "kind": "aarch64.gpr32", "target_type": "w32", "payload": { "reg": 14 }, "modifiers": [] },
+        { "role": "imm", "kind": "aarch64.imm", "target_type": "imm3", "payload": { "value": 4 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0005",
+      "section_id": ".text",
+      "offset": 16,
+      "form_id": "aarch64:add/x64-x64-w32-imm3-sxth",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 15 }, "modifiers": [] },
+        { "role": "src", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 16 }, "modifiers": [] },
+        { "role": "src2", "kind": "aarch64.gpr32", "target_type": "w32", "payload": { "reg": 17 }, "modifiers": [] },
+        { "role": "imm", "kind": "aarch64.imm", "target_type": "imm3", "payload": { "value": 0 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0006",
+      "section_id": ".text",
+      "offset": 20,
+      "form_id": "aarch64:add/x64-x64-w32-imm3-sxtw",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 18 }, "modifiers": [] },
+        { "role": "src", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 19 }, "modifiers": [] },
+        { "role": "src2", "kind": "aarch64.gpr32", "target_type": "w32", "payload": { "reg": 20 }, "modifiers": [] },
+        { "role": "imm", "kind": "aarch64.imm", "target_type": "imm3", "payload": { "value": 4 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0007",
+      "section_id": ".text",
+      "offset": 24,
+      "form_id": "aarch64:add/x64-x64-x64-imm3-uxtx",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 21 }, "modifiers": [] },
+        { "role": "src", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 22 }, "modifiers": [] },
+        { "role": "src2", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 23 }, "modifiers": [] },
+        { "role": "imm", "kind": "aarch64.imm", "target_type": "imm3", "payload": { "value": 0 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0008",
+      "section_id": ".text",
+      "offset": 28,
+      "form_id": "aarch64:add/x64-x64-x64-imm3-sxtx",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 24 }, "modifiers": [] },
+        { "role": "src", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 25 }, "modifiers": [] },
+        { "role": "src2", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 26 }, "modifiers": [] },
+        { "role": "imm", "kind": "aarch64.imm", "target_type": "imm3", "payload": { "value": 4 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    }
+  ],
+  "fixups": []
+}

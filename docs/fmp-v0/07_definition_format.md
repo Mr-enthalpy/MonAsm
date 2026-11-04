@@ -265,7 +265,7 @@ Every row is verified against `llvm-mc` 23.1.2 in `EXP-0004`: each template byte
 string is decoded, and each `ModRM` and immediate/branch field is exercised
 across its whole encoded range.
 
-### 8.2 `aarch64` `0.1.0`, `0.2.0`, `0.3.0`, `0.4.0`, `0.5.0` and `0.6.0`
+### 8.2 `aarch64` `0.1.0`, `0.2.0`, `0.3.0`, `0.4.0`, `0.5.0`, `0.6.0` and `0.7.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -287,13 +287,22 @@ across its whole encoded range.
 | `aarch64:add/x64-x64-x64-imm6-lsl` | `0000008b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm6` → `[10,6]` | 4 | `EC-31`, `A64-P8` — `0.6.0` only |
 | `aarch64:add/x64-x64-x64-imm6-lsr` | `0000408b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm6` → `[10,6]` | 4 | `EC-31`, `A64-P8` — `0.6.0` only |
 | `aarch64:add/x64-x64-x64-imm6-asr` | `0000808b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm6` → `[10,6]` | 4 | `EC-31`, `A64-P8` — `0.6.0` only |
+| `aarch64:add/x64-x64-w32-imm3-uxtb` | `0000208b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P9` — `0.7.0` only |
+| `aarch64:add/x64-x64-w32-imm3-uxth` | `0020208b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P9` — `0.7.0` only |
+| `aarch64:add/x64-x64-w32-imm3-uxtw` | `0040208b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P9` — `0.7.0` only |
+| `aarch64:add/x64-x64-x64-imm3-uxtx` | `0060208b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P9` — `0.7.0` only |
+| `aarch64:add/x64-x64-w32-imm3-sxtb` | `0080208b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P9` — `0.7.0` only |
+| `aarch64:add/x64-x64-w32-imm3-sxth` | `00a0208b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P9` — `0.7.0` only |
+| `aarch64:add/x64-x64-w32-imm3-sxtw` | `00c0208b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P9` — `0.7.0` only |
+| `aarch64:add/x64-x64-x64-imm3-sxtx` | `00e0208b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P9` — `0.7.0` only |
 
 `0.1.0` holds the first, second, fourth and fifth rows; `0.2.0` adds
 `aarch64:add/x64-imm12-lsl12` (ADR-0011); `0.3.0` repeats all five and adds
 `aarch64:b.cond/imm19` (ADR-0012); `0.4.0` repeats all six and adds the five
 load/store rows (ADR-0013); `0.5.0` repeats all eleven and adds the four `movz`
 rows (ADR-0014); `0.6.0` repeats all fifteen and adds the three shift rows
-(ADR-0015). Each document therefore shares its earlier rows
+(ADR-0015); `0.7.0` repeats all eighteen and adds the eight extend rows
+(ADR-0016). Each document therefore shares its earlier rows
 unchanged and differs only in the rows its version introduced, so a plan bound to
 an older version cannot reach a newer form (`E-FORM-001`, `N01`) even though the
 newest document has it.
@@ -303,15 +312,16 @@ The templates are little-endian file order, so `0000008b` is the word
 (`research/evidence/experiments/EXP-0008/generate_aarch64.py`) derives every
 bit from the MRS node, requires the MRS node name to exist, and refuses to emit
 unless all 32 bits are covered exactly once by a fixed bit or a slot placement;
-`EXP-0008` §2–§3 records the nodes and the coverage check. The eighteen forms come
-from eleven nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
-pinned to 0 and once per shift keyword, `ADD_64_addsub_imm` twice, once with
+`EXP-0008` §2–§3 records the nodes and the coverage check. The twenty-six forms come
+from twelve nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
+pinned to 0 and once per shift keyword, `ADD_64_addsub_ext` eight times, once per
+`option` value, `ADD_64_addsub_imm` twice, once with
 `sh = 0` and once with `sh = 1`, `MOVZ_64_movewide` four times, once per `hw`
 value, `B_only_condbranch` contributes one row with both of its variable
 fields as operands, and each of the five load/store rows reads one node whose
 addressing-kind bits are fixed and whose `imm12`/`imm9` is the single variable
 field; the generator states each pinned value explicitly and asserts that
-`0.1.0` … `0.5.0` still hash to their frozen digests.
+`0.1.0` … `0.6.0` still hash to their frozen digests.
 
 The `-lsl0`/`-lsl12` suffix on the `add` rows carries a decision the operand list
 does not state, and the name states it instead (`01_contract.md` §7, `ADR-0004`):
@@ -373,9 +383,22 @@ node. `imm6` (bits 15–10) is the amount: `0…63`, field content, one slot wit
 `align_bits = 0` because nothing is scaled. An amount of `64` is `E-RANGE-001`
 (`N03-imm6`), and the same shift stated as a `modifiers` entry on `-lsl0` is
 `E-OPERAND-003` (`N19`): a modifier is a guard and never writes a bit, so
-accepting it would emit the unshifted word and report success. The extend family
-(`ADD_64_addsub_ext`, bit 21 = 1, `option`/`imm3`, a `w` source for some options)
-has no row, so naming it is `E-FORM-001` (`N01e`, `EC-31`, ADR-0015).
+accepting it would emit the unshifted word and report success.
+
+The eight extend rows are the sixth form-variant case and the first where the
+form fixes an operand's *width* as well as a field. `option` (bits 15–13) is the
+keyword: six `[su]xt[bhw]` spellings consume a `w` register and two `[su]xtx`
+spellings consume an `x` register, and the assembler rejects the cross pairings,
+so the width has to be the row's (`src2` is `aarch64.gpr32`/`w32` on six rows and
+`aarch64.gpr64`/`x64` on two). The encoded register is the same 5-bit number
+either way, so a single row with a free `option` and a free register class would
+emit a legal word for a plan the assembler refuses (`INV-07`, `EC-32`,
+ADR-0016). `imm3` (bits 12–10) is the amount: the field is three bits, but
+`add/sub` extended allocates only `0…4`, so the slot is `bits: 3` with
+`excluded: [5, 6, 7]` (`ADR-0009`) — `8` is `E-RANGE-001` (`N03-imm3`) and `5` is
+`E-RANGE-004` (`N16c`). `imm3 = 0` stays legal: the assembler prints `uxtb #0`
+back as `uxtb`, the same word, so excluding it would make the value choose the
+form. `sub`, `adds`/`subs` and the `sf = 0` node have no row (`N01f`).
 
 `adrp`'s immediate is one value over two fields: `immhi` holds bits `[20:2]` and
 `immlo` holds `[1:0]`, which is why the slot has two placements in that order
@@ -424,7 +447,10 @@ instruction does not have (`EC-30`, ADR-0014, `EXP-0016` §2).
 
 The shift amount is the plainest case of the same rule, with no multiplier at all:
 `imm6` is the amount the plan states, `shift` is the keyword the row pins, and the
-instruction applies the field directly (`EC-31`, ADR-0015, `EXP-0017` §2).
+instruction applies the field directly (`EC-31`, ADR-0015, `EXP-0017` §2). The
+extend amount is the same rule with a non-convex domain: `imm3` is the field, and
+the three values beyond `4` are unallocated rather than out of range, so they are
+`excluded` (`EC-32`, ADR-0016, `EXP-0018` §2).
 
 RV64 follows the same rule with different shift amounts (ADR-0007, `EXP-0009`):
 the source states `left_shift: 1` for `beq`/`jal` and `left_shift: 12` for
@@ -433,7 +459,9 @@ while the slot keeps `align_bits: 0` and holds field content. The B- and J-type
 slots have several placements each (`beq`: `[31,1]`, `[7,1]`, `[25,6]`, `[8,4]`;
 `jal`: `[31,1]`, `[12,8]`, `[20,1]`, `[21,10]`), which is the scattered-field
 case directive §6.3 item 6 asks for. `c.addi` needs `imm != 0` and `xd != 0`;
-that is the `excluded` rule of §4, not a scaling rule, and §8.5 records it.
+that is the `excluded` rule of §4, not a scaling rule, and §8.5 records it. The
+extend rows' `imm3` is the same rule in §8.2: values `5`–`7` fit the field but are
+unallocated, so they are excluded rather than scaled or clamped.
 
 ### 8.4 `rv64` `0.1.0`
 
@@ -548,13 +576,12 @@ without a plan error: the input is the definition.
   ADR-0006: the facts come from the Arm MRS 2026-06 OPENSOURCE packaging, and
   the Arm notice ships with the generated table. The format did not need to
   change for it: `adrp`'s split `immhi:immlo` is two placements of one slot, as
-  §4.1 anticipated. `definitions/aarch64/0.1.0.json` … `0.6.0.json` now exist
+  §4.1 anticipated. `definitions/aarch64/0.1.0.json` … `0.7.0.json` now exist
   (§8.2); each is a superset that adds its own rows without a format change
-  (ADR-0011, ADR-0012, ADR-0013, ADR-0014, ADR-0015). What is missing is coverage,
-  not design: the extend family has no row, so naming it is `E-FORM-001` (`N01e`),
-  and neither the register-offset kind nor the literal load nor the store's
-  `imm9` kinds has a row. `sub` and the `w`-width rows of the arithmetic nodes are
-  absent for the same reason.
+  (ADR-0011, ADR-0012, ADR-0013, ADR-0014, ADR-0015, ADR-0016). What is missing is
+  coverage, not design: neither the register-offset kind nor the literal load nor
+  the store's `imm9` kinds has a row, and `sub`, `adds`/`subs` and the `w`-width
+  rows of the arithmetic nodes are absent for the same reason.
 - The archive is still not vendored and the drop is not a build input: a
   regeneration reads `research/external/arm-mrs/` after `tools/check_mrs.py`
   passes, and the shipped artifact is the JSON plus its digest.

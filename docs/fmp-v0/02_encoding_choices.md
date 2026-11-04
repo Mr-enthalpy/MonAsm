@@ -91,6 +91,7 @@ not be moved to `frozen` on the strength of an argument alone.
 | EC-29 | AArch64 | `b.cond` condition: sixteen values in the 4-bit `cond` field | Bits 0–3; no length, opcode or relocation change | `operand type` (`aarch64.cond` / `cond4`) | `b.eq .+4` is `0x54000020` and `b.ne .+4` is `0x54000021`: one nibble apart, both 4 bytes, so a wrong condition is a valid word that branches on the wrong flags. Masking `cond = 16` to four bits yields `0x0`, which is `eq` (`ADR-0012`, `EXP-0014`). | frozen |
 | EC-30 | AArch64 | `MOVZ` lane: `hw` selects which 16-bit lane of the 64-bit destination the `imm16` content lands in | Bits 22–21; the value the instruction builds is `imm16 << 16·hw` | `form variant` (`-lsl0` … `-lsl48`) | `llvm-mc` 23.1.2: `movz x0, #0x1234` is `0xd2824680` and `movz x0, #0x1234, lsl #16` is `0xd2a24680`. Both put the same `imm16 = 0x1234` at bits 20–5 and differ only in bits 22–21, so neither the operand value nor `expected_size` can tell them apart; two honest implementers of one `movz` row would emit different words (`ADR-0014`, `EXP-0016`). | frozen |
 | EC-31 | AArch64 | Shift on a register operand: `lsl` / `lsr` / `asr` with an amount `0…63` (`shift` at 23–22, `imm6` at 15–10) | Bits 23–22 and 15–10; the operand value is combined with a shifted register | `form variant` for the keyword (`-imm6-lsl` … `-imm6-asr`), `operand type` for the amount (`aarch64.imm` / `imm6`) | `llvm-mc` 23.1.2: `add x0, x1, x2, lsl #3` is `0x8b020c20` and `add x0, x1, x2, lsr #7` is `0x8b421c20`; every register field is identical, and a plan that stated only the registers could not distinguish the two words. The amount is a second reading of the same instruction: `lsl #0` and `lsl #63` differ only in `imm6`. The keyword has no numeric spelling (`ror` is rejected, `shift = 11` is unallocated), and a `modifiers` entry cannot carry it — the `-lsl0` row with `{"name": "lsl", "value": 3}` is `E-OPERAND-003` (`N19`), because the materializer would otherwise emit the unshifted word and report success (`ADR-0015`, `EXP-0017`). | frozen |
+| EC-32 | AArch64 | Extend keyword and amount on an extended-register source: `uxtb`/`uxth`/`uxtw`/`sxtb`/`sxth`/`sxtw` (a `w` source) or `uxtx`/`sxtx` (an `x` source), each with `imm3` in `0…4` (`option` at 15–13, `imm3` at 12–10, bit 21 = 1) | Bits 15–13 and 12–10, plus the register class the keyword implies | `form variant` for the keyword (`-imm3-uxtb` … `-imm3-sxtx`), `operand type` for the amount (`aarch64.imm` / `imm3`) | `llvm-mc` 23.1.2: `add x0, x1, w2, uxtb #0` is `0x8b220020` and `add x0, x1, w2, uxth #4` is `0x8b223020`; all three register fields are identical and only bits 15–13 and 12–10 differ, so a plan stating only the registers could not tell the rows apart. The register class is the second counterexample: `option = 3` (`uxtx`) consumes an `x` register, and the assembler rejects `uxtw` on an `x` source and `uxtx` on a `w` one, so a single row with a free `option` and a free register class would emit a legal word for an illegal plan. The amount is not a signed 3-bit range: values `5`, `6`, `7` fit the field but are unallocated, which is why `imm3` is a `0…4` domain plus a closed `excluded` list rather than a wider range (`ADR-0016`, `EXP-0018`). | frozen |
 
 ## v0 surface (OD-10)
 
@@ -116,7 +117,7 @@ is what makes the two `mov` forms and the two `add` immediate forms distinct
 without an extra choice field. A plan that names `x86:mov/r64-r64` or
 `x86:add/rm64-imm` is rejected: those ids are not in the v0 definition.
 
-The AArch64 slice is eighteen forms across six documents, covering nine frozen
+The AArch64 slice is twenty-six forms across seven documents, covering ten frozen
 `EC` rows:
 
 | `form_id` | Encoding | Operand signature | Table | Covers |
@@ -139,6 +140,14 @@ The AArch64 slice is eighteen forms across six documents, covering nine frozen
 | `aarch64:add/x64-x64-x64-imm6-lsl` | `ADD (shifted register)`, `sf=1`, `shift=LSL` | dest `x64`, src `x64`, src2 `x64`, imm `imm6` (amount) | `0.6.0`+ | EC-31, A64-P8 |
 | `aarch64:add/x64-x64-x64-imm6-lsr` | `ADD (shifted register)`, `shift=LSR` | dest `x64`, src `x64`, src2 `x64`, imm `imm6` (amount) | `0.6.0`+ | EC-31, A64-P8 |
 | `aarch64:add/x64-x64-x64-imm6-asr` | `ADD (shifted register)`, `shift=ASR` | dest `x64`, src `x64`, src2 `x64`, imm `imm6` (amount) | `0.6.0`+ | EC-31, A64-P8 |
+| `aarch64:add/x64-x64-w32-imm3-uxtb` | `ADD (extended register)`, `sf=1`, bit 21 = 1, `option=000` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.7.0`+ | EC-13, EC-32, A64-P9 |
+| `aarch64:add/x64-x64-w32-imm3-uxth` | `ADD (extended register)`, `option=001` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.7.0`+ | EC-13, EC-32, A64-P9 |
+| `aarch64:add/x64-x64-w32-imm3-uxtw` | `ADD (extended register)`, `option=010` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.7.0`+ | EC-13, EC-32, A64-P9 |
+| `aarch64:add/x64-x64-x64-imm3-uxtx` | `ADD (extended register)`, `option=011` | dest `x64`, src `x64`, src2 `x64`, imm `imm3` (0–4) | `0.7.0`+ | EC-13, EC-32, A64-P9 |
+| `aarch64:add/x64-x64-w32-imm3-sxtb` | `ADD (extended register)`, `option=100` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.7.0`+ | EC-13, EC-32, A64-P9 |
+| `aarch64:add/x64-x64-w32-imm3-sxth` | `ADD (extended register)`, `option=101` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.7.0`+ | EC-13, EC-32, A64-P9 |
+| `aarch64:add/x64-x64-w32-imm3-sxtw` | `ADD (extended register)`, `option=110` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.7.0`+ | EC-13, EC-32, A64-P9 |
+| `aarch64:add/x64-x64-x64-imm3-sxtx` | `ADD (extended register)`, `option=111` | dest `x64`, src `x64`, src2 `x64`, imm `imm3` (0–4) | `0.7.0`+ | EC-13, EC-32, A64-P9 |
 
 The `-lsl0`/`-lsl12` suffix is part of the id because the MRS node leaves
 `shift`, `imm6` and `sh` variable; the table pins them and the name says so
@@ -146,8 +155,10 @@ The `-lsl0`/`-lsl12` suffix is part of the id because the MRS node leaves
 by a form variant, not by a value-dependent bit. `-lsl12` is in `0.2.0` and later
 only, so naming it against `0.1.0` is `E-FORM-001` (`N01`). The
 `-lsl0` … `-lsl48` suffix on the four `movz` rows is the same device for the
-2-bit `hw` lane selector, and `-imm6-lsl` … `-imm6-asr` is the same device again
-for the 2-bit `shift` selector, with the amount as the last operand.
+2-bit `hw` lane selector, `-imm6-lsl` … `-imm6-asr` is the same device again
+for the 2-bit `shift` selector, with the amount as the last operand, and
+`-imm3-uxtb` … `-imm3-sxtx` is the same device for the 3-bit `option` selector
+of the extended-register node.
 
 `b.cond` is the opposite case and shows where the line is: the condition is a
 4-bit *operand* (`EC-29`), so one row covers all sixteen conditions, while the
@@ -169,9 +180,23 @@ numeric spelling — `ror` is rejected and `shift = 11` is unallocated) and an
 (`-imm6-lsl` … `-imm6-asr`) and the amount as an `imm6` operand, because a
 `modifiers` entry is a guard that never writes a bit: the `-lsl0` row with
 `{"name": "lsl", "value": 3}` is `E-OPERAND-003` (`N19`), and silently accepting it
-would emit the unshifted word and report success (`EC-31`, ADR-0015). The extend
-family (`add x0, x1, w2, uxtw #3` → `0x8b224c20`) is a different node with a
-narrower source operand, so it has no row (`E-FORM-001`, `N01e`).
+would emit the unshifted word and report success (`EC-31`, ADR-0015).
+
+The extended-register node is the fifth shape and the one a plan would most
+naturally try to carry as an `option` operand. It is one bit apart from the
+shifted node (bit 21 = 1, `opt` pinned at `00`), and its keyword does two jobs:
+it writes the 3-bit `option` field *and* fixes the width of the register it
+consumes — the six `[su]xt[bhw]` keywords take a `w` source, `uxtx`/`sxtx` take
+an `x` source, and the assembler rejects the cross pairings (`EXP-0018` §2).
+Because the encoding records the width as the same 5-bit register number, a free
+`option` operand would let a `w` register ride on `-imm3-uxtx` and emit a legal
+word for an illegal plan (`INV-07`). `0.7.0` therefore carries one row per
+keyword, and the amount is `imm3` field content: the field is three bits, but
+only `0…4` are allocated, so the slot states `bits: 3` plus `excluded: [5, 6, 7]`
+(`ADR-0009`). `imm3 = 8` is `E-RANGE-001` (`N03-imm3`), `imm3 = 5` is
+`E-RANGE-004` (`N16c`), a `w` operand on `-imm3-uxtx` or on a shifted row is
+`E-OPERAND-001` (`N02b`), and `sub`/`adds`/`subs`/the 32-bit node stay out
+(`E-FORM-001`, `N01f`).
 
 The five load/store rows carry `EC-14` and are the AArch64 half of `ADR-0008`:
 the address is `base` + `disp`, never one memory payload, and the addressing
@@ -352,12 +377,13 @@ The v0 `EC` set is decided (OD-10). What remains is per-row evidence:
   which carries the condition as an operand rather than as sixteen forms; EC-14 in
   `0.4.0`, one row per addressing kind; EC-30 in `0.5.0`, one row per `movz` lane;
   EC-31 in `0.6.0`, one row per shift keyword with the amount as an `imm6`
-  operand.
+  operand, and EC-32 in `0.7.0`, one row per extend keyword with the amount as an
+  `imm3` operand whose domain is `0…4` minus a closed `excluded` tail.
   EC-16 (the `mov` alias family) and EC-18 stay `draft` and are not in the v0
   surface: EC-30 decides the lane *inside* `movz` and does not decide which
-  lowering a `mov` request becomes. EC-13's shifted-register half is carried by
-  `0.1.0` and `0.6.0`; its extended-register half has no row yet, and neither has
-  `sub`, the `w` rows or the load/store kinds listed above.
+  lowering a `mov` request becomes. EC-13 is now carried in both halves:
+  shifted-register by `0.1.0` and `0.6.0`, extended-register by `0.7.0`.
+  `sub`, the `w` rows and the load/store kinds listed above still have no row.
 - The RV64 source is settled (ADR-0007: the UDB resolved spec, pinned by archive
   hash in `EXP-0009`), and both documents are generated: `definitions/rv64/0.1.0.json`
   and `0.2.0.json` (ADR-0009). `RV-P7` (`c.addi`) needed a format decision before

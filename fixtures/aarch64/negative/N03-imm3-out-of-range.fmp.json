@@ -1,0 +1,52 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "aarch64",
+    "isa_variant": "aarch64",
+    "execution_mode": "n/a",
+    "enabled_extensions": [],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.aarch64",
+    "version": "0.7.0",
+    "digest": "sha256:1bb920356476cea20688b2d6596d787f3cf99aedebe7240b1af8227f64d29053"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [".text"],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": 4,
+      "fragments": [
+        { "offset": 0, "size": 4, "kind": "instruction", "instruction_id": "I0001" }
+      ]
+    }
+  ],
+  "symbols": [],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "aarch64:add/x64-x64-w32-imm3-uxtb",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "src", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "src2", "kind": "aarch64.gpr32", "target_type": "w32", "payload": { "reg": 2 }, "modifiers": [] },
+        { "role": "imm", "kind": "aarch64.imm", "target_type": "imm3", "payload": { "value": 8 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    }
+  ],
+  "fixups": []
+}

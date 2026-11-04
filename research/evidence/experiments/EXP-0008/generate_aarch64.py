@@ -22,7 +22,7 @@ What it does, per form:
 Documents are emitted per version. A form appears in a document when the
 document's version is at or after the form's `since` (absent `since` means every
 version), so a later document cannot silently lose an earlier form. `0.1.0` …
-`0.5.0` stay frozen: their digests are asserted below, so a later edit that
+`0.6.0` stay frozen: their digests are asserted below, so a later edit that
 perturbs any of them fails loudly instead of shipping.
 
 Reads:  research/external/arm-mrs/Instructions.json (pinned by check_mrs.py)
@@ -32,6 +32,7 @@ Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.4.0.json
         definitions/aarch64/0.5.0.json
         definitions/aarch64/0.6.0.json
+        definitions/aarch64/0.7.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -49,7 +50,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
 MRS = os.path.join(ROOT, "research", "external", "arm-mrs", "Instructions.json")
 OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
-VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0"]
+VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0"]
 
 # Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
@@ -58,6 +59,7 @@ FROZEN_DIGESTS = {
     "0.3.0": "sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb",
     "0.4.0": "sha256:14d6c2b66669ff45401b8b69d5ce111c13ce6e8ef44f04440b961b8f2133bc78",
     "0.5.0": "sha256:9cec1688b5b9d1a9bd9299e6d0a155885053e7b228ff6eee88f40cef6f34e23e",
+    "0.6.0": "sha256:1151944e5855c08bd3d96074ace3ca787be6b7284c5d3e84654a257ab2055964",
 }
 
 WIDTH = 32
@@ -387,6 +389,167 @@ FORMS = [
              "range": {"signed": False, "bits": 6, "align_bits": 0}},
         ],
     },
+    # `A64-P9` (ADR-0016). The extended-register node is one bit apart from the
+    # shifted one: bit 21 = 1 and `opt` = 00 instead of a variable `shift`. Its
+    # three variable fields are `option` (13+3), `imm3` (10+3) and the registers.
+    # The keyword is the form because it also fixes the width of the register it
+    # consumes: the six `[su]xt[bhw]` keywords take a `w` source, `uxtx`/`sxtx`
+    # take an `x` source, and the assembler rejects the other pairing. The amount
+    # is field content, but the field is 3 bits and only `0…4` are allocated, so
+    # the slot carries `excluded: [5, 6, 7]` (ADR-0009) and `8` is outside the
+    # field. `sub`, `adds`/`subs` and the `sf = 0` node are other nodes.
+    {
+        "form_id": "aarch64:add/x64-x64-w32-imm3-uxtb",
+        "mrs": "ADD_64_addsub_ext",
+        "decision": "option = UXTB (000); imm3 is field content in 0..4, 5..7 excluded",
+        "pinned": {"option": 0},
+        "since": "0.7.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["imm3"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm3",
+             "range": {"signed": False, "bits": 3, "align_bits": 0},
+             "excluded": [5, 6, 7]},
+        ],
+    },
+    {
+        "form_id": "aarch64:add/x64-x64-w32-imm3-uxth",
+        "mrs": "ADD_64_addsub_ext",
+        "decision": "option = UXTH (001); imm3 is field content in 0..4, 5..7 excluded",
+        "pinned": {"option": 1},
+        "since": "0.7.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["imm3"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm3",
+             "range": {"signed": False, "bits": 3, "align_bits": 0},
+             "excluded": [5, 6, 7]},
+        ],
+    },
+    {
+        "form_id": "aarch64:add/x64-x64-w32-imm3-uxtw",
+        "mrs": "ADD_64_addsub_ext",
+        "decision": "option = UXTW (010); imm3 is field content in 0..4, 5..7 excluded",
+        "pinned": {"option": 2},
+        "since": "0.7.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["imm3"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm3",
+             "range": {"signed": False, "bits": 3, "align_bits": 0},
+             "excluded": [5, 6, 7]},
+        ],
+    },
+    {
+        "form_id": "aarch64:add/x64-x64-x64-imm3-uxtx",
+        "mrs": "ADD_64_addsub_ext",
+        "decision": "option = UXTX (011); imm3 is field content in 0..4, 5..7 excluded",
+        "pinned": {"option": 3},
+        "since": "0.7.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm3"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm3",
+             "range": {"signed": False, "bits": 3, "align_bits": 0},
+             "excluded": [5, 6, 7]},
+        ],
+    },
+    {
+        "form_id": "aarch64:add/x64-x64-w32-imm3-sxtb",
+        "mrs": "ADD_64_addsub_ext",
+        "decision": "option = SXTB (100); imm3 is field content in 0..4, 5..7 excluded",
+        "pinned": {"option": 4},
+        "since": "0.7.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["imm3"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm3",
+             "range": {"signed": False, "bits": 3, "align_bits": 0},
+             "excluded": [5, 6, 7]},
+        ],
+    },
+    {
+        "form_id": "aarch64:add/x64-x64-w32-imm3-sxth",
+        "mrs": "ADD_64_addsub_ext",
+        "decision": "option = SXTH (101); imm3 is field content in 0..4, 5..7 excluded",
+        "pinned": {"option": 5},
+        "since": "0.7.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["imm3"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm3",
+             "range": {"signed": False, "bits": 3, "align_bits": 0},
+             "excluded": [5, 6, 7]},
+        ],
+    },
+    {
+        "form_id": "aarch64:add/x64-x64-w32-imm3-sxtw",
+        "mrs": "ADD_64_addsub_ext",
+        "decision": "option = SXTW (110); imm3 is field content in 0..4, 5..7 excluded",
+        "pinned": {"option": 6},
+        "since": "0.7.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["imm3"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm3",
+             "range": {"signed": False, "bits": 3, "align_bits": 0},
+             "excluded": [5, 6, 7]},
+        ],
+    },
+    {
+        "form_id": "aarch64:add/x64-x64-x64-imm3-sxtx",
+        "mrs": "ADD_64_addsub_ext",
+        "decision": "option = SXTX (111); imm3 is field content in 0..4, 5..7 excluded",
+        "pinned": {"option": 7},
+        "since": "0.7.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm3"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm3",
+             "range": {"signed": False, "bits": 3, "align_bits": 0},
+             "excluded": [5, 6, 7]},
+        ],
+    },
 ]
 
 
@@ -584,6 +747,35 @@ def build(spec, node):
         }
         if "range" in slot_spec:
             slot["range"] = slot_spec["range"]
+        if "excluded" in slot_spec:
+            span = slot_spec.get("range") or {}
+            if slot_spec["from"] != "operand_value" or "bits" not in span:
+                raise SystemExit(
+                    "{0}/{1}: `excluded` needs an operand_value slot with a "
+                    "declared range.bits".format(spec["form_id"], slot_spec["role"])
+                )
+            if span.get("signed"):
+                raise SystemExit(
+                    "{0}/{1}: `excluded` is only emitted for unsigned slots".format(
+                        spec["form_id"], slot_spec["role"]
+                    )
+                )
+            values = list(slot_spec["excluded"])
+            if sorted(set(values)) != values:
+                raise SystemExit(
+                    "{0}/{1}: `excluded` must be strictly increasing".format(
+                        spec["form_id"], slot_spec["role"]
+                    )
+                )
+            low, high = 0, (1 << span["bits"]) - 1
+            for value in values:
+                if value < low or value > high:
+                    raise SystemExit(
+                        "{0}/{1}: excluded value {2} is outside [{3}, {4}]".format(
+                            spec["form_id"], slot_spec["role"], value, low, high
+                        )
+                    )
+            slot["excluded"] = values
         slot["modifiers"] = []
         slot["placements"] = placements
         slots.append(slot)
@@ -666,6 +858,12 @@ def render(document, forms):
                         "true" if span["signed"] else "false",
                         span["bits"],
                         span["align_bits"],
+                    )
+                )
+            if "excluded" in slot:
+                lines.append(
+                    '          "excluded": [{0}],'.format(
+                        ", ".join(str(value) for value in slot["excluded"])
                     )
                 )
             lines.append('          "modifiers": [],')
