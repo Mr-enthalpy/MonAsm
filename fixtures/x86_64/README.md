@@ -11,23 +11,25 @@ Vectors: `X86-P1` … `X86-P9` in `docs/fmp-v0/06_validation_matrix.md`.
 | X86-P3 | `X86-P3-two-legal-encodings` | `EXP-0005` (`81 /0` measured on `%rbx`; decode-verified on `%rax`) |
 | X86-P7 | `X86-P7-short-and-near-branch` | `EXP-0005` |
 | X86-P8 | `X86-P8-local-and-external-branch` | `EXP-0005`, record count from `llvm-readobj` |
+| X86-P6 | `X86-P6-rip-relative` | `EXP-0005` + `EXP-0029`, record count from `llvm-readobj` |
 
-`X86-P4` (displacement width), `X86-P5` (prefix rules) and `X86-P6`
-(RIP-relative) are **deferred, not omitted**: all three need a memory-operand
-form, which the seven-form v0 surface (`OD-10`) does not contain. The schema's
-payload shapes (`01_contract.md` §8.1) would have to grow a `{mem: …}` shape
-first. `X86-P9` is deferred with the extension families (`OD-10`).
+`X86-P6` ships in `definitions/x86_64/0.2.0.json` as two forms with
+`mod = 00`, `r/m = 101` and `disp32` as the last field (`ADR-0027`). `X86-P4`
+(displacement width) and `X86-P5` (prefix rules) are **deferred, not omitted**:
+both need a base+disp or prefixed memory-operand form, which the nine-form
+surface (`OD-10`) does not contain. `X86-P4` also needs a SIB decision for
+`%rsp`/`%r12`. `X86-P9` is deferred with the extension families (`OD-10`).
 
 ## Negative fixtures present
 
 | Vector | Fixture | Code |
 |---|---|---|
-| N01 | `negative/N01-absent-form` | `E-FORM-001` |
-| N02 | `negative/N02-operand-kind-mismatch` | `E-OPERAND-001` |
+| N01 | `negative/N01-absent-form`, `negative/N01x-absent-riprel-form` | `E-FORM-001` |
+| N02 | `negative/N02-operand-kind-mismatch`, `negative/N02j-base-on-riprel-form` | `E-OPERAND-001`, `E-OPERAND-002` |
 | N03 | `negative/N03-imm8-out-of-range` | `E-RANGE-001` |
-| N04 | `negative/N04a-rel8-out-of-range`, `N04b-rel32-absolute-out-of-range` | `E-RANGE-002`, `E-FIXUP-003` |
+| N04 | `negative/N04a-rel8-out-of-range`, `N04b-rel32-absolute-out-of-range`, `N04e-riprel32-literal-out-of-range` | `E-RANGE-002`, `E-FIXUP-003` |
 | N05 | `negative/N05-expected-size-mismatch` | `E-SIZE-001` |
-| N07 | `negative/N07-fixup-partial-field` | `E-FIXUP-001` |
+| N07 | `negative/N07-fixup-partial-field`, `negative/N07b-riprel-operand-fixup-mismatch` | `E-FIXUP-001` |
 | N08 | `negative/N08-undeclared-symbol`, `N08b-resolve-undefined-symbol`, `N08c-absolute-pcrel-without-base` | `E-SYMBOL-001`, `E-FIXUP-002` |
 | N09 | `negative/N09-overlapping-fragments` | `E-LAYOUT-001` |
 | N10 | `negative/N10-definition-digest-mismatch` | `E-DEF-001` |

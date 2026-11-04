@@ -222,6 +222,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | Table | Namespace | Digest |
 |---|---|---|
 | `definitions/x86_64/0.1.0.json` | `monasm.isa.x86` | `sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad` |
+| `definitions/x86_64/0.2.0.json` | `monasm.isa.x86` | `sha256:d9c088cacb9d20dcf8b801cbdb978996ed31d2e70b631897a905d179207991ac` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -244,7 +245,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0`
+### 8.1 `x86-64` `0.1.0` … `0.2.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -255,6 +256,8 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:add/rax-imm32/legacy` | `480500000000` | imm: `x86.imm`/`imm32` → `[16,32]` | 6 | `EC-04` |
 | `x86:jmp/rel8/legacy` | `eb00` | target: `x86.rel`/`rel8` → `[8,8]` | 2 | `EC-03` |
 | `x86:jmp/rel32/legacy` | `e900000000` | target: `x86.rel`/`rel32` → `[8,32]` | 5 | `EC-03` |
+| `x86:mov/r64-riprel32/legacy` | `488b0500000000` | dest: `x86.gpr64`/`r64` → `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `EC-34`, `X86-P6` — `0.2.0`+ |
+| `x86:mov/riprel32-r64/legacy` | `48890500000000` | src: `x86.gpr64`/`r64` → `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `EC-34`, `X86-P6` — `0.2.0`+ |
 
 Placements are written `[bit_offset, width]`. `[16,3]` is the low three bits of
 byte 2, which is `ModRM.rm`; `[19,3]` is `ModRM.reg`; `[24,8]` is byte 3. The two
@@ -275,6 +278,15 @@ implicit widening.
 Every row is verified against `llvm-mc` 23.1.2 in `EXP-0004`: each template byte
 string is decoded, and each `ModRM` and immediate/branch field is exercised
 across its whole encoded range.
+
+`0.2.0` adds the two RIP-relative rows. `mod = 00` and `r/m = 101` are template,
+the destination/source is `ModRM.reg`, and `disp32` is the instruction's last
+field. The displacement is a `target` operand with `kind: x86.rel`, not a `disp`,
+because the form has no base register: RIP is not in `x86.gpr64` and no slot
+carries it (`ADR-0027`). A symbol reference uses `pcrel_end` with `addend = 0`;
+the measured `L1` at `0x20` with the instruction at offset `7` gives
+`12 00 00 00` (`EXP-0029` §4). Base+disp8/disp32, SIB shapes, the `0x67`
+address-size prefix and `moffs` remain absent.
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 

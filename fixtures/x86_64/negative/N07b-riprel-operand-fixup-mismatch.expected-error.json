@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-FIXUP-001", "path": "/instructions/0/operands/1/payload", "detail_keys": ["kind", "form_id", "field"] }
+  ]
+}

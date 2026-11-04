@@ -1,7 +1,7 @@
 # EXP-0005 — x86-64 positive fixtures, measured with LLVM
 
-- Date: 2026-11-04
-- Subject: `fixtures/x86_64/positive/` — the five bytes-emitting vectors
+- Date: 2026-11-04 (extended 2026-11-05 with `X86-P6`)
+- Subject: `fixtures/x86_64/positive/` — the six bytes-emitting vectors
 - Toolchain: LLVM 23.1.2 (`llvm-mc`, `llvm-objcopy`, `llvm-readobj`), Python 3.8
 - Basis: **experiment** for every byte below
 - Reproduce: `python fixture_oracle.py` (rewrites), or
@@ -28,6 +28,7 @@ LLVM agree, not that a function agrees with itself.
 | `X86-P2-add-imm8-and-imm32` | `addq $1,%rax`; `addq $300,%rbx` | `4883c001 4881c32c010000` | 11 | `llvm-mc` |
 | `X86-P3-two-legal-encodings` | `addq $300,%rax`; `addq $300,%rbx` | `48052c010000 4881c32c010000` | 13 | `llvm-mc` |
 | `X86-P7-short-and-near-branch` | `jmp .+0x81`; `jmp .+0x82` | `eb7f e97d000000` | 7 | `llvm-mc` |
+| `X86-P6-rip-relative` | `movq 16(%rip),%rax`; local load/store against `L1` at `0x20`; `movq ext(%rip),%rbx` | `488b0510000000 488b0d12000000` + 2×`00` + `48891509000000` + 9×`00` + `aabbccdd 488b1d00000000` | 43 | `llvm-mc` + `llvm-readobj` |
 | `X86-P8-local-and-external-branch` | `jmp L1` (resolved); `jmp ext` (recorded) | `e9cb000000` + 200×`00` + `4889d8 4883c001 e900000000` | 217 | `llvm-mc` + `llvm-readobj` |
 
 `EXP-0004` decoded every row of the definition table, including the forms LLVM

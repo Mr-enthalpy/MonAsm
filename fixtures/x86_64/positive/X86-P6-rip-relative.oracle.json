@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj P6.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "f61542efebf930f78ddfd4a138125a22bcd257aab5b82209f92ca774d21f982f",
+  "output_sha256": "1e70735cff06ee7a57c34709753ea715ac9098f5c4d8bcb650804eb8c04709bf",
+  "size": 43,
+  "records": 1,
+  "notes": "`movq 16(%rip), %rax` is a literal disp32; `movq L1(%rip), %rcx` and `movq %rdx, L1(%rip)` resolve against L1 at 0x20 (disp 0x12 and 0x09); `movq ext(%rip), %rbx` assembles to 48 8b 1d 00 00 00 00 with R_X86_64_PC32 ext -4, and our pcrel_end with addend 0 is the same value.",
+  "relocation_check": "llvm-readobj --relocations reports '0x27 R_X86_64_PC32 ext 0xFFFFFFFFFFFFFFFC'"
+}

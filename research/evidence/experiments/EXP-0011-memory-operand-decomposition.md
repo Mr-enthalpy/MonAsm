@@ -191,7 +191,9 @@ Not settled, and explicitly left open:
 
 - **Which x86 variants v0 needs.** At minimum `mod=00/01/10` and "with/without
   SIB", plus the RIP-relative form; the set is not enumerated or measured yet.
-  `X86-P4`/`P6` stay deferred.
+  `X86-P4` stays deferred. (2026-11-05: `X86-P6` is now closed — `EXP-0029`
+  measured the `mod=00`/`r/m=101` shape and `ADR-0027` made it two forms; the
+  base+disp and SIB variants are still open.)
 - **AArch64's byte-vs-field-value question for `disp`** and its four addressing
   variants. `A64-P3` stays deferred.
 - **The ModRM rule in §4.2.** The bytes are observed; the manual text behind the

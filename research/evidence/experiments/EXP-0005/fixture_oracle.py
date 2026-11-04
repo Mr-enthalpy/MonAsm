@@ -16,6 +16,9 @@ Two cases cannot be produced from a mnemonic and are handled explicitly:
   `R_X86_64_PLT32 ext -4` relocation. The record's `records` count is 1; the
   materializer's `pcrel_end` with `addend = 0` is the same value
   (`03_fixup_model.md` §6.1).
+- `X86-P6`'s external load: `movq ext(%rip), %rbx` assembles to
+  `48 8b 1d 00 00 00 00` plus one `R_X86_64_PC32 ext -4` relocation at the
+  `disp32` field. Its `records` count is 1, for the same `pcrel_end` reason.
 
 Run with `--check` to verify the committed files still match without rewriting.
 """
@@ -85,6 +88,23 @@ CASES = [
         ),
     },
     {
+        "stem": "X86-P6-rip-relative",
+        "asm": "P6.asm",
+        "suffix": b"",
+        "records": 1,
+        "kind": "assembler",
+        "notes": (
+            "`movq 16(%rip), %rax` is a literal disp32; `movq L1(%rip), %rcx` and "
+            "`movq %rdx, L1(%rip)` resolve against L1 at 0x20 (disp 0x12 and 0x09); "
+            "`movq ext(%rip), %rbx` assembles to 48 8b 1d 00 00 00 00 with "
+            "R_X86_64_PC32 ext -4, and our pcrel_end with addend 0 is the same value."
+        ),
+        "relocation_check": (
+            "llvm-readobj --relocations reports "
+            "'0x27 R_X86_64_PC32 ext 0xFFFFFFFFFFFFFFFC'"
+        ),
+    },
+    {
         "stem": "X86-P8-local-and-external-branch",
         "asm": "P8.asm",
         "suffix": b"",
@@ -94,6 +114,10 @@ CASES = [
             "`jmp L1` resolves in place (e9 cb 00 00 00; L1 is 203 bytes after the end "
             "of the instruction). `jmp ext` assembles to e9 00 00 00 00 with "
             "R_X86_64_PLT32 ext -4; our pcrel_end with addend 0 is the same value."
+        ),
+        "relocation_check": (
+            "llvm-readobj --relocations reports "
+            "'0xD5 R_X86_64_PLT32 ext 0xFFFFFFFFFFFFFFFC'"
         ),
     },
 ]
@@ -183,11 +207,8 @@ def main():
         }
         if case["suffix"]:
             record["disassembly"] = disassemble(case["suffix"])
-        if case["stem"].startswith("X86-P8"):
-            record["relocation_check"] = (
-                "llvm-readobj --relocations reports "
-                "'0xD5 R_X86_64_PLT32 ext 0xFFFFFFFFFFFFFFFC'"
-            )
+        if case.get("relocation_check"):
+            record["relocation_check"] = case["relocation_check"]
 
         encoded = json.dumps(record, indent=2, sort_keys=False) + "\n"
         if check:

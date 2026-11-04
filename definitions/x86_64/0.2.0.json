@@ -1,0 +1,196 @@
+{
+  "definition_format": "fmp-def/0.1",
+  "namespace": "monasm.isa.x86",
+  "version": "0.2.0",
+  "target_identity": {
+    "isa_family": "x86",
+    "isa_variant": "x86-64",
+    "execution_mode": "64",
+    "enabled_extensions": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "forms": [
+    {
+      "form_id": "x86:mov/rm-r64/legacy",
+      "template": "4889c0",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 16, "width": 3 }]
+        },
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 19, "width": 3 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/r64-rm/legacy",
+      "template": "488bc0",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 16, "width": 3 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:add/rm64-imm8/legacy",
+      "template": "4883c000",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 16, "width": 3 }]
+        },
+        {
+          "role": "imm",
+          "kind": "x86.imm",
+          "target_type": "imm8",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 8, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 24, "width": 8 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:add/rm64-imm32/legacy",
+      "template": "4881c000000000",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 16, "width": 3 }]
+        },
+        {
+          "role": "imm",
+          "kind": "x86.imm",
+          "target_type": "imm32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 24, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:add/rax-imm32/legacy",
+      "template": "480500000000",
+      "slots": [
+        {
+          "role": "imm",
+          "kind": "x86.imm",
+          "target_type": "imm32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 16, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:jmp/rel8/legacy",
+      "template": "eb00",
+      "slots": [
+        {
+          "role": "target",
+          "kind": "x86.rel",
+          "target_type": "rel8",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 8, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 8, "width": 8 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:jmp/rel32/legacy",
+      "template": "e900000000",
+      "slots": [
+        {
+          "role": "target",
+          "kind": "x86.rel",
+          "target_type": "rel32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 8, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/r64-riprel32/legacy",
+      "template": "488b0500000000",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "target",
+          "kind": "x86.rel",
+          "target_type": "riprel32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 24, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/riprel32-r64/legacy",
+      "template": "48890500000000",
+      "slots": [
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "target",
+          "kind": "x86.rel",
+          "target_type": "riprel32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 24, "width": 32 }]
+        }
+      ]
+    }
+  ]
+}

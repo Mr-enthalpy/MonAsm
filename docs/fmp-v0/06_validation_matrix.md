@@ -10,13 +10,13 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 
 | ID | Input condition | Expected | Code | ISAs | Fixture | Status |
 |---|---|---|---|---|---|---|
-| N01 | Plan names a form that leaves a byte-affecting decision open (`x86:mov/r64-r64`, `x86:add/rm64-imm`), a form missing a required component (`x86:mov/rm-r64` without `/legacy`), a renamed variant, or names a variant the definition does not contain | Reject, never append a default variant or match a near neighbour | E-FORM-001 | x86, aarch64, rv64 | `x86_64/negative/N01-absent-form.fmp.json`, `aarch64/negative/N01-absent-scaled-form.fmp.json`, `aarch64/negative/N01d-absent-movz-lane.fmp.json`, `aarch64/negative/N01e-absent-extend-form.fmp.json`, `aarch64/negative/N01f-absent-sub-ext.fmp.json`, `aarch64/negative/N01g-absent-flag-form.fmp.json`, `aarch64/negative/N01h-absent-32bit-form.fmp.json`, `aarch64/negative/N01i-absent-cmp-alias.fmp.json`, `aarch64/negative/N01j-absent-flag-32bit-form.fmp.json`, `aarch64/negative/N01k-absent-w-form.fmp.json`, `aarch64/negative/N01l-absent-32bit-ext-form.fmp.json`, `aarch64/negative/N01m-absent-cmn-alias.fmp.json`, `aarch64/negative/N01n-absent-store-imm9-form.fmp.json`, `aarch64/negative/N01o-absent-loadlit-form.fmp.json`, `aarch64/negative/N01p-regoff-absent-in-previous-version.fmp.json`, `aarch64/negative/N01q-absent-regoff-shift-one.fmp.json`, `aarch64/negative/N01r-w32-regoff-absent-in-previous-version.fmp.json`, `aarch64/negative/N01s-absent-w32-regoff-shift-three.fmp.json`, `aarch64/negative/N01t-absent-movk-lsl8.fmp.json`, `aarch64/negative/N01u-movk-absent-in-previous-version.fmp.json`, `aarch64/negative/N01v-absent-w32-movk-lane.fmp.json`, `aarch64/negative/N01w-absent-mov-alias.fmp.json`, `rv64/negative/N01c-caddi-against-0.1.0.fmp.json` | x86, aarch64 and rv64 passing (`N01i`/`N01m` are `0.11.0` version boundaries now that `0.12.0` carries the ids, `N01n` is the `0.12.0` boundary for the `0.13.0` store rows, `N01o` is the `0.13.0` boundary for the `0.14.0` literal row, `N01p` is the `0.14.0` boundary for the `0.15.0` register-offset rows, `N01q` names a `-lsl1` row that no version has, `N01r` is the `0.15.0` boundary for the `0.16.0` 32-bit rows, `N01s` names a `-lsl3` row that no version has at that width, `N01t` names a `-lsl8` move-wide lane that no version has, `N01u` is the `0.16.0` boundary for the `0.17.0` `movk` rows, `N01v` names a `w32` move-wide lane that no version has, and `N01w` names a `mov` alias row that no version has) |
-| N02 | Operand register class does not match the form, or the operand count/role sequence does | Reject; never add, drop or reorder an operand | E-OPERAND-001 / E-OPERAND-002 | x86, aarch64, rv64 | `x86_64/negative/N02-operand-kind-mismatch.fmp.json`, `aarch64/negative/N02b-w-source-in-shift-form.fmp.json`, `aarch64/negative/N02c-x-dest-on-w-row.fmp.json`, `aarch64/negative/N02d-ext-x-source-on-w-keyword.fmp.json`, `aarch64/negative/N02e-dest-on-cmp-row.fmp.json`, `aarch64/negative/N02f-w-index-on-lsl-row.fmp.json`, `aarch64/negative/N02g-w-index-on-w32-lsl-row.fmp.json`, `aarch64/negative/N02h-x-dest-on-w32-row.fmp.json`, `aarch64/negative/N02i-w-dest-on-movk-row.fmp.json` | x86 and aarch64 passing (`N02e` is the count mismatch: `expected: 2`, `found: 3`; `N02f` is a `w32` index on a `-lsl0` row: two `E-OPERAND-001`, on `kind` and `target_type`; `N02g`/`N02h` are the same two errors at `size = 10`, on the `index` and on the `dest`; `N02i` is a `w32` destination on a 64-bit move-wide row: the same two errors on the `dest`) |
+| N01 | Plan names a form that leaves a byte-affecting decision open (`x86:mov/r64-r64`, `x86:add/rm64-imm`), a form missing a required component (`x86:mov/rm-r64` without `/legacy`), a renamed variant, or names a variant the definition does not contain | Reject, never append a default variant or match a near neighbour | E-FORM-001 | x86, aarch64, rv64 | `x86_64/negative/N01-absent-form.fmp.json`, `x86_64/negative/N01x-absent-riprel-form.fmp.json`, `aarch64/negative/N01-absent-scaled-form.fmp.json`, `aarch64/negative/N01d-absent-movz-lane.fmp.json`, `aarch64/negative/N01e-absent-extend-form.fmp.json`, `aarch64/negative/N01f-absent-sub-ext.fmp.json`, `aarch64/negative/N01g-absent-flag-form.fmp.json`, `aarch64/negative/N01h-absent-32bit-form.fmp.json`, `aarch64/negative/N01i-absent-cmp-alias.fmp.json`, `aarch64/negative/N01j-absent-flag-32bit-form.fmp.json`, `aarch64/negative/N01k-absent-w-form.fmp.json`, `aarch64/negative/N01l-absent-32bit-ext-form.fmp.json`, `aarch64/negative/N01m-absent-cmn-alias.fmp.json`, `aarch64/negative/N01n-absent-store-imm9-form.fmp.json`, `aarch64/negative/N01o-absent-loadlit-form.fmp.json`, `aarch64/negative/N01p-regoff-absent-in-previous-version.fmp.json`, `aarch64/negative/N01q-absent-regoff-shift-one.fmp.json`, `aarch64/negative/N01r-w32-regoff-absent-in-previous-version.fmp.json`, `aarch64/negative/N01s-absent-w32-regoff-shift-three.fmp.json`, `aarch64/negative/N01t-absent-movk-lsl8.fmp.json`, `aarch64/negative/N01u-movk-absent-in-previous-version.fmp.json`, `aarch64/negative/N01v-absent-w32-movk-lane.fmp.json`, `aarch64/negative/N01w-absent-mov-alias.fmp.json`, `rv64/negative/N01c-caddi-against-0.1.0.fmp.json` | x86, aarch64 and rv64 passing (`N01x` is the `0.1.0` boundary for the `0.2.0` RIP-relative rows, `N01i`/`N01m` are `0.11.0` version boundaries now that `0.12.0` carries the ids, `N01n` is the `0.12.0` boundary for the `0.13.0` store rows, `N01o` is the `0.13.0` boundary for the `0.14.0` literal row, `N01p` is the `0.14.0` boundary for the `0.15.0` register-offset rows, `N01q` names a `-lsl1` row that no version has, `N01r` is the `0.15.0` boundary for the `0.16.0` 32-bit rows, `N01s` names a `-lsl3` row that no version has at that width, `N01t` names a `-lsl8` move-wide lane that no version has, `N01u` is the `0.16.0` boundary for the `0.17.0` `movk` rows, `N01v` names a `w32` move-wide lane that no version has, and `N01w` names a `mov` alias row that no version has) |
+| N02 | Operand register class does not match the form, or the operand count/role sequence does | Reject; never add, drop or reorder an operand | E-OPERAND-001 / E-OPERAND-002 | x86, aarch64, rv64 | `x86_64/negative/N02-operand-kind-mismatch.fmp.json`, `x86_64/negative/N02j-base-on-riprel-form.fmp.json`, `aarch64/negative/N02b-w-source-in-shift-form.fmp.json`, `aarch64/negative/N02c-x-dest-on-w-row.fmp.json`, `aarch64/negative/N02d-ext-x-source-on-w-keyword.fmp.json`, `aarch64/negative/N02e-dest-on-cmp-row.fmp.json`, `aarch64/negative/N02f-w-index-on-lsl-row.fmp.json`, `aarch64/negative/N02g-w-index-on-w32-lsl-row.fmp.json`, `aarch64/negative/N02h-x-dest-on-w32-row.fmp.json`, `aarch64/negative/N02i-w-dest-on-movk-row.fmp.json` | x86 and aarch64 passing (`N02j` is a `base` operand added to the two-slot RIP-relative row: count mismatch, `expected: 2`, `found: 3`; `N02e` is the count mismatch: `expected: 2`, `found: 3`; `N02f` is a `w32` index on a `-lsl0` row: two `E-OPERAND-001`, on `kind` and `target_type`; `N02g`/`N02h` are the same two errors at `size = 10`, on the `index` and on the `dest`; `N02i` is a `w32` destination on a 64-bit move-wide row: the same two errors on the `dest`) |
 | N03 | Immediate exceeds the field's range | Reject | E-RANGE-001 | x86, aarch64, rv64 | `x86_64/negative/N03-imm8-out-of-range.fmp.json`, `aarch64/negative/N03-imm12-out-of-range.fmp.json`, `aarch64/negative/N03-cond-out-of-range.fmp.json`, `aarch64/negative/N03-imm6-out-of-range.fmp.json`, `aarch64/negative/N03-imm3-out-of-range.fmp.json`, `aarch64/negative/N03-imm12-disp-out-of-range.fmp.json`, `aarch64/negative/N03-imm9-disp-out-of-range.fmp.json`, `aarch64/negative/N03-str-imm9-post-disp-out-of-range.fmp.json`, `aarch64/negative/N03-stur-imm9-disp-out-of-range.fmp.json`, `aarch64/negative/N03-movk-imm16-out-of-range.fmp.json` | x86 and aarch64 passing |
-| N04 | Control-transfer or literal displacement exceeds the form's range | Reject, never expand or re-form | E-RANGE-002 / E-FIXUP-003 | x86, aarch64, rv64 | `x86_64/negative/N04a-rel8-out-of-range.fmp.json`, `N04b-rel32-absolute-out-of-range.fmp.json`, `aarch64/negative/N04c-bcond-imm19-out-of-range.fmp.json`, `aarch64/negative/N04d-loadlit-imm19-out-of-range.fmp.json` | x86 and aarch64 passing |
+| N04 | Control-transfer or literal displacement exceeds the form's range | Reject, never expand or re-form | E-RANGE-002 / E-FIXUP-003 | x86, aarch64, rv64 | `x86_64/negative/N04a-rel8-out-of-range.fmp.json`, `N04b-rel32-absolute-out-of-range.fmp.json`, `x86_64/negative/N04e-riprel32-literal-out-of-range.fmp.json`, `aarch64/negative/N04c-bcond-imm19-out-of-range.fmp.json`, `aarch64/negative/N04d-loadlit-imm19-out-of-range.fmp.json` | x86 and aarch64 passing (`N04e` is `disp32 = 2147483648`, one past the measured `[-2147483648, 2147483647]`) |
 | N05 | `expected_size` disagrees with the encoded length | Reject | E-SIZE-001 / E-LAYOUT-003 | x86, aarch64, rv64 | `x86_64/negative/N05-expected-size-mismatch.fmp.json` | x86 passing |
 | N06 | Form requires a disabled target extension | Reject | E-TARGET-003 | rv64 (C), x86 (AVX), aarch64 (optional feature) | none | not applicable to x86 v0 (no extension-gated form); see `04_errors.md` §2.3 |
-| N07 | Fixup kind is incompatible with the field | Reject | E-FIXUP-001 | x86, aarch64, rv64 | `x86_64/negative/N07-fixup-partial-field.fmp.json` | x86 passing |
+| N07 | Fixup kind is incompatible with the field | Reject | E-FIXUP-001 | x86, aarch64, rv64 | `x86_64/negative/N07-fixup-partial-field.fmp.json`, `x86_64/negative/N07b-riprel-operand-fixup-mismatch.fmp.json` | x86 passing (`N07b`: the operand names `S1`, the fixup targets `S2`) |
 | N08 | Reference names a `symbol_id` absent from `symbols[]`; or `resolve_in_place` is asked to patch a symbol that exists but has no address | Reject the identity error in every mode; reject only the mode that needs an address | E-SYMBOL-001 / E-FIXUP-002 | x86, aarch64, rv64 | `x86_64/negative/N08-undeclared-symbol.fmp.json`, `N08b-resolve-undefined-symbol.fmp.json`, `N08c-absolute-pcrel-without-base.fmp.json` | x86 passing |
 | N09 | Two layout fragments overlap | Reject | E-LAYOUT-001 | all (layout is ISA-independent) | `x86_64/negative/N09-overlapping-fragments.fmp.json` | x86 passing |
 | N10 | Definition digest does not match | Reject | E-DEF-001 | all | `x86_64/negative/N10-definition-digest-mismatch.fmp.json` | x86 passing |
@@ -128,7 +128,7 @@ Each vector needs **two independent sources**: our materializer, and an oracle
 | X86-P3 | Same operation, different legal encodings | `x86:add/rax-imm32/legacy` vs `x86:add/rm64-imm32/legacy`; `x86:mov/rm-r64` vs `x86:mov/r64-rm` | llvm-mc | x86 passing (`EXP-0005`) |
 | X86-P4 | Displacement width | `mov rax, [rbp-8]` (disp8) vs (disp32) | llvm-mc | deferred: needs one `form_id` per ModRM mod shape, measured (`ADR-0008`, `OD-13`) |
 | X86-P5 | Prefix rules | 16-bit operand with `0x66`; REX + high-byte rejection | llvm-mc | deferred: no `0x66`/high-byte form in the v0 surface (`OD-10`) |
-| X86-P6 | RIP-relative reference | `mov rax, [rip+disp32]` with a fixup | llvm-mc + readelf | deferred: needs a `rip_relative` `form_id`, measured (`ADR-0008`, `OD-13`) |
+| X86-P6 | RIP-relative reference | `mov rax, [rip+disp32]`: `x86:mov/r64-riprel32/legacy` and the store direction, with a `pcrel_end` fixup | llvm-mc + llvm-readobj | x86 passing (`EXP-0029`; `X86-P6-rip-relative`) |
 | X86-P7 | Short vs near branch | `x86:jmp/rel8/legacy` and `x86:jmp/rel32/legacy` as explicit plans | llvm-mc | x86 passing (`EXP-0005`) |
 | X86-P8 | External branch fixup | `x86:jmp/rel32/legacy` to an undefined symbol with `emit_relocation`, record emitted. `call rel32` is not in the v0 surface (`OD-10`); its descriptor is identical, so the record shape is exercised without adding a form | llvm-mc + llvm-readobj | x86 passing (`EXP-0005`) |
 | X86-P9 | Explicit encoding family | SSE vs VEX vs EVEX for one operation | llvm-mc | deferred (OD-10) |
@@ -140,28 +140,32 @@ numeric branch target (`jmp 0x12`, `0x7f`, `0x80`, `0x1000`, `5` all emit
 the displacement, not the resolved target, so the vector is compared as bytes and
 the target is computed from the plan.
 
-Definition anchor for X86-P1–P8, measured 2026-11-04: the seven forms live in
-`definitions/x86_64/0.1.0.json` (digest
+Definition anchor for X86-P1–P8, measured 2026-11-04 and 2026-11-05: the seven
+`0.1.0` forms live in `definitions/x86_64/0.1.0.json` (digest
 `sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad`), and
 `EXP-0004` decodes 223 plan-derived byte strings with `llvm-mc` to confirm every
-row's field placement.
+row's field placement. `definitions/x86_64/0.2.0.json` repeats those seven and
+adds the two RIP-relative rows (nine forms, digest
+`sha256:d9c088cacb9d20dcf8b801cbdb978996ed31d2e70b631897a905d179207991ac`);
+`EXP-0029` measures their fields and the fixture below.
 
-X86-P1, P2, P3, P7 and P8 have fixtures under `fixtures/x86_64/positive/` and a
-recorded oracle in `EXP-0005`; the fixture gate compares their bytes with the
-oracle's, never with the materializer's own expectation.
+X86-P1, P2, P3, P6, P7 and P8 have fixtures under `fixtures/x86_64/positive/`
+and a recorded oracle in `EXP-0005`; the fixture gate compares their bytes with
+the oracle's, never with the materializer's own expectation.
 
-X86-P4, P5 and P6 are **deferred, not omitted**. P4 and P6 need memory
-addressing, and `ADR-0008` settled the representation: it is one operand per
-encoded field (`base`, `disp`, `index`, `scale`), never a `{mem: …}` payload,
-because the encoding form changes with the operand values. `movq 8(%rcx), %rax`
-is `48 8b 41 08` (mod=01), `movq 4096(%rcx), %rax` is
-`48 8b 81 00 10 00 00` (mod=10), and `movq (%rbp), %rax` is `48 8b 45 00`
-(mod=01, because mod=00 with `r/m = 101` is RIP-relative). An encoder that
-picked mod from the displacement would select an encoding form (`INV-02`), so
-the slice needs one `form_id` per ModRM mod / SIB shape, enumerated and measured
-before it lands. P5 is a different gap: the `0x66` prefix and the high-byte
-register rule are absent from the v0 surface (`OD-10`). The rows return when
-that definition slice lands.
+X86-P4 and P5 are **deferred, not omitted**. `ADR-0008` settled the
+representation: one operand per encoded field (`base`, `disp`, `index`,
+`scale`), never a `{mem: …}` payload, because the encoding form changes with
+the operand values. `movq 8(%rcx), %rax` is `48 8b 41 08` (mod=01),
+`movq 4096(%rcx), %rax` is `48 8b 81 00 10 00 00` (mod=10), and
+`movq (%rbp), %rax` is `48 8b 45 00` (mod=01, because mod=00 with `r/m = 101` is
+RIP-relative). An encoder that picked mod from the displacement would select an
+encoding form (`INV-02`), so `X86-P4` still needs one `form_id` per base+disp
+mod shape and a SIB decision for `%rsp`/`%r12`, each enumerated and measured
+before it lands. `X86-P6` took the one shape that has no base register and no
+SIB alternative: `mod = 00`, `r/m = 101`, `disp32` (`ADR-0027`, `EXP-0029`).
+P5 is a different gap: the `0x66` prefix and the high-byte register rule are
+absent from the v0 surface (`OD-10`).
 
 
 ### AArch64 (directive §6.2)
