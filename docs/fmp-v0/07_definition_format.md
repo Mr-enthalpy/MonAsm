@@ -227,6 +227,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
 | `definitions/aarch64/0.4.0.json` | `monasm.isa.aarch64` | `sha256:14d6c2b66669ff45401b8b69d5ce111c13ce6e8ef44f04440b961b8f2133bc78` |
 | `definitions/aarch64/0.5.0.json` | `monasm.isa.aarch64` | `sha256:9cec1688b5b9d1a9bd9299e6d0a155885053e7b228ff6eee88f40cef6f34e23e` |
+| `definitions/aarch64/0.6.0.json` | `monasm.isa.aarch64` | `sha256:1151944e5855c08bd3d96074ace3ca787be6b7284c5d3e84654a257ab2055964` |
 | `definitions/rv64/0.1.0.json` | `monasm.isa.riscv` | `sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083` |
 | `definitions/rv64/0.2.0.json` | `monasm.isa.riscv` | `sha256:8329a38faa964f9c69207a48e3bfb45c13fb0ddbaeb829ddcc0dbd1cffa8de10` |
 
@@ -264,7 +265,7 @@ Every row is verified against `llvm-mc` 23.1.2 in `EXP-0004`: each template byte
 string is decoded, and each `ModRM` and immediate/branch field is exercised
 across its whole encoded range.
 
-### 8.2 `aarch64` `0.1.0`, `0.2.0`, `0.3.0`, `0.4.0` and `0.5.0`
+### 8.2 `aarch64` `0.1.0`, `0.2.0`, `0.3.0`, `0.4.0`, `0.5.0` and `0.6.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -283,12 +284,16 @@ across its whole encoded range.
 | `aarch64:movz/x64-imm16-lsl16` | `0000a0d2` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; imm: `aarch64.imm`/`imm16` → `[5,16]` | 4 | `EC-30`, `A64-P7` — `0.5.0` only |
 | `aarch64:movz/x64-imm16-lsl32` | `0000c0d2` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; imm: `aarch64.imm`/`imm16` → `[5,16]` | 4 | `EC-30`, `A64-P7` — `0.5.0` only |
 | `aarch64:movz/x64-imm16-lsl48` | `0000e0d2` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; imm: `aarch64.imm`/`imm16` → `[5,16]` | 4 | `EC-30`, `A64-P7` — `0.5.0` only |
+| `aarch64:add/x64-x64-x64-imm6-lsl` | `0000008b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm6` → `[10,6]` | 4 | `EC-31`, `A64-P8` — `0.6.0` only |
+| `aarch64:add/x64-x64-x64-imm6-lsr` | `0000408b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm6` → `[10,6]` | 4 | `EC-31`, `A64-P8` — `0.6.0` only |
+| `aarch64:add/x64-x64-x64-imm6-asr` | `0000808b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm6` → `[10,6]` | 4 | `EC-31`, `A64-P8` — `0.6.0` only |
 
 `0.1.0` holds the first, second, fourth and fifth rows; `0.2.0` adds
 `aarch64:add/x64-imm12-lsl12` (ADR-0011); `0.3.0` repeats all five and adds
 `aarch64:b.cond/imm19` (ADR-0012); `0.4.0` repeats all six and adds the five
 load/store rows (ADR-0013); `0.5.0` repeats all eleven and adds the four `movz`
-rows (ADR-0014). Each document therefore shares its earlier rows
+rows (ADR-0014); `0.6.0` repeats all fifteen and adds the three shift rows
+(ADR-0015). Each document therefore shares its earlier rows
 unchanged and differs only in the rows its version introduced, so a plan bound to
 an older version cannot reach a newer form (`E-FORM-001`, `N01`) even though the
 newest document has it.
@@ -298,23 +303,29 @@ The templates are little-endian file order, so `0000008b` is the word
 (`research/evidence/experiments/EXP-0008/generate_aarch64.py`) derives every
 bit from the MRS node, requires the MRS node name to exist, and refuses to emit
 unless all 32 bits are covered exactly once by a fixed bit or a slot placement;
-`EXP-0008` §2–§3 records the nodes and the coverage check. The fifteen forms come
-from eleven nodes: `ADD_64_addsub_imm` is read twice, once with `sh = 0` and once
-with `sh = 1`, `MOVZ_64_movewide` four times, once per `hw` value,
-`B_only_condbranch` contributes one row with both of its variable
+`EXP-0008` §2–§3 records the nodes and the coverage check. The eighteen forms come
+from eleven nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
+pinned to 0 and once per shift keyword, `ADD_64_addsub_imm` twice, once with
+`sh = 0` and once with `sh = 1`, `MOVZ_64_movewide` four times, once per `hw`
+value, `B_only_condbranch` contributes one row with both of its variable
 fields as operands, and each of the five load/store rows reads one node whose
 addressing-kind bits are fixed and whose `imm12`/`imm9` is the single variable
 field; the generator states each pinned value explicitly and asserts that
-`0.1.0` … `0.4.0` still hash to their frozen digests.
+`0.1.0` … `0.5.0` still hash to their frozen digests.
 
 The `-lsl0`/`-lsl12` suffix on the `add` rows carries a decision the operand list
 does not state, and the name states it instead (`01_contract.md` §7, `ADR-0004`):
 the MRS leaves AArch64 `shift` (2 bits) and `imm6` (6 bits) variable in the
 shifted-register node, and `sh` (1 bit) variable in the immediate node. This
-table pins them to `LSL #0` in the register row, and to `sh = 0` or `sh = 1` in
-the two immediate rows. A plan that wants `add x0, x1, x2, lsl #4` names a form
-that does not exist and is rejected `E-FORM-001`; nothing shifts implicitly
-(`INV-02`, `INV-03`, `N01`).
+table pins `shift` to `LSL` and `imm6` to 0 in the plain register row, and pins
+`sh` to `0` or `1` in the two immediate rows. The shift *keyword* is a decision;
+the shift *amount* is not: `-imm6-lsl`/`-imm6-lsr`/`-imm6-asr` pin `shift` and
+leave `imm6` open as a `0…63` operand, so `add x0, x1, x2, lsl #4` is
+`aarch64:add/x64-x64-x64-imm6-lsl` with `imm = 4`, and nothing shifts implicitly
+(`INV-02`, `INV-03`, `EC-31`, ADR-0015). `lsl #0` is expressible both ways —
+`-lsl0` and `-imm6-lsl` with `imm6 = 0` are the same word `0x8b020020` — because
+the assembly language itself treats the two spellings as one instruction, and
+excluding `0` would make an operand's value choose the form.
 
 The two immediate rows hold the *same* operand value type, and only the form
 differs: `{ "value": n }` must be in `[0, 4095]` for both, and the instruction
@@ -354,6 +365,17 @@ as `0x12340000` on `-lsl16` is `E-RANGE-001` (`N18c`), and a lane the ISA does n
 have (`-lsl8`) is `E-FORM-001` (`N01d`). `movk`, `movn`, the `w` variant and the
 `mov` alias have no row: the first three differ in `opc`/`sf`, and the alias picks
 its lane from the literal's value, which is `EC-16`.
+
+The three shift rows are the fifth form-variant case, and the first where one
+modifier spelling splits into a form and an operand. `shift` (bits 23–22) is the
+keyword: three spellings, no numeric one, and `shift = 11` is unallocated in this
+node. `imm6` (bits 15–10) is the amount: `0…63`, field content, one slot with
+`align_bits = 0` because nothing is scaled. An amount of `64` is `E-RANGE-001`
+(`N03-imm6`), and the same shift stated as a `modifiers` entry on `-lsl0` is
+`E-OPERAND-003` (`N19`): a modifier is a guard and never writes a bit, so
+accepting it would emit the unshifted word and report success. The extend family
+(`ADD_64_addsub_ext`, bit 21 = 1, `option`/`imm3`, a `w` source for some options)
+has no row, so naming it is `E-FORM-001` (`N01e`, `EC-31`, ADR-0015).
 
 `adrp`'s immediate is one value over two fields: `immhi` holds bits `[20:2]` and
 `immlo` holds `[1:0]`, which is why the slot has two placements in that order
@@ -399,6 +421,10 @@ second carrier for a decision the `form_id` already names (`INV-02`, ADR-0011).
 field, `hw` is the exponent of the multiplier, and the four rows are the four
 values of `hw`, so no slot has to carry `16 × hw` and no plan can state a lane the
 instruction does not have (`EC-30`, ADR-0014, `EXP-0016` §2).
+
+The shift amount is the plainest case of the same rule, with no multiplier at all:
+`imm6` is the amount the plan states, `shift` is the keyword the row pins, and the
+instruction applies the field directly (`EC-31`, ADR-0015, `EXP-0017` §2).
 
 RV64 follows the same rule with different shift amounts (ADR-0007, `EXP-0009`):
 the source states `left_shift: 1` for `beq`/`jal` and `left_shift: 12` for
@@ -522,12 +548,13 @@ without a plan error: the input is the definition.
   ADR-0006: the facts come from the Arm MRS 2026-06 OPENSOURCE packaging, and
   the Arm notice ships with the generated table. The format did not need to
   change for it: `adrp`'s split `immhi:immlo` is two placements of one slot, as
-  §4.1 anticipated. `definitions/aarch64/0.1.0.json` … `0.5.0.json` now exist
+  §4.1 anticipated. `definitions/aarch64/0.1.0.json` … `0.6.0.json` now exist
   (§8.2); each is a superset that adds its own rows without a format change
-  (ADR-0011, ADR-0012, ADR-0013, ADR-0014). What is missing is coverage, not
-  design: `A64-P8` has no row, so naming it is `E-FORM-001`, and neither the
-  register-offset kind nor the literal load nor the store's `imm9` kinds has a
-  row.
+  (ADR-0011, ADR-0012, ADR-0013, ADR-0014, ADR-0015). What is missing is coverage,
+  not design: the extend family has no row, so naming it is `E-FORM-001` (`N01e`),
+  and neither the register-offset kind nor the literal load nor the store's
+  `imm9` kinds has a row. `sub` and the `w`-width rows of the arithmetic nodes are
+  absent for the same reason.
 - The archive is still not vendored and the drop is not a build input: a
   regeneration reads `research/external/arm-mrs/` after `tools/check_mrs.py`
   passes, and the shipped artifact is the JSON plus its digest.

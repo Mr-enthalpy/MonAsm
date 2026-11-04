@@ -14,32 +14,38 @@ Vectors: `A64-P1` … `A64-P8` in `docs/fmp-v0/06_validation_matrix.md`.
 | `positive/A64-P5-bl-local-symbol` | `aarch64:bl/imm26` ×2, +4 and −4 | `llvm-mc` + `ld.lld` |
 | `positive/A64-P6-adrp-lo12-pair` | `aarch64:adrp/x64-imm21` + `aarch64:add/x64-imm12-lsl0`, one `pair_group` | `llvm-mc` + `ld.lld`; relocation kinds read with `llvm-readobj` |
 | `positive/A64-P7-movz-lane` | `aarch64:movz/x64-imm16-lsl0` ×2, `-lsl16`, `-lsl32`, `-lsl48` (`0.5.0`); five instructions, 20 B | `llvm-mc` (no linker: immediates only, no relocations) |
+| `positive/A64-P8-shift-modifier` | `aarch64:add/x64-x64-x64-imm6-lsl`, `-imm6-lsr`, `-imm6-asr` (`0.6.0`); six instructions, 24 B | `llvm-mc` (no linker: registers and immediates only, no relocations) |
 | `negative/N01-absent-scaled-form` | `aarch64:add/x64-imm12-lsl12` against `0.1.0`, which lacks it | `E-FORM-001` |
 | `negative/N01b-absent-register-offset-form` | `aarch64:ldr/x64-base-regoff` (`0.4.0` has no such form) | `E-FORM-001` |
 | `negative/N01d-absent-movz-lane` | `aarch64:movz/x64-imm16-lsl8` (`0.5.0` has four lanes, not eight) | `E-FORM-001` |
+| `negative/N01e-absent-extend-form` | `aarch64:add/x64-x64-w64-uxtw-imm3` (`0.6.0` has no extend row) | `E-FORM-001` |
 | `negative/N03-imm12-out-of-range` | imm12 = 4096 | `E-RANGE-001` |
 | `negative/N03-imm12-disp-out-of-range` | `disp = 4096` on the load/store `imm12` field | `E-RANGE-001` |
 | `negative/N03-imm9-disp-out-of-range` | `disp = −257` on the `imm9` field | `E-RANGE-001` |
 | `negative/N03-cond-out-of-range` | `cond = 16` in a 4-bit field | `E-RANGE-001` |
+| `negative/N03-imm6-out-of-range` | `imm6 = 64`, one past the shift amount's 6-bit field | `E-RANGE-001` |
 | `negative/N04c-bcond-imm19-out-of-range` | `imm19 = 262144`, one past the signed 19-bit field | `E-RANGE-002` |
 | `negative/N12a-pair-without-lo` | two `hi` members in one `pair_group` | `E-FIXUP-007` |
 | `negative/N14-register-wider-than-field` | register 32 in a 5-bit field | `E-OPERAND-004` |
 | `negative/N18a-no-form-switch` | `0x1000` stated on `-lsl0` (legal only as a scaled literal) | `E-RANGE-001` |
 | `negative/N18b-operand-is-field-content` | `0x123000` stated on `-lsl12` (a pre-scaled literal) | `E-RANGE-001` |
 | `negative/N18c-movz-pre-scaled-literal` | `0x12340000` stated on `movz/x64-imm16-lsl16` (a pre-scaled literal) | `E-RANGE-001` |
+| `negative/N19-modifier-is-not-a-carrier` | `{"name": "lsl", "value": 3}` in a `modifiers` entry on `aarch64:add/x64-x64-x64-lsl0` | `E-OPERAND-003` |
 
 `N01` is why the version split matters: a form exists, but not in an older
 document, so a plan bound to `0.1.0` still cannot reach `-lsl12`, a plan bound
 to `0.2.0` cannot reach `b.cond`, a plan bound to `0.3.0` cannot reach the
-load/store rows, and a plan bound to `0.4.0` cannot reach the `movz` lanes. Each
-fixture names the document it targets and that document's digest.
+load/store rows, a plan bound to `0.4.0` cannot reach the `movz` lanes, and a
+plan bound to `0.5.0` cannot reach the shift rows. Each fixture names the
+document it targets and that document's digest.
 
-Not yet covered: `A64-P8` (shift/extend modifier). It has no form in any document,
-so `N01` rejects it rather than guessing.
-The load/store register-offset and literal kinds, and the store's `imm9` kinds,
-are absent for the same reason. A linked `:lo12:` inside the `-lsl12` form is
-measured at the record level (`EXP-0013` §5) but is not an address of the symbol,
-so no fixture links one.
+The extend family (`add x0, x1, w2, uxtw #3`) is the one modifier-shaped
+spelling still absent: it is a different MRS node from the shift rows, with an
+`option` field and a `w` source operand, so it has no form in any document and
+`N01e` rejects it. `sub`, the `w`-width rows, the load/store register-offset and
+literal kinds, and the store's `imm9` kinds are absent for the same reason. A
+linked `:lo12:` inside the `-lsl12` form is measured at the record level
+(`EXP-0013` §5) but is not an address of the symbol, so no fixture links one.
 
 ## Two things a reader of the plans should know
 
@@ -72,6 +78,15 @@ instead of fixed: `imm16` is the field content and `hw` is the exponent, so
 differ only in bits 22–21. Stating the pre-scaled literal (`0x12340000`) on
 `-lsl16` is `E-RANGE-001` (`N18c`), and `lsl #8` is not a lane the ISA has, so it
 is `E-FORM-001` (`N01d`, `ADR-0014`).
+
+The shift rows are the fifth instance, and the one where a single spelling is two
+decisions at once. `imm6` is the field content (`0…63`, no multiplier), and the
+keyword selects the row: `lsl #3`, `lsr #7` and `asr #63` differ in bits 23–22 and
+nothing else about their operands. The keyword cannot be carried by a `modifiers`
+entry — a modifier is a guard in v0 — so the same shift stated as
+`{"name": "lsl", "value": 3}` on `-lsl0` is `E-OPERAND-003` (`N19`), and an amount
+of `64` is `E-RANGE-001` (`N03-imm6`). `lsl #0` and `-lsl0` are the same word
+(`0x8b020020`), so both rows stay (`ADR-0015`, `EXP-0017`).
 
 **An operand whose bits a fixup owns has an empty payload.** `{"payload": {}}`,
 not a `symbol_id`: `01_contract.md` §8.1 only allows `symbol_id` on a `target`

@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P8-shift-modifier.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "3d226fa68fec0ebfba561293b6df5963c4a7a25b8104f063e05927edca5bfee1",
+  "output_sha256": "b20a9e68f624be216c293d3e8ab9d518d9e3c6dd59f89681c22704a8ec20a82d",
+  "size": 24,
+  "records": 0,
+  "notes": "Input (153 B, LF, trailing newline), one instruction per line with two leading spaces: `add x0, x1, x2, lsl #3` / `lsr #7` / `asr #63` / `add x3, x4, x5, lsl #63` / `add x0, x1, x2, lsl #0` / `add x0, x1, x2, lsr #0`. Three forms, one per `shift` value: the first three lines differ only in bits 23-22 and bits 15-10, so the words pin the kind and the amount independently. The `lsl #63` line moves all three registers. The last two lines pin the 0 end of `imm6` on a kind other than LSL, so the range is not a special case for `-lsl0`. `llvm-mc -show-encoding` prints the `lsl #0` line back as `add x0, x1, x2`, the same word as the `-lsl0` form: the two spellings are one instruction (ADR-0015). Every operand is a register or an immediate, so `llvm-readobj -r` prints an empty relocation list and no linker is involved.",
+  "source": "Arm MRS ADD_64_addsub_shift (shift at 22+2, imm6 at 10+6, bit 21 = 0); measured in EXP-0017 §2"
+}

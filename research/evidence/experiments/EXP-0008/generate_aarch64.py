@@ -22,7 +22,7 @@ What it does, per form:
 Documents are emitted per version. A form appears in a document when the
 document's version is at or after the form's `since` (absent `since` means every
 version), so a later document cannot silently lose an earlier form. `0.1.0` …
-`0.4.0` stay frozen: their digests are asserted below, so a later edit that
+`0.5.0` stay frozen: their digests are asserted below, so a later edit that
 perturbs any of them fails loudly instead of shipping.
 
 Reads:  research/external/arm-mrs/Instructions.json (pinned by check_mrs.py)
@@ -31,6 +31,7 @@ Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.3.0.json
         definitions/aarch64/0.4.0.json
         definitions/aarch64/0.5.0.json
+        definitions/aarch64/0.6.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -48,7 +49,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
 MRS = os.path.join(ROOT, "research", "external", "arm-mrs", "Instructions.json")
 OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
-VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0"]
+VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0"]
 
 # Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
@@ -56,6 +57,7 @@ FROZEN_DIGESTS = {
     "0.2.0": "sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed",
     "0.3.0": "sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb",
     "0.4.0": "sha256:14d6c2b66669ff45401b8b69d5ce111c13ce6e8ef44f04440b961b8f2133bc78",
+    "0.5.0": "sha256:9cec1688b5b9d1a9bd9299e6d0a155885053e7b228ff6eee88f40cef6f34e23e",
 }
 
 WIDTH = 32
@@ -323,6 +325,66 @@ FORMS = [
             {"mrs": ["imm16"], "role": "imm", "kind": "aarch64.imm",
              "from": "operand_value", "target_type": "imm16",
              "range": {"signed": False, "bits": 16, "align_bits": 0}},
+        ],
+    },
+    # `A64-P8` (ADR-0015). The shift on a register operand is one keyword plus
+    # one number: `add x0, x1, x2, lsl #3`. The keyword is the 2-bit `shift`
+    # field, the number is the 6-bit `imm6` field. The keyword is a form (three
+    # spellings exist and none of them is numeric), the number is field content
+    # (`0…63`), for the same reason `movz`'s lane is a form and `imm16` is not
+    # (ADR-0014). `shift = 11` is unallocated for add/sub, so `-ror` is not a row.
+    {
+        "form_id": "aarch64:add/x64-x64-x64-imm6-lsl",
+        "mrs": "ADD_64_addsub_shift",
+        "decision": "shift = LSL (00); imm6 is field content (the shift amount)",
+        "pinned": {"shift": 0},
+        "since": "0.6.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm6"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm6",
+             "range": {"signed": False, "bits": 6, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:add/x64-x64-x64-imm6-lsr",
+        "mrs": "ADD_64_addsub_shift",
+        "decision": "shift = LSR (01); imm6 is field content (the shift amount)",
+        "pinned": {"shift": 1},
+        "since": "0.6.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm6"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm6",
+             "range": {"signed": False, "bits": 6, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:add/x64-x64-x64-imm6-asr",
+        "mrs": "ADD_64_addsub_shift",
+        "decision": "shift = ASR (10); imm6 is field content (the shift amount)",
+        "pinned": {"shift": 2},
+        "since": "0.6.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm6"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm6",
+             "range": {"signed": False, "bits": 6, "align_bits": 0}},
         ],
     },
 ]

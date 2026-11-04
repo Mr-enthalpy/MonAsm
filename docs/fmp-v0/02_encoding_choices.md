@@ -90,6 +90,7 @@ not be moved to `frozen` on the strength of an argument alone.
 | EC-28 | x86-64 | Minimal prefix set vs a redundant prefix (`89 d8` vs `40 89 d8`; likewise a redundant `66`, segment or `REX` prefix) | One byte per redundant prefix, identical semantics | `none` — definition rule: emit the minimal prefix set | `40 89 d8` decodes as `movl %ebx, %eax`, exactly like `89 d8`. Two honest implementers could differ by one byte with no observable semantic difference, so the definition must pin minimality and no plan field may request the redundant byte. | frozen |
 | EC-29 | AArch64 | `b.cond` condition: sixteen values in the 4-bit `cond` field | Bits 0–3; no length, opcode or relocation change | `operand type` (`aarch64.cond` / `cond4`) | `b.eq .+4` is `0x54000020` and `b.ne .+4` is `0x54000021`: one nibble apart, both 4 bytes, so a wrong condition is a valid word that branches on the wrong flags. Masking `cond = 16` to four bits yields `0x0`, which is `eq` (`ADR-0012`, `EXP-0014`). | frozen |
 | EC-30 | AArch64 | `MOVZ` lane: `hw` selects which 16-bit lane of the 64-bit destination the `imm16` content lands in | Bits 22–21; the value the instruction builds is `imm16 << 16·hw` | `form variant` (`-lsl0` … `-lsl48`) | `llvm-mc` 23.1.2: `movz x0, #0x1234` is `0xd2824680` and `movz x0, #0x1234, lsl #16` is `0xd2a24680`. Both put the same `imm16 = 0x1234` at bits 20–5 and differ only in bits 22–21, so neither the operand value nor `expected_size` can tell them apart; two honest implementers of one `movz` row would emit different words (`ADR-0014`, `EXP-0016`). | frozen |
+| EC-31 | AArch64 | Shift on a register operand: `lsl` / `lsr` / `asr` with an amount `0…63` (`shift` at 23–22, `imm6` at 15–10) | Bits 23–22 and 15–10; the operand value is combined with a shifted register | `form variant` for the keyword (`-imm6-lsl` … `-imm6-asr`), `operand type` for the amount (`aarch64.imm` / `imm6`) | `llvm-mc` 23.1.2: `add x0, x1, x2, lsl #3` is `0x8b020c20` and `add x0, x1, x2, lsr #7` is `0x8b421c20`; every register field is identical, and a plan that stated only the registers could not distinguish the two words. The amount is a second reading of the same instruction: `lsl #0` and `lsl #63` differ only in `imm6`. The keyword has no numeric spelling (`ror` is rejected, `shift = 11` is unallocated), and a `modifiers` entry cannot carry it — the `-lsl0` row with `{"name": "lsl", "value": 3}` is `E-OPERAND-003` (`N19`), because the materializer would otherwise emit the unshifted word and report success (`ADR-0015`, `EXP-0017`). | frozen |
 
 ## v0 surface (OD-10)
 
@@ -115,7 +116,7 @@ is what makes the two `mov` forms and the two `add` immediate forms distinct
 without an extra choice field. A plan that names `x86:mov/r64-r64` or
 `x86:add/rm64-imm` is rejected: those ids are not in the v0 definition.
 
-The AArch64 slice is fifteen forms across five documents, covering eight frozen
+The AArch64 slice is eighteen forms across six documents, covering nine frozen
 `EC` rows:
 
 | `form_id` | Encoding | Operand signature | Table | Covers |
@@ -135,6 +136,9 @@ The AArch64 slice is fifteen forms across five documents, covering eight frozen
 | `aarch64:movz/x64-imm16-lsl16` | `MOVZ`, `hw=01` | dest `x64`, imm `imm16` (field content) | `0.5.0`+ | EC-30, A64-P7 |
 | `aarch64:movz/x64-imm16-lsl32` | `MOVZ`, `hw=10` | dest `x64`, imm `imm16` (field content) | `0.5.0`+ | EC-30, A64-P7 |
 | `aarch64:movz/x64-imm16-lsl48` | `MOVZ`, `hw=11` | dest `x64`, imm `imm16` (field content) | `0.5.0`+ | EC-30, A64-P7 |
+| `aarch64:add/x64-x64-x64-imm6-lsl` | `ADD (shifted register)`, `sf=1`, `shift=LSL` | dest `x64`, src `x64`, src2 `x64`, imm `imm6` (amount) | `0.6.0`+ | EC-31, A64-P8 |
+| `aarch64:add/x64-x64-x64-imm6-lsr` | `ADD (shifted register)`, `shift=LSR` | dest `x64`, src `x64`, src2 `x64`, imm `imm6` (amount) | `0.6.0`+ | EC-31, A64-P8 |
+| `aarch64:add/x64-x64-x64-imm6-asr` | `ADD (shifted register)`, `shift=ASR` | dest `x64`, src `x64`, src2 `x64`, imm `imm6` (amount) | `0.6.0`+ | EC-31, A64-P8 |
 
 The `-lsl0`/`-lsl12` suffix is part of the id because the MRS node leaves
 `shift`, `imm6` and `sh` variable; the table pins them and the name says so
@@ -142,7 +146,8 @@ The `-lsl0`/`-lsl12` suffix is part of the id because the MRS node leaves
 by a form variant, not by a value-dependent bit. `-lsl12` is in `0.2.0` and later
 only, so naming it against `0.1.0` is `E-FORM-001` (`N01`). The
 `-lsl0` … `-lsl48` suffix on the four `movz` rows is the same device for the
-2-bit `hw` lane selector.
+2-bit `hw` lane selector, and `-imm6-lsl` … `-imm6-asr` is the same device again
+for the 2-bit `shift` selector, with the amount as the last operand.
 
 `b.cond` is the opposite case and shows where the line is: the condition is a
 4-bit *operand* (`EC-29`), so one row covers all sixteen conditions, while the
@@ -154,8 +159,19 @@ assembly language gives it four spellings (`lsl #0/#16/#32/#48`) but no operand:
 `llvm-mc` rejects `lsl #8` and rejects a pre-scaled literal such as `#0x10000`
 (`EXP-0016` §2). So `0.5.0` carries one row per lane, `imm16` stays field content
 in `0…65535`, and the `mov` alias — which *does* pick the lane from the literal's
-value — stays out as `EC-16` (`EC-30`, ADR-0014). `A64-P8` (a shift or extend
-modifier on a register operand) has no row, so naming it is `E-FORM-001`.
+value — stays out as `EC-16` (`EC-30`, ADR-0014).
+
+The shift on a register operand is the fourth shape and the one a plan would most
+naturally try to carry as a modifier. It is two decisions in one spelling:
+`add x0, x1, x2, lsl #3` names a *kind* (`lsl`/`lsr`/`asr`, three keywords and no
+numeric spelling — `ror` is rejected and `shift = 11` is unallocated) and an
+*amount* (`imm6`, `0…63`). `0.6.0` carries the kind as the form
+(`-imm6-lsl` … `-imm6-asr`) and the amount as an `imm6` operand, because a
+`modifiers` entry is a guard that never writes a bit: the `-lsl0` row with
+`{"name": "lsl", "value": 3}` is `E-OPERAND-003` (`N19`), and silently accepting it
+would emit the unshifted word and report success (`EC-31`, ADR-0015). The extend
+family (`add x0, x1, w2, uxtw #3` → `0x8b224c20`) is a different node with a
+narrower source operand, so it has no row (`E-FORM-001`, `N01e`).
 
 The five load/store rows carry `EC-14` and are the AArch64 half of `ADR-0008`:
 the address is `base` + `disp`, never one memory payload, and the addressing
@@ -325,15 +341,23 @@ The v0 `EC` set is decided (OD-10). What remains is per-row evidence:
 
 - `EC-05`, `EC-08`, `EC-09`, `EC-10`, `EC-16`, `EC-18`, `EC-23`, `EC-24`,
   `EC-25`, `EC-26` are `draft` and need an observed counterexample before they can
-  be frozen. None of them is required by the x86 slice.
+  be frozen. None of them is required by the x86 slice. `EC-08`, `EC-10` and
+  `EC-26` name `operand modifier` as the carrier for `addr_size`, `lock`/`rep` and
+  `aq`/`rl`; ADR-0015 shows that in v0 a modifier is a guard that never writes a
+  bit, so each of those rows still needs a decision about which of the two
+  readings it is.
 - The AArch64 rows now have a table (ADR-0005, ADR-0006, ADR-0011, ADR-0012):
   EC-11, EC-13, EC-15 and EC-17 are exercised by `definitions/aarch64/0.1.0.json`;
   EC-12 in both halves, `sh=0` in `0.1.0` and `sh=1` in `0.2.0`; EC-29 in `0.3.0`,
   which carries the condition as an operand rather than as sixteen forms; EC-14 in
-  `0.4.0`, one row per addressing kind; EC-30 in `0.5.0`, one row per `movz` lane.
+  `0.4.0`, one row per addressing kind; EC-30 in `0.5.0`, one row per `movz` lane;
+  EC-31 in `0.6.0`, one row per shift keyword with the amount as an `imm6`
+  operand.
   EC-16 (the `mov` alias family) and EC-18 stay `draft` and are not in the v0
   surface: EC-30 decides the lane *inside* `movz` and does not decide which
-  lowering a `mov` request becomes.
+  lowering a `mov` request becomes. EC-13's shifted-register half is carried by
+  `0.1.0` and `0.6.0`; its extended-register half has no row yet, and neither has
+  `sub`, the `w` rows or the load/store kinds listed above.
 - The RV64 source is settled (ADR-0007: the UDB resolved spec, pinned by archive
   hash in `EXP-0009`), and both documents are generated: `definitions/rv64/0.1.0.json`
   and `0.2.0.json` (ADR-0009). `RV-P7` (`c.addi`) needed a format decision before
