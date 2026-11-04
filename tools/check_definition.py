@@ -223,7 +223,31 @@ def check_definition(path: Path, errors):
                     )
             if "excluded" in slot:
                 check_excluded(slot, slot_spot, total, errors)
+        check_prefix_kinds(slots, bytes.fromhex(template), spot, errors)
     return document
+
+
+def check_prefix_kinds(slots, template, spot, errors):
+    """`ADR-0029`: a REX prefix re-labels 8-bit register numbers 4-7 as
+    `spl`/`bpl`/`sil`/`dil`, so a high-byte slot cannot sit in a REX template
+    and a REX-less low-byte slot must exclude 4-7."""
+    rex = bool(template) and 0x40 <= template[0] <= 0x4F
+    for index, slot in enumerate(slots):
+        kind = slot.get("kind")
+        if kind == "x86.gpr8h" and rex:
+            fail(
+                errors,
+                "%s/slots/%d" % (spot, index),
+                "a REX-prefixed form cannot carry x86.gpr8h",
+            )
+        if kind == "x86.gpr8" and not rex:
+            excluded = slot.get("excluded") or []
+            if not all(value in excluded for value in (4, 5, 6, 7)):
+                fail(
+                    errors,
+                    "%s/slots/%d" % (spot, index),
+                    "a REX-less x86.gpr8 slot must exclude 4..7",
+                )
 
 
 def check_excluded(slot, spot, width_bits, errors):

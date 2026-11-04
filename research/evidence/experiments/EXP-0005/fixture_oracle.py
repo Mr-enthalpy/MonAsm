@@ -6,12 +6,18 @@ extracts `.text`, and that byte string becomes `*.expected.bin`. The script then
 records the tool version, the exact command, and the SHA-256 of both the input
 and the output, so the measurement can be repeated from a clean checkout.
 
-Two cases cannot be produced from a mnemonic and are handled explicitly:
+Cases where the assembler makes a different choice than the plan are handled
+explicitly:
 
 - `X86-P1`'s `8B /r` half: `llvm-mc` always picks `89 /r` for
   `movq %rbx, %rax`. The second instruction's bytes are therefore verified by
   disassembly, and the record says `manual+disassembly` rather than pretending a
   tool emitted them.
+- `X86-P4`'s last instruction: `llvm-mc` always picks `mod = 01` for `8(%rbp)`,
+  so the `disp32` row with a small value is derived from the ModRM rule and
+  verified by disassembly.
+- `X86-P5`'s `8B /r` 16-bit half: `llvm-mc` always picks `89 /r` for
+  `movw %bx, %ax`, for the same reason as P1.
 - `X86-P8`'s external branch: the assembled bytes are `e9 00 00 00 00` plus one
   `R_X86_64_PLT32 ext -4` relocation. The record's `records` count is 1; the
   materializer's `pcrel_end` with `addend = 0` is the same value
@@ -102,6 +108,22 @@ CASES = [
             "selects it from a mnemonic, so it is derived from the ModRM rule and "
             "verified by `llvm-mc -disassemble`, which prints `movq 8(%rbp), %rax`. It "
             "pins that the disp32 form is not shortened (INV-02)."
+        ),
+    },
+    {
+        "stem": "X86-P5-prefixes",
+        "asm": "P5.asm",
+        "suffix": bytes.fromhex("668bc3"),
+        "records": 0,
+        "kind": "manual+disassembly",
+        "notes": (
+            "The assembled part exercises both prefix rules: `movw %bx,%ax` is 66 89 d8 "
+            "and `movw %si,%di` is 66 89 f7 (0x66 as template byte 0); `movb %ah,%ch` is "
+            "88 e5 while `movb %spl,%bpl` is 40 88 e5, the same ModRM byte with a different "
+            "register set; `movb %al,%cl` is the REX-less low-byte row and `movb %ah,%ah` "
+            "keeps number 4 as a high byte on both sides. The appended 66 8b c3 is the `8B` "
+            "direction at 16 bits, which llvm-mc will not select from a mnemonic, so it is "
+            "verified by `llvm-mc -disassemble`, which prints `movw %bx, %ax`."
         ),
     },
     {

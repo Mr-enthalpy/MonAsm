@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj P5.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "manual+disassembly",
+  "input_sha256": "2025c68efd6397b6ff70dfb3795d052c88b37cf8cdce22b42ffa926a67faf151",
+  "output_sha256": "e38f01697dade526a61fae6932b4cde283c32bce12ede7d63c096a2c98615cac",
+  "size": 20,
+  "records": 0,
+  "notes": "The assembled part exercises both prefix rules: `movw %bx,%ax` is 66 89 d8 and `movw %si,%di` is 66 89 f7 (0x66 as template byte 0); `movb %ah,%ch` is 88 e5 while `movb %spl,%bpl` is 40 88 e5, the same ModRM byte with a different register set; `movb %al,%cl` is the REX-less low-byte row and `movb %ah,%ah` keeps number 4 as a high byte on both sides. The appended 66 8b c3 is the `8B` direction at 16 bits, which llvm-mc will not select from a mnemonic, so it is verified by `llvm-mc -disassemble`, which prints `movw %bx, %ax`.",
+  "disassembly": "movw\t%bx, %ax"
+}

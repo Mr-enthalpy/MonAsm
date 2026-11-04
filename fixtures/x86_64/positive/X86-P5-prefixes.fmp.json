@@ -1,0 +1,134 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "x86",
+    "isa_variant": "x86-64",
+    "execution_mode": "64",
+    "enabled_extensions": [],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.x86",
+    "version": "0.4.0",
+    "digest": "sha256:ee2141cbb17f338c5b4a9de0302076bb2416838c09f7c44e2ca097cb142a2682"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [".text"],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": 20,
+      "fragments": [
+        { "offset": 0, "size": 3, "kind": "instruction", "instruction_id": "I0001" },
+        { "offset": 3, "size": 3, "kind": "instruction", "instruction_id": "I0002" },
+        { "offset": 6, "size": 2, "kind": "instruction", "instruction_id": "I0003" },
+        { "offset": 8, "size": 2, "kind": "instruction", "instruction_id": "I0004" },
+        { "offset": 10, "size": 2, "kind": "instruction", "instruction_id": "I0005" },
+        { "offset": 12, "size": 3, "kind": "instruction", "instruction_id": "I0006" },
+        { "offset": 15, "size": 2, "kind": "instruction", "instruction_id": "I0007" },
+        { "offset": 17, "size": 3, "kind": "instruction", "instruction_id": "I0008" }
+      ]
+    }
+  ],
+  "symbols": [],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "x86:mov/rm16-r16/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr16", "target_type": "rm16", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.gpr16", "target_type": "r16", "payload": { "reg": 3 }, "modifiers": [] }
+      ],
+      "expected_size": 3
+    },
+    {
+      "instruction_id": "I0002",
+      "section_id": ".text",
+      "offset": 3,
+      "form_id": "x86:mov/rm16-r16/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr16", "target_type": "rm16", "payload": { "reg": 7 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.gpr16", "target_type": "r16", "payload": { "reg": 6 }, "modifiers": [] }
+      ],
+      "expected_size": 3
+    },
+    {
+      "instruction_id": "I0003",
+      "section_id": ".text",
+      "offset": 6,
+      "form_id": "x86:mov/rm8h-r8h/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr8h", "target_type": "rm8h", "payload": { "reg": 5 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.gpr8h", "target_type": "r8h", "payload": { "reg": 4 }, "modifiers": [] }
+      ],
+      "expected_size": 2
+    },
+    {
+      "instruction_id": "I0004",
+      "section_id": ".text",
+      "offset": 8,
+      "form_id": "x86:mov/rm8h-r8h/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr8h", "target_type": "rm8h", "payload": { "reg": 4 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.gpr8h", "target_type": "r8h", "payload": { "reg": 5 }, "modifiers": [] }
+      ],
+      "expected_size": 2
+    },
+    {
+      "instruction_id": "I0005",
+      "section_id": ".text",
+      "offset": 10,
+      "form_id": "x86:mov/rm8-r8/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr8", "target_type": "rm8", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.gpr8", "target_type": "r8", "payload": { "reg": 0 }, "modifiers": [] }
+      ],
+      "expected_size": 2
+    },
+    {
+      "instruction_id": "I0006",
+      "section_id": ".text",
+      "offset": 12,
+      "form_id": "x86:mov/rm8-r8-rex/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr8", "target_type": "rm8", "payload": { "reg": 5 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.gpr8", "target_type": "r8", "payload": { "reg": 4 }, "modifiers": [] }
+      ],
+      "expected_size": 3
+    },
+    {
+      "instruction_id": "I0007",
+      "section_id": ".text",
+      "offset": 15,
+      "form_id": "x86:mov/rm8h-r8h/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr8h", "target_type": "rm8h", "payload": { "reg": 4 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.gpr8h", "target_type": "r8h", "payload": { "reg": 4 }, "modifiers": [] }
+      ],
+      "expected_size": 2
+    },
+    {
+      "instruction_id": "I0008",
+      "section_id": ".text",
+      "offset": 17,
+      "form_id": "x86:mov/r16-rm16/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr16", "target_type": "r16", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.gpr16", "target_type": "rm16", "payload": { "reg": 3 }, "modifiers": [] }
+      ],
+      "expected_size": 3
+    }
+  ],
+  "fixups": []
+}

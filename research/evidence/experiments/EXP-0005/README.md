@@ -1,7 +1,7 @@
 # EXP-0005 — x86-64 positive fixtures, measured with LLVM
 
-- Date: 2026-11-04 (extended 2026-11-05 with `X86-P6` and `X86-P4`)
-- Subject: `fixtures/x86_64/positive/` — the seven bytes-emitting vectors
+- Date: 2026-11-04 (extended 2026-11-05 with `X86-P6`, `X86-P4` and `X86-P5`)
+- Subject: `fixtures/x86_64/positive/` — the eight bytes-emitting vectors
 - Toolchain: LLVM 23.1.2 (`llvm-mc`, `llvm-objcopy`, `llvm-readobj`), Python 3.8
 - Basis: **experiment** for every byte below
 - Reproduce: `python fixture_oracle.py` (rewrites), or
@@ -29,6 +29,7 @@ LLVM agree, not that a function agrees with itself.
 | `X86-P3-two-legal-encodings` | `addq $300,%rax`; `addq $300,%rbx` | `48052c010000 4881c32c010000` | 13 | `llvm-mc` |
 | `X86-P7-short-and-near-branch` | `jmp .+0x81`; `jmp .+0x82` | `eb7f e97d000000` | 7 | `llvm-mc` |
 | `X86-P4-base-disp` | `%rbp` at 0; `disp8 = 8`/`-1`; `disp32 = 4096`; `%rsp` SIB pair; both stores; `disp32 = 8` | `488b4500 488b4d08 488b50ff 488b9d00100000 488b742408 488bbc2400100000 48894510 4889942400100000 488b8508000000` | 51 | `llvm-mc` + `manual+disassembly` |
+| `X86-P5-prefixes` | two `movw` rows; high bytes both ways; `movb %al,%cl`; `movb %spl,%bpl`; `movb %ah,%ah`; decode-verified `66 8b c3` | `6689d8 6689f7 88e5 88ec 88c1 4088e5 88e4 668bc3` | 20 | `llvm-mc` + `manual+disassembly` |
 | `X86-P6-rip-relative` | `movq 16(%rip),%rax`; local load/store against `L1` at `0x20`; `movq ext(%rip),%rbx` | `488b0510000000 488b0d12000000` + 2×`00` + `48891509000000` + 9×`00` + `aabbccdd 488b1d00000000` | 43 | `llvm-mc` + `llvm-readobj` |
 | `X86-P8-local-and-external-branch` | `jmp L1` (resolved); `jmp ext` (recorded) | `e9cb000000` + 200×`00` + `4889d8 4883c001 e900000000` | 217 | `llvm-mc` + `llvm-readobj` |
 
@@ -38,7 +39,7 @@ path: the plan names a form, the table places the fields, and the bytes match.
 
 ## 3. Cases LLVM cannot emit from assembly text
 
-Three instructions in the fixtures are not produced by `llvm-mc` from a
+Four instructions in the fixtures are not produced by `llvm-mc` from a
 mnemonic. They are **decode-verified**, not assembled, and the oracle record says
 so:
 
@@ -58,6 +59,11 @@ so:
   is derived from the ModRM rule and verified by `llvm-mc -disassemble`, which
   prints `movq 8(%rbp), %rax`. It pins that the plan's named width is not
   shortened (`INV-02`).
+- `X86-P5`'s last instruction (`66 8B /r`). `llvm-mc` always picks `89 /r` for
+  `movw %bx, %ax`, so the load direction at 16 bits is the `8B` twin of the
+  measured `66 89 d8` and is verified by `llvm-mc -disassemble`, which prints
+  `movw %bx, %ax`. It keeps the direction pair explicit, as `X86-P1` does at 64
+  bits.
 
 ## 4. Branch notes
 

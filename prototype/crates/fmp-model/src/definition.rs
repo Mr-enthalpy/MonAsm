@@ -322,6 +322,30 @@ fn bind_form(value: &json::Json, path: String) -> Result<Form, Diagnostic> {
         }
         slots.push(slot);
     }
+    // `ADR-0029`: a REX prefix re-labels 8-bit register numbers 4–7 from
+    // `ah`/`ch`/`dh`/`bh` to `spl`/`bpl`/`sil`/`dil`, so the high-byte kind can
+    // only sit in a template without a leading REX byte, and a REX-less low-byte
+    // slot must not accept 4–7 (they would encode the high bytes instead).
+    let rex_prefixed = matches!(template.first(), Some(byte) if (0x40..=0x4f).contains(byte));
+    for (index, slot) in slots.iter().enumerate() {
+        if slot.kind == "x86.gpr8h" && rex_prefixed {
+            return Err(load_error(
+                &form_id,
+                &format!("slot {index}: a REX-prefixed form cannot carry x86.gpr8h"),
+            ));
+        }
+        if slot.kind == "x86.gpr8"
+            && !rex_prefixed
+            && ![4, 5, 6, 7]
+                .iter()
+                .all(|value| slot.excluded.contains(value))
+        {
+            return Err(load_error(
+                &form_id,
+                &format!("slot {index}: a REX-less x86.gpr8 slot must exclude 4..=7"),
+            ));
+        }
+    }
     Ok(Form {
         form_id,
         template,
@@ -720,4 +744,47 @@ fn collect_json(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), Diagnostic> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn document(form: &str) -> String {
+        [
+            r#"{"definition_format":"fmp-def/0.1","namespace":"monasm.isa.x86","version":"test","#,
+            r#""target_identity":{"isa_family":"x86","isa_variant":"x86-64","execution_mode":"64","#,
+            r#""enabled_extensions":[],"byte_order":"little","address_width":64},"forms":["#,
+            form,
+            "]}",
+        ]
+        .concat()
+    }
+
+    fn form(id: &str, template: &str, slot: &str) -> String {
+        format!(r#"{{"form_id":"{id}","template":"{template}","slots":[{slot}]}}"#)
+    }
+
+    const HIGH_SLOT: &str = r#"{"role":"dest","kind":"x86.gpr8h","target_type":"rm8h","from":"reg_number","modifiers":[],"placements":[{"bit_offset":16,"width":3}]}"#;
+    const LOW_SLOT: &str = r#"{"role":"dest","kind":"x86.gpr8","target_type":"rm8","from":"reg_number","modifiers":[],"placements":[{"bit_offset":8,"width":3}]}"#;
+
+    /// `ADR-0029`: a REX prefix re-labels 4–7 as `spl`/`bpl`/`sil`/`dil`, so a
+    /// high-byte slot in a REX form would encode a different register silently.
+    #[test]
+    fn high_byte_kind_is_rejected_on_a_rex_form() {
+        let text = document(&form("x86:mov/rm8h-r8h/legacy", "4088e0", HIGH_SLOT));
+        let error = read(text.as_bytes()).expect_err("a REX form must not carry x86.gpr8h");
+        assert_eq!(error.code(), codes::E_DEF_001);
+        assert!(format!("{error:?}").contains("x86.gpr8h"));
+    }
+
+    /// The same rule seen from the other side: without REX, value 4 is `ah`, so a
+    /// `x86.gpr8` slot that accepts it would name the wrong register.
+    #[test]
+    fn low_byte_kind_without_rex_must_exclude_the_high_numbers() {
+        let text = document(&form("x86:mov/rm8-r8/legacy", "88c0", LOW_SLOT));
+        let error = read(text.as_bytes()).expect_err("a REX-less gpr8 slot must exclude 4..=7");
+        assert_eq!(error.code(), codes::E_DEF_001);
+        assert!(format!("{error:?}").contains("exclude 4..=7"));
+    }
 }

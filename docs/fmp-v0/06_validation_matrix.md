@@ -105,7 +105,7 @@ host" is the honest result.
 | AC-01 | Contract complete enough to guide implementation | `01_contract.md` with no `TBD` on fields used by the three slices | **clear for the x86 and AArch64 slices**: OD-02, OD-04, OD-07 and OD-09 settled; the fields those tables use have frozen rows in `01_contract.md`, `03_fixup_model.md` and `07_definition_format.md`. The RV64 surface has no table yet (`OD-12` settles its source, ADR-0007), so AC-01 stays open until `definitions/rv64/` lands |
 | AC-02 | Key fields justified | Each frozen field cites a counterexample or source evidence | in progress — every field the x86 slice uses now cites one (OD-02/04/09); the remaining `draft` fields are optional or Level 1 |
 | AC-03 | Three-ISA vertical slices | One closed loop per ISA: plan → validate → encode → fixup → oracle compare | planned |
-| AC-04 | Encoding ambiguity proven absent | x86 `imm8`/`imm32`, `rel8`/`rel32`, `89`/`8B` and RV64 `c.*` vs standard are distinct `form_id`s; per-`EC` negative test per `02_encoding_choices.md`, "Validation obligation" | planned |
+| AC-04 | Encoding ambiguity proven absent | x86 `imm8`/`imm32`, `rel8`/`rel32`, `89`/`8B`, the `88`/`40 88`/`88h` register sets and RV64 `c.*` vs standard are distinct `form_id`s; per-`EC` negative test per `02_encoding_choices.md`, "Validation obligation" | planned |
 | AC-05 | Fixups validated | x86 `rel32`; AArch64 `adrp`+`:lo12:`; RV64 `auipc`+`lo12` or B-type scatter | planned — the mode decision is settled (OD-02: two modes, one effect each), so the fixtures can be written |
 | AC-06 | Strict rejection | All applicable N01–N13 with recorded codes | planned |
 | AC-07 | Deterministic replay | EXP-R1, EXP-R2, EXP-R4, EXP-R5 | planned |
@@ -127,7 +127,7 @@ Each vector needs **two independent sources**: our materializer, and an oracle
 | X86-P2 | Arithmetic with immediate | `x86:add/rm64-imm8/legacy` and `x86:add/rm64-imm32/legacy` as separate forms | llvm-mc | x86 passing (`EXP-0005`) |
 | X86-P3 | Same operation, different legal encodings | `x86:add/rax-imm32/legacy` vs `x86:add/rm64-imm32/legacy`; `x86:mov/rm-r64` vs `x86:mov/r64-rm` | llvm-mc | x86 passing (`EXP-0005`) |
 | X86-P4 | Displacement width | `mov rax, [rbp-8]` (disp8) vs (disp32): `x86:mov/r64-base-disp8/legacy` / `-disp32`, the store pair, and the `%rsp` SIB pair | llvm-mc + llvm-objdump | x86 passing (`EXP-0030`; `X86-P4-base-disp`) |
-| X86-P5 | Prefix rules | 16-bit operand with `0x66`; REX + high-byte rejection | llvm-mc | deferred: no `0x66`/high-byte form in the v0 surface (`OD-10`) |
+| X86-P5 | Prefix rules | 16-bit operand with `0x66`; REX + high-byte rejection: `x86:mov/rm16-r16/legacy`, `x86:mov/r16-rm16/legacy`, `x86:mov/rm8h-r8h/legacy`, `x86:mov/rm8-r8/legacy` and `x86:mov/rm8-r8-rex/legacy` | llvm-mc | x86 passing (`EXP-0031`; `X86-P5-prefixes`) |
 | X86-P6 | RIP-relative reference | `mov rax, [rip+disp32]`: `x86:mov/r64-riprel32/legacy` and the store direction, with a `pcrel_end` fixup | llvm-mc + llvm-readobj | x86 passing (`EXP-0029`; `X86-P6-rip-relative`) |
 | X86-P7 | Short vs near branch | `x86:jmp/rel8/legacy` and `x86:jmp/rel32/legacy` as explicit plans | llvm-mc | x86 passing (`EXP-0005`) |
 | X86-P8 | External branch fixup | `x86:jmp/rel32/legacy` to an undefined symbol with `emit_relocation`, record emitted. `call rel32` is not in the v0 surface (`OD-10`); its descriptor is identical, so the record shape is exercised without adding a form | llvm-mc + llvm-readobj | x86 passing (`EXP-0005`) |
@@ -152,23 +152,27 @@ adds the two RIP-relative rows (nine forms, digest
 base+displacement rows (seventeen forms, digest
 `sha256:02500bf74d5c3db7816a30aca6c9c4d8fc7c5097306bc742f51284636c487c10`);
 `EXP-0030` measures their fields and the fixture below.
+`definitions/x86_64/0.4.0.json` repeats those seventeen and adds the five
+prefix rows (twenty-two forms, digest
+`sha256:ee2141cbb17f338c5b4a9de0302076bb2416838c09f7c44e2ca097cb142a2682`);
+`EXP-0031` measures their bytes and the fixture below.
 
-X86-P1, P2, P3, P4, P6, P7 and P8 have fixtures under
+X86-P1, P2, P3, P4, P5, P6, P7 and P8 have fixtures under
 `fixtures/x86_64/positive/` and a recorded oracle in `EXP-0005`; the fixture gate
 compares their bytes with the oracle's, never with the materializer's own
 expectation.
 
-X86-P5 is **deferred, not omitted**. `ADR-0008` settled the representation: one
-operand per encoded field (`base`, `disp`, `index`, `scale`), never a
-`{mem: …}` payload, because the encoding form changes with the operand values.
-`movq 8(%rcx), %rax` is `48 8b 41 08` (mod=01),
-`movq 4096(%rcx), %rax` is `48 8b 81 00 10 00 00` (mod=10), and
-`movq (%rbp), %rax` is `48 8b 45 00` (mod=01, because mod=00 with `r/m = 101` is
-RIP-relative). `X86-P4` took those base+disp shapes plus the `%rsp` SIB pair in
-`0.3.0` (`ADR-0028`, `EXP-0030`), and `X86-P6` took the one shape that has no
-base register: `mod = 00`, `r/m = 101`, `disp32` (`ADR-0027`, `EXP-0029`). P5 is
-a different gap: the `0x66` prefix and the high-byte register rule are absent
-from the v0 surface (`OD-10`).
+`ADR-0008` settled the memory representation: one operand per encoded field
+(`base`, `disp`, `index`, `scale`), never a `{mem: …}` payload, because the
+encoding form changes with the operand values. That decision plus `ADR-0027`
+and `ADR-0028` closed P4 and P6: `movq 8(%rcx), %rax` is `48 8b 41 08`
+(mod=01), `movq 4096(%rcx), %rax` is `48 8b 81 00 10 00 00` (mod=10),
+`movq (%rbp), %rax` is `48 8b 45 00` (mod=01, because mod=00 with `r/m = 101`
+is RIP-relative), and `%rsp` is a fixed-base SIB form. P5 is a different
+question and is closed by `ADR-0029`: `0x66` selects the 16-bit width as
+template byte 0, and the 8-bit rows are split by prefix because `88 e5` is
+`ah`/`ch` while `40 88 e5` is `spl`/`bpl` (`EC-36`, `EXP-0031`). Only `X86-P9`
+(the extension encoding families) stays outside v0 (`OD-10`).
 
 
 ### AArch64 (directive §6.2)

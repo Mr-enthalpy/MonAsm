@@ -132,7 +132,9 @@ the list is rejected with `E-RANGE-004` even though `range` accepts it; an
 absent key means no value is excluded, and an empty list is a definition error
 because it is not a statement. The check is a lookup, never an expression
 (`INV-06`), so "legal" remains decidable by inspection. No AArch64 slot declares
-one; on x86 the base slots of the non-SIB rows exclude `%rsp` (`ADR-0028`);
+one; on x86 the base slots of the non-SIB rows exclude `%rsp` (`ADR-0028`) and
+the three 8-bit rows use the list to keep the high-byte, REX-less low-byte and
+REX low-byte number sets disjoint (`ADR-0029`);
 `riscv:c.addi/rd-imm6` was the first user, excluding `0` on both slots (§8.5).
 
 ### 4.1 Placements
@@ -224,6 +226,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.1.0.json` | `monasm.isa.x86` | `sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad` |
 | `definitions/x86_64/0.2.0.json` | `monasm.isa.x86` | `sha256:d9c088cacb9d20dcf8b801cbdb978996ed31d2e70b631897a905d179207991ac` |
 | `definitions/x86_64/0.3.0.json` | `monasm.isa.x86` | `sha256:02500bf74d5c3db7816a30aca6c9c4d8fc7c5097306bc742f51284636c487c10` |
+| `definitions/x86_64/0.4.0.json` | `monasm.isa.x86` | `sha256:ee2141cbb17f338c5b4a9de0302076bb2416838c09f7c44e2ca097cb142a2682` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -246,7 +249,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.3.0`
+### 8.1 `x86-64` `0.1.0` … `0.4.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -267,6 +270,11 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:mov/r64-rsp-disp32/legacy` | `488b842400000000` | dest: `x86.gpr64`/`r64` → `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
 | `x86:mov/rsp-disp8-r64/legacy` | `4889442400` | src: `x86.gpr64`/`r64` → `[19,3]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
 | `x86:mov/rsp-disp32-r64/legacy` | `4889842400000000` | src: `x86.gpr64`/`r64` → `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
+| `x86:mov/rm16-r16/legacy` | `6689c0` | dest: `x86.gpr16`/`rm16` → `[16,3]`; src: `x86.gpr16`/`r16` → `[19,3]` | 3 | `EC-36`, `X86-P5` — `0.4.0`+ |
+| `x86:mov/r16-rm16/legacy` | `668bc0` | dest: `x86.gpr16`/`r16` → `[19,3]`; src: `x86.gpr16`/`rm16` → `[16,3]` | 3 | `EC-36`, `X86-P5` — `0.4.0`+ |
+| `x86:mov/rm8h-r8h/legacy` | `88e4` | dest: `x86.gpr8h`/`rm8h` → `[8,3]` (excl 0, 1, 2, 3); src: `x86.gpr8h`/`r8h` → `[11,3]` (excl 0, 1, 2, 3) | 2 | `EC-36`, `X86-P5` — `0.4.0`+ |
+| `x86:mov/rm8-r8/legacy` | `88c0` | dest: `x86.gpr8`/`rm8` → `[8,3]` (excl 4, 5, 6, 7); src: `x86.gpr8`/`r8` → `[11,3]` (excl 4, 5, 6, 7) | 2 | `EC-36`, `X86-P5` — `0.4.0`+ |
+| `x86:mov/rm8-r8-rex/legacy` | `4088e0` | dest: `x86.gpr8`/`rm8` → `[16,3]` (excl 0, 1, 2, 3); src: `x86.gpr8`/`r8` → `[19,3]` (excl 0, 1, 2, 3) | 3 | `EC-36`, `X86-P5` — `0.4.0`+ |
 
 Placements are written `[bit_offset, width]`. `[16,3]` is the low three bits of
 byte 2, which is `ModRM.rm`; `[19,3]` is `ModRM.reg`; `[24,8]` is byte 3. In the
@@ -305,6 +313,19 @@ inside the template, so their `disp` starts at bit 32. `disp8` is signed 8 bits
 and `disp32` signed 32 bits, and a value outside the named row's field is
 `E-RANGE-001` rather than a re-formed instruction (`ADR-0028`, `EC-35`). Index
 and scale, `mod = 00`, the `0x67` address-size prefix and `moffs` remain absent.
+
+`0.4.0` adds the five prefix rows: two 16-bit directions with `0x66` as
+template byte 0, the high-byte row, and the low-byte pair split by REX. The
+3-byte templates are 24 bits and the 2-byte templates are 16 bits, so the
+`ModRM` byte starts at bit 16 and bit 8 respectively; `[8,3]` is `ModRM.rm` and
+`[11,3]` is `ModRM.reg` in the short rows. `x86.gpr16` and `x86.gpr8h`/`x86.gpr8` are
+separate kinds, because the same `ModRM` number is a different register in each
+set; `%sp` is encodable in a 16-bit register-direct field (`66 89 e0`), so the
+16-bit rows exclude nothing. The exclusion lists keep the three 8-bit rows
+disjoint: `0–3` are the REX-less low bytes, `4–7` in `gpr8h` are
+`ah`/`ch`/`dh`/`bh`, and `4–7` in a REX row are `spl`/`bpl`/`sil`/`dil`
+(`ADR-0029`, `EC-36`). The `8A` direction, memory operands at these widths,
+`0x67`, and `r8`–`r15` remain absent.
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 
@@ -880,6 +901,7 @@ same table that produced §8.4's assertions; `ext/C.yaml` states the relation
 | placement outside the template, or two placements overlapping | `E-DEF-001` |
 | slot with no placement | `E-DEF-001` |
 | placement widths that do not sum to `range.bits` | `E-DEF-001` |
+| `x86.gpr8h` slot in a REX-prefixed template, or a REX-less `x86.gpr8` slot that does not exclude `4…7` | `E-DEF-001` |
 | plan digest does not match the loaded definition | `E-DEF-001` |
 
 A definition that fails a load-time check is unusable, so the namespace/version
