@@ -238,6 +238,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/aarch64/0.14.0.json` | `monasm.isa.aarch64` | `sha256:a90ceac19824fbb00731e040346daa191973652e58522fab72336e24f769a5ba` |
 | `definitions/aarch64/0.15.0.json` | `monasm.isa.aarch64` | `sha256:422ebb83b897b18e010da37539796b0b97cfc9018a47209fc4a6ddc5b14af5d3` |
 | `definitions/aarch64/0.16.0.json` | `monasm.isa.aarch64` | `sha256:1e83c6cad91594e8315500f39d0bcffa235edc90c5f47c012555c077a8dbc457` |
+| `definitions/aarch64/0.17.0.json` | `monasm.isa.aarch64` | `sha256:de2c53e1871f5c24f6af73082dcc402729786d2e6e2495f84e3ed553adb4e4ed` |
 | `definitions/rv64/0.1.0.json` | `monasm.isa.riscv` | `sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083` |
 | `definitions/rv64/0.2.0.json` | `monasm.isa.riscv` | `sha256:8329a38faa964f9c69207a48e3bfb45c13fb0ddbaeb829ddcc0dbd1cffa8de10` |
 
@@ -275,7 +276,7 @@ Every row is verified against `llvm-mc` 23.1.2 in `EXP-0004`: each template byte
 string is decoded, and each `ModRM` and immediate/branch field is exercised
 across its whole encoded range.
 
-### 8.2 `aarch64` `0.1.0` … `0.16.0`
+### 8.2 `aarch64` `0.1.0` … `0.17.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -298,6 +299,14 @@ across its whole encoded range.
 | `aarch64:movz/x64-imm16-lsl16` | `0000a0d2` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; imm: `aarch64.imm`/`imm16` → `[5,16]` | 4 | `EC-30`, `A64-P7` — `0.5.0` only |
 | `aarch64:movz/x64-imm16-lsl32` | `0000c0d2` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; imm: `aarch64.imm`/`imm16` → `[5,16]` | 4 | `EC-30`, `A64-P7` — `0.5.0` only |
 | `aarch64:movz/x64-imm16-lsl48` | `0000e0d2` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; imm: `aarch64.imm`/`imm16` → `[5,16]` | 4 | `EC-30`, `A64-P7` — `0.5.0` only |
+| `aarch64:movk/x64-imm16-lsl0` | `000080f2` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; imm: `aarch64.imm`/`imm16` → `[5,16]` | 4 | `EC-30`, `EC-16`, `A64-P19` — `0.17.0` only |
+| `aarch64:movk/x64-imm16-lsl16` | `0000a0f2` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; imm: `aarch64.imm`/`imm16` → `[5,16]` | 4 | `EC-30`, `EC-16`, `A64-P19` — `0.17.0` only |
+| `aarch64:movk/x64-imm16-lsl32` | `0000c0f2` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; imm: `aarch64.imm`/`imm16` → `[5,16]` | 4 | `EC-30`, `EC-16`, `A64-P19` — `0.17.0` only |
+| `aarch64:movk/x64-imm16-lsl48` | `0000e0f2` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; imm: `aarch64.imm`/`imm16` → `[5,16]` | 4 | `EC-30`, `EC-16`, `A64-P19` — `0.17.0` only |
+| `aarch64:movn/x64-imm16-lsl0` | `00008092` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; imm: `aarch64.imm`/`imm16` → `[5,16]` | 4 | `EC-30`, `EC-16`, `A64-P19` — `0.17.0` only |
+| `aarch64:movn/x64-imm16-lsl16` | `0000a092` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; imm: `aarch64.imm`/`imm16` → `[5,16]` | 4 | `EC-30`, `EC-16`, `A64-P19` — `0.17.0` only |
+| `aarch64:movn/x64-imm16-lsl32` | `0000c092` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; imm: `aarch64.imm`/`imm16` → `[5,16]` | 4 | `EC-30`, `EC-16`, `A64-P19` — `0.17.0` only |
+| `aarch64:movn/x64-imm16-lsl48` | `0000e092` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; imm: `aarch64.imm`/`imm16` → `[5,16]` | 4 | `EC-30`, `EC-16`, `A64-P19` — `0.17.0` only |
 | `aarch64:add/x64-x64-x64-imm6-lsl` | `0000008b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm6` → `[10,6]` | 4 | `EC-31`, `A64-P8` — `0.6.0` only |
 | `aarch64:add/x64-x64-x64-imm6-lsr` | `0000408b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm6` → `[10,6]` | 4 | `EC-31`, `A64-P8` — `0.6.0` only |
 | `aarch64:add/x64-x64-x64-imm6-asr` | `0000808b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm6` → `[10,6]` | 4 | `EC-31`, `A64-P8` — `0.6.0` only |
@@ -464,7 +473,8 @@ thirty-two and adds the three store `imm9` rows (ADR-0022); `0.14.0` repeats all
 one hundred and thirty-five and adds the literal load row (ADR-0023); `0.15.0`
 repeats all one hundred and thirty-six and adds the sixteen register-offset rows
 (ADR-0024); `0.16.0` repeats all one hundred and fifty-two and adds the sixteen
-32-bit register-offset rows (ADR-0025).
+32-bit register-offset rows (ADR-0025); `0.17.0` repeats all one hundred and
+sixty-eight and adds the eight `movk`/`movn` rows (ADR-0026).
 Each document therefore shares its earlier rows
 unchanged and differs only in the rows its version introduced, so a plan bound to
 an older version cannot reach a newer form (`E-FORM-001`, `N01`) even though the
@@ -476,12 +486,13 @@ The templates are little-endian file order, so `0000008b` is the word
 bit from the MRS node, requires the MRS node name to exist, and refuses to emit
 unless all 32 bits are covered exactly once by a fixed bit or a slot placement;
 `EXP-0008` §2–§3 records the nodes and the coverage check. The one hundred and
-sixty-eight forms come
-from thirty-six encode nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
+seventy-six forms come
+from thirty-nine encode nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
 pinned to 0 and once per shift keyword, `ADD_64_addsub_ext` eight times, once per
 `option` value, `ADD_64_addsub_imm` twice, once with
 `sh = 0` and once with `sh = 1`, `MOVZ_64_movewide` four times, once per `hw`
-value, `SUB_64_addsub_shift` four times and `SUB_64_addsub_imm` twice, each once
+value, `MOVK_64_movewide` and `MOVN_64_movewide` four times each, once per `hw`
+value (`ADR-0026`), `SUB_64_addsub_shift` four times and `SUB_64_addsub_imm` twice, each once
 per row it shares with the `add` half (`ADR-0017`), `ADDS_64_addsub_shift` and
 `SUBS_64_addsub_shift` four times each, `ADDS_64S_addsub_imm` and
 `SUBS_64S_addsub_imm` twice each (`ADR-0018`), the eight `*_32*` nodes four times
@@ -631,15 +642,20 @@ the amount (`-lsl0` … `-sxtx2`), so `-lsl1` and `-lsl3` are names for nothing 
 this width (`E-FORM-001`, `N01s`), and the same modifier rule holds: `lsl #2` as
 a `modifiers` entry on the `index` is `E-OPERAND-003` (`N19c`).
 
-The four `movz` rows are the fourth form-variant case and the first whose pinned
-field is multi-bit. `hw` (bits 22–21) selects the 16-bit lane, the four values are
+The move-wide rows are the fourth form-variant case and the first whose pinned
+field is multi-bit; `0.17.0` brings them to twelve. `hw` (bits 22–21) selects the 16-bit lane, the four values are
 exactly the four `lsl #0/#16/#32/#48` spellings the assembler accepts, and the slot
 holds `imm16` field content in `0…65535`: the value the instruction builds,
 `imm16 << 16·hw`, belongs to the row (`EC-30`, ADR-0014). A pre-scaled literal such
-as `0x12340000` on `-lsl16` is `E-RANGE-001` (`N18c`), and a lane the ISA does not
-have (`-lsl8`) is `E-FORM-001` (`N01d`). `movk`, `movn`, the `w` variant and the
-`mov` alias have no row: the first three differ in `opc`/`sf`, and the alias picks
-its lane from the literal's value, which is `EC-16`.
+as `0x12340000` on `-lsl16` is `E-RANGE-001` (`N18c`, `N18g`), and a lane the ISA
+does not have (`-lsl8`) is `E-FORM-001` (`N01d`, `N01t`). `0.17.0` adds the same
+four lanes for `movk` and `movn`, whose `MOVK_64_movewide`/`MOVN_64_movewide`
+nodes fix `opc` to `11`/`00`, so the mnemonic is the node and never an operand
+(`EC-16`, ADR-0026). `movn` stores the raw `imm16` field: the complement is the
+instruction's operation, not a plan-side computation, so `movn x0, #0x1234` is
+`0x92824680` with `imm16 = 0x1234`. The `w` (`sf = 0`) lanes and the `mov` alias
+have no row: the first is a different node, and the alias picks its operation and
+lane from the literal's value, which is `EC-16` (`N01w`).
 
 The three shift rows are the fifth form-variant case, and the first where one
 modifier spelling splits into a form and an operand. `shift` (bits 23–22) is the
@@ -714,7 +730,9 @@ second carrier for a decision the `form_id` already names (`INV-02`, ADR-0011).
 `movz`'s lane is the field-selected version of the same rule: `imm16` is the
 field, `hw` is the exponent of the multiplier, and the four rows are the four
 values of `hw`, so no slot has to carry `16 × hw` and no plan can state a lane the
-instruction does not have (`EC-30`, ADR-0014, `EXP-0016` §2).
+instruction does not have (`EC-30`, ADR-0014, `EXP-0016` §2). `movk` and `movn`
+reuse the same four lanes; their `opc` comes from the node, so the mnemonic adds
+no field to the operand list (`ADR-0026`, `EXP-0028` §2).
 
 The shift amount is the plainest case of the same rule, with no multiplier at all:
 `imm6` is the amount the plan states, `shift` is the keyword the row pins, and the
@@ -847,13 +865,13 @@ without a plan error: the input is the definition.
   ADR-0006: the facts come from the Arm MRS 2026-06 OPENSOURCE packaging, and
   the Arm notice ships with the generated table. The format did not need to
   change for it: `adrp`'s split `immhi:immlo` is two placements of one slot, as
-  §4.1 anticipated. `definitions/aarch64/0.1.0.json` … `0.16.0.json` now exist
+  §4.1 anticipated. `definitions/aarch64/0.1.0.json` … `0.17.0.json` now exist
   (§8.2); each is a superset that adds its own rows without a format change
-  (ADR-0011 to ADR-0025). What is
+  (ADR-0011 to ADR-0026). What is
   missing is coverage, not design: the `b`/`h` load/store widths, the signed and
   extended load rows (`LDRSW`/`LDRSB`/`LDRSH`), `prfm`, the 32-bit
-  extended `add`/`sub` nodes and their aliases, and `movk`/`movn`/the `mov`
-  alias and the 32-bit `movz` lanes have no row. Each is `E-FORM-001` until
+  extended `add`/`sub` nodes and their aliases, and the `mov` alias and the
+  32-bit move-wide lanes have no row. Each is `E-FORM-001` until
   a slice adds it.
 - The archive is still not vendored and the drop is not a build input: a
   regeneration reads `research/external/arm-mrs/` after `tools/check_mrs.py`

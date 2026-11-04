@@ -42,19 +42,21 @@ destination dropped), ADR-0022 completes the store half of the addressing
 kinds (the load `imm9` layouts with `opc = 00` and the stored register as `src`),
 ADR-0023 makes the literal load a row with `dest`/`target` and no base register,
 and ADR-0024 makes register offset a form family (`option` fixes the index width
-and keyword, `S` is the only scale carrier), and ADR-0025 repeats it at `size =
-10` where `S = 1` is `#2`.
-Nineteen definition documents are frozen and oracle-verified; the materializer
+and keyword, `S` is the only scale carrier), ADR-0025 repeats it at `size =
+10` where `S = 1` is `#2`, and ADR-0026 repeats the `movz` lane family for
+`movk`/`movn`, whose `opc` is fixed by the node and whose `imm16` operand is the
+raw field.
+Twenty definition documents are frozen and oracle-verified; the materializer
 and its fixture gate are implemented.
 
 | Area | State |
 |---|---|
 | Contract (`docs/fmp-v0/01_contract.md`) | draft, fields marked `TBD` where unproven |
 | Schema (`schema/fmp-v0.schema.json`) | draft, examples validate |
-| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms), `0.8.0` (32 forms), `0.9.0` (44 forms), `0.10.0` (68 forms), `0.11.0` (92 forms), `0.12.0` (132 forms), `0.13.0` (135 forms), `0.14.0` (136 forms), `0.15.0` (152 forms) and `0.16.0` (168 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
+| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms), `0.8.0` (32 forms), `0.9.0` (44 forms), `0.10.0` (68 forms), `0.11.0` (92 forms), `0.12.0` (132 forms), `0.13.0` (135 forms), `0.14.0` (136 forms), `0.15.0` (152 forms), `0.16.0` (168 forms) and `0.17.0` (176 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
 | Prototype (`prototype/`) | workspace compiled; all three slices materialize from the plan |
 | Oracles (`tools/oracle/`) | planned; `llvm-mc` (± `ld.lld`) drives the experiments |
-| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0027 |
+| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0028 |
 
 Read `docs/STATUS.md` for the current phase, gate status, and next action.
 

@@ -22,7 +22,7 @@ What it does, per form:
 Documents are emitted per version. A form appears in a document when the
 document's version is at or after the form's `since` (absent `since` means every
 version), so a later document cannot silently lose an earlier form. `0.1.0` …
-`0.15.0` stay frozen: their digests are asserted below, so a later edit that
+`0.16.0` stay frozen: their digests are asserted below, so a later edit that
 perturbs any of them fails loudly instead of shipping.
 
 Reads:  research/external/arm-mrs/Instructions.json (pinned by check_mrs.py)
@@ -42,6 +42,7 @@ Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.14.0.json
         definitions/aarch64/0.15.0.json
         definitions/aarch64/0.16.0.json
+        definitions/aarch64/0.17.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -62,7 +63,7 @@ OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
 VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0",
             "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0",
-            "0.14.0", "0.15.0", "0.16.0"]
+            "0.14.0", "0.15.0", "0.16.0", "0.17.0"]
 
 # Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
@@ -81,6 +82,7 @@ FROZEN_DIGESTS = {
     "0.13.0": "sha256:d3876dd37a8441057b586312b3bee410e39594c64806b2c5c59960c06f9c7a5f",
     "0.14.0": "sha256:a90ceac19824fbb00731e040346daa191973652e58522fab72336e24f769a5ba",
     "0.15.0": "sha256:422ebb83b897b18e010da37539796b0b97cfc9018a47209fc4a6ddc5b14af5d3",
+    "0.16.0": "sha256:1e83c6cad91594e8315500f39d0bcffa235edc90c5f47c012555c077a8dbc457",
 }
 
 WIDTH = 32
@@ -909,6 +911,124 @@ FORMS = [
         "decision": "hw = 3 (LSL #48); imm16 is field content in bits 63:48",
         "pinned": {"hw": 3},
         "since": "0.5.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm16"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm16",
+             "range": {"signed": False, "bits": 16, "align_bits": 0}},
+        ],
+    },
+    # `A64-P19` (ADR-0026). `MOVK_64_movewide` and `MOVN_64_movewide` are the
+    # `MOVZ_64_movewide` layout with `opc` at 29+2 fixed to 11 and 00. The lane
+    # `hw` is still a form (four spellings), `imm16` is still field content, and
+    # `movn` stores the raw field because the complement is the instruction's
+    # operation, not a plan-side computation. The `mov` alias is value-driven
+    # (mov x0,#0x1234 -> movz, mov x0,#-1 -> movn), so it stays out.
+    {
+        "form_id": "aarch64:movk/x64-imm16-lsl0",
+        "mrs": "MOVK_64_movewide",
+        "decision": "hw = 0 (LSL #0); imm16 is field content in bits 15:0",
+        "pinned": {"hw": 0},
+        "since": "0.17.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm16"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm16",
+             "range": {"signed": False, "bits": 16, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:movk/x64-imm16-lsl16",
+        "mrs": "MOVK_64_movewide",
+        "decision": "hw = 1 (LSL #16); imm16 is field content in bits 31:16",
+        "pinned": {"hw": 1},
+        "since": "0.17.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm16"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm16",
+             "range": {"signed": False, "bits": 16, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:movk/x64-imm16-lsl32",
+        "mrs": "MOVK_64_movewide",
+        "decision": "hw = 2 (LSL #32); imm16 is field content in bits 47:32",
+        "pinned": {"hw": 2},
+        "since": "0.17.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm16"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm16",
+             "range": {"signed": False, "bits": 16, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:movk/x64-imm16-lsl48",
+        "mrs": "MOVK_64_movewide",
+        "decision": "hw = 3 (LSL #48); imm16 is field content in bits 63:48",
+        "pinned": {"hw": 3},
+        "since": "0.17.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm16"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm16",
+             "range": {"signed": False, "bits": 16, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:movn/x64-imm16-lsl0",
+        "mrs": "MOVN_64_movewide",
+        "decision": "hw = 0 (LSL #0); imm16 is field content in bits 15:0",
+        "pinned": {"hw": 0},
+        "since": "0.17.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm16"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm16",
+             "range": {"signed": False, "bits": 16, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:movn/x64-imm16-lsl16",
+        "mrs": "MOVN_64_movewide",
+        "decision": "hw = 1 (LSL #16); imm16 is field content in bits 31:16",
+        "pinned": {"hw": 1},
+        "since": "0.17.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm16"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm16",
+             "range": {"signed": False, "bits": 16, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:movn/x64-imm16-lsl32",
+        "mrs": "MOVN_64_movewide",
+        "decision": "hw = 2 (LSL #32); imm16 is field content in bits 47:32",
+        "pinned": {"hw": 2},
+        "since": "0.17.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm16"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm16",
+             "range": {"signed": False, "bits": 16, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:movn/x64-imm16-lsl48",
+        "mrs": "MOVN_64_movewide",
+        "decision": "hw = 3 (LSL #48); imm16 is field content in bits 63:48",
+        "pinned": {"hw": 3},
+        "since": "0.17.0",
         "slots": [
             {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
              "from": "reg_number", "target_type": "x64"},

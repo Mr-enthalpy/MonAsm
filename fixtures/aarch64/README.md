@@ -1,6 +1,6 @@
 # AArch64 fixtures
 
-Vectors: `A64-P1` … `A64-P18` in `docs/fmp-v0/06_validation_matrix.md`.
+Vectors: `A64-P1` … `A64-P19` in `docs/fmp-v0/06_validation_matrix.md`.
 
 ## What is here
 
@@ -25,6 +25,7 @@ Vectors: `A64-P1` … `A64-P18` in `docs/fmp-v0/06_validation_matrix.md`.
 | `positive/A64-P16-loadlit` | `aarch64:ldr/x64-imm19` ×6 (`0.14.0`): two symbol targets and four plain field values, both ends of `imm19` included; six instructions, 24 B | `llvm-mc` (no linker: local instruction labels, no relocations) |
 | `positive/A64-P17-regoff` | `aarch64:ldr/x64-base-regoff-*` ×8 and `str/x64-base-regoff-*` ×8 (`0.15.0`), one per `option`/`S` pair, plus four register-31 rows (`sp` in `Rn`, `xzr`/`wzr` in `Rm`); twenty instructions, 80 B | `llvm-mc` (no linker: registers only, no relocations) |
 | `positive/A64-P18-w32regoff` | `aarch64:ldr/w32-base-regoff-*` ×8 and `str/w32-base-regoff-*` ×8 (`0.16.0`), one per `option`/`S` pair at `#0`/`#2`, plus the same four register-31 rows; twenty instructions, 80 B, `w32` destination/source and `x64` base/index | `llvm-mc` (no linker: registers only, no relocations) |
+| `positive/A64-P19-movwide` | `aarch64:movk/x64-imm16-lsl*` ×4 and `movn/x64-imm16-lsl*` ×4 (`0.17.0`), one per `hw` lane in lane order, plus four boundary rows (`x31`, `#0`, `#0xffff` at `lsl #48`, `movn` at `lsl #48` with `#0`); twelve instructions, 48 B | `llvm-mc` (no linker: registers and immediates only, no relocations) |
 | `negative/N01-absent-scaled-form` | `aarch64:add/x64-imm12-lsl12` against `0.1.0`, which lacks it | `E-FORM-001` |
 | `negative/N01b-absent-register-offset-form` | `aarch64:ldr/x64-base-regoff` (`0.4.0` has no such form) | `E-FORM-001` |
 | `negative/N01d-absent-movz-lane` | `aarch64:movz/x64-imm16-lsl8` (`0.5.0` has four lanes, not eight) | `E-FORM-001` |
@@ -43,6 +44,10 @@ Vectors: `A64-P1` … `A64-P18` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N01q-absent-regoff-shift-one` | `aarch64:ldr/x64-base-regoff-lsl1` against `0.15.0`: only `#0` and `#3` are encodable, so no row exists | `E-FORM-001` |
 | `negative/N01r-w32-regoff-absent-in-previous-version` | `aarch64:ldr/w32-base-regoff-lsl0` against `0.15.0`, which does not have the 32-bit register-offset rows yet | `E-FORM-001` |
 | `negative/N01s-absent-w32-regoff-shift-three` | `aarch64:ldr/w32-base-regoff-lsl3` against `0.16.0`: only `#0` and `#2` are encodable at `size = 10`, so no row exists | `E-FORM-001` |
+| `negative/N01t-absent-movk-lsl8` | `aarch64:movk/x64-imm16-lsl8` against `0.17.0`: the only lanes are `#0`/`#16`/`#32`/`#48` | `E-FORM-001` |
+| `negative/N01u-movk-absent-in-previous-version` | `aarch64:movk/x64-imm16-lsl16` against `0.16.0`, which does not have the `movk` rows yet | `E-FORM-001` |
+| `negative/N01v-absent-w32-movk-lane` | `aarch64:movk/w32-imm16-lsl16`: the `sf = 0` node is in no document | `E-FORM-001` |
+| `negative/N01w-absent-mov-alias` | `aarch64:mov/x64-imm16-lsl0`: the alias picks its operation and lane from the literal's value | `E-FORM-001` |
 | `negative/N02b-w-source-in-shift-form` | a `w32` operand on the `x`-source `-imm6-lsl` row | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02c-x-dest-on-w-row` | an `x64` destination on `aarch64:add/w32-w32-w32-lsl0` | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02d-ext-x-source-on-w-keyword` | an `x64` source on `aarch64:sub/x64-x64-w32-imm3-uxtb` | `E-OPERAND-001` (kind and target_type) |
@@ -50,6 +55,7 @@ Vectors: `A64-P1` … `A64-P18` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N02f-w-index-on-lsl-row` | a `w32` index on `aarch64:ldr/x64-base-regoff-lsl0`, whose `index` is `x64` | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02g-w-index-on-w32-lsl-row` | a `w32` index on `aarch64:ldr/w32-base-regoff-lsl0`, whose `index` is `x64` | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02h-x-dest-on-w32-row` | an `x64` destination on `aarch64:ldr/w32-base-regoff-lsl0`, whose `dest` is `w32` | `E-OPERAND-001` (kind and target_type) |
+| `negative/N02i-w-dest-on-movk-row` | a `w32` destination on `aarch64:movk/x64-imm16-lsl16`, whose `dest` is `x64` | `E-OPERAND-001` (kind and target_type) |
 | `negative/N03-imm12-out-of-range` | imm12 = 4096 | `E-RANGE-001` |
 | `negative/N03-imm12-disp-out-of-range` | `disp = 4096` on the load/store `imm12` field | `E-RANGE-001` |
 | `negative/N03-imm9-disp-out-of-range` | `disp = −257` on the `ldur` `imm9` field | `E-RANGE-001` |
@@ -58,6 +64,7 @@ Vectors: `A64-P1` … `A64-P18` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N03-cond-out-of-range` | `cond = 16` in a 4-bit field | `E-RANGE-001` |
 | `negative/N03-imm6-out-of-range` | `imm6 = 64`, one past the shift amount's 6-bit field | `E-RANGE-001` |
 | `negative/N03-imm3-out-of-range` | `imm3 = 8`, one past the extend amount's 3-bit field | `E-RANGE-001` |
+| `negative/N03-movk-imm16-out-of-range` | `imm16 = 65536`, one past the 16-bit move-wide field | `E-RANGE-001` |
 | `negative/N04c-bcond-imm19-out-of-range` | `imm19 = 262144`, one past the signed 19-bit field | `E-RANGE-002` |
 | `negative/N04d-loadlit-imm19-out-of-range` | `imm19 = 262144` on the literal row, one past the same signed field | `E-RANGE-002` |
 | `negative/N12a-pair-without-lo` | two `hi` members in one `pair_group` | `E-FIXUP-007` |
@@ -68,6 +75,7 @@ Vectors: `A64-P1` … `A64-P18` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N18d-sub-no-form-switch` | `4096` stated on `sub/x64-imm12-lsl0` (encodable only as `-lsl12`) | `E-RANGE-001` |
 | `negative/N18e-adds-no-form-switch` | `4096` stated on `adds/x64-imm12-lsl0` (encodable only as `-lsl12`) | `E-RANGE-001` |
 | `negative/N18f-w-adds-no-form-switch` | `4096` stated on `adds/w32-imm12-lsl0` (encodable only as `-lsl12`) | `E-RANGE-001` |
+| `negative/N18g-movk-pre-scaled-literal` | `0x12340000` stated on `movk/x64-imm16-lsl16` (a pre-scaled literal) | `E-RANGE-001` |
 | `negative/N16c-imm3-excluded` | `imm3 = 5`, inside the 3-bit field but not allocated to `add` extended | `E-RANGE-004` |
 | `negative/N16d-w-imm6-excluded` | `imm6 = 32` on `add/w32-w32-w32-imm6-lsl`, inside the 6-bit field but not allocated to the 32-bit instruction | `E-RANGE-004` |
 | `negative/N16e-ext-imm3-excluded` | `imm3 = 5` on `subs/x64-x64-w32-imm3-sxtb`, inside the 3-bit field but not allocated to the extended layout | `E-RANGE-004` |
@@ -89,8 +97,12 @@ now shows for `subs`), a plan bound to `0.9.0` cannot reach the `w` rows
 `cmp`/`cmn` rows (`N01i`, `N01m`), a plan bound to `0.12.0` cannot reach the
 store `imm9` rows (`N01n`), a plan bound to `0.13.0` cannot reach the
 literal load (`N01o`), a plan bound to `0.14.0` cannot reach the
-register-offset rows (`N01p`), and a plan bound to `0.15.0` cannot reach the
-32-bit register-offset rows (`N01r`). `N01h` and `N01j` are the same shape one
+register-offset rows (`N01p`), a plan bound to `0.15.0` cannot reach the
+32-bit register-offset rows (`N01r`), and a plan bound to `0.16.0` cannot reach
+the `movk`/`movn` rows (`N01u`). `N01t` and `N01v` are a different negation: they
+name a lane no version has (`-lsl8`) and a width no version has (`w32`), and
+`N01w` names the `mov` alias, which no version has because its literal chooses
+the operation and lane. `N01h` and `N01j` are the same shape one
 version earlier for the `w`
 rows of `0.8.0`/`0.9.0`.
 Each fixture names the document it targets and that
@@ -260,6 +272,21 @@ and a `w32` index on a `-lsl0` row is the same diagnostic on `index` (`N02g`).
 `lsl #2` as a `modifiers` entry is `E-OPERAND-003` (`N19c`): the scale is the
 `S` bit, and a modifier never writes one. The same four register-31 lines close
 the vector, with `w0` as the loaded/stored register.
+
+The move-wide rows are the fourteenth instance, and the one where a second
+mnemonic shares an existing lane family. `A64-P19` covers the eight `0.17.0`
+rows (`ADR-0026`, `EXP-0028` §1–§2): `MOVK_64_movewide` and
+`MOVN_64_movewide` are `MOVZ_64_movewide` with `opc` fixed to `11`/`00`, so the
+four `hw` lanes are the same four `form_id` suffixes and no plan field names the
+mnemonic (`EC-16`). `imm16` stays field content and `movn` stores it raw: the
+assembler reads `movn x4, #0x1234` back as `mov x4, #-0x1235`, because the
+complement is the instruction's operation and not an operand transform. `-lsl8`
+is a name for nothing (`E-FORM-001`, `N01t`), the `w32` lanes and the `mov` alias
+have no row (`N01v`, `N01w`), a `w32` destination is `E-OPERAND-001` (`N02i`),
+and `65536` or a pre-scaled literal is `E-RANGE-001`
+(`N03-movk-imm16-out-of-range`, `N18g`). The four boundary rows pin `Rd = 31`,
+both ends of `imm16` on the top lane, and the one word `llvm-objdump` prints as
+`movn` rather than the `mov` alias.
 
 **An operand whose bits a fixup owns has an empty payload.** `{"payload": {}}`,
 not a `symbol_id`: `01_contract.md` §8.1 only allows `symbol_id` on a `target`

@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-05
-Phase: **3 in progress (x86, AArch64 and RV64 slices): nineteen definition documents, the materializer and the fixture gate are in place; every x86, AArch64 and RV64 coverage row is now carried, so widening is coverage work with its own ADR per slice**
+Phase: **3 in progress (x86, AArch64 and RV64 slices): twenty definition documents, the materializer and the fixture gate are in place; every x86, AArch64 and RV64 coverage row is now carried, so widening is coverage work with its own ADR per slice**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -14,7 +14,7 @@ this file plus `AGENTS.md` alone.
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
-| 3 | Three-ISA vertical prototype | **in progress**: nineteen definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 5 positive and 15 negative fixtures, AArch64 has 19 positive and 50 negative, RV64 has 9 positive and 11 negative, all passing the two-source gate |
+| 3 | Three-ISA vertical prototype | **in progress**: twenty definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 5 positive and 15 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 11 negative, all passing the two-source gate |
 | 4 | Invariants, negative tests, replay | not started |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
@@ -25,7 +25,7 @@ this file plus `AGENTS.md` alone.
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
 | G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: 23 of 33 rows are frozen; the 10 rows still `draft` are EC-05, EC-08, EC-09, EC-10, EC-16, EC-18, EC-23, EC-24, EC-25 and EC-26, and none of them is needed by the three slices as they stand |
-| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 5 positive, 15 negative; AArch64: 19 positive, 50 negative; RV64: 9 positive, 11 negative) |
+| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 5 positive, 15 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 11 negative) |
 
 ## Decisions
 
@@ -56,6 +56,7 @@ this file plus `AGENTS.md` alone.
 | ADR-0023 | The literal load carries its displacement in `imm19` and has no base register: `0.14.0` adds one row, `aarch64:ldr/x64-imm19`, from `LDR_64_loadlit` (`opc = 01`, pattern `0x58000000`), with `dest` at `[0,5]` and `target` at `[5,19]` and no `base`; the slot is the field (`align_bits 0`), a byte displacement is a `pcrel_begin` + `scale(2)` fixup with `range.bits 19`/`align_bits 2` and the byte range `−1048576…+1048572`, `imm19 = 262144` is `E-RANGE-002` (`N04d`), a 2-byte symbol offset is `E-RANGE-003` (`N20`, our own split of the assembler's one message), `N01o` is the `0.13.0` boundary, the `w`/`LDRSW`/`PRFM`/SIMD literals and register offset stay out, and no store literal exists | accepted 2026-11-04 |
 | ADR-0024 | Register offset is a form family and `option`/`S` are form bits: `0.15.0` adds sixteen rows, `ldr`/`str` × `{lsl,uxtw,sxtw,sxtx}{0,3}`, from `LDR_64_ldst_regoff`/`STR_64_ldst_regoff`, which differ only in `opc`; `Rm` is an `index` slot at `[16,5]`, `option` (13+3) fixes both the keyword and the index width (`lsl`/`sxtx` take `x64`, `uxtw`/`sxtw` take `w32`), and `S` (12+1) is the only scale carrier (`#0` or `#3` on these `size = 11` rows), so neither is an operand; `lsl #0` is the same word as the bare spelling, `-lsl1`/`-lsl4` have no row (`N01q`), a `w32` index on a `-lsl0` row is `E-OPERAND-001` (`N02f`), a modifier stating `lsl #3` is `E-OPERAND-003` (`N19b`), `N01p` is the `0.14.0` boundary, the coarse `aarch64:ldr/x64-base-regoff` stays absent (`N01b`), the `w`/byte/halfword and `prfm` register offsets stay out, and no schema or Rust change is needed | accepted 2026-11-05 |
 | ADR-0025 | The 32-bit register offset is the same `option` family at `size = 10`: `0.16.0` adds sixteen rows, `ldr`/`str` × `{lsl,uxtw,sxtw,sxtx}{0,2}`, from `LDR_32_ldst_regoff`/`STR_32_ldst_regoff`, which are the 64-bit pair with `size = 10` and the same `opc` split; `option` keeps its keyword/width pairing (`lsl`/`sxtx` take `x64`, `uxtw`/`sxtw` take `w32`), `S` is still the only scale carrier but means `#2` on a 4-byte access, and only `Rt` changes class (`w32`), so `dest`/`src` are `aarch64.gpr32`/`w32` while `base` and the `x` index rows stay `x64`; `-lsl3` has no row at this width (`N01s`), a `w32` index on `-lsl0` or an `x64` destination is `E-OPERAND-001` (`N02g`/`N02h`), a modifier stating `lsl #2` is `E-OPERAND-003` (`N19c`), `N01r` is the `0.15.0` boundary, the `b`/`h` widths, the signed/extended loads and `prfm` stay out, and no schema or Rust change is needed | accepted 2026-11-05 |
+| ADR-0026 | `movk`/`movn` are the `movz` lane family one `opc` over: `0.17.0` adds eight rows, four `hw` lanes on each of `MOVK_64_movewide` (`opc = 11`) and `MOVN_64_movewide` (`opc = 00`), so the mnemonic is the node and no plan field names the operation (`EC-16`); `sf = 1`, `hw` at 21+2 and `Rd` at 0+5 are unchanged, `imm16` stays unsigned field content in `0…65535`, and `movn` stores the raw field rather than its complement; `-lsl8` has no row (`N01t`), the `w` lanes and the `mov` alias stay out (`N01v`/`N01w`), a `w32` destination is `E-OPERAND-001` (`N02i`), `imm16 = 65536` or a pre-scaled literal is `E-RANGE-001` (`N03-movk-imm16`, `N18g`), and no schema or Rust change is needed | accepted 2026-11-05 |
 
 ## Settled decisions (contract level)
 
@@ -112,10 +113,13 @@ adds the sixteen register-offset rows, one per `option`/`S` pair on each of the
 two register-offset nodes (`A64-P17`, ADR-0024), and `0.16.0.json` adds the
 sixteen 32-bit register-offset rows, the same pairs at `size = 10` with `#2` as
 the scaled amount and `w32` as the destination/source class (`A64-P18`,
-ADR-0025).
-Nineteen positive fixtures match `llvm-mc` (`EXP-0008`, `EXP-0013`, `EXP-0014`, `EXP-0015`,
+ADR-0025), and `0.17.0.json` adds the eight 64-bit `movk`/`movn` lanes, the four
+`hw` values on each of the two `opc`-fixed nodes with `imm16` as field content
+(`A64-P19`, ADR-0026).
+Twenty positive fixtures match `llvm-mc` (`EXP-0008`, `EXP-0013`, `EXP-0014`, `EXP-0015`,
 `EXP-0016`, `EXP-0017`, `EXP-0018`, `EXP-0019`, `EXP-0020`, `EXP-0021`,
-`EXP-0022`, `EXP-0023`, `EXP-0024`, `EXP-0025`, `EXP-0026`, `EXP-0027`). Every directive §6.2 item now has a passing
+`EXP-0022`, `EXP-0023`, `EXP-0024`, `EXP-0025`, `EXP-0026`, `EXP-0027`,
+`EXP-0028`). Every directive §6.2 item now has a passing
 row; what remains is widening, not a decision.
 OD-12 is settled by ADR-0007: the RV64 source is the UDB resolved
 spec, pinned by archive and node hashes, `EXP-0009` verified the B/J/RVC scatter
@@ -218,7 +222,12 @@ not cover is caught only by the weaker size check; it is now settled, and
    `0.16.0`: ADR-0025 repeated the rows at `size = 10`, `A64-P18-w32regoff`
    matches `llvm-mc`, and `N01r`/`N01s`/`N02g`/`N02h`/`N19c` pin the version
    boundary, the absent `-lsl3` row, the `w32` index and `x64` destination
-   mismatches and the same modifier rule. A `:lo12:` inside the
+   mismatches and the same modifier rule. `A64-P19` is closed by `0.17.0`:
+   ADR-0026 added the four `movk` and four `movn` lanes with `opc` fixed by the
+   node, `A64-P19-movwide` matches `llvm-mc`, and
+   `N01t`/`N01u`/`N01v`/`N01w`/`N02i`/`N03-movk-imm16`/`N18g` pin the absent
+   `-lsl8` lane, the `0.16.0` boundary, the `w32` lane, the `mov` alias, the
+   `w32` destination, the field end and the pre-scaled literal. A `:lo12:` inside the
    `-lsl12` form is measured at the record level but is not a symbol address
    (`EXP-0013` §5); a slice that wants one must decide what its addend means
    first.
@@ -244,7 +253,7 @@ sets — code, JSON Pointer, detail keys — are compared for exact equality.
 The AArch64 slice adds `definitions/aarch64/0.1.0.json` (four forms: two `add`,
 `bl`, `adrp`; digest `sha256:96f87aa…`) with the Arm BSD-3-Clause notice beside
 it, `EXP-0008` (five MRS nodes, the all-32-bits-covered check, and the
-`immlo`-at-30:29 correction the oracle caught), and 19 positive + 50 negative
+`immlo`-at-30:29 correction the oracle caught), and 20 positive + 57 negative
 fixtures. `0.2.0` adds the fifth form, `aarch64:add/x64-imm12-lsl12` (digest
 `sha256:169e4bf6…`), which pins `sh = 1` and leaves the operand as `imm12`
 field content (ADR-0011, `EXP-0013`); `N18a`/`N18b` record the two literals that
@@ -316,12 +325,19 @@ modifier. `0.16.0` adds the sixteen 32-bit register-offset rows (digest
 `A64-P18-w32regoff` is 80 bytes over the sixteen rows plus the four register-31
 rows, `N01r` is the `0.15.0` boundary, `N01s` rejects a `-lsl3` row, `N02g`
 rejects a `w32` index on `-lsl0`, `N02h` rejects an `x64` destination, and
-`N19c` rejects `lsl #2` as a modifier.
+`N19c` rejects `lsl #2` as a modifier. `0.17.0` adds the eight 64-bit
+`movk`/`movn` rows (digest `sha256:de2c53e1…`), the four `hw` lanes on each of
+`MOVK_64_movewide`/`MOVN_64_movewide` with `opc` fixed by the node and `imm16`
+stored raw (ADR-0026, `EXP-0028`); `A64-P19-movwide` is 48 bytes over the eight
+rows plus four boundary rows, `N01t` rejects a `-lsl8` lane, `N01u` is the
+`0.16.0` boundary, `N01v` rejects a `w32` lane, `N01w` rejects the `mov` alias,
+`N02i` rejects a `w32` destination, and `N03-movk-imm16`/`N18g` reject the field
+end and a pre-scaled literal.
 A64-P5/P6 use `llvm-mc` →
 `ld.lld` → `llvm-objcopy`
 because `llvm-mc` leaves AArch64 branch and `adrp` fields as relocations; A64-P3,
 A64-P4, A64-P7, A64-P8, A64-P9, A64-P10, A64-P11, A64-P12, A64-P13, A64-P14,
-A64-P15, A64-P16, A64-P17 and A64-P18
+A64-P15, A64-P16, A64-P17, A64-P18 and A64-P19
 need no
 linker
 because their

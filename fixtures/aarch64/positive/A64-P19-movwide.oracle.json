@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P19-movwide.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "7df95f1854ea40d4bab6bdba56adf1d42d4a252e881eb60cb3240868348b794a",
+  "output_sha256": "ec16d04e59c5133b303bedf0d70a5558967c5575d9985e87eb56e8405bad65a7",
+  "size": 48,
+  "records": 0,
+  "notes": "Input (268 B, LF, trailing newline). Twelve instructions: the eight new rows in lane order (`movk` lsl #0/#16/#32/#48 on x0-x3, then the same four `movn` rows on x4-x7), each with a distinct 16-bit field value, then four boundary rows (`movk x31, #0`, `movn x31, #0xffff`, `movk x8, #0xffff, lsl #48`, `movn x8, #0, lsl #48`). The first eight keep every field value distinct (Rd 0-7, imm16 0x1234/0x00ff/0xbeef/0x0001, hw 0-3); the last four pin the extremes of Rd and imm16. `llvm-readobj -r` prints an empty relocation list and the source names no symbols, so no linker is involved.",
+  "source": "Arm MRS MOVK_64_movewide / MOVN_64_movewide (opc at 29+2, hw at 21+2, imm16 at 5+16, Rd at 0+5, sf = 1), measured in EXP-0028 §2-§3"
+}
