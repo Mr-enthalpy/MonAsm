@@ -22,7 +22,7 @@ What it does, per form:
 Documents are emitted per version. A form appears in a document when the
 document's version is at or after the form's `since` (absent `since` means every
 version), so a later document cannot silently lose an earlier form. `0.1.0` …
-`0.7.0` stay frozen: their digests are asserted below, so a later edit that
+`0.8.0` stay frozen: their digests are asserted below, so a later edit that
 perturbs any of them fails loudly instead of shipping.
 
 Reads:  research/external/arm-mrs/Instructions.json (pinned by check_mrs.py)
@@ -34,6 +34,7 @@ Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.6.0.json
         definitions/aarch64/0.7.0.json
         definitions/aarch64/0.8.0.json
+        definitions/aarch64/0.9.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -52,7 +53,7 @@ MRS = os.path.join(ROOT, "research", "external", "arm-mrs", "Instructions.json")
 OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
 VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0",
-            "0.8.0"]
+            "0.8.0", "0.9.0"]
 
 # Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
@@ -63,6 +64,7 @@ FROZEN_DIGESTS = {
     "0.5.0": "sha256:9cec1688b5b9d1a9bd9299e6d0a155885053e7b228ff6eee88f40cef6f34e23e",
     "0.6.0": "sha256:1151944e5855c08bd3d96074ace3ca787be6b7284c5d3e84654a257ab2055964",
     "0.7.0": "sha256:1bb920356476cea20688b2d6596d787f3cf99aedebe7240b1af8227f64d29053",
+    "0.8.0": "sha256:9f82b566af004aaa9f0471151497d65acb45c3a7b46e4240345d21f4e330bc35",
 }
 
 WIDTH = 32
@@ -648,6 +650,213 @@ FORMS = [
         "decision": "shift = ASR (10); imm6 is field content (the shift amount)",
         "pinned": {"shift": 2},
         "since": "0.8.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm6"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm6",
+             "range": {"signed": False, "bits": 6, "align_bits": 0}},
+        ],
+    },
+    # `A64-P11` (ADR-0018). `ADDS_*`/`SUBS_*` are the four nodes above with
+    # `S` at 29+1 fixed to `1` — one bit, and nothing else. The mnemonic is the
+    # form family and the flag-setting bit is the node's, so each row repeats the
+    # `add`/`sub` shape of the same name. `cmp`/`cmn` are aliases that fix `Rd`
+    # to 31 and drop the destination, so they are their own family and stay out.
+    {
+        "form_id": "aarch64:adds/x64-x64-x64-lsl0",
+        "mrs": "ADDS_64_addsub_shift",
+        "decision": "shift = LSL (00) and imm6 = 000000; the node fixes S = 1",
+        "pinned": {"shift": 0, "imm6": 0},
+        "since": "0.9.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+        ],
+    },
+    {
+        "form_id": "aarch64:adds/x64-imm12-lsl0",
+        "mrs": "ADDS_64S_addsub_imm",
+        "decision": "sh = 0 (no LSL #12); the node fixes S = 1",
+        "pinned": {"sh": 0},
+        "since": "0.9.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm12"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm12",
+             "range": {"signed": False, "bits": 12, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:adds/x64-imm12-lsl12",
+        "mrs": "ADDS_64S_addsub_imm",
+        "decision": "sh = 1 (LSL #12), imm12 still field content; the node fixes S = 1",
+        "pinned": {"sh": 1},
+        "since": "0.9.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm12"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm12",
+             "range": {"signed": False, "bits": 12, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:adds/x64-x64-x64-imm6-lsl",
+        "mrs": "ADDS_64_addsub_shift",
+        "decision": "shift = LSL (00); imm6 is field content (the shift amount)",
+        "pinned": {"shift": 0},
+        "since": "0.9.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm6"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm6",
+             "range": {"signed": False, "bits": 6, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:adds/x64-x64-x64-imm6-lsr",
+        "mrs": "ADDS_64_addsub_shift",
+        "decision": "shift = LSR (01); imm6 is field content (the shift amount)",
+        "pinned": {"shift": 1},
+        "since": "0.9.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm6"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm6",
+             "range": {"signed": False, "bits": 6, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:adds/x64-x64-x64-imm6-asr",
+        "mrs": "ADDS_64_addsub_shift",
+        "decision": "shift = ASR (10); imm6 is field content (the shift amount)",
+        "pinned": {"shift": 2},
+        "since": "0.9.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm6"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm6",
+             "range": {"signed": False, "bits": 6, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:subs/x64-x64-x64-lsl0",
+        "mrs": "SUBS_64_addsub_shift",
+        "decision": "shift = LSL (00) and imm6 = 000000; the node fixes S = 1 and op = 1",
+        "pinned": {"shift": 0, "imm6": 0},
+        "since": "0.9.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+        ],
+    },
+    {
+        "form_id": "aarch64:subs/x64-imm12-lsl0",
+        "mrs": "SUBS_64S_addsub_imm",
+        "decision": "sh = 0 (no LSL #12); the node fixes S = 1 and op = 1",
+        "pinned": {"sh": 0},
+        "since": "0.9.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm12"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm12",
+             "range": {"signed": False, "bits": 12, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:subs/x64-imm12-lsl12",
+        "mrs": "SUBS_64S_addsub_imm",
+        "decision": "sh = 1 (LSL #12), imm12 still field content; the node fixes S = 1 and op = 1",
+        "pinned": {"sh": 1},
+        "since": "0.9.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm12"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm12",
+             "range": {"signed": False, "bits": 12, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:subs/x64-x64-x64-imm6-lsl",
+        "mrs": "SUBS_64_addsub_shift",
+        "decision": "shift = LSL (00); imm6 is field content (the shift amount)",
+        "pinned": {"shift": 0},
+        "since": "0.9.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm6"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm6",
+             "range": {"signed": False, "bits": 6, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:subs/x64-x64-x64-imm6-lsr",
+        "mrs": "SUBS_64_addsub_shift",
+        "decision": "shift = LSR (01); imm6 is field content (the shift amount)",
+        "pinned": {"shift": 1},
+        "since": "0.9.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "src2", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm6"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm6",
+             "range": {"signed": False, "bits": 6, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:subs/x64-x64-x64-imm6-asr",
+        "mrs": "SUBS_64_addsub_shift",
+        "decision": "shift = ASR (10); imm6 is field content (the shift amount)",
+        "pinned": {"shift": 2},
+        "since": "0.9.0",
         "slots": [
             {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
              "from": "reg_number", "target_type": "x64"},

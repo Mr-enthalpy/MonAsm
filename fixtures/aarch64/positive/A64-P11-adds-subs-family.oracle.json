@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P11-adds-subs-family.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "fdb731f0c8405a7d102d0b17e605a7fd691a4a4f18fc33d10004eb2f7f64902f",
+  "output_sha256": "5aa58f45502aa26b2bc5ff0649c499dec87896e92b34a6da42c66ef6f4c472b7",
+  "size": 48,
+  "records": 0,
+  "notes": "Input (306 B, LF, trailing newline), one instruction per line with two leading spaces: `adds x0, x1, x2` / `adds x3, x4, #4095` / `adds x5, x6, #291, lsl #12` / `adds x7, x8, x9, lsl #3` / `adds x10, x11, x12, lsr #7` / `adds x13, x14, x15, asr #63` / `subs x16, x17, x18` / `subs x19, x20, #4095` / `subs x21, x22, #291, lsl #12` / `subs x23, x24, x25, lsl #3` / `subs x26, x27, x28, lsr #7` / `subs x29, x30, #1`. One instruction per row: the unshifted register row, both `sh` values of the immediate row, and all three shift keywords, six rows for `adds` and six for `subs`. Every row uses distinct registers, so a register-field slip cannot hide; `imm12` is exercised at 4095 (all twelve bits set) on both mnemonics, at 291 with `lsl #12` (field content, not the pre-scaled literal), and at 1 on the `subs` `sh = 0` half. `llvm-mc -show-encoding` prints the unshifted lines back without the modifier, i.e. the `-lsl0` spelling. Every operand is a register or an immediate, so `llvm-readobj -r` prints an empty relocation list and no linker is involved.",
+  "source": "Arm MRS ADDS_64_addsub_shift, ADDS_64S_addsub_imm, SUBS_64_addsub_shift and SUBS_64S_addsub_imm (S at 29+1 = 1, op at 30+1 = 0/1, shift at 22+2, imm6 at 10+6, sh at 22+1, imm12 at 10+12); measured in EXP-0020 §2"
+}

@@ -29,19 +29,21 @@ ADR-0013 makes AArch64 addressing kinds forms and the offset field content,
 ADR-0014 makes an AArch64 `movz` lane a form with `imm16` as field content,
 ADR-0015 makes an AArch64 shift keyword a form with the amount as field content,
 ADR-0016 makes an AArch64 extend keyword a form with the amount as field
-content and a closed excluded tail, and ADR-0017 makes an AArch64 mnemonic a
-form family (`sub` repeats the `add` shapes with the node's `op = 1`).
-Eleven definition documents are frozen and oracle-verified; the materializer and
+content and a closed excluded tail, ADR-0017 makes an AArch64 mnemonic a
+form family (`sub` repeats the `add` shapes with the node's `op = 1`), and
+ADR-0018 makes the flag-setting mnemonic a form family too (`adds`/`subs`
+repeat the shapes with the node's `S = 1`).
+Twelve definition documents are frozen and oracle-verified; the materializer and
 its fixture gate are implemented.
 
 | Area | State |
 |---|---|
 | Contract (`docs/fmp-v0/01_contract.md`) | draft, fields marked `TBD` where unproven |
 | Schema (`schema/fmp-v0.schema.json`) | draft, examples validate |
-| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms) and `0.8.0` (32 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
+| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms), `0.8.0` (32 forms) and `0.9.0` (44 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
 | Prototype (`prototype/`) | workspace compiled; all three slices materialize from the plan |
 | Oracles (`tools/oracle/`) | planned; `llvm-mc` (± `ld.lld`) drives the experiments |
-| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0019 |
+| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0020 |
 
 Read `docs/STATUS.md` for the current phase, gate status, and next action.
 

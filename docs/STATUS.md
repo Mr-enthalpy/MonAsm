@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-04
-Phase: **3 in progress (x86, AArch64 and RV64 slices): eleven definition documents, the materializer and the fixture gate are in place; every x86, AArch64 and RV64 coverage row is now carried, so widening is coverage work with its own ADR per slice**
+Phase: **3 in progress (x86, AArch64 and RV64 slices): twelve definition documents, the materializer and the fixture gate are in place; every x86, AArch64 and RV64 coverage row is now carried, so widening is coverage work with its own ADR per slice**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -14,7 +14,7 @@ this file plus `AGENTS.md` alone.
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
-| 3 | Three-ISA vertical prototype | **in progress**: eleven definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 5 positive and 15 negative fixtures, AArch64 has 11 positive and 23 negative, RV64 has 9 positive and 11 negative, all passing the two-source gate |
+| 3 | Three-ISA vertical prototype | **in progress**: twelve definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 5 positive and 15 negative fixtures, AArch64 has 12 positive and 26 negative, RV64 has 9 positive and 11 negative, all passing the two-source gate |
 | 4 | Invariants, negative tests, replay | not started |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
@@ -25,7 +25,7 @@ this file plus `AGENTS.md` alone.
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
 | G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: 22 of 32 rows are frozen; the 10 rows still `draft` are EC-05, EC-08, EC-09, EC-10, EC-16, EC-18, EC-23, EC-24, EC-25 and EC-26, and none of them is needed by the three slices as they stand |
-| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 5 positive, 15 negative; AArch64: 11 positive, 23 negative; RV64: 9 positive, 11 negative) |
+| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 5 positive, 15 negative; AArch64: 12 positive, 26 negative; RV64: 9 positive, 11 negative) |
 
 ## Decisions
 
@@ -48,6 +48,7 @@ this file plus `AGENTS.md` alone.
 | ADR-0015 | An AArch64 shift keyword is a form and the amount is field content: `0.6.0` adds three rows (`-imm6-lsl`/`-imm6-lsr`/`-imm6-asr`), each pinning `shift` (22+2), with `imm6` as an `aarch64.imm`/`imm6` operand over `0…63` at `[10,6]` and `align_bits 0`; a modifier never writes a bit, so the same shift stated as `{"name":"lsl","value":3}` on `-lsl0` is `E-OPERAND-003` (`N19`), an amount of 64 is `E-RANGE-001` (`N03-imm6`), `imm6 = 0` on `-imm6-lsl` is the same word as `-lsl0` and both stay, and the extend family/`sub`/the `w` rows stay out (`E-FORM-001`, `N01e`) | accepted 2026-11-04 |
 | ADR-0016 | An AArch64 extend keyword is a form and the amount is field content with an excluded tail: `0.7.0` adds eight rows, one per `option` value (`-imm3-uxtb` … `-imm3-sxtx`), with `option` pinned at 15–13, `src2` a `w` register on the six `[su]xt[bhw]` rows and an `x` register on the two `[su]xtx` rows, and `imm3` as an `aarch64.imm`/`imm3` operand at `[10,3]` over `0…4` with `excluded: [5,6,7]`; `imm3 = 8` is `E-RANGE-001` (`N03-imm3`), `5` is `E-RANGE-004` (`N16c`), a `w` operand on a shifted row is `E-OPERAND-001` (`N02b`), and the extended `sub` node/`adds`/`subs`/the 32-bit node stay out (`E-FORM-001`, `N01f`, `N01g`, `N01h`; the decision-7 scope is narrowed by ADR-0017) | accepted 2026-11-04 |
 | ADR-0017 | An AArch64 mnemonic is a form family: `0.8.0` adds six `sub` rows (`-lsl0`, `-imm12-lsl0`/`-lsl12`, `-imm6-lsl`/`-lsr`/`-asr`) from `SUB_64_addsub_shift`/`SUB_64_addsub_imm`, which are the `ADD_64` nodes with `op` at 30+1 fixed to `1` by the node itself, so no plan field names the mnemonic bit; the `sh`/`shift`/`imm6` treatment and slot shapes are inherited from ADR-0011/ADR-0015, register 31 in these rows is `xzr` (not `sp`), `subs` and the `sf = 0` node are `E-FORM-001` (`N01g`/`N01h`), and a literal outside the named `sh` half is `E-RANGE-001` (`N18d`) | accepted 2026-11-04 |
+| ADR-0018 | An AArch64 flag-setting mnemonic is a form family and `S = 1` is the node's: `0.9.0` adds twelve rows, six `adds` and six `subs` (`-lsl0`, `-imm12-lsl0`/`-lsl12`, `-imm6-lsl`/`-lsr`/`-asr` each) from `ADDS_64_addsub_shift`/`ADDS_64S_addsub_imm`/`SUBS_64_addsub_shift`/`SUBS_64S_addsub_imm`, the four nodes already read with `S` at 29+1 fixed to `1`, so no plan field names the bit; every word is its `add`/`sub` twin with bit 29 set, the `sh`/`shift`/`imm6` treatment and slot shapes are inherited, register 31 is `xzr` (the extended S nodes are absent), `cmp`/`cmn` are a two-operand alias family and out (`N01i`), the `sf = 0` S nodes are out (`N01j`), and a literal outside the named `sh` half is `E-RANGE-001` (`N18e`) | accepted 2026-11-04 |
 
 ## Settled decisions (contract level)
 
@@ -86,11 +87,13 @@ addressing kind (`A64-P3`, ADR-0013), `0.5.0.json` adds four `movz` rows from
 one node, one per `hw` lane (`A64-P7`, ADR-0014), `0.6.0.json` adds three
 shift rows from `ADD_64_addsub_shift`, one per keyword (`A64-P8`, ADR-0015),
 `0.7.0.json` adds eight extend rows from `ADD_64_addsub_ext`, one per `option`
-value (`A64-P9`, ADR-0016), and `0.8.0.json` adds six `sub` rows from
+value (`A64-P9`, ADR-0016), `0.8.0.json` adds six `sub` rows from
 `SUB_64_addsub_shift`/`SUB_64_addsub_imm`, whose nodes fix `op = 1` so the
-mnemonic is the form family (`A64-P10`, ADR-0017).
-Eleven fixtures match `llvm-mc` (`EXP-0008`, `EXP-0013`, `EXP-0014`, `EXP-0015`,
-`EXP-0016`, `EXP-0017`, `EXP-0018`, `EXP-0019`). Every directive §6.2 item now has a passing
+mnemonic is the form family (`A64-P10`, ADR-0017), and `0.9.0.json` adds twelve
+`adds`/`subs` rows from the four `S = 1` nodes, whose `S` bit is fixed by the node
+in the same way (`A64-P11`, ADR-0018).
+Twelve fixtures match `llvm-mc` (`EXP-0008`, `EXP-0013`, `EXP-0014`, `EXP-0015`,
+`EXP-0016`, `EXP-0017`, `EXP-0018`, `EXP-0019`, `EXP-0020`). Every directive §6.2 item now has a passing
 row; what remains is widening, not a decision.
 OD-12 is settled by ADR-0007: the RV64 source is the UDB resolved
 spec, pinned by archive and node hashes, `EXP-0009` verified the B/J/RVC scatter
@@ -138,9 +141,12 @@ not cover is caught only by the weaker size check; it is now settled, and
 2. Extend the AArch64 coverage, one vertical slice at a time. All eight directive
    §6.2 items now pass; the next slices are widening, and each needs its own ADR
    (ADR-0011 decision 7's rule):
-   - `adds`/`subs` (`S = 1`) and the `w`-width rows (`sf = 0`, `EC-11`);
-   - the extended `sub` node (`SUB_64_addsub_ext`, the eight `option` rows with
-     `op = 1`, ADR-0017 kept them out);
+   - the `w`-width rows (`sf = 0`, `EC-11`), including the four 32-bit `S` nodes;
+   - the extended `sub`/`adds`/`subs` nodes (`SUB_64_addsub_ext`,
+     `ADDS_64S_addsub_ext`, `SUBS_64S_addsub_ext`, the eight `option` rows each,
+     ADR-0016/ADR-0017/ADR-0018 kept them out);
+   - the `cmp`/`cmn` alias family (`Rd = 31`, destination dropped, ADR-0018 kept
+     it out);
    - the load/store kinds still absent: register-offset, literal, and the store's
      `imm9` pre/post pair (ADR-0013 kept them out).
    `A64-P4` is closed by `0.3.0`: ADR-0012 made the condition an operand
@@ -160,7 +166,11 @@ not cover is caught only by the weaker size check; it is now settled, and
    and the absent `sub` node. `A64-P10` is closed by `0.8.0`: ADR-0017 made the
    mnemonic the form family, so `sub` repeats the `add` shapes with `op = 1`,
    `A64-P10-sub-family` matches `llvm-mc`, and `N01g`/`N01h`/`N18d` pin the absent
-   `subs`, the absent `w` form and the literal that only fits the other `sh` half. A `:lo12:` inside the
+   `subs`, the absent `w` form and the literal that only fits the other `sh` half.
+   `A64-P11` is closed by `0.9.0`: ADR-0018 made the flag-setting mnemonic the
+   form family too, so `adds`/`subs` repeat the shapes with `S = 1`,
+   `A64-P11-adds-subs-family` matches `llvm-mc`, and `N01i`/`N01j`/`N18e` pin the
+   absent `cmp` alias, the absent `w` form and the same literal. A `:lo12:` inside the
    `-lsl12` form is measured at the record level but is not a symbol address
    (`EXP-0013` §5); a slice that wants one must decide what its addend means
    first.
@@ -186,7 +196,7 @@ sets — code, JSON Pointer, detail keys — are compared for exact equality.
 The AArch64 slice adds `definitions/aarch64/0.1.0.json` (four forms: two `add`,
 `bl`, `adrp`; digest `sha256:96f87aa…`) with the Arm BSD-3-Clause notice beside
 it, `EXP-0008` (five MRS nodes, the all-32-bits-covered check, and the
-`immlo`-at-30:29 correction the oracle caught), and 11 positive + 23 negative
+`immlo`-at-30:29 correction the oracle caught), and 12 positive + 26 negative
 fixtures. `0.2.0` adds the fifth form, `aarch64:add/x64-imm12-lsl12` (digest
 `sha256:169e4bf6…`), which pins `sh = 1` and leaves the operand as `imm12`
 field content (ADR-0011, `EXP-0013`); `N18a`/`N18b` record the two literals that
@@ -215,12 +225,16 @@ class and the absent `sub` node. `0.8.0` adds six `sub` rows (digest
 mnemonic as the form family and register 31 reading `xzr` (ADR-0017, `EXP-0019`);
 `A64-P10-sub-family` is 24 bytes over six forms, and `N01g`/`N01h`/`N18d` pin the
 absent `subs`, the absent `w` form and the literal that only fits the other `sh`
-half. A64-P5/P6 use `llvm-mc` →
+half. `0.9.0` adds twelve `adds`/`subs` rows (digest `sha256:99728cd9…`) from the
+four `S = 1` nodes, one bit over the `add`/`sub` shapes, with the flag-setting
+mnemonic as the form family (ADR-0018, `EXP-0020`); `A64-P11-adds-subs-family` is
+48 bytes over twelve forms, and `N01i`/`N01j`/`N18e` pin the absent `cmp` alias,
+the absent `w` form and the literal that only fits the other `sh` half. A64-P5/P6 use `llvm-mc` →
 `ld.lld` → `llvm-objcopy`
 because `llvm-mc` leaves AArch64 branch and `adrp` fields as relocations; A64-P3,
-A64-P4, A64-P7, A64-P8, A64-P9 and A64-P10 need no linker because their operands
-are immediates or local labels in one section and `llvm-mc` resolves them, emitting
-no relocations.
+A64-P4, A64-P7, A64-P8, A64-P9, A64-P10 and A64-P11 need no linker because their
+operands are immediates or local labels in one section and `llvm-mc` resolves
+them, emitting no relocations.
 The generator now gates each form on a `since` version, so an older document
 cannot lose a form and a newer one cannot gain one by accident. The fixture gate
 scans every `fixtures/<isa>/<kind>/` directory, so a new table's vectors are gated
