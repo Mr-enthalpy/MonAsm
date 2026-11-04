@@ -224,7 +224,7 @@ six transforms `fmp/0.1` defines, and nothing else:
 | Transform | Applied as | Where it comes from |
 |---|---|---|
 | `identity` | `v = D` | — |
-| `scale` | `v = D >> transform_shift`, arithmetic | `scale(2)` for AArch64 `b` below |
+| `scale` | `v = D >> transform_shift`, arithmetic | `scale(2)` for AArch64 `b`, `b.cond` and `ldr (literal)` below |
 | `page` | `v = (page(S + A) - page(P)) >> 12`, with `page(x) = x & !0xFFF` | `adrp` below |
 | `lo12_i` | `v = (S + A) & 0xFFF` — a mask, never range-checked | `add :lo12:` below |
 | `pcrel_hi20` | `v = (D + 0x800) >> 12` | RV64 `auipc` below |
@@ -250,12 +250,19 @@ The ISA table:
 | x86-64 PLT/GOT | semantics depend on link-time policy | v0: not expressible; a plan that names it is `E-VERSION-001` (§10) |
 | AArch64 `b`/`bl` | imm26, signed, scaled by 4, `P` = instruction address, ±128 MiB | `pcrel_begin`, `scale(2)`, `range.bits = 26`, `align_bits = 2` |
 | AArch64 `b.cond` | imm19, signed, scaled by 4, `P` = instruction address, −1 MiB…+1048572 B (`imm19` ends at 262143, so the upward end is not a round MiB) | `pcrel_begin`, `scale(2)`, `range.bits = 19`, `align_bits = 2`; the condition is an operand of the form, never a fixup field (`EC-29`) |
+| AArch64 `ldr` (literal) | imm19, signed, scaled by 4, `P` = instruction address, −1048576…+1048572 B | `pcrel_begin`, `scale(2)`, `range.bits = 19`, `align_bits = 2`; destination is a register operand, and there is no base register (`EC-15`) |
 | AArch64 `adrp` | immhi:immlo = `(page(S+A) - page(P)) >> 12`, signed 21 bits | `pcrel_page`, `value_transform = page`, pair `hi` |
 | AArch64 `add :lo12:` | imm12 = `(S+A) & 0xFFF`; `sh` picks `LSL #0`/`#12` and is fixed by the form, not by the fixup | `value_transform = lo12_i`, pair `lo`, same `pair_group` |
 | RV64 B-type | imm12…imm1 scattered; `P` = instruction address; ±4 KiB, 2-byte aligned | `pcrel_begin`, `range.bits = 12`, `align_bits = 1` |
 | RV64 J-type (`jal`) | imm20…imm1 scattered; ±1 MiB | `pcrel_begin`, `range.bits = 20`, `align_bits = 1` |
 | RV64 `auipc` hi20 | `hi20 = (S + A - P + 0x800) >> 12` in exact arithmetic, `P` = the `auipc`'s address | pair `hi`, `pcrel_begin`, `pcrel_hi20` |
 | RV64 `addi`/load/store lo12 | `lo12 = (S + A - P_hi) & 0xFFF`, `P_hi` = the paired `auipc`'s address | pair `lo`, `pcrel_hi`, `pcrel_lo12`, `addend` MUST be 0 |
+
+The literal load is the first non-branch PC-relative slot. Every earlier row with
+`pcrel_begin` and `scale(2)` was a branch, so the fact that the target is a data
+address rather than a control-transfer destination changes no field: the record
+still carries `pcrel_begin`, `scale(2)` and the same 19-bit range check, and
+`field_descriptor` still names `imm19` at `lsb 5` (`EXP-0025` §3).
 
 The scaled AArch64 low half adds no fixup field: `#:lo12:ext, lsl #12` emits the
 same `R_AARCH64_ADD_ABS_LO12_NC` record as the unscaled spelling and, for the

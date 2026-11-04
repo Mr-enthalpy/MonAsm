@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P16-loadlit.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "4826ea6ba480496ca463852643e33a63f1df26565114de561451f62d88f45fe8",
+  "output_sha256": "a9b2f62fe38b21cdabce3a7ba3136ba240fda4dd80f25e9b1f628d556324ae37",
+  "size": 24,
+  "records": 0,
+  "notes": "Input (104 B, LF, trailing newline). The source is two labels plus six loads in the plan's order: `.L1:` / `ldr x0, .L2` / `ldr x1, #-4` / `.L2:` / `ldr x2, #1048572` / `ldr x3, #-1048576` / `ldr x4, .L1` / `ldr x5, #4`. `.L1` is offset 0 and `.L2` is offset 8, so the two symbol targets are the same two instruction addresses the plan's symbols name (S1 = 0, S2 = 8) and the same `(S, P)` pairs reach the field: 8 and -16 bytes. `llvm-mc` resolves local labels itself, so `llvm-readobj -r` prints an empty relocation list and no linker is involved. The four value rows state `imm19` field content in 4-byte units (`-1`, `262143`, `-262144`, `1`), which is why `#-4` and `#4` in the source are the field values `-1` and `1`: the assembler spells the byte offset, the plan states the field (ADR-0023 decision 3). Labels on instruction addresses keep the vector one section with no data fragments; the fixup arithmetic is the same one a data target would use.",
+  "source": "Arm MRS LDR_64_loadlit (opc = 01, imm19 at 5+19, Rt at 0+5, no Rn), measured in EXP-0025 §1-§3"
+}

@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-RANGE-003", "path": "/fixups/0/value_transform", "detail_keys": ["required_align", "value"] }
+  ]
+}

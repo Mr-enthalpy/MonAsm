@@ -50,7 +50,7 @@ Rules:
 | E-OPERAND-004 | Operand value is not representable in the slot's field width (register number wider than the encoded field) | `target_type`, `value`, `field_bits` | N14 |
 | E-RANGE-001 | Immediate outside the legal encoding range | `min`, `max`, `value`, `target_type` | N03, N18a, N18b |
 | E-RANGE-002 | Displacement or branch offset outside the legal range | `min`, `max`, `value`, `bits`, `align_bits` | N04 |
-| E-RANGE-003 | Alignment requirement not met | `required_align`, `value` | — |
+| E-RANGE-003 | Alignment requirement not met | `required_align`, `value` | N20 |
 | E-RANGE-004 | Operand value is excluded by the slot's declared domain | `target_type`, `value`, `excluded` | N16a, N16b |
 | E-LAYOUT-001 | Fragments overlap | `first`, `second` | N09 |
 | E-LAYOUT-002 | Fragment gap, or fragment sum != `declared_size` | `declared`, `covered` | N11 |
@@ -97,7 +97,9 @@ rejection; `derived` means it follows from a measured byte sequence.
   `[-262144, 262143]` field units, so the reachable byte range is
   `-1048576 … +1048572`, and `262144` is `N04c` (`EXP-0014` §3 measured both ends;
   an encoder cannot widen `b.cond` to `b` without changing either the instruction
-  or the condition).
+  or the condition). The literal load reuses the same field and the same refusal
+  on a non-branch row: `ldr x0, #1048576` is rejected, `262144` is `N04d`, and
+  the field's byte range is the same `-1048576 … +1048572` (`EXP-0025` §2).
 - `E-FIXUP-003` — observed, F-06 (label path): XirAsm rejects an out-of-range
   label with "does not fit the signed 8-bit displacement". The same condition on
   a planned fixup is this code.
@@ -155,7 +157,10 @@ rejection; `derived` means it follows from a measured byte sequence.
 - `E-RANGE-003` — derived, OD-09: an AArch64 `b` targets `.text+2`. The
   displacement is not a multiple of 4, and `imm26 = D >> 2` would silently drop
   the low two bits, branching 2 bytes before the requested address. Reject
-  rather than round.
+  rather than round. `N20` is the first fixture: a `pcrel_begin` literal-load
+  fixup whose target is 2 bytes away is refused at `/fixups/0/value_transform`
+  with `required_align 2` and `value 2`, after the field itself was checked and
+  found in range (`EXP-0025` §3).
 - `E-RANGE-004` — observed, `EXP-0012` §2: `c.addi a0, 0` is accepted by
   `llvm-mc 23.1.2` and encodes `01 05`, which `llvm-objdump` prints as
   `c.addi a0, 0x0`; `c.addi x0, 1` encodes `05 00` and prints as `c.nop 0x1`.

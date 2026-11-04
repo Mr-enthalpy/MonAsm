@@ -74,7 +74,7 @@ not be moved to `frozen` on the strength of an argument alone.
 | EC-12 | AArch64 | `add/sub` immediate: imm12 vs imm12 shifted by 12 | Different `sh` bit and range | `form variant` (`imm12` / `imm12-scaled`) | `add x0,x1,#1` and `add x0,x1,#1,lsl #12` are both legal spellings of different values. The `sub` rows in `0.8.0` carry the same pair: `sub x0, x1, #4096` is encodable only as `-lsl12` (`imm12 = 1`), `llvm-mc` picks that form without a diagnostic, and naming `-lsl0` is `E-RANGE-001` (`N18d`, `EXP-0019` §2). | frozen |
 | EC-13 | AArch64 | Shifted-register vs extended-register form | Different `shift`/`option` fields | `form variant` (`shifted-reg` / `extended-reg`) | `add x0,x1,x2,lsl #3` vs `add x0,x1,w2,uxtw #3` share a mnemonic but not an encoding. The flag-setting spelling repeats it: `adds x0,x1,x2,lsl #3` is `0xab020c20` while `adds x0,x1,w2,uxtw #3` is `0xab224c20`, so the same split lands on the `S = 1` nodes (`EXP-0020` §2, ADR-0018). | frozen |
 | EC-14 | AArch64 | Load/store addressing: unsigned-offset vs pre-index vs post-index vs unscaled vs register-offset | Different addressing bits (bit 24, bits 11–10) and writeback semantics | `form variant` (`unsigned-offset` / `pre-index` / `post-index` / `unscaled` / `register-offset`) | llvm-mc 23.1.2: `ldr x0,[x1,#16]` is `0xf9400820` (`imm12 = 2`, unsigned-offset) while `ldur x0,[x1,#16]` is `0xf8410020` (`imm9 = 16`, unscaled). Worse, `ldr x0,[x1,#1]` emits `0xf8401020`, which `llvm-objdump` reads back as `ldur`: the mnemonic does not name the form, so the assembler silently switches instruction on the offset's value (INV-02). The store half is the same: `str x0,[x1,#8]!` is `0xf8008c20` (pre-index, `opc = 00`) and `str x0,[x1,#1]` emits `0xf8001020`, read back as `stur` (`EXP-0024` §2). | frozen |
-| EC-15 | AArch64 | Literal load vs `adrp` + `lo12` sequence | Instruction count (INV-03 boundary) | `form variant` (one instruction vs two planned instructions) | A "load from label" request is a plan decision: one literal load or two instructions. | frozen |
+| EC-15 | AArch64 | Literal load vs `adrp` + `lo12` sequence | Instruction count (INV-03 boundary) | `form variant` (one instruction vs two planned instructions) | A "load from label" request is a plan decision: one literal load or two instructions. llvm-mc 23.1.2: `ldr x0, #-4` is one 4-byte word (`0x58ffffe0`), while the same address takes `adrp` + `add :lo12:` — two planned instructions with a pair-grouped fixup. Its reach is `−1048576 … +1048572` bytes and the reference is the instruction address (`pcrel_begin`, `EXP-0025` §2). Both halves now have rows (`aarch64:ldr/x64-imm19` in `0.14.0`, `aarch64:adrp/x64-imm21` since `0.1.0`), so the choice is the plan's and neither is inferred from the distance. | frozen |
 | EC-16 | AArch64 | `mov` alias family: `movz` / `movn` / `orr` immediate / register | Different opcodes | `form variant` (`movz` / `movn` / `orr-imm` / `reg`) | `mov x0,#1` can be `movz` or `orr`; both are legitimate and differ in bytes. | draft |
 | EC-17 | AArch64 | `adr` (±1 MB) vs `adrp` (page) for a symbol address | Different instruction and fixup kind | `form variant` + `fixup field` (`kind`) | Choosing `adrp` when the target is in range changes both bytes and relocation semantics. | frozen |
 | EC-18 | AArch64 | `b.cond` vs `cbz/cbnz` vs `tbz/tbnz` for a conditional transfer | Different forms and operand sets | `form variant` | A planner that says only "branch if zero" has not chosen a form. The `b.cond` half now ships as `aarch64:b.cond/imm19`; `cbz`/`tbnz` are absent, so naming one is `E-FORM-001`. | draft |
@@ -118,7 +118,7 @@ is what makes the two `mov` forms and the two `add` immediate forms distinct
 without an extra choice field. A plan that names `x86:mov/r64-r64` or
 `x86:add/rm64-imm` is rejected: those ids are not in the v0 definition.
 
-The AArch64 slice is one hundred and thirty-five forms across thirteen documents,
+The AArch64 slice is one hundred and thirty-six forms across fourteen documents,
 covering eleven frozen `EC` rows:
 
 | `form_id` | Encoding | Operand signature | Table | Covers |
@@ -137,6 +137,7 @@ covering eleven frozen `EC` rows:
 | `aarch64:str/x64-base-imm9-pre` | `STR (immediate)`, bits 11–10 = `11`, `opc=00` | src `x64`, base `x64`, disp `imm9` (signed bytes) | `0.13.0`+ | EC-14, A64-P15 |
 | `aarch64:str/x64-base-imm9-post` | `STR (immediate)`, bits 11–10 = `01`, `opc=00` | src `x64`, base `x64`, disp `imm9` (signed bytes) | `0.13.0`+ | EC-14, A64-P15 |
 | `aarch64:stur/x64-base-imm9` | `STUR`, bits 11–10 = `00`, `opc=00` | src `x64`, base `x64`, disp `imm9` (signed bytes) | `0.13.0`+ | EC-14, A64-P15 |
+| `aarch64:ldr/x64-imm19` | `LDR (literal)`, `opc=01`, `VR=0`, no `Rn` | dest `x64`, `imm19` target (field content, ×4) | `0.14.0`+ | EC-15, A64-P16 |
 | `aarch64:movz/x64-imm16-lsl0` | `MOVZ`, `sf=1`, `opc=10`, `hw=00` | dest `x64`, imm `imm16` (field content) | `0.5.0`+ | EC-30, A64-P7 |
 | `aarch64:movz/x64-imm16-lsl16` | `MOVZ`, `hw=01` | dest `x64`, imm `imm16` (field content) | `0.5.0`+ | EC-30, A64-P7 |
 | `aarch64:movz/x64-imm16-lsl32` | `MOVZ`, `hw=10` | dest `x64`, imm `imm16` (field content) | `0.5.0`+ | EC-30, A64-P7 |
@@ -380,14 +381,28 @@ still the `form_id`, and the store mnemonic still does not name it —
 (`EXP-0024`). `N01n` names the pre-index store id against `0.12.0`, so the new
 rows are a version boundary rather than an absence.
 
-The eight load/store rows carry `EC-14` and are the AArch64 half of `ADR-0008`:
+`0.14.0` adds the literal load, and it is the first row in this family whose
+operand list differs rather than only its bits (`ADR-0023`). `LDR_64_loadlit`
+has no `Rn`: the row is `dest` + `target`, with `imm19` at 5+19 and `Rt` at
+0+5, and the fixed pattern is `0x58000000`. `imm19` is field content in 4-byte
+units, so `{ "value": 1 }` is a load from `PC + 4` and a byte displacement is
+the `pcrel_begin` + `scale(2)` fixup with `align_bits: 2`; the field's signed
+range is `−262144 … 262143`, i.e. `−1048576 … +1048572` bytes (`EXP-0025`). Only
+`opc = 01` (`LDR Xt`) is a row: `00` (`LDR Wt`), `10` (`LDRSW`) and `11`
+(`PRFM`) change the destination class or the operation, and `VR = 1` is the
+SIMD/FP family. There is no store literal to add — no `STR_*_loadlit` node
+exists and the assembler rejects the spelling — so `aarch64:str/x64-imm19` is
+`E-FORM-001` in every document.
+
+The eight offset rows carry `EC-14` and are the AArch64 half of `ADR-0008`:
 the address is `base` + `disp`, never one memory payload, and the addressing
 kind is the `form_id`. `disp` is field content, so the unit belongs to the row:
 the two unsigned-offset rows count 8-byte units (`#16` is `disp = 2`) and the
 six `imm9` rows count signed bytes (`-256 … 255`), with `align_bits = 0` on
 both because the slot holds the field, not the byte offset (`ADR-0013`,
-`ADR-0022`). The register-offset kind (`aarch64:ldr/x64-base-regoff`) and the
-literal load are absent, so naming either of them is `E-FORM-001`.
+`ADR-0022`). The literal row is the ninth member of the family and the only one
+without a `base`; the register-offset kind (`aarch64:ldr/x64-base-regoff`) is
+the only addressing kind still absent, so naming it is `E-FORM-001`.
 
 `EC-05`, `EC-09` and `EC-10` are out of v0. `X86-P9` (explicit encoding family)
 stays deferred, so `vex`/`evex` never appear in a v0 `form_id`.
@@ -566,9 +581,12 @@ The v0 `EC` set is decided (OD-10). What remains is per-row evidence:
   lowering a `mov` request becomes. EC-13 is now carried in both halves:
   shifted-register by `0.1.0` and `0.6.0`, extended-register by `0.7.0`. `0.8.0`
   adds the `sub` halves of EC-12 and EC-31 (ADR-0017), and `0.9.0` repeats them on
-  the `S = 1` nodes for `adds`/`subs` (ADR-0018); the `w` rows, the extended
-  `sub`/`adds`/`subs` nodes and the `cmp`/`cmn` aliases still have no row, and
-  neither do the load/store kinds listed above.
+  the `S = 1` nodes for `adds`/`subs` (ADR-0018); `0.10.0` adds the twenty-four
+  `w` rows (ADR-0019), `0.11.0` the extended-register `sub`/`adds`/`subs` rows
+  (ADR-0020), and `0.12.0` the forty `cmp`/`cmn` aliases (ADR-0021). `0.13.0`
+  completes the store `imm9` kinds (ADR-0022), `0.14.0` adds the literal load
+  (ADR-0023), and the register-offset kind is the only load/store kind still
+  without a row.
 - The RV64 source is settled (ADR-0007: the UDB resolved spec, pinned by archive
   hash in `EXP-0009`), and both documents are generated: `definitions/rv64/0.1.0.json`
   and `0.2.0.json` (ADR-0009). `RV-P7` (`c.addi`) needed a format decision before

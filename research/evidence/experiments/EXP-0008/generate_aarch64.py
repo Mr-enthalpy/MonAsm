@@ -22,7 +22,7 @@ What it does, per form:
 Documents are emitted per version. A form appears in a document when the
 document's version is at or after the form's `since` (absent `since` means every
 version), so a later document cannot silently lose an earlier form. `0.1.0` …
-`0.12.0` stay frozen: their digests are asserted below, so a later edit that
+`0.13.0` stay frozen: their digests are asserted below, so a later edit that
 perturbs any of them fails loudly instead of shipping.
 
 Reads:  research/external/arm-mrs/Instructions.json (pinned by check_mrs.py)
@@ -39,6 +39,7 @@ Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.11.0.json
         definitions/aarch64/0.12.0.json
         definitions/aarch64/0.13.0.json
+        definitions/aarch64/0.14.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -58,7 +59,8 @@ MRS = os.path.join(ROOT, "research", "external", "arm-mrs", "Instructions.json")
 OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
 VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0",
-            "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0"]
+            "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0",
+            "0.14.0"]
 
 # Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
@@ -74,6 +76,7 @@ FROZEN_DIGESTS = {
     "0.10.0": "sha256:e958d69b4ba93222e7621a1f5c3ebd056ce929e2974a961a03abb7b66f0b247b",
     "0.11.0": "sha256:c5a9aec943f9b195c400380b8416bf63cba944da3fdf0203f90de5baff295002",
     "0.12.0": "sha256:8a428926568b99f0674785cc674bc066adc452216131706d458b9e3390da03b6",
+    "0.13.0": "sha256:d3876dd37a8441057b586312b3bee410e39594c64806b2c5c59960c06f9c7a5f",
 }
 
 WIDTH = 32
@@ -332,6 +335,27 @@ FORMS = [
             {"mrs": ["imm9"], "role": "disp", "kind": "aarch64.imm",
              "from": "operand_value", "target_type": "imm9",
              "range": {"signed": True, "bits": 9, "align_bits": 0}},
+        ],
+    },
+    # `A64-P16` (ADR-0023). The literal load is the one load with no `Rn`: the
+    # node fixes `opc = 01`, bit 24 = 0 and the kind bits that the other rows
+    # vary, and leaves only `Rt` and `imm19`. `imm19` is field content in
+    # 4-byte units, so a byte displacement is the fixup's `scale` with shift 2
+    # (07_definition_format.md §8.3) and the slot's `align_bits` stays 0. The
+    # other `opc` values (00 `LDR Wt`, 10 `LDRSW`, 11 `PRFM`) and the `VR = 1`
+    # SIMD/FP loads are different rows; no store literal node exists.
+    {
+        "form_id": "aarch64:ldr/x64-imm19",
+        "mrs": "LDR_64_loadlit",
+        "decision": "opc = 01 (LDR Xt); imm19 is field content in 4-byte units",
+        "pinned": {},
+        "since": "0.14.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm19"], "role": "target", "kind": "aarch64.rel",
+             "from": "operand_value", "target_type": "imm19",
+             "range": {"signed": True, "bits": 19, "align_bits": 0}},
         ],
     },
     # `A64-P7` (ADR-0014). `MOVZ`'s 2-bit `hw` field selects which 16-bit lane
