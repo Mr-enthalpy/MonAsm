@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-04
-Phase: **3 in progress (x86, AArch64 and RV64 slices): six definition documents, the materializer and the fixture gate are in place; three AArch64 coverage rows remain, and every RV64 row is now carried**
+Phase: **3 in progress (x86, AArch64 and RV64 slices): seven definition documents, the materializer and the fixture gate are in place; two AArch64 coverage rows remain, and every RV64 row is now carried**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -14,7 +14,7 @@ this file plus `AGENTS.md` alone.
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
-| 3 | Three-ISA vertical prototype | **in progress**: six definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 5 positive and 15 negative fixtures, AArch64 has 6 positive and 8 negative, RV64 has 9 positive and 11 negative, all passing the two-source gate |
+| 3 | Three-ISA vertical prototype | **in progress**: seven definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 5 positive and 15 negative fixtures, AArch64 has 7 positive and 11 negative, RV64 has 9 positive and 11 negative, all passing the two-source gate |
 | 4 | Invariants, negative tests, replay | not started |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
@@ -25,7 +25,7 @@ this file plus `AGENTS.md` alone.
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
 | G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: the x86 slice rows are frozen (EC-01/02/03/04/06/07/27/28); 10 rows are still `draft` |
-| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 5 positive, 15 negative; AArch64: 6 positive, 8 negative; RV64: 9 positive, 11 negative) |
+| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 5 positive, 15 negative; AArch64: 7 positive, 11 negative; RV64: 9 positive, 11 negative) |
 
 ## Decisions
 
@@ -43,6 +43,7 @@ this file plus `AGENTS.md` alone.
 | ADR-0010 | An RV64 low half names its high half: `pc_reference_rule: pcrel_hi` puts `P` at the paired `hi`'s site, `value_transform: pcrel_lo12` masks the displaced value, a `lo` addend must be 0 (`E-FIXUP-009`), and a group is one `hi` with at least one `lo` | accepted 2026-11-04 |
 | ADR-0011 | AArch64 `add` with `LSL #12` is a second `form_id` (`-lsl12`) in `0.2.0`: the form pins `sh = 1`, the slot stays `imm12` field content, no slot-level scale is added, and a literal that only fits the other form is `E-RANGE-001` (`N18a`/`N18b`) | accepted 2026-11-04 |
 | ADR-0012 | An AArch64 condition is an operand, not sixteen forms: `aarch64:b.cond/imm19` in `0.3.0` carries `cond` as `aarch64.cond`/`cond4` at bits 0–3 (range `0..15`, no `excluded` — all sixteen are defined), and the `imm19` target is field content with a `pcrel_begin` + `scale(2)` fixup; `cond = 16` is `E-RANGE-001` (`N03`), a displacement past `imm19` is `E-RANGE-002` (`N04c`) | accepted 2026-11-04 |
+| ADR-0013 | AArch64 addressing kinds are forms, and `disp` is field content: `0.4.0` adds five load/store rows (`ldr` imm12/imm9-pre/imm9-post, `ldur` imm9, `str` imm12), `imm12` counts 8-byte units for these `x` rows, `imm9` counts signed bytes, `align_bits` stays 0, and the register-offset, literal and store-`imm9` kinds stay absent (`E-FORM-001`) | accepted 2026-11-04 |
 
 ## Settled decisions (contract level)
 
@@ -58,7 +59,7 @@ this file plus `AGENTS.md` alone.
 | OD-10 | v0 ships only the forms the slices use; the definition table is the feature surface and absence is `E-FORM-001` | `02_encoding_choices.md`, "v0 surface"; ADR-0004 |
 | OD-11 | A byte-affecting decision is carried by `form_id`, a typed operand, a fixup field or a target field — never by a separate choice list | ADR-0004; `02_encoding_choices.md` |
 | OD-12 | RV64 facts come from the UDB resolved spec (`sha256:be184986…`), pinned per node; riscv-opcodes is the upstream cross-check and `llvm-mc` the oracle | ADR-0007; `EXP-0009`; `EXP-0010`; `definitions/rv64/NOTICE` |
-| OD-13 | A memory operand is field-level: `base`/`disp` are separate operands and the addressing form is a `form_id` variant; a composite `{"mem": …}` payload is `E-OPERAND-003` | ADR-0008; `EXP-0011`; `N15` |
+| OD-13 | A memory operand is field-level: `base`/`disp` are separate operands and the addressing form is a `form_id` variant; a composite `{"mem": …}` payload is `E-OPERAND-003` | ADR-0008; ADR-0013 (AArch64 half); `EXP-0011`; `EXP-0015`; `N15`; `N01b` |
 | OD-14 | A slot may exclude a closed list of exact values inside its domain; the rejection is `E-RANGE-004`, the check is a lookup, and an absent key means no exclusion | ADR-0009; `EXP-0012`; `N16a`/`N16b` |
 | OD-15 | A `hi`/`lo` pair expresses RISC-V's "the low half names the high half" with `pcrel_hi` (P = the paired `hi`'s site) and `pcrel_lo12` (mask the displaced value), a zero `lo` addend, and a 1:N group | ADR-0010; psABI `riscv-elf.adoc:1578-1605`; `RV-P8-pcrel-pair`, `RV-P8-pcrel-pair-resolved`; `N17a`/`N17b` |
 
@@ -76,9 +77,10 @@ pinned by ADR-0006, and the AArch64 tables it authorised now exist: five MRS
 nodes generated the forms in `definitions/aarch64/0.1.0.json`, the same nodes
 generated `0.2.0.json` with one extra row for the `sh = 1` half of `A64-P2`
 (ADR-0011), and `0.3.0.json` adds the `b.cond` row whose condition is an operand
-(ADR-0012). Six fixtures match `llvm-mc` (`EXP-0008`, `EXP-0013`, `EXP-0014`).
-What remains is coverage, not a decision: `A64-P3`/`P7`/`P8` have no table row
-yet.
+(ADR-0012). `0.4.0.json` adds five load/store rows from five more nodes, one per
+addressing kind (`A64-P3`, ADR-0013). Seven fixtures match `llvm-mc`
+(`EXP-0008`, `EXP-0013`, `EXP-0014`, `EXP-0015`). What remains is coverage, not a
+decision: `A64-P7`/`P8` have no table row yet.
 OD-12 is settled by ADR-0007: the RV64 source is the UDB resolved
 spec, pinned by archive and node hashes, `EXP-0009` verified the B/J/RVC scatter
 against `llvm-mc`, and `EXP-0010` generated `definitions/rv64/0.1.0.json` (seven
@@ -88,7 +90,10 @@ different ranges (RV64 `xs1`/`imm`/`xd`), that the x86 encoding form changes wit
 the displacement value (`48 8b 41 08` vs `48 8b 81 00 10 00 00`), and that the
 AArch64 `imm12` is already a scaled field value (`ldr x0, [x1, #16]` →
 `imm12 = 2`). `ld`/`sd` are therefore three operands, and `N15` pins the rejected
-composite payload. OD-14 is settled by ADR-0009: `EXP-0012` §2 measured that
+composite payload. The AArch64 half is pinned by ADR-0013: `disp` is field
+content, so the four addressing kinds are five rows in `aarch64/0.4.0.json` and
+`N01b` rejects the register-offset kind (`EXP-0015`). OD-14 is settled by
+ADR-0009: `EXP-0012` §2 measured that
 `c.addi a0, 0` (`01 05`) and `c.addi x0, 1` (`05 00`) are reserved HINTs despite
 being inside the declared range, so the slot excludes `0` and
 `riscv:c.addi/rd-imm6` lands in `rv64/0.2.0.json` (`RV-P7`, `N16a`/`N16b`). OD-15
@@ -114,17 +119,21 @@ not cover is caught only by the weaker size check; it is now settled, and
    `pcrel_lo12`, and `RV-P8-pcrel-pair` plus `RV-P8-pcrel-pair-resolved` now
    carry the record and arithmetic halves.
    The memory-operand question is closed: `OD-13`/ADR-0008 chose one operand per
-   field, `RV-P3` now passes, and `X86-P4`/`P6` and `A64-P3` carry a precondition
-   (enumerate and measure one `form_id` per addressing variant) rather than an
-   open question. The non-zero question is closed too: `OD-14`/ADR-0009 added
-   `excluded`, and `RV-P7` now passes (`EXP-0012`).
-2. Extend the AArch64 coverage, one vertical slice at a time: `A64-P3`
-   (load/store) next, then `A64-P7` and `A64-P8`, each with its own MRS node,
-   fixture and oracle record. `A64-P4` is closed by `0.3.0`: ADR-0012 made the
-   condition an operand (`aarch64.cond`/`cond4`) instead of sixteen forms, and
-   `N03`/`N04c` pin the two rejections. A `:lo12:` inside the `-lsl12` form
-   is measured at the record level but is not a symbol address (`EXP-0013` §5);
-   a slice that wants one must decide what its addend means first.
+   field, `RV-P3` now passes, `A64-P3` is closed by `0.4.0`/ADR-0013, and
+   `X86-P4`/`P6` carry a precondition (enumerate and measure one `form_id` per
+   addressing variant) rather than an open question. The non-zero question is
+   closed too: `OD-14`/ADR-0009 added `excluded`, and `RV-P7` now passes
+   (`EXP-0012`).
+2. Extend the AArch64 coverage, one vertical slice at a time: `A64-P7` and
+   `A64-P8` remain, each with its own MRS node, fixture and oracle record.
+   `A64-P4` is closed by `0.3.0`: ADR-0012 made the condition an operand
+   (`aarch64.cond`/`cond4`) instead of sixteen forms, and `N03`/`N04c` pin the
+   two rejections. `A64-P3` is closed by `0.4.0`: ADR-0013 made each addressing
+   kind a form and `disp` field content, `A64-P3-ldst-addressing` matches
+   `llvm-mc`, and `N03` ×2 plus `N01b` pin the rejections. A `:lo12:` inside the
+   `-lsl12` form is measured at the record level but is not a symbol address
+   (`EXP-0013` §5); a slice that wants one must decide what its addend means
+   first.
 3. Close the remaining contract debt:
    - `OD-05` (unknown fields/extensions) and `OD-08` (canonical wire form);
    - the Level 1 artifact envelope, which is deferred by `OD-03` and is not
@@ -147,17 +156,22 @@ sets — code, JSON Pointer, detail keys — are compared for exact equality.
 The AArch64 slice adds `definitions/aarch64/0.1.0.json` (four forms: two `add`,
 `bl`, `adrp`; digest `sha256:96f87aa…`) with the Arm BSD-3-Clause notice beside
 it, `EXP-0008` (five MRS nodes, the all-32-bits-covered check, and the
-`immlo`-at-30:29 correction the oracle caught), and 6 positive + 8 negative
+`immlo`-at-30:29 correction the oracle caught), and 7 positive + 11 negative
 fixtures. `0.2.0` adds the fifth form, `aarch64:add/x64-imm12-lsl12` (digest
 `sha256:169e4bf6…`), which pins `sh = 1` and leaves the operand as `imm12`
 field content (ADR-0011, `EXP-0013`); `N18a`/`N18b` record the two literals that
 must be rejected rather than form-switched. `0.3.0` adds the sixth,
 `aarch64:b.cond/imm19` (digest `sha256:71af93c0…`), where the condition is a
 four-bit operand rather than sixteen near-identical rows (ADR-0012, `EXP-0014`);
-`N03-cond` and `N04c` pin `cond = 16` and an `imm19` overflow. A64-P5/P6 use
-`llvm-mc` → `ld.lld` → `llvm-objcopy` because `llvm-mc` leaves AArch64 branch and
-`adrp` fields as relocations; A64-P4 needs no linker because its three targets are
-local labels in one section and `llvm-mc` resolves them, emitting no relocations.
+`N03-cond` and `N04c` pin `cond = 16` and an `imm19` overflow. `0.4.0` adds five
+load/store rows (digest `sha256:14d6c2b6…`), one per addressing kind, with `disp`
+as field content in 8-byte units (`imm12`) or signed bytes (`imm9`) (ADR-0013,
+`EXP-0015`); `A64-P3-ldst-addressing` is 24 bytes over five forms, and
+`N03-imm12-disp`/`N03-imm9-disp`/`N01b` pin the two range rejections and the
+absent register-offset kind. A64-P5/P6 use `llvm-mc` → `ld.lld` → `llvm-objcopy`
+because `llvm-mc` leaves AArch64 branch and `adrp` fields as relocations; A64-P3
+and A64-P4 need no linker because their operands are immediates or local labels
+in one section and `llvm-mc` resolves them, emitting no relocations.
 The generator now gates each form on a `since` version, so an older document
 cannot lose a form and a newer one cannot gain one by accident. The fixture gate
 scans every `fixtures/<isa>/<kind>/` directory, so a new table's vectors are gated

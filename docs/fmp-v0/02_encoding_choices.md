@@ -73,7 +73,7 @@ not be moved to `frozen` on the strength of an argument alone.
 | EC-11 | AArch64 | 32-bit (`w`) vs 64-bit (`x`) variant | Different `sf` bit, different semantics | `operand type` (`wreg` / `xreg`) | `add w0,w1,w2` vs `add x0,x1,x2` differ in one bit and in overflow behavior. | frozen |
 | EC-12 | AArch64 | `add/sub` immediate: imm12 vs imm12 shifted by 12 | Different `sh` bit and range | `form variant` (`imm12` / `imm12-scaled`) | `add x0,x1,#1` and `add x0,x1,#1,lsl #12` are both legal spellings of different values. | frozen |
 | EC-13 | AArch64 | Shifted-register vs extended-register form | Different `shift`/`option` fields | `form variant` (`shifted-reg` / `extended-reg`) | `add x0,x1,x2,lsl #3` vs `add x0,x1,w2,uxtw #3` share a mnemonic but not an encoding. | frozen |
-| EC-14 | AArch64 | Load/store addressing: unsigned-offset vs pre-index vs post-index vs register-offset | Different addressing bits and writeback semantics | `form variant` (`unsigned-offset` / `pre-index` / `post-index` / `register-offset`) | `ldr x0,[x1,#8]` vs `ldr x0,[x1],#8` differ in writeback; an encoder must not pick one. | frozen |
+| EC-14 | AArch64 | Load/store addressing: unsigned-offset vs pre-index vs post-index vs unscaled vs register-offset | Different addressing bits (bit 24, bits 11–10) and writeback semantics | `form variant` (`unsigned-offset` / `pre-index` / `post-index` / `unscaled` / `register-offset`) | llvm-mc 23.1.2: `ldr x0,[x1,#16]` is `0xf9400820` (`imm12 = 2`, unsigned-offset) while `ldur x0,[x1,#16]` is `0xf8410020` (`imm9 = 16`, unscaled). Worse, `ldr x0,[x1,#1]` emits `0xf8401020`, which `llvm-objdump` reads back as `ldur`: the mnemonic does not name the form, so the assembler silently switches instruction on the offset's value (INV-02). | frozen |
 | EC-15 | AArch64 | Literal load vs `adrp` + `lo12` sequence | Instruction count (INV-03 boundary) | `form variant` (one instruction vs two planned instructions) | A "load from label" request is a plan decision: one literal load or two instructions. | frozen |
 | EC-16 | AArch64 | `mov` alias family: `movz` / `movn` / `orr` immediate / register | Different opcodes | `form variant` (`movz` / `movn` / `orr-imm` / `reg`) | `mov x0,#1` can be `movz` or `orr`; both are legitimate and differ in bytes. | draft |
 | EC-17 | AArch64 | `adr` (±1 MB) vs `adrp` (page) for a symbol address | Different instruction and fixup kind | `form variant` + `fixup field` (`kind`) | Choosing `adrp` when the target is in range changes both bytes and relocation semantics. | frozen |
@@ -114,8 +114,8 @@ is what makes the two `mov` forms and the two `add` immediate forms distinct
 without an extra choice field. A plan that names `x86:mov/r64-r64` or
 `x86:add/rm64-imm` is rejected: those ids are not in the v0 definition.
 
-The AArch64 slice is six forms across three documents, covering six frozen `EC`
-rows:
+The AArch64 slice is eleven forms across four documents, covering seven frozen
+`EC` rows:
 
 | `form_id` | Encoding | Operand signature | Table | Covers |
 |---|---|---|---|---|
@@ -125,6 +125,11 @@ rows:
 | `aarch64:bl/imm26` | `BL imm26` | `imm26` target | all | A64-P5 |
 | `aarch64:adrp/x64-imm21` | `ADRP immlo:immhi` | dest `x64`, `imm21` target | all | EC-15, EC-17 |
 | `aarch64:b.cond/imm19` | `B.cond`, `o0=0` | cond `cond4`, `imm19` target | `0.3.0`+ | EC-29, A64-P4 |
+| `aarch64:ldr/x64-base-imm12` | `LDR (immediate)`, `size=11`, bit 24 = 1 | dest `x64`, base `x64`, disp `imm12` (8-byte units) | `0.4.0`+ | EC-14, A64-P3 |
+| `aarch64:ldr/x64-base-imm9-pre` | `LDR (immediate)`, bits 11–10 = `11` | dest `x64`, base `x64`, disp `imm9` (signed bytes) | `0.4.0`+ | EC-14, A64-P3 |
+| `aarch64:ldr/x64-base-imm9-post` | `LDR (immediate)`, bits 11–10 = `01` | dest `x64`, base `x64`, disp `imm9` (signed bytes) | `0.4.0`+ | EC-14, A64-P3 |
+| `aarch64:ldur/x64-base-imm9` | `LDUR`, bits 11–10 = `00` | dest `x64`, base `x64`, disp `imm9` (signed bytes) | `0.4.0`+ | EC-14, A64-P3 |
+| `aarch64:str/x64-base-imm12` | `STR (immediate)`, `size=11`, bit 24 = 1 | src `x64`, base `x64`, disp `imm12` (8-byte units) | `0.4.0`+ | EC-14, A64-P3 |
 
 The `-lsl0`/`-lsl12` suffix is part of the id because the MRS node leaves
 `shift`, `imm6` and `sh` variable; the table pins them and the name says so
@@ -135,7 +140,16 @@ only, so naming it against `0.1.0` is `E-FORM-001` (`N01`).
 `b.cond` is the opposite case and shows where the line is: the condition is a
 4-bit *operand* (`EC-29`), so one row covers all sixteen conditions, while the
 `b.cond`-vs-`cbz`-vs-`tbz` choice of instruction is a form variant (`EC-18`).
-`A64-P3`/`P7`/`P8` have no row, so naming them is `E-FORM-001` too.
+`A64-P7`/`P8` have no row, so naming them is `E-FORM-001` too.
+
+The five load/store rows carry `EC-14` and are the AArch64 half of `ADR-0008`:
+the address is `base` + `disp`, never one memory payload, and the addressing
+kind is the `form_id`. `disp` is field content, so the unit belongs to the row:
+the two unsigned-offset rows count 8-byte units (`#16` is `disp = 2`) and the
+three `imm9` rows count signed bytes (`-256 … 255`), with `align_bits = 0` on
+both because the slot holds the field, not the byte offset (`ADR-0013`). The
+register-offset kind (`aarch64:ldr/x64-base-regoff`), the literal load and the
+store's `imm9` kinds are absent, so naming any of them is `E-FORM-001`.
 
 `EC-05`, `EC-09` and `EC-10` are out of v0. `X86-P9` (explicit encoding family)
 stays deferred, so `vex`/`evex` never appear in a v0 `form_id`.

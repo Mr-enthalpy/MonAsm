@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P3-ldst-addressing.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "80cb4897cfb7826323ce6bf59096e6d80286c01b7bf45981dfd4820b31b2265b",
+  "output_sha256": "3f0ecd8652a642925cd995b22de0f6a7d70961b8276bfeb2d01e61f1c61481c0",
+  "size": 24,
+  "records": 0,
+  "notes": "Input (118 B, LF, trailing newline), one instruction per line: `ldr x0, [x1]` / `ldr x2, [x3, #32760]` / `ldr x4, [x5, #8]!` / `ldr x6, [x7], #-8` / `ldur x8, [x9, #-256]` / `str x10, [x11]`. Five forms: unsigned offset at both ends of `imm12` (`0`, `4095`), pre-index `+8`, post-index `-8`, `ldur` at `-256`, and a store at offset 0. Every operand is an immediate, so `llvm-readobj -r` prints an empty relocation list and no linker is involved. The plan states the addressing kind in `form_id` (ADR-0013) and `disp` as field content, so the `#32760` line is `disp = 4095` and the `#-256` line is `disp = -256`.",
+  "source": "Arm MRS LDR_64_ldst_pos (imm12 at 10+12), LDR_64_ldst_immpre / LDR_64_ldst_immpost (imm9 at 12+9, bits 11-10 = 11/01), LDUR_64_ldst_unscaled (bits 11-10 = 00), STR_64_ldst_pos (opc = 00); measured in EXP-0015 §3"
+}

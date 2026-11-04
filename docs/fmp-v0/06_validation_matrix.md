@@ -168,14 +168,14 @@ that definition slice lands.
 |---|---|---|---|---|
 | A64-P1 | Register arithmetic | `add x0, x1, x2` (`shifted-register`, pinned `LSL #0`) | llvm-mc | **passing** — `aarch64/positive/A64-P1-add-register` |
 | A64-P2 | Immediate arithmetic | `add x0, x1, #imm12` and the `LSL #12` variant as two forms | llvm-mc | **passing** — `add/x64-imm12-lsl0` (imm 0 and 4095) in `A64-P2-add-imm12`; `add/x64-imm12-lsl12` (field content 1, 291, 4095, 0) in `A64-P2-add-imm12-lsl12`; `N18a`/`N18b` reject the form-switching spellings |
-| A64-P3 | Load/store addressing | unsigned-offset vs pre/post-index as distinct forms | llvm-mc | planned — needs the four addressing kinds as separate `form_id`s (`ADR-0008`, `OD-13`) |
+| A64-P3 | Load/store addressing | unsigned-offset vs pre/post-index vs unscaled as distinct forms | llvm-mc | **passing** — `A64-P3-ldst-addressing` (six instructions, five forms: `imm12` at 0 and 4095, pre-index +8, post-index −8, `ldur` at −256, store at 0) through `aarch64:ldr/x64-base-imm12`, `ldr/x64-base-imm9-pre`, `ldr/x64-base-imm9-post`, `ldur/x64-base-imm9` and `str/x64-base-imm12`; `N03` rejects `disp = 4096` on `imm12` and `disp = −257` on `imm9`; `N01b` rejects the absent register-offset id |
 | A64-P4 | Conditional branch | `b.eq` imm19 | llvm-mc | **passing** — `A64-P4-b-cond` (`b.eq` +4, `b.ne` −4, `b.gt` −8) through `aarch64:b.cond/imm19` with the condition as a `cond4` operand; `N03` rejects `cond = 16` and `N04c` rejects an out-of-range `imm19` |
 | A64-P5 | Unconditional branch/call | `bl` imm26 | llvm-mc + ld.lld | **passing** — `A64-P5-bl-local-symbol` (+4 and −4) |
 | A64-P6 | PC-relative pair | `adrp` + `add #:lo12:` with `pair_group` | llvm-mc + ld.lld + llvm-readobj | **passing** — `A64-P6-adrp-lo12-pair` |
 | A64-P7 | Scattered/scaled field | ins/del of a scaled immediate, or `movz` shift | llvm-mc | planned — no table row |
 | A64-P8 | Target-specific modifier | shift/extend modifier on a register operand | llvm-mc | planned — no table row |
 
-Definition anchor for A64-P1/P2/P4/P5/P6, measured 2026-11-04: the four base
+Definition anchor for A64-P1/P2/P3/P4/P5/P6, measured 2026-11-04: the four base
 forms live in `definitions/aarch64/0.1.0.json` (digest
 `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e`),
 generated from the Arm MRS 2026-06 drop by `EXP-0008`. `0.2.0` adds the fifth,
@@ -189,14 +189,19 @@ when a plan names it against `0.1.0`. The `-lsl0`/`-lsl12` suffix names the pinn
 `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb`),
 whose `B_only_condbranch` node leaves both the 4-bit condition and the 19-bit
 displacement variable; the condition is an operand (`EC-29`, ADR-0012), not
-sixteen forms. `llvm-mc` does not resolve AArch64 branch or `adrp` immediates when
+sixteen forms. `0.4.0` adds the five load/store rows (digest
+`sha256:14d6c2b66669ff45401b8b69d5ce111c13ce6e8ef44f04440b961b8f2133bc78`), one per
+MRS addressing-kind node, with `disp` as field content in 8-byte units (`imm12`)
+or signed bytes (`imm9`) (`EC-14`, ADR-0013); `0.1.0`…`0.3.0` are unchanged.
+`llvm-mc` does not resolve AArch64 branch or `adrp` immediates when
 they name a symbol, so A64-P5/P6 take their bytes after
 `ld.lld --image-base=0 -Ttext=0` has resolved the same `(S, P)` pair; the
 relocation kinds were read with `llvm-readobj -r` before linking (see
-`fixtures/aarch64/README.md`). A64-P4 needs no linker: all three of its targets are
-local labels in one section and `llvm-mc` resolves them itself, emitting no
-relocations. The eight negative fixtures (`N01`, `N03` ×2, `N04c`, `N12a`, `N14`,
-`N18a`, `N18b`) exercise these tables with exact diagnostic sets.
+`fixtures/aarch64/README.md`). A64-P3 and A64-P4 need no linker: A64-P3's operands
+are all immediates and A64-P4's three targets are local labels in one section, so
+`llvm-mc` resolves both itself and emits no relocations. The eleven negative
+fixtures (`N01` ×2, `N03` ×4, `N04c`, `N12a`, `N14`, `N18a`, `N18b`) exercise
+these tables with exact diagnostic sets.
 
 N03 and N04 gain their AArch64 cases from `b.cond`, and both are the "in range
 but wrong field" shape. `cond = 16` is a legal number for a 4-bit-typed value but
@@ -207,6 +212,14 @@ past the signed 19-bit field, which is why the reachable displacement ends at
 `+1048572` rather than `+1 MiB` (`EXP-0014` §3). The fixture states the
 displacement as a field value instead of a fixup so the range check is the only
 thing under test; the positive vector exercises the fixup path.
+
+N03's load/store cases are the same shape one field over. `imm12` is `0…4095`
+field units (the access size is the multiplier) and `imm9` is `−256…255` signed
+bytes, so `4096` and `−257` have no encoding; there is no second form to fall
+back to, because the kind is already the `form_id` (`EXP-0015` §2, ADR-0013).
+`N01b` is the other half: `aarch64:ldr/x64-base-regoff` names an addressing kind
+the table does not contain, so it is `E-FORM-001`, not a plan the materializer
+silently reinterprets as an unsigned-offset load.
 
 ### RV64 (directive §6.3)
 

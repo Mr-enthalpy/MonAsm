@@ -112,7 +112,12 @@ rejection; `derived` means it follows from a measured byte sequence.
   is a plausible number for "one past the last condition" but the field is four
   bits, and masking it yields `0x0`, which is `eq` — an accepted branch on the
   wrong condition (`N03`, `EXP-0014` §2). The range check is what turns that into
-  a rejection instead of a silently different program.
+  a rejection instead of a silently different program. The load/store `disp`
+  ranges are the same shape one field over: `imm12` holds `0…4095` field units
+  and `imm9` holds `−256…255` signed bytes, so the assembler's `#32760` is `4095`
+  while `#32768` has no encoding, and `4096` or `−257` is `N03` (`EXP-0015` §2).
+  Widening `imm9` to `imm12` would be a different addressing kind, which is a
+  different `form_id`; the materializer may not do it to make the value fit.
 - `E-OPERAND-001` — observed, F-10: `c.addi a6, 5` (x16) is rejected because the
   compressed register class is `x8..x15`. A register-class violation is a
   legality rule, never a widening opportunity.

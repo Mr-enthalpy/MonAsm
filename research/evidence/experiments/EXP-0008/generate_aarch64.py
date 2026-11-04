@@ -21,14 +21,15 @@ What it does, per form:
 
 Documents are emitted per version. A form appears in a document when the
 document's version is at or after the form's `since` (absent `since` means every
-version), so a later document cannot silently lose an earlier form. `0.1.0` and
-`0.2.0` stay frozen: their digests are asserted below, so a later edit that
-perturbs either one fails loudly instead of shipping.
+version), so a later document cannot silently lose an earlier form. `0.1.0` …
+`0.3.0` stay frozen: their digests are asserted below, so a later edit that
+perturbs any of them fails loudly instead of shipping.
 
 Reads:  research/external/arm-mrs/Instructions.json (pinned by check_mrs.py)
 Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.2.0.json
         definitions/aarch64/0.3.0.json
+        definitions/aarch64/0.4.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -46,12 +47,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
 MRS = os.path.join(ROOT, "research", "external", "arm-mrs", "Instructions.json")
 OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
-VERSIONS = ["0.1.0", "0.2.0", "0.3.0"]
+VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0"]
 
 # Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
     "0.1.0": "sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e",
     "0.2.0": "sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed",
+    "0.3.0": "sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb",
 }
 
 WIDTH = 32
@@ -168,6 +170,95 @@ FORMS = [
             {"mrs": ["imm19"], "role": "target", "kind": "aarch64.rel",
              "from": "operand_value", "target_type": "imm19",
              "range": {"signed": True, "bits": 19, "align_bits": 0}},
+        ],
+    },
+    # `A64-P3` (ADR-0013). The four immediate addressing kinds are four MRS
+    # nodes, so the kind is a `form_id`, not an operand value. `disp` is field
+    # content: `imm12` counts 8-byte units for these `size = 11` rows and is
+    # unsigned; `imm9` counts signed bytes. No slot-level scale exists
+    # (07_definition_format.md §5), and `align_bits` checks the field value, not
+    # the byte offset (§4).
+    {
+        "form_id": "aarch64:ldr/x64-base-imm12",
+        "mrs": "LDR_64_ldst_pos",
+        "decision": "bit 24 = 1 (unsigned offset); imm12 is field content in 8-byte units",
+        "pinned": {},
+        "since": "0.4.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm12"], "role": "disp", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm12",
+             "range": {"signed": False, "bits": 12, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:ldr/x64-base-imm9-pre",
+        "mrs": "LDR_64_ldst_immpre",
+        "decision": "bits 11-10 = 11 (pre-index); imm9 is signed field content in bytes",
+        "pinned": {},
+        "since": "0.4.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm9"], "role": "disp", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm9",
+             "range": {"signed": True, "bits": 9, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:ldr/x64-base-imm9-post",
+        "mrs": "LDR_64_ldst_immpost",
+        "decision": "bits 11-10 = 01 (post-index); imm9 is signed field content in bytes",
+        "pinned": {},
+        "since": "0.4.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm9"], "role": "disp", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm9",
+             "range": {"signed": True, "bits": 9, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:ldur/x64-base-imm9",
+        "mrs": "LDUR_64_ldst_unscaled",
+        "decision": "bits 11-10 = 00 (unscaled); imm9 is signed field content in bytes",
+        "pinned": {},
+        "since": "0.4.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm9"], "role": "disp", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm9",
+             "range": {"signed": True, "bits": 9, "align_bits": 0}},
+        ],
+    },
+    {
+        # Same layout as the `ldr` unsigned-offset row with `opc = 00`; the
+        # stored register is `Rt`. This row is what proves `opc` comes from the
+        # form and not from the mnemonic (ADR-0013 decision 5).
+        "form_id": "aarch64:str/x64-base-imm12",
+        "mrs": "STR_64_ldst_pos",
+        "decision": "bit 24 = 1 (unsigned offset); opc = 00 (store); imm12 is field content in 8-byte units",
+        "pinned": {},
+        "since": "0.4.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm12"], "role": "disp", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm12",
+             "range": {"signed": False, "bits": 12, "align_bits": 0}},
         ],
     },
 ]

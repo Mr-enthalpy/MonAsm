@@ -9,11 +9,15 @@ Vectors: `A64-P1` … `A64-P8` in `docs/fmp-v0/06_validation_matrix.md`.
 | `positive/A64-P1-add-register` | `aarch64:add/x64-x64-x64-lsl0` ×3 | `llvm-mc` |
 | `positive/A64-P2-add-imm12` | `aarch64:add/x64-imm12-lsl0` ×2, imm 0 and 4095 | `llvm-mc` |
 | `positive/A64-P2-add-imm12-lsl12` | `aarch64:add/x64-imm12-lsl12` ×4 (`0.2.0`), field content 0, 1, 291, 4095 | `llvm-mc` |
+| `positive/A64-P3-ldst-addressing` | `aarch64:ldr/x64-base-imm12` ×2 (`0.4.0`), `ldr/x64-base-imm9-pre`, `ldr/x64-base-imm9-post`, `ldur/x64-base-imm9`, `str/x64-base-imm12`; six instructions, 24 B | `llvm-mc` (no linker: immediates only, no relocations) |
 | `positive/A64-P4-b-cond` | `aarch64:b.cond/imm19` ×3 (`0.3.0`), `b.eq` +4, `b.ne` −4, `b.gt` −8 | `llvm-mc` (no linker: local labels, no relocations) |
 | `positive/A64-P5-bl-local-symbol` | `aarch64:bl/imm26` ×2, +4 and −4 | `llvm-mc` + `ld.lld` |
 | `positive/A64-P6-adrp-lo12-pair` | `aarch64:adrp/x64-imm21` + `aarch64:add/x64-imm12-lsl0`, one `pair_group` | `llvm-mc` + `ld.lld`; relocation kinds read with `llvm-readobj` |
 | `negative/N01-absent-scaled-form` | `aarch64:add/x64-imm12-lsl12` against `0.1.0`, which lacks it | `E-FORM-001` |
+| `negative/N01b-absent-register-offset-form` | `aarch64:ldr/x64-base-regoff` (`0.4.0` has no such form) | `E-FORM-001` |
 | `negative/N03-imm12-out-of-range` | imm12 = 4096 | `E-RANGE-001` |
+| `negative/N03-imm12-disp-out-of-range` | `disp = 4096` on the load/store `imm12` field | `E-RANGE-001` |
+| `negative/N03-imm9-disp-out-of-range` | `disp = −257` on the `imm9` field | `E-RANGE-001` |
 | `negative/N03-cond-out-of-range` | `cond = 16` in a 4-bit field | `E-RANGE-001` |
 | `negative/N04c-bcond-imm19-out-of-range` | `imm19 = 262144`, one past the signed 19-bit field | `E-RANGE-002` |
 | `negative/N12a-pair-without-lo` | two `hi` members in one `pair_group` | `E-FIXUP-007` |
@@ -22,15 +26,17 @@ Vectors: `A64-P1` … `A64-P8` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N18b-operand-is-field-content` | `0x123000` stated on `-lsl12` (a pre-scaled literal) | `E-RANGE-001` |
 
 `N01` is why the version split matters: a form exists, but not in an older
-document, so a plan bound to `0.1.0` still cannot reach `-lsl12`, and a plan bound
-to `0.2.0` cannot reach `b.cond`. Each fixture names the document it targets and
-that document's digest.
+document, so a plan bound to `0.1.0` still cannot reach `-lsl12`, a plan bound
+to `0.2.0` cannot reach `b.cond`, and a plan bound to `0.3.0` cannot reach the
+load/store rows. Each fixture names the document it targets and that document's
+digest.
 
-Not yet covered: `A64-P3` (load/store), `A64-P7` (scattered field) and `A64-P8`
-(shift/extend modifier). They have no form in any document, so `N01` rejects them
-rather than guessing. A linked `:lo12:` inside the `-lsl12` form is measured at
-the record level (`EXP-0013` §5) but is not an address of the symbol, so no
-fixture links one.
+Not yet covered: `A64-P7` (scattered field) and `A64-P8` (shift/extend modifier).
+They have no form in any document, so `N01` rejects them rather than guessing.
+The load/store register-offset and literal kinds, and the store's `imm9` kinds,
+are absent for the same reason. A linked `:lo12:` inside the `-lsl12` form is
+measured at the record level (`EXP-0013` §5) but is not an address of the symbol,
+so no fixture links one.
 
 ## Two things a reader of the plans should know
 
@@ -39,13 +45,23 @@ and `adrp`'s `imm21` are not byte counts: the ISA divides by 4 and by 4096. A
 `{ "value": n }` payload on those slots is written to the field as `n`, because a
 definition slot has no scaling transform. A byte offset is expressed with a
 fixup instead — `scale` with `transform_shift: 2` for `bl`, `page` for `adrp` —
-which is the only path that performs the division. Both fixtures use the fixup
-path; `A64-P1`/`P2` use plain values on non-scaled fields.
+which is the only path that performs the division. Both branch fixtures use the
+fixup path. `A64-P1`/`P2` state plain values on fields that are not scaled at
+all; `A64-P3` states field content too, even though its `imm12` is scaled in the
+ISA, because the multiplier belongs to the field and not to a slot transform.
 
 The same rule covers the scaled immediate: `A64-P2-add-imm12-lsl12` holds
 `imm12` content (0…4095) and the form's `sh = 1` does the `<< 12`. Stating
 `0x1000` there, or stating it on `-lsl0`, is `E-RANGE-001` (`N18a`/`N18b`), never
 a form switch.
+
+The load/store rows are the third instance. Their `disp` is the field, so the
+unit is per row: the two unsigned-offset rows count 8-byte units for the `x`
+width, which is why `A64-P3` states `2` for `#16` and `4095` for `#32760`, while
+the `imm9` rows count signed bytes (`8`, `−8`, `−256`). Stating a byte offset on
+an `imm12` row would address eight times too far and still emit four legal bytes,
+which is the same-length hazard `expected_digest` (`OD-01`) exists for
+(`ADR-0013`).
 
 **An operand whose bits a fixup owns has an empty payload.** `{"payload": {}}`,
 not a `symbol_id`: `01_contract.md` §8.1 only allows `symbol_id` on a `target`

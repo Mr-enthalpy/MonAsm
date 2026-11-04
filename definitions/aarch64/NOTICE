@@ -1,11 +1,12 @@
 AArch64 encoding definitions
 ============================
 
-`definitions/aarch64/0.1.0.json`, `0.2.0.json` and `0.3.0.json` are derived from
-the Arm Architecture Machine Readable Specification, A-profile, 2026-06 (release
-`2026-06_rel`, build 818, schema 2.9.5). All three are generated from the same
-pinned drop and ship under the same terms; each later document repeats the
-earlier rows and adds its own, so there is one notice for all of them.
+`definitions/aarch64/0.1.0.json`, `0.2.0.json`, `0.3.0.json` and `0.4.0.json` are
+derived from the Arm Architecture Machine Readable Specification, A-profile,
+2026-06 (release `2026-06_rel`, build 818, schema 2.9.5). All four are generated
+from the same pinned drop and ship under the same terms; each later document
+repeats the earlier rows and adds its own, so there is one notice for all of
+them.
 
 Pinned source archive (ADR-0006):
 
