@@ -117,7 +117,7 @@ is what makes the two `mov` forms and the two `add` immediate forms distinct
 without an extra choice field. A plan that names `x86:mov/r64-r64` or
 `x86:add/rm64-imm` is rejected: those ids are not in the v0 definition.
 
-The AArch64 slice is sixty-eight forms across ten documents, covering ten frozen
+The AArch64 slice is ninety-two forms across eleven documents, covering ten frozen
 `EC` rows:
 
 | `form_id` | Encoding | Operand signature | Table | Covers |
@@ -190,6 +190,30 @@ The AArch64 slice is sixty-eight forms across ten documents, covering ten frozen
 | `aarch64:subs/w32-w32-w32-imm6-lsl` | `SUBS (shifted register)`, `sf=0`, `op=1`, `S=1`, `shift=LSL` | dest `w32`, src `w32`, src2 `w32`, imm `imm6` (`0…31`) | `0.10.0`+ | EC-11, EC-31, A64-P12 |
 | `aarch64:subs/w32-w32-w32-imm6-lsr` | `SUBS (shifted register)`, `sf=0`, `op=1`, `S=1`, `shift=LSR` | dest `w32`, src `w32`, src2 `w32`, imm `imm6` (`0…31`) | `0.10.0`+ | EC-11, EC-31, A64-P12 |
 | `aarch64:subs/w32-w32-w32-imm6-asr` | `SUBS (shifted register)`, `sf=0`, `op=1`, `S=1`, `shift=ASR` | dest `w32`, src `w32`, src2 `w32`, imm `imm6` (`0…31`) | `0.10.0`+ | EC-11, EC-31, A64-P12 |
+| `aarch64:sub/x64-x64-w32-imm3-uxtb` | `SUB (extended register)`, `op=1`, bit 21 = 1, `option=000` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:sub/x64-x64-w32-imm3-uxth` | `SUB (extended register)`, `option=001` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:sub/x64-x64-w32-imm3-uxtw` | `SUB (extended register)`, `option=010` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:sub/x64-x64-x64-imm3-uxtx` | `SUB (extended register)`, `option=011` | dest `x64`, src `x64`, src2 `x64`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:sub/x64-x64-w32-imm3-sxtb` | `SUB (extended register)`, `option=100` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:sub/x64-x64-w32-imm3-sxth` | `SUB (extended register)`, `option=101` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:sub/x64-x64-w32-imm3-sxtw` | `SUB (extended register)`, `option=110` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:sub/x64-x64-x64-imm3-sxtx` | `SUB (extended register)`, `option=111` | dest `x64`, src `x64`, src2 `x64`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:adds/x64-x64-w32-imm3-uxtb` | `ADDS (extended register)`, `S=1`, bit 21 = 1, `option=000` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:adds/x64-x64-w32-imm3-uxth` | `ADDS (extended register)`, `option=001` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:adds/x64-x64-w32-imm3-uxtw` | `ADDS (extended register)`, `option=010` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:adds/x64-x64-x64-imm3-uxtx` | `ADDS (extended register)`, `option=011` | dest `x64`, src `x64`, src2 `x64`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:adds/x64-x64-w32-imm3-sxtb` | `ADDS (extended register)`, `option=100` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:adds/x64-x64-w32-imm3-sxth` | `ADDS (extended register)`, `option=101` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:adds/x64-x64-w32-imm3-sxtw` | `ADDS (extended register)`, `option=110` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:adds/x64-x64-x64-imm3-sxtx` | `ADDS (extended register)`, `option=111` | dest `x64`, src `x64`, src2 `x64`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:subs/x64-x64-w32-imm3-uxtb` | `SUBS (extended register)`, `op=1`, `S=1`, bit 21 = 1, `option=000` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:subs/x64-x64-w32-imm3-uxth` | `SUBS (extended register)`, `option=001` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:subs/x64-x64-w32-imm3-uxtw` | `SUBS (extended register)`, `option=010` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:subs/x64-x64-x64-imm3-uxtx` | `SUBS (extended register)`, `option=011` | dest `x64`, src `x64`, src2 `x64`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:subs/x64-x64-w32-imm3-sxtb` | `SUBS (extended register)`, `option=100` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:subs/x64-x64-w32-imm3-sxth` | `SUBS (extended register)`, `option=101` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:subs/x64-x64-w32-imm3-sxtw` | `SUBS (extended register)`, `option=110` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
+| `aarch64:subs/x64-x64-x64-imm3-sxtx` | `SUBS (extended register)`, `option=111` | dest `x64`, src `x64`, src2 `x64`, imm `imm3` (0–4) | `0.11.0`+ | EC-13, EC-32, A64-P13 |
 
 The `-lsl0`/`-lsl12` suffix is part of the id because the MRS node leaves
 `shift`, `imm6` and `sh` variable; the table pins them and the name says so
@@ -269,14 +293,24 @@ word for an illegal plan (`INV-07`). `0.7.0` therefore carries one row per
 keyword, and the amount is `imm3` field content: the field is three bits, but
 only `0…4` are allocated, so the slot states `bits: 3` plus `excluded: [5, 6, 7]`
 (`ADR-0009`). `imm3 = 8` is `E-RANGE-001` (`N03-imm3`), `imm3 = 5` is
-`E-RANGE-004` (`N16c`), a `w` operand on `-imm3-uxtx` or on a shifted `x64` row
-is `E-OPERAND-001` (`N02b`), and the extended `sub` node and the extended `S`
-node stay out (`E-FORM-001`, `N01f`, `N01g`). Those last two are separate slices:
-each fixes a different bit (`option` with bit 21, or `S` on the extended layout),
-so neither is a modifier of a row in this table. The `sf = 0` nodes are in
-`0.10.0`, but only on the shifted and immediate layouts — their extended
-siblings are not. `N01h` and `N01k` name a `w` row against `0.8.0`/`0.9.0`,
-where it does not exist yet, and `N01j` does the same for the flag-setting one.
+`E-RANGE-004` (`N16c`), and a `w` operand on `-imm3-uxtx` or on a shifted `x64`
+row is `E-OPERAND-001` (`N02b`).
+
+`0.11.0` closes the mnemonic family on this layout. `SUB_64_addsub_ext`,
+`ADDS_64S_addsub_ext` and `SUBS_64S_addsub_ext` are `ADD_64_addsub_ext` with
+`op` at 30+1 and/or `S` at 29+1 fixed, so the eight extended rows repeat for
+each of `sub`, `adds` and `subs` (`ADR-0020`). The keyword still fixes the
+`src2` width and the `imm3` tail is unchanged: an `x` source on a `-uxtb` row is
+`E-OPERAND-001` (`N02d`) and `imm3 = 5` on a `subs` row is `E-RANGE-004`
+(`N16e`). Register 31 is not pinned: it stays a plain `reg_number`, and the
+node's role decides whether it denotes `sp` or `xzr` (`ADR-0020` decision 5).
+The `sf = 0` nodes are in `0.10.0` on the shifted and immediate layouts only;
+the extended ones are absent from every document, so
+`aarch64:sub/w32-w32-w32-imm3-uxtb` and its `add`/`adds`/`subs` twins are
+`E-FORM-001` (`N01l`), and `cmp`/`cmn` remain separate two-operand aliases
+(`N01i`). `N01f`, `N01g`, `N01h`, `N01j` and `N01k` name a row against a version
+that predates it, so they now mark version boundaries rather than absence from
+the table.
 
 The five load/store rows carry `EC-14` and are the AArch64 half of `ADR-0008`:
 the address is `base` + `disp`, never one memory payload, and the addressing

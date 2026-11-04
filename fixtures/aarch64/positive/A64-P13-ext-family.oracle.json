@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P13-ext-family.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "ccc709c80bc75639c8d3197f95373f2d3b3c180d4c28e858ab45752d33ac2fc0",
+  "output_sha256": "9783c84acf84fa0663ff2f51a4c02d4098138af13e2c1c4ff3c10c330b599852",
+  "size": 108,
+  "records": 0,
+  "notes": "Input (763 B, LF, trailing newline), one instruction per line with two leading spaces: `sub`, `adds` and `subs` each with all eight extend keywords, `imm3` cycling 0-4, and three additional rows for register 31 (one per role the MRS grammar allows: `sub sp, x1, w2, uxtb #3`, `adds x0, sp, w1, uxtb`, `subs xzr, x1, w2, uxtb`). Twenty-seven instructions, one per new form plus the three role rows. Every row uses three distinct register numbers, so a register-field slip cannot hide; `option` takes all eight values on every mnemonic and `imm3` takes 0, 1, 2, 3 and 4. `subs xzr, ...` is printed by llvm-mc as `cmp x1, w2, uxtb`, the same word. Every operand is a register or an immediate, so `llvm-readobj -r` prints an empty relocation list and no linker is involved.",
+  "source": "Arm MRS SUB_64_addsub_ext (op at 30+1 = 1), ADDS_64S_addsub_ext and SUBS_64S_addsub_ext (S at 29+1 = 1), with option at 13+3, imm3 at 10+3, Rd at 0+5, Rn at 5+5 and Rm at 16+5, bit 21 fixed to 1; measured in EXP-0022 section 2"
+}

@@ -1,6 +1,6 @@
 # AArch64 fixtures
 
-Vectors: `A64-P1` … `A64-P12` in `docs/fmp-v0/06_validation_matrix.md`.
+Vectors: `A64-P1` … `A64-P13` in `docs/fmp-v0/06_validation_matrix.md`.
 
 ## What is here
 
@@ -19,18 +19,21 @@ Vectors: `A64-P1` … `A64-P12` in `docs/fmp-v0/06_validation_matrix.md`.
 | `positive/A64-P10-sub-family` | `aarch64:sub/x64-x64-x64-lsl0`, `sub/x64-imm12-lsl0` at 4095, `sub/x64-imm12-lsl12` at 291, `sub/x64-x64-x64-imm6-lsl`/`-lsr`/`-asr` (`0.8.0`); six instructions, 24 B | `llvm-mc` (no linker: registers and immediates only, no relocations) |
 | `positive/A64-P11-adds-subs-family` | `aarch64:adds/x64-x64-x64-lsl0`, `adds/x64-imm12-lsl0` at 4095, `adds/x64-imm12-lsl12` at 291, `adds/x64-x64-x64-imm6-lsl`/`-lsr`/`-asr`, and the same six `subs/…` rows (`0.9.0`); twelve instructions, 48 B | `llvm-mc` (no linker: registers and immediates only, no relocations) |
 | `positive/A64-P12-w-rows` | `aarch64:add/w32-w32-w32-lsl0`, `add/w32-imm12-lsl0` at 4095, `add/w32-imm12-lsl12` at 291, `add/w32-w32-w32-imm6-lsl`/`-lsr`/`-asr`, and the same six `sub/…`, `adds/…` and `subs/…` rows (`0.10.0`); twenty-four instructions, 96 B, registers 0–30 | `llvm-mc` (no linker: registers and immediates only, no relocations) |
+| `positive/A64-P13-ext-family` | the eight `aarch64:sub/x64-x64-*-imm3-*` rows, the eight `adds/…` rows and the eight `subs/…` rows (`0.11.0`), plus `sub sp, x1, w2, uxtb #3`, `adds x0, sp, w1, uxtb` and `subs xzr, x1, w2, uxtb #0`; twenty-seven instructions, 108 B | `llvm-mc` (no linker: registers and immediates only, no relocations) |
 | `negative/N01-absent-scaled-form` | `aarch64:add/x64-imm12-lsl12` against `0.1.0`, which lacks it | `E-FORM-001` |
 | `negative/N01b-absent-register-offset-form` | `aarch64:ldr/x64-base-regoff` (`0.4.0` has no such form) | `E-FORM-001` |
 | `negative/N01d-absent-movz-lane` | `aarch64:movz/x64-imm16-lsl8` (`0.5.0` has four lanes, not eight) | `E-FORM-001` |
 | `negative/N01e-absent-extend-form` | `aarch64:add/x64-x64-w64-uxtw-imm3`, an extend spelling against `0.6.0` | `E-FORM-001` |
-| `negative/N01f-absent-sub-ext` | `aarch64:sub/x64-x64-w32-imm3-uxtb` (`0.8.0` has the immediate and shifted `sub` nodes, not the extended one) | `E-FORM-001` |
-| `negative/N01g-absent-flag-form` | `aarch64:subs/x64-x64-x64-lsl0` (`S = 1` is a different node) | `E-FORM-001` |
+| `negative/N01f-absent-sub-ext` | `aarch64:sub/x64-x64-w32-imm3-uxtb` against `0.7.0`, before any document carried the extended `sub` row (the boundary moved to `0.11.0`) | `E-FORM-001` |
+| `negative/N01g-absent-flag-form` | `aarch64:subs/x64-x64-x64-lsl0` against `0.8.0` (`S = 1` is a different node; the row lands in `0.9.0`) | `E-FORM-001` |
 | `negative/N01h-absent-32bit-form` | `aarch64:sub/w32-w32-w32-lsl0` (`sf = 0` is a different node) | `E-FORM-001` |
 | `negative/N01i-absent-cmp-alias` | `aarch64:cmp/x64-x64` (`cmp`/`cmn` fix `Rd = 31` and drop the destination, so they are their own family) | `E-FORM-001` |
 | `negative/N01j-absent-flag-32bit-form` | `aarch64:adds/w32-w32-w32-lsl0` (`sf = 0` on the `S = 1` node is still a different node) | `E-FORM-001` |
 | `negative/N01k-absent-w-form` | `aarch64:add/w32-w32-w32-lsl0` against `0.9.0`, which does not have the `w` rows yet | `E-FORM-001` |
+| `negative/N01l-absent-32bit-ext-form` | `aarch64:sub/w32-w32-w32-imm3-uxtb`, one of the four `sf = 0` extended nodes, in no document | `E-FORM-001` |
 | `negative/N02b-w-source-in-shift-form` | a `w32` operand on the `x`-source `-imm6-lsl` row | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02c-x-dest-on-w-row` | an `x64` destination on `aarch64:add/w32-w32-w32-lsl0` | `E-OPERAND-001` (kind and target_type) |
+| `negative/N02d-ext-x-source-on-w-keyword` | an `x64` source on `aarch64:sub/x64-x64-w32-imm3-uxtb` | `E-OPERAND-001` (kind and target_type) |
 | `negative/N03-imm12-out-of-range` | imm12 = 4096 | `E-RANGE-001` |
 | `negative/N03-imm12-disp-out-of-range` | `disp = 4096` on the load/store `imm12` field | `E-RANGE-001` |
 | `negative/N03-imm9-disp-out-of-range` | `disp = −257` on the `imm9` field | `E-RANGE-001` |
@@ -48,6 +51,7 @@ Vectors: `A64-P1` … `A64-P12` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N18f-w-adds-no-form-switch` | `4096` stated on `adds/w32-imm12-lsl0` (encodable only as `-lsl12`) | `E-RANGE-001` |
 | `negative/N16c-imm3-excluded` | `imm3 = 5`, inside the 3-bit field but not allocated to `add` extended | `E-RANGE-004` |
 | `negative/N16d-w-imm6-excluded` | `imm6 = 32` on `add/w32-w32-w32-imm6-lsl`, inside the 6-bit field but not allocated to the 32-bit instruction | `E-RANGE-004` |
+| `negative/N16e-ext-imm3-excluded` | `imm3 = 5` on `subs/x64-x64-w32-imm3-sxtb`, inside the 3-bit field but not allocated to the extended layout | `E-RANGE-004` |
 | `negative/N19-modifier-is-not-a-carrier` | `{"name": "lsl", "value": 3}` in a `modifiers` entry on `aarch64:add/x64-x64-x64-lsl0` | `E-OPERAND-003` |
 
 `N01` is why the version split matters: a form exists, but not in an older
@@ -57,14 +61,16 @@ load/store rows, a plan bound to `0.4.0` cannot reach the `movz` lanes, a plan
 bound to `0.5.0` cannot reach the shift rows, a plan bound to `0.6.0` cannot
 reach the extend rows, a plan bound to `0.7.0` cannot reach the `sub` rows, a
 plan bound to `0.8.0` cannot reach the `adds`/`subs` rows (which is what `N01g`
-now shows for `subs`), and a plan bound to `0.9.0` cannot reach the `w` rows
-(`N01k`). `N01h` and `N01j` are the same shape one version earlier for the `w`
+now shows for `subs`), a plan bound to `0.9.0` cannot reach the `w` rows
+(`N01k`), and a plan bound to `0.10.0` cannot reach the extended
+`sub`/`adds`/`subs` rows (`N01f`). `N01h` and `N01j` are the same shape one
+version earlier for the `w`
 rows of `0.8.0`/`0.9.0`.
 Each fixture names the document it targets and that
 document's digest.
 
 The extended `sf = 0` nodes (`add w0, wsp, w1` is the extended node), the
-extended `sub`/`adds`/`subs` nodes, the `cmp`/`cmn` aliases, the load/store
+`cmp`/`cmn` aliases, the load/store
 register-offset and literal kinds, and
 the store's `imm9` kinds are absent for the same reason. A linked `:lo12:` inside
 the `-lsl12` form is measured at the record level (`EXP-0013` §5) but is not an
@@ -130,8 +136,8 @@ not values of an operand: each is a different MRS node, with `op` or `S` fixed b
 the node, so the `form_id`'s mnemonic component carries it and no plan field can
 move the bit. The `0.9.0` rows repeat the `add`/`sub` shapes one bit over
 (`0x8b…`→`0xab…`, `0xcb…`→`0xeb…`, `0x91…`→`0xb1…`, `0xd1…`→`0xf1…`); `cmp` and
-`cmn` are a two-operand alias family (`N01i`), and the extended nodes stay absent
-(`N01f`, `N01g`).
+`cmn` are a two-operand alias family (`N01i`), and the extended
+`sub`/`adds`/`subs` nodes are the ninth instance below.
 
 The width rows are the eighth instance, and the one where no operand at all can
 carry the decision. `A64-P12` repeats all six shapes on the eight `sf = 0` nodes,
@@ -148,6 +154,17 @@ meanings live in `EXP-0021` §2. The 32-bit shift amount stops at 31: `lsl #32` 
 rejected and the `imm6 = 32` word does not decode, so the slot is `bits: 6` with
 `excluded: [32 … 63]` and `32` is `E-RANGE-004` (`N16d`), while `4096` on
 `-imm12-lsl0` is still `E-RANGE-001` (`N18f`, `ADR-0019`).
+
+The extended mnemonic rows are the ninth instance, and the one where the earlier
+two families meet: `A64-P13` repeats the eight `add` extend rows on
+`SUB_64_addsub_ext`, `ADDS_64S_addsub_ext` and `SUBS_64S_addsub_ext`, so each
+word is its `add` twin with bit 30 and/or bit 29 set
+(`0x8b…`→`0xcb…`/`0xab…`/`0xeb…`) and bits 28–0 unchanged (`EXP-0022` §2). The
+keyword still decides the source width and `imm3` still stops at 4 (`N02d`,
+`N16e`), and register 31 means what the node's grammar says: `sp` in `sub`'s
+`Rd`, `xzr` in the two S nodes' `Rd`, and `sp` in `Rn` throughout — so the vector
+carries three rows for it rather than a slot kind (`ADR-0020`). The 32-bit
+extended nodes stay absent (`N01l`).
 
 **An operand whose bits a fixup owns has an empty payload.** `{"payload": {}}`,
 not a `symbol_id`: `01_contract.md` §8.1 only allows `symbol_id` on a `target`

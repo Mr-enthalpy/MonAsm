@@ -36,6 +36,7 @@ Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.8.0.json
         definitions/aarch64/0.9.0.json
         definitions/aarch64/0.10.0.json
+        definitions/aarch64/0.11.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -54,7 +55,7 @@ MRS = os.path.join(ROOT, "research", "external", "arm-mrs", "Instructions.json")
 OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
 VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0",
-            "0.8.0", "0.9.0", "0.10.0"]
+            "0.8.0", "0.9.0", "0.10.0", "0.11.0"]
 
 # Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
@@ -67,6 +68,7 @@ FROZEN_DIGESTS = {
     "0.7.0": "sha256:1bb920356476cea20688b2d6596d787f3cf99aedebe7240b1af8227f64d29053",
     "0.8.0": "sha256:9f82b566af004aaa9f0471151497d65acb45c3a7b46e4240345d21f4e330bc35",
     "0.9.0": "sha256:99728cd9bd85b8b0768e700e15dd6263171d6261c385ac15ceeb5df6d2cafcff",
+    "0.10.0": "sha256:e958d69b4ba93222e7621a1f5c3ebd056ce929e2974a961a03abb7b66f0b247b",
 }
 
 WIDTH = 32
@@ -948,6 +950,86 @@ def _w_forms():
 
 
 FORMS.extend(_w_forms())
+
+# `A64-P13` (ADR-0020). `SUB_64_addsub_ext`, `ADDS_64S_addsub_ext` and
+# `SUBS_64S_addsub_ext` are `ADD_64_addsub_ext` with `op` (30+1) and/or `S`
+# (29+1) fixed, so each row repeats the `add` extended row of the same keyword
+# with the mnemonic component changed. The keyword still fixes the width of
+# `src2` — the six `[su]xt[bhw]` take a `w` register, `uxtx`/`sxtx` an `x` one —
+# and `imm3` still carries the excluded tail 5..7. Register 31 is not pinned
+# anywhere: it stays a plain `reg_number` and the node's role says whether it is
+# `sp` or `wzr`/`xzr` (ADR-0020 decision 5).
+_EXT_FAMILIES = [
+    ("sub", "SUB_64_addsub_ext", " and op = 1"),
+    ("adds", "ADDS_64S_addsub_ext", " and S = 1"),
+    ("subs", "SUBS_64S_addsub_ext", " and S = 1 and op = 1"),
+]
+
+_EXT_KEYWORDS = [
+    ("uxtb", 0, "w32"),
+    ("uxth", 1, "w32"),
+    ("uxtw", 2, "w32"),
+    ("uxtx", 3, "x64"),
+    ("sxtb", 4, "w32"),
+    ("sxth", 5, "w32"),
+    ("sxtw", 6, "w32"),
+    ("sxtx", 7, "x64"),
+]
+
+
+def _ext_forms():
+    rows = []
+    for mnemonic, node, note in _EXT_FAMILIES:
+        for keyword, option, source in _EXT_KEYWORDS:
+            kind = "aarch64.gpr32" if source == "w32" else "aarch64.gpr64"
+            rows.append(
+                {
+                    "form_id": "aarch64:{0}/x64-x64-{1}-imm3-{2}".format(
+                        mnemonic, source, keyword
+                    ),
+                    "mrs": node,
+                    "decision": "option = {0} ({1}); imm3 is field content in "
+                    "0..4, 5..7 excluded{2}".format(option, keyword.upper(), note),
+                    "pinned": {"option": option},
+                    "since": "0.11.0",
+                    "slots": [
+                        {
+                            "mrs": ["Rd"],
+                            "role": "dest",
+                            "kind": "aarch64.gpr64",
+                            "from": "reg_number",
+                            "target_type": "x64",
+                        },
+                        {
+                            "mrs": ["Rn"],
+                            "role": "src",
+                            "kind": "aarch64.gpr64",
+                            "from": "reg_number",
+                            "target_type": "x64",
+                        },
+                        {
+                            "mrs": ["Rm"],
+                            "role": "src2",
+                            "kind": kind,
+                            "from": "reg_number",
+                            "target_type": source,
+                        },
+                        {
+                            "mrs": ["imm3"],
+                            "role": "imm",
+                            "kind": "aarch64.imm",
+                            "from": "operand_value",
+                            "target_type": "imm3",
+                            "range": {"signed": False, "bits": 3, "align_bits": 0},
+                            "excluded": [5, 6, 7],
+                        },
+                    ],
+                }
+            )
+    return rows
+
+
+FORMS.extend(_ext_forms())
 
 
 def document_for(version):

@@ -232,6 +232,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/aarch64/0.8.0.json` | `monasm.isa.aarch64` | `sha256:9f82b566af004aaa9f0471151497d65acb45c3a7b46e4240345d21f4e330bc35` |
 | `definitions/aarch64/0.9.0.json` | `monasm.isa.aarch64` | `sha256:99728cd9bd85b8b0768e700e15dd6263171d6261c385ac15ceeb5df6d2cafcff` |
 | `definitions/aarch64/0.10.0.json` | `monasm.isa.aarch64` | `sha256:e958d69b4ba93222e7621a1f5c3ebd056ce929e2974a961a03abb7b66f0b247b` |
+| `definitions/aarch64/0.11.0.json` | `monasm.isa.aarch64` | `sha256:c5a9aec943f9b195c400380b8416bf63cba944da3fdf0203f90de5baff295002` |
 | `definitions/rv64/0.1.0.json` | `monasm.isa.riscv` | `sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083` |
 | `definitions/rv64/0.2.0.json` | `monasm.isa.riscv` | `sha256:8329a38faa964f9c69207a48e3bfb45c13fb0ddbaeb829ddcc0dbd1cffa8de10` |
 
@@ -269,7 +270,7 @@ Every row is verified against `llvm-mc` 23.1.2 in `EXP-0004`: each template byte
 string is decoded, and each `ModRM` and immediate/branch field is exercised
 across its whole encoded range.
 
-### 8.2 `aarch64` `0.1.0` … `0.10.0`
+### 8.2 `aarch64` `0.1.0` … `0.11.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -341,6 +342,30 @@ across its whole encoded range.
 | `aarch64:subs/w32-w32-w32-imm6-asr` | `0000806b` | dest: `aarch64.gpr32`/`w32` → `[0,5]`; src: `aarch64.gpr32`/`w32` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm6` → `[10,6]` (excl 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63) | 4 | `EC-11`, `EC-31`, `A64-P12` |
 | `aarch64:subs/w32-imm12-lsl0` | `00000071` | dest: `aarch64.gpr32`/`w32` → `[0,5]`; src: `aarch64.gpr32`/`w32` → `[5,5]`; imm: `aarch64.imm`/`imm12` → `[10,12]` | 4 | `EC-11`, `EC-12`, `A64-P12` |
 | `aarch64:subs/w32-imm12-lsl12` | `00004071` | dest: `aarch64.gpr32`/`w32` → `[0,5]`; src: `aarch64.gpr32`/`w32` → `[5,5]`; imm: `aarch64.imm`/`imm12` → `[10,12]` | 4 | `EC-11`, `EC-12`, `A64-P12` |
+| `aarch64:sub/x64-x64-w32-imm3-uxtb` | `000020cb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:sub/x64-x64-w32-imm3-uxth` | `002020cb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:sub/x64-x64-w32-imm3-uxtw` | `004020cb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:sub/x64-x64-x64-imm3-uxtx` | `006020cb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:sub/x64-x64-w32-imm3-sxtb` | `008020cb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:sub/x64-x64-w32-imm3-sxth` | `00a020cb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:sub/x64-x64-w32-imm3-sxtw` | `00c020cb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:sub/x64-x64-x64-imm3-sxtx` | `00e020cb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:adds/x64-x64-w32-imm3-uxtb` | `000020ab` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:adds/x64-x64-w32-imm3-uxth` | `002020ab` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:adds/x64-x64-w32-imm3-uxtw` | `004020ab` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:adds/x64-x64-x64-imm3-uxtx` | `006020ab` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:adds/x64-x64-w32-imm3-sxtb` | `008020ab` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:adds/x64-x64-w32-imm3-sxth` | `00a020ab` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:adds/x64-x64-w32-imm3-sxtw` | `00c020ab` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:adds/x64-x64-x64-imm3-sxtx` | `00e020ab` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:subs/x64-x64-w32-imm3-uxtb` | `000020eb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:subs/x64-x64-w32-imm3-uxth` | `002020eb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:subs/x64-x64-w32-imm3-uxtw` | `004020eb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:subs/x64-x64-x64-imm3-uxtx` | `006020eb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:subs/x64-x64-w32-imm3-sxtb` | `008020eb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:subs/x64-x64-w32-imm3-sxth` | `00a020eb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:subs/x64-x64-w32-imm3-sxtw` | `00c020eb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
+| `aarch64:subs/x64-x64-x64-imm3-sxtx` | `00e020eb` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-13`, `EC-32`, `A64-P13` |
 
 `0.1.0` holds the first, second, fourth and fifth rows; `0.2.0` adds
 `aarch64:add/x64-imm12-lsl12` (ADR-0011); `0.3.0` repeats all five and adds
@@ -350,7 +375,9 @@ rows (ADR-0014); `0.6.0` repeats all fifteen and adds the three shift rows
 (ADR-0015); `0.7.0` repeats all eighteen and adds the eight extend rows
 (ADR-0016); `0.8.0` repeats all twenty-six and adds the six `sub` rows (ADR-0017);
 `0.9.0` repeats all thirty-two and adds the twelve `adds`/`subs` rows (ADR-0018);
-`0.10.0` repeats all forty-four and adds the twenty-four `w` rows (ADR-0019).
+`0.10.0` repeats all forty-four and adds the twenty-four `w` rows (ADR-0019);
+`0.11.0` repeats all sixty-eight and adds the twenty-four extended
+`sub`/`adds`/`subs` rows (ADR-0020).
 Each document therefore shares its earlier rows
 unchanged and differs only in the rows its version introduced, so a plan bound to
 an older version cannot reach a newer form (`E-FORM-001`, `N01`) even though the
@@ -361,8 +388,8 @@ The templates are little-endian file order, so `0000008b` is the word
 (`research/evidence/experiments/EXP-0008/generate_aarch64.py`) derives every
 bit from the MRS node, requires the MRS node name to exist, and refuses to emit
 unless all 32 bits are covered exactly once by a fixed bit or a slot placement;
-`EXP-0008` §2–§3 records the nodes and the coverage check. The sixty-eight forms come
-from twenty-six nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
+`EXP-0008` §2–§3 records the nodes and the coverage check. The ninety-two forms come
+from twenty-nine nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
 pinned to 0 and once per shift keyword, `ADD_64_addsub_ext` eight times, once per
 `option` value, `ADD_64_addsub_imm` twice, once with
 `sh = 0` and once with `sh = 1`, `MOVZ_64_movewide` four times, once per `hw`
@@ -371,11 +398,13 @@ per row it shares with the `add` half (`ADR-0017`), `ADDS_64_addsub_shift` and
 `SUBS_64_addsub_shift` four times each, `ADDS_64S_addsub_imm` and
 `SUBS_64S_addsub_imm` twice each (`ADR-0018`), the eight `*_32*` nodes four times
 (shifted) or twice (immediate) each on the same pattern (`ADR-0019`),
+`SUB_64_addsub_ext`, `ADDS_64S_addsub_ext` and `SUBS_64S_addsub_ext` eight times
+each, once per `option` value (`ADR-0020`),
 `B_only_condbranch` contributes one row with both of its variable
 fields as operands, and each of the five load/store rows reads one node whose
 addressing-kind bits are fixed and whose `imm12`/`imm9` is the single variable
 field; the generator states each pinned value explicitly and asserts that
-`0.1.0` … `0.9.0` still hash to their frozen digests.
+`0.1.0` … `0.10.0` still hash to their frozen digests.
 
 The `-lsl0`/`-lsl12` suffix on the `add`, `sub`, `adds` and `subs` rows carries a
 decision the operand list does not state, and the name states it instead
@@ -419,6 +448,15 @@ difference: the field is six bits wide but the 32-bit instruction allocates only
 `0…31` (`lsl #32` is rejected, the `imm6 = 32` word does not decode), so the
 slot declares `bits: 6` and `excluded: [32 … 63]`; `imm6 = 32` is
 `E-RANGE-004` (`N16d`), never a truncated shift (`EXP-0021` §2).
+
+The twenty-four `sub`/`adds`/`subs` extended rows repeat the `0.7.0` extend rows
+on the three nodes that fix `op` at bit 30 and/or `S` at bit 29 (`ADR-0020`).
+The slots are identical to `add`'s: the keyword pins `option` at 13+3 and fixes
+`src2`'s width, and `imm3` is `[10,3]` with `excluded: [5, 6, 7]`. Register 31 is
+again a plain `reg_number` — `sp` in `sub`'s `Rd`, `xzr` in `adds`/`subs` `Rd` —
+because the node's role supplies the meaning, not the slot (`EXP-0022` §2). The
+four `sf = 0` extended nodes have no row, so `sub w0, w1, w2, uxtb` is
+`E-FORM-001` (`N01l`).
 
 `aarch64:b.cond/imm19` is the one row whose *condition* is an operand. `cond` is a
 4-bit field, all sixteen values are architecture-defined, and the sixteen rows it
@@ -657,7 +695,7 @@ without a plan error: the input is the definition.
   ADR-0006: the facts come from the Arm MRS 2026-06 OPENSOURCE packaging, and
   the Arm notice ships with the generated table. The format did not need to
   change for it: `adrp`'s split `immhi:immlo` is two placements of one slot, as
-  §4.1 anticipated. `definitions/aarch64/0.1.0.json` … `0.9.0.json` now exist
+  §4.1 anticipated. `definitions/aarch64/0.1.0.json` … `0.11.0.json` now exist
   (§8.2); each is a superset that adds its own rows without a format change
   (ADR-0011, ADR-0012, ADR-0013, ADR-0014, ADR-0015, ADR-0016, ADR-0017,
   ADR-0018). What is
