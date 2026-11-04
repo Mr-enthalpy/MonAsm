@@ -236,6 +236,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/aarch64/0.12.0.json` | `monasm.isa.aarch64` | `sha256:8a428926568b99f0674785cc674bc066adc452216131706d458b9e3390da03b6` |
 | `definitions/aarch64/0.13.0.json` | `monasm.isa.aarch64` | `sha256:d3876dd37a8441057b586312b3bee410e39594c64806b2c5c59960c06f9c7a5f` |
 | `definitions/aarch64/0.14.0.json` | `monasm.isa.aarch64` | `sha256:a90ceac19824fbb00731e040346daa191973652e58522fab72336e24f769a5ba` |
+| `definitions/aarch64/0.15.0.json` | `monasm.isa.aarch64` | `sha256:422ebb83b897b18e010da37539796b0b97cfc9018a47209fc4a6ddc5b14af5d3` |
 | `definitions/rv64/0.1.0.json` | `monasm.isa.riscv` | `sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083` |
 | `definitions/rv64/0.2.0.json` | `monasm.isa.riscv` | `sha256:8329a38faa964f9c69207a48e3bfb45c13fb0ddbaeb829ddcc0dbd1cffa8de10` |
 
@@ -273,7 +274,7 @@ Every row is verified against `llvm-mc` 23.1.2 in `EXP-0004`: each template byte
 string is decoded, and each `ModRM` and immediate/branch field is exercised
 across its whole encoded range.
 
-### 8.2 `aarch64` `0.1.0` … `0.14.0`
+### 8.2 `aarch64` `0.1.0` … `0.15.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -413,6 +414,22 @@ across its whole encoded range.
 | `aarch64:cmn/x64-x64-w32-imm3-sxth` | `1fa020ab` | src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-33`, `A64-P14` |
 | `aarch64:cmn/x64-x64-w32-imm3-sxtw` | `1fc020ab` | src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-33`, `A64-P14` |
 | `aarch64:cmn/x64-x64-x64-imm3-sxtx` | `1fe020ab` | src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.imm`/`imm3` → `[10,3]` (excl 5, 6, 7) | 4 | `EC-33`, `A64-P14` |
+| `aarch64:ldr/x64-base-regoff-lsl0` | `006860f8` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:ldr/x64-base-regoff-lsl3` | `007860f8` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:ldr/x64-base-regoff-uxtw0` | `004860f8` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:ldr/x64-base-regoff-uxtw3` | `005860f8` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:ldr/x64-base-regoff-sxtw0` | `00c860f8` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:ldr/x64-base-regoff-sxtw3` | `00d860f8` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:ldr/x64-base-regoff-sxtx0` | `00e860f8` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:ldr/x64-base-regoff-sxtx3` | `00f860f8` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:str/x64-base-regoff-lsl0` | `006820f8` | src: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:str/x64-base-regoff-lsl3` | `007820f8` | src: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:str/x64-base-regoff-uxtw0` | `004820f8` | src: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:str/x64-base-regoff-uxtw3` | `005820f8` | src: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:str/x64-base-regoff-sxtw0` | `00c820f8` | src: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:str/x64-base-regoff-sxtw3` | `00d820f8` | src: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:str/x64-base-regoff-sxtx0` | `00e820f8` | src: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:str/x64-base-regoff-sxtx3` | `00f820f8` | src: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
 
 `0.1.0` holds the first, second, fourth and fifth rows; `0.2.0` adds
 `aarch64:add/x64-imm12-lsl12` (ADR-0011); `0.3.0` repeats all five and adds
@@ -427,7 +444,9 @@ rows (ADR-0014); `0.6.0` repeats all fifteen and adds the three shift rows
 `sub`/`adds`/`subs` rows (ADR-0020); `0.12.0` repeats all ninety-two and adds the
 forty `cmp`/`cmn` alias rows (ADR-0021); `0.13.0` repeats all one hundred and
 thirty-two and adds the three store `imm9` rows (ADR-0022); `0.14.0` repeats all
-one hundred and thirty-five and adds the literal load row (ADR-0023).
+one hundred and thirty-five and adds the literal load row (ADR-0023); `0.15.0`
+repeats all one hundred and thirty-six and adds the sixteen register-offset rows
+(ADR-0024).
 Each document therefore shares its earlier rows
 unchanged and differs only in the rows its version introduced, so a plan bound to
 an older version cannot reach a newer form (`E-FORM-001`, `N01`) even though the
@@ -439,8 +458,8 @@ The templates are little-endian file order, so `0000008b` is the word
 bit from the MRS node, requires the MRS node name to exist, and refuses to emit
 unless all 32 bits are covered exactly once by a fixed bit or a slot placement;
 `EXP-0008` §2–§3 records the nodes and the coverage check. The one hundred and
-thirty-six forms come
-from thirty-three encode nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
+fifty-two forms come
+from thirty-five encode nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
 pinned to 0 and once per shift keyword, `ADD_64_addsub_ext` eight times, once per
 `option` value, `ADD_64_addsub_imm` twice, once with
 `sh = 0` and once with `sh = 1`, `MOVZ_64_movewide` four times, once per `hw`
@@ -456,10 +475,11 @@ fields as operands, and each of the eight load/store rows reads one node whose
 addressing-kind bits are fixed and whose `imm12`/`imm9` is the single variable
 field (`ADR-0022` adds the three store `imm9` nodes); `LDR_64_loadlit` is the one
 node with no base register, and its `imm19` is the single variable field
-(`ADR-0023`); the ten `CMP`/`CMN` alias
+(`ADR-0023`); `LDR_64_ldst_regoff` and `STR_64_ldst_regoff` are each read eight
+times, once per `option`/`S` pair (`ADR-0024`); the ten `CMP`/`CMN` alias
 nodes are read for verification only, because
 they carry no `encoding` and the bytes stay the base node's (`ADR-0021`). The
-generator states each pinned value explicitly and asserts that `0.1.0` … `0.13.0`
+generator states each pinned value explicitly and asserts that `0.1.0` … `0.14.0`
 still hash to their frozen digests.
 
 The literal row's `imm19` follows §8.3's rule, not a slot transform: the slot is
@@ -549,8 +569,8 @@ offset: the two `imm12` rows count 8-byte units for these `size = 11` rows
 (`#16` is `disp = 2`, `#32760` is `4095`) and the six `imm9` rows count signed
 bytes (`-256 … 255`). The three store `imm9` rows are the load rows' layouts
 with `opc = 00` and `Rt` as the stored register, so the family is symmetric:
-every addressing kind the MRS drop carries except register offset has a row,
-and that one is `E-FORM-001` (`N01b`). `LDR_64_loadlit` is the ninth member and
+every addressing kind the MRS drop carries now has a row, with register offset
+the last one added (`ADR-0024`, below). `LDR_64_loadlit` is the ninth member and
 the only one with no `Rn`: bits 11–10 and bit 21 are not fields there, so no
 kind question arises, and its single variable field is `imm19` in 4-byte units
 (`ADR-0023`). A plan that states a byte offset on
@@ -559,6 +579,27 @@ addresses eight times too far without any error; `expected_digest` (`OD-01`) is
 what catches that class of same-length defect, which is why the unit is stated
 here rather than inferred. `align_bits` is `0` on both because the range check
 applies to the field value (§4), not to a byte offset that was divided first.
+
+The sixteen register-offset rows are the only form-variant case whose variant is
+two bit fields rather than a keyword, and they close the load/store family.
+`option` (bits 15–13) fixes which register the row consumes as the index and how
+it extends it: `011`
+`lsl` and `111` `sxtx` take an `x` register, `010` `uxtw` and `110` `sxtw` take a
+`w`, and the assembler rejects the cross pairings (`ldr x0, [x1, x2, uxtw]`,
+`ldr x0, [x1, w2, lsl #3]`), so `index` is `aarch64.gpr64`/`x64` on four rows and
+`aarch64.gpr32`/`w32` on four. `S` (bit 12) is whether the index is scaled by the
+access size: `0` is the bare spelling or `#0`, `1` is `#3` on these `size = 11`
+rows, so the scale is a form bit and never an operand (`INV-02`, `EC-14`,
+ADR-0024). `Rm` is the `index` slot at `[16,5]`; `Rn` and `Rt` keep the
+`base`/`dest`/`src` roles of the offset rows, and register 31 is again a plain
+`reg_number` — `sp` in `Rn`, `xzr`/`wzr` in `Rm`. `lsl #1` and `lsl #4` have no
+row: only `#0` and `#3` are encodable on a 64-bit access, and `N01q` names the
+`#1` spelling. The other four `option` values (`000`, `001`, `100`, `101`) are
+unallocated, so no spelling reaches them and no row needs to exclude them. Bit
+21 is `1` in both templates, which is why `ldur x0, [x1, x2]` is not this kind:
+the assembler reads it as an unscaled offset and demands an integer. Register
+offset has no writeback variant either: `ldr x0, [x1, x2, lsl #3]!` is rejected
+(`EXP-0026` §2), so there is no pre/post row to add here.
 
 The four `movz` rows are the fourth form-variant case and the first whose pinned
 field is multi-bit. `hw` (bits 22–21) selects the 16-bit lane, the four values are
@@ -776,13 +817,13 @@ without a plan error: the input is the definition.
   ADR-0006: the facts come from the Arm MRS 2026-06 OPENSOURCE packaging, and
   the Arm notice ships with the generated table. The format did not need to
   change for it: `adrp`'s split `immhi:immlo` is two placements of one slot, as
-  §4.1 anticipated. `definitions/aarch64/0.1.0.json` … `0.14.0.json` now exist
+  §4.1 anticipated. `definitions/aarch64/0.1.0.json` … `0.15.0.json` now exist
   (§8.2); each is a superset that adds its own rows without a format change
-  (ADR-0011 to ADR-0023). What is
-  missing is coverage, not design: the register-offset kind has no row, and
-  neither do the `w`/`b`/`h` load/store widths, the 32-bit
-  extended `add`/`sub` nodes and their aliases, or `movk`/`movn`/the `mov`
-  alias and the 32-bit `movz` lanes. Each is `E-FORM-001` until a slice adds it.
+  (ADR-0011 to ADR-0024). What is
+  missing is coverage, not design: the `w`/`b`/`h` load/store widths, the 32-bit
+  extended `add`/`sub` nodes and their aliases, `prfm`, and `movk`/`movn`/the
+  `mov` alias and the 32-bit `movz` lanes have no row. Each is `E-FORM-001` until
+  a slice adds it.
 - The archive is still not vendored and the drop is not a build input: a
   regeneration reads `research/external/arm-mrs/` after `tools/check_mrs.py`
   passes, and the shipped artifact is the JSON plus its digest.

@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P17-regoff.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "17ddf5e13cafcd23f9c14b7eb673be91e5ebf677593e555839b0efcd700ea4f9",
+  "output_sha256": "d7f2ba579c94ca0ca62ddc2193da1080bdf13e5aeef794a6b3488423e2763091",
+  "size": 80,
+  "records": 0,
+  "notes": "Input (510 B, LF, trailing newline). Twenty instructions, one per new form plus four register-31 rows: eight `ldr` rows (lsl/uxtw/sxtw/sxtx at #0 and #3), the same eight `str` rows, `ldr x0, [sp, x2]`, `ldr x0, [x1, xzr, lsl #3]`, `str x0, [sp, x2, lsl #3]` and `ldr x0, [x1, wzr, uxtw]`. Registers 0-9 keep every field value distinct, and 31 exercises the role meanings (sp in Rn, xzr/wzr in Rm). `llvm-readobj -r` prints an empty relocation list and the source names no symbols, so no linker is involved. The encoder rows are all 64-bit (`size = 11`), so the scaled `S = 1` rows shift the index by 3; `lsl #0` is the same word as the bare spelling (ADR-0024 decision 3).",
+  "source": "Arm MRS LDR_64_ldst_regoff / STR_64_ldst_regoff (Rm at 16+5, option at 13+3, S at 12+1, Rn at 5+5, Rt at 0+5), measured in EXP-0026 §1-§3"
+}
