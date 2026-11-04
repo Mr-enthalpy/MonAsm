@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P12-w-rows.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "be9c5ff9cc5dd857039c7c78a30fb124e13c2f4b593afb164b14f010d75ffcb4",
+  "output_sha256": "7f4b3b968f707622f009685b4080af538fa04f8b18bfaae330b683317599706e",
+  "size": 96,
+  "records": 0,
+  "notes": "Input (600 B, LF, trailing newline), one instruction per line with two leading spaces: `add w0, w1, w2` / `add w3, w4, #4095` / `add w5, w6, #291, lsl #12` / `add w7, w8, w9, lsl #3` / `add w10, w11, w12, lsr #7` / `add w13, w14, w15, asr #31` / `sub w16, w17, w18` / `sub w19, w20, #4095` / `sub w21, w22, #291, lsl #12` / `sub w23, w24, w25, lsl #3` / `sub w26, w27, w28, lsr #7` / `sub w29, w30, #1`, then the same twelve rows for `adds` and `subs`. One instruction per row: the unshifted register row, both `sh` values of the immediate row, and all three shift keywords, six rows per mnemonic. Every row uses distinct registers 0-30, so a register-field slip cannot hide; `imm12` is exercised at 4095 (all twelve bits set) and at 291 with `lsl #12` (field content, not the pre-scaled literal), and `imm6` at 3, 7 and 31, the top amount the 32-bit field allocates. Register 31 is left out on purpose: `llvm-mc` refuses the spellings `add wzr, w1, #5` and `adds wsp, w1, #5`, so its role meanings are recorded in EXP-0021 section 2 rather than in this vector. Every operand is a register or an immediate, so `llvm-readobj -r` prints an empty relocation list and no linker is involved.",
+  "source": "Arm MRS ADD_32_addsub_shift, ADD_32_addsub_imm, SUB_32_addsub_shift, SUB_32_addsub_imm, ADDS_32_addsub_shift, ADDS_32S_addsub_imm, SUBS_32_addsub_shift and SUBS_32S_addsub_imm (sf at 31+1 = 0, op at 30+1 = 0/1, S at 29+1 = 0/1, shift at 22+2, imm6 at 10+6, sh at 22+1, imm12 at 10+12); measured in EXP-0021 section 2"
+}

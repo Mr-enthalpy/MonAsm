@@ -35,6 +35,7 @@ Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.7.0.json
         definitions/aarch64/0.8.0.json
         definitions/aarch64/0.9.0.json
+        definitions/aarch64/0.10.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -53,7 +54,7 @@ MRS = os.path.join(ROOT, "research", "external", "arm-mrs", "Instructions.json")
 OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
 VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0",
-            "0.8.0", "0.9.0"]
+            "0.8.0", "0.9.0", "0.10.0"]
 
 # Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
@@ -65,6 +66,7 @@ FROZEN_DIGESTS = {
     "0.6.0": "sha256:1151944e5855c08bd3d96074ace3ca787be6b7284c5d3e84654a257ab2055964",
     "0.7.0": "sha256:1bb920356476cea20688b2d6596d787f3cf99aedebe7240b1af8227f64d29053",
     "0.8.0": "sha256:9f82b566af004aaa9f0471151497d65acb45c3a7b46e4240345d21f4e330bc35",
+    "0.9.0": "sha256:99728cd9bd85b8b0768e700e15dd6263171d6261c385ac15ceeb5df6d2cafcff",
 }
 
 WIDTH = 32
@@ -870,6 +872,82 @@ FORMS = [
         ],
     },
 ]
+
+# `A64-P12` (ADR-0019). The eight `*_32*` nodes are the `*_64*` nodes above with
+# `sf` at 31+1 fixed to `0`; every other field, including `op` (30+1) and `S`
+# (29+1), is in the same place. So each `w` row repeats the `x64` row of the same
+# name with every register slot narrowed to `aarch64.gpr32`/`w32`, and the MRS
+# node supplies `sf` — no plan field names the width and nothing is pinned by
+# hand. The `imm6` field stays six bits wide, but the 32-bit form allocates only
+# 0..31 (measured: `imm6 = 32` does not decode), so the slot carries the excluded
+# tail 32..63 — the same shape as the `imm3` tail of ADR-0009/ADR-0016.
+_W_FAMILIES = [
+    ("add", "ADD_32_addsub_shift", "ADD_32_addsub_imm", ""),
+    ("sub", "SUB_32_addsub_shift", "SUB_32_addsub_imm", " and op = 1"),
+    ("adds", "ADDS_32_addsub_shift", "ADDS_32S_addsub_imm", " and S = 1"),
+    ("subs", "SUBS_32_addsub_shift", "SUBS_32S_addsub_imm",
+     " and S = 1 and op = 1"),
+]
+
+_W_SHIFT_ROWS = [
+    ("lsl0", 0, "shift = LSL (00) and imm6 = 000000"),
+    ("imm6-lsl", 0, "shift = LSL (00); imm6 is field content (the shift amount)"),
+    ("imm6-lsr", 1, "shift = LSR (01); imm6 is field content (the shift amount)"),
+    ("imm6-asr", 2, "shift = ASR (10); imm6 is field content (the shift amount)"),
+]
+
+
+def _w_register(mrs, role):
+    return {"mrs": [mrs], "role": role, "kind": "aarch64.gpr32",
+            "from": "reg_number", "target_type": "w32"}
+
+
+def _w_forms():
+    rows = []
+    for mnemonic, shift_node, imm_node, note in _W_FAMILIES:
+        for shape, shift_value, decision in _W_SHIFT_ROWS:
+            pinned = {"shift": shift_value}
+            slots = [_w_register("Rd", "dest"), _w_register("Rn", "src"),
+                     _w_register("Rm", "src2")]
+            if shape == "lsl0":
+                pinned["imm6"] = 0
+            else:
+                slots.append(
+                    {"mrs": ["imm6"], "role": "imm", "kind": "aarch64.imm",
+                     "from": "operand_value", "target_type": "imm6",
+                     "range": {"signed": False, "bits": 6, "align_bits": 0},
+                     "excluded": list(range(32, 64))}
+                )
+            rows.append({
+                "form_id": "aarch64:{0}/w32-w32-w32-{1}".format(mnemonic, shape),
+                "mrs": shift_node,
+                "decision": "sf = 0 is the node's; {0}{1}".format(decision, note),
+                "pinned": pinned,
+                "since": "0.10.0",
+                "slots": slots,
+            })
+        for shape, sh_value, decision in [
+            ("lsl0", 0, "sh = 0 (no LSL #12)"),
+            ("lsl12", 1, "sh = 1 (LSL #12), imm12 still field content"),
+        ]:
+            rows.append({
+                "form_id": "aarch64:{0}/w32-imm12-{1}".format(mnemonic, shape),
+                "mrs": imm_node,
+                "decision": "sf = 0 is the node's; {0}{1}".format(decision, note),
+                "pinned": {"sh": sh_value},
+                "since": "0.10.0",
+                "slots": [
+                    _w_register("Rd", "dest"),
+                    _w_register("Rn", "src"),
+                    {"mrs": ["imm12"], "role": "imm", "kind": "aarch64.imm",
+                     "from": "operand_value", "target_type": "imm12",
+                     "range": {"signed": False, "bits": 12, "align_bits": 0}},
+                ],
+            })
+    return rows
+
+
+FORMS.extend(_w_forms())
 
 
 def document_for(version):

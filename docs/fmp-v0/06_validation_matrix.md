@@ -10,8 +10,8 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 
 | ID | Input condition | Expected | Code | ISAs | Fixture | Status |
 |---|---|---|---|---|---|---|
-| N01 | Plan names a form that leaves a byte-affecting decision open (`x86:mov/r64-r64`, `x86:add/rm64-imm`), a form missing a required component (`x86:mov/rm-r64` without `/legacy`), a renamed variant, or names a variant the definition does not contain | Reject, never append a default variant or match a near neighbour | E-FORM-001 | x86, aarch64, rv64 | `x86_64/negative/N01-absent-form.fmp.json`, `aarch64/negative/N01-absent-scaled-form.fmp.json`, `aarch64/negative/N01d-absent-movz-lane.fmp.json`, `aarch64/negative/N01e-absent-extend-form.fmp.json`, `aarch64/negative/N01f-absent-sub-ext.fmp.json`, `aarch64/negative/N01g-absent-flag-form.fmp.json`, `aarch64/negative/N01h-absent-32bit-form.fmp.json`, `aarch64/negative/N01i-absent-cmp-alias.fmp.json`, `aarch64/negative/N01j-absent-flag-32bit-form.fmp.json`, `rv64/negative/N01c-caddi-against-0.1.0.fmp.json` | x86, aarch64 and rv64 passing |
-| N02 | Operand register class does not match the form | Reject | E-OPERAND-001 | x86, aarch64, rv64 | `x86_64/negative/N02-operand-kind-mismatch.fmp.json`, `aarch64/negative/N02b-w-source-in-shift-form.fmp.json` | x86 and aarch64 passing |
+| N01 | Plan names a form that leaves a byte-affecting decision open (`x86:mov/r64-r64`, `x86:add/rm64-imm`), a form missing a required component (`x86:mov/rm-r64` without `/legacy`), a renamed variant, or names a variant the definition does not contain | Reject, never append a default variant or match a near neighbour | E-FORM-001 | x86, aarch64, rv64 | `x86_64/negative/N01-absent-form.fmp.json`, `aarch64/negative/N01-absent-scaled-form.fmp.json`, `aarch64/negative/N01d-absent-movz-lane.fmp.json`, `aarch64/negative/N01e-absent-extend-form.fmp.json`, `aarch64/negative/N01f-absent-sub-ext.fmp.json`, `aarch64/negative/N01g-absent-flag-form.fmp.json`, `aarch64/negative/N01h-absent-32bit-form.fmp.json`, `aarch64/negative/N01i-absent-cmp-alias.fmp.json`, `aarch64/negative/N01j-absent-flag-32bit-form.fmp.json`, `aarch64/negative/N01k-absent-w-form.fmp.json`, `rv64/negative/N01c-caddi-against-0.1.0.fmp.json` | x86, aarch64 and rv64 passing |
+| N02 | Operand register class does not match the form | Reject | E-OPERAND-001 | x86, aarch64, rv64 | `x86_64/negative/N02-operand-kind-mismatch.fmp.json`, `aarch64/negative/N02b-w-source-in-shift-form.fmp.json`, `aarch64/negative/N02c-x-dest-on-w-row.fmp.json` | x86 and aarch64 passing |
 | N03 | Immediate exceeds the field's range | Reject | E-RANGE-001 | x86, aarch64, rv64 | `x86_64/negative/N03-imm8-out-of-range.fmp.json`, `aarch64/negative/N03-imm12-out-of-range.fmp.json`, `aarch64/negative/N03-cond-out-of-range.fmp.json`, `aarch64/negative/N03-imm6-out-of-range.fmp.json`, `aarch64/negative/N03-imm3-out-of-range.fmp.json` | x86 and aarch64 passing |
 | N04 | Branch displacement exceeds the form's range | Reject, never expand | E-RANGE-002 / E-FIXUP-003 | x86, aarch64, rv64 | `x86_64/negative/N04a-rel8-out-of-range.fmp.json`, `N04b-rel32-absolute-out-of-range.fmp.json`, `aarch64/negative/N04c-bcond-imm19-out-of-range.fmp.json` | x86 and aarch64 passing |
 | N05 | `expected_size` disagrees with the encoded length | Reject | E-SIZE-001 / E-LAYOUT-003 | x86, aarch64, rv64 | `x86_64/negative/N05-expected-size-mismatch.fmp.json` | x86 passing |
@@ -25,9 +25,9 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 | N13 | `expected_digest` is present and the emitted bytes hash to a different value | Reject, never re-encode to match | E-BYTE-001 | x86, aarch64, rv64 | `x86_64/negative/N13-expected-digest-mismatch.fmp.json` | x86 passing |
 | N14 | Operand value does not fit the slot's encoded field: `r9` in a 3-bit `ModRM` field, or `x32` in a 5-bit AArch64 register field | Reject, never truncate to another register | E-OPERAND-004 | x86, aarch64 | `x86_64/negative/N14-register-wider-than-field.fmp.json`, `aarch64/negative/N14-register-wider-than-field.fmp.json` | x86 and aarch64 passing |
 | N15 | Operand payload is a composite memory operand (`{"mem": {"base": …, "disp": …}}`), not one of the four `fmp/0.1` shapes | Reject at read time, never split it into operands | E-OPERAND-003 | all | `rv64/negative/N15-composite-memory-payload.fmp.json` | rv64 passing |
-| N16 | Operand value is inside the slot's field range but excluded by the form (`c.addi` zero immediate, `c.addi` zero destination, the extended-register `imm3` values `5`–`7`) | Reject, never encode the HINT or the unallocated word the bytes would mean | E-RANGE-004 | rv64, aarch64 | `rv64/negative/N16a-caddi-imm-zero.fmp.json`, `rv64/negative/N16b-caddi-rd-zero.fmp.json`, `aarch64/negative/N16c-imm3-excluded.fmp.json` | rv64 and aarch64 passing |
+| N16 | Operand value is inside the slot's field range but excluded by the form (`c.addi` zero immediate, `c.addi` zero destination, the extended-register `imm3` values `5`–`7`, the 32-bit `imm6` values `32`–`63`) | Reject, never encode the HINT or the unallocated word the bytes would mean | E-RANGE-004 | rv64, aarch64 | `rv64/negative/N16a-caddi-imm-zero.fmp.json`, `rv64/negative/N16b-caddi-rd-zero.fmp.json`, `aarch64/negative/N16c-imm3-excluded.fmp.json`, `aarch64/negative/N16d-w-imm6-excluded.fmp.json` | rv64 and aarch64 passing |
 | N17 | RV64 pair half is inconsistent: `N17a` a `pcrel_lo12` low half with a non-zero `addend`, `N17b` a `pcrel_hi` fixup with no `pair_role: lo`, `N17c` a `pcrel_hi` low half in a different section than its `hi` | Reject, never fold the addend in, fall back to `pcrel_begin`, or measure across sections | E-FIXUP-009 / E-FIXUP-007 | rv64 | `rv64/negative/N17a-lo12-addend-nonzero.fmp.json`, `rv64/negative/N17b-pcrel-hi-without-lo-role.fmp.json`, `rv64/negative/N17c-lo-in-other-section.fmp.json` | rv64 passing |
-| N18 | Operand value is legal as a *literal* for the instruction but not inside the named form's field: `0x1000` on `add/x64-imm12-lsl0`, `0x123000` on `add/x64-imm12-lsl12`, `0x12340000` on `movz/x64-imm16-lsl16`, `4096` on `sub/x64-imm12-lsl0`, or `4096` on `adds/x64-imm12-lsl0` | Reject, never switch to the other form or pre-scale the operand | E-RANGE-001 | aarch64 | `aarch64/negative/N18a-no-form-switch.fmp.json`, `aarch64/negative/N18b-operand-is-field-content.fmp.json`, `aarch64/negative/N18c-movz-pre-scaled-literal.fmp.json`, `aarch64/negative/N18d-sub-no-form-switch.fmp.json`, `aarch64/negative/N18e-adds-no-form-switch.fmp.json` | aarch64 passing |
+| N18 | Operand value is legal as a *literal* for the instruction but not inside the named form's field: `0x1000` on `add/x64-imm12-lsl0`, `0x123000` on `add/x64-imm12-lsl12`, `0x12340000` on `movz/x64-imm16-lsl16`, `4096` on `sub/x64-imm12-lsl0`, `4096` on `adds/x64-imm12-lsl0`, or `4096` on `adds/w32-imm12-lsl0` | Reject, never switch to the other form or pre-scale the operand | E-RANGE-001 | aarch64 | `aarch64/negative/N18a-no-form-switch.fmp.json`, `aarch64/negative/N18b-operand-is-field-content.fmp.json`, `aarch64/negative/N18c-movz-pre-scaled-literal.fmp.json`, `aarch64/negative/N18d-sub-no-form-switch.fmp.json`, `aarch64/negative/N18e-adds-no-form-switch.fmp.json`, `aarch64/negative/N18f-w-adds-no-form-switch.fmp.json` | aarch64 passing |
 | N19 | A byte-affecting variation is stated as an operand `modifiers` entry the slot does not permit (`{"name": "lsl", "value": 3}` on `aarch64:add/x64-x64-x64-lsl0`) | Reject, never emit the word the unshifted form would produce | E-OPERAND-003 | aarch64 | `aarch64/negative/N19-modifier-is-not-a-carrier.fmp.json` | aarch64 passing |
 
 N13's counterexample is `EXP-0002` W2: a same-length encoder defect turns
@@ -178,8 +178,9 @@ that definition slice lands.
 | A64-P9 | Target-specific modifier | extend modifier on a register operand: the keyword is the form and fixes the source width, `imm3` is the amount (`0…4`, `5…7` excluded) | llvm-mc | **passing** — `A64-P9-extend-modifier` (eight instructions, one per `option`: six `w`-source keywords and two `x`-source keywords, with `imm3` at 0 and 4 on both classes and all three registers distinct in every row) through `aarch64:add/x64-x64-w32-imm3-uxtb` … `-imm3-sxtx`; `N03-imm3` rejects an amount of 8, `N16c` rejects 5 as excluded, `N02b` rejects a `w` operand on a shifted row, and `N01f` rejects the absent `sub`-extended id |
 | A64-P10 | Widening: a second arithmetic mnemonic | `sub` reuses the `add` shapes with `op = 1`: the unshifted register row, both `sh` halves of the immediate row, and the three shift keywords | llvm-mc | **passing** — `A64-P10-sub-family` (six instructions, one per new row: `-lsl0`, `-imm12-lsl0` at 4095, `-imm12-lsl12` at 291, and `-imm6-lsl/lsr/asr` at 3/7/63, with distinct registers in every row) through `aarch64:sub/x64-x64-x64-lsl0` … `-imm6-asr`; `N01g` rejects the absent `subs` form, `N01h` the absent `w` form, and `N18d` a literal that only fits the other `sh` half |
 | A64-P11 | Widening: the flag-setting mnemonic | `adds`/`subs` reuse the `add`/`sub` shapes with `S = 1`: the unshifted register row, both `sh` halves of the immediate row, and the three shift keywords, per mnemonic | llvm-mc | **passing** — `A64-P11-adds-subs-family` (twelve instructions, one per new row: six `adds` and six `subs`, with `imm12` at 4095 and 291<<12, all three shift keywords at `imm6` 3/7/63, and distinct registers in every row) through `aarch64:adds/x64-x64-x64-lsl0` … `subs/x64-x64-x64-imm6-asr`; `N01i` rejects the absent `cmp` alias, `N01j` the absent `w` form, and `N18e` a literal that only fits the other `sh` half |
+| A64-P12 | Widening: the 32-bit register class | every `add`/`sub`/`adds`/`subs` shape repeated on the `sf = 0` node, with `w32` registers and `imm6` over `0…31` | llvm-mc | **passing** — `A64-P12-w-rows` (twenty-four instructions, one per new row: six per mnemonic, with `imm12` at 4095 and 291<<12, all three shift keywords at `imm6` 3/7/31, and distinct registers 0–30 in every row) through `aarch64:add/w32-w32-w32-lsl0` … `subs/w32-w32-w32-imm6-asr`; `N01k` rejects the `w` form against `0.9.0`, `N02c` an `x64` destination on a `w` row, `N16d` `imm6 = 32`, and `N18f` a literal that only fits the other `sh` half |
 
-Definition anchor for A64-P1/P2/P3/P4/P5/P6/P7/P8/P9/P10/P11, measured 2026-11-04: the four base
+Definition anchor for A64-P1/P2/P3/P4/P5/P6/P7/P8/P9/P10/P11/P12, measured 2026-11-04: the four base
 forms live in `definitions/aarch64/0.1.0.json` (digest
 `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e`),
 generated from the Arm MRS 2026-06 drop by `EXP-0008`. `0.2.0` adds the fifth,
@@ -213,7 +214,12 @@ treatment as the `add` rows and the same slot shapes (`EC-12` `sub` half,
 `EC-31`, ADR-0017); and `0.9.0` adds the twelve `adds`/`subs` rows (digest
 `sha256:99728cd9bd85b8b0768e700e15dd6263171d6261c385ac15ceeb5df6d2cafcff`),
 the same two shapes again with `S = 1`, with the same treatment and slot shapes
-(`EC-12`, `EC-13`, `EC-31`, ADR-0018); `0.1.0`…`0.8.0` are unchanged.
+(`EC-12`, `EC-13`, `EC-31`, ADR-0018); and `0.10.0` adds the twenty-four `w` rows
+(digest
+`sha256:e958d69b4ba93222e7621a1f5c3ebd056ce929e2974a961a03abb7b66f0b247b`),
+the same six shapes on each of the eight `sf = 0` nodes with `w32` registers and
+the 32-bit `imm6` tail (`EC-11`, `EC-31`, ADR-0019); `0.1.0`…`0.9.0` are
+unchanged.
 `llvm-mc` does not resolve AArch64 branch or `adrp` immediates when
 they name a symbol, so A64-P5/P6 take their bytes after
 `ld.lld --image-base=0 -Ttext=0` has resolved the same `(S, P)` pair; the
@@ -221,10 +227,10 @@ relocation kinds were read with `llvm-readobj -r` before linking (see
 `fixtures/aarch64/README.md`). A64-P3 and A64-P4 need no linker: A64-P3's operands
 are all immediates and A64-P4's three targets are local labels in one section, so
 `llvm-mc` resolves both itself and emits no relocations. A64-P7, A64-P8, A64-P9,
-A64-P10 and A64-P11
+A64-P10, A64-P11 and A64-P12
 need no linker either: their operands are registers or immediates only. The
-twenty-six negative fixtures (`N01` ×9, `N02`, `N03` ×6, `N04c`, `N12a`, `N14`,
-`N16`, `N18` ×5, `N19`) exercise these tables with exact diagnostic sets.
+thirty negative fixtures (`N01` ×10, `N02` ×2, `N03` ×6, `N04c`, `N12a`, `N14`,
+`N16` ×2, `N18` ×6, `N19`) exercise these tables with exact diagnostic sets.
 
 N18's `movz` case is the same "literal versus field" shape as `add`'s. `hw`
 selects the lane, so `imm16` is field content in `0…65535` on every one of the
@@ -270,9 +276,10 @@ A64-P10 is the widening case, and its boundary is the mnemonic rather than a
 field. `sub` is not a value of anything: `SUB_64_addsub_shift` and
 `SUB_64_addsub_imm` are the `ADD_64` nodes with `op` at bit 30 fixed to `1`, so
 the six rows repeat the `add` shapes and differ only in that node (`ADR-0017`).
-The three `E-FORM-001` fixtures are the three neighbours the table does not
+The three `E-FORM-001` fixtures are the three neighbours `0.8.0` does not
 carry — `subs` (`S = 1`, bit 29: `0xeb020020`), `sub w0, w1, w2` (`sf = 0`:
-`0x4b020020`) and `sub … uxtb` (bit 21 plus `option`, `N01f`) — and `N18d` is the
+`0x4b020020`, carried later by `0.10.0`, so `N01h` is a version-boundary
+fixture) and `sub … uxtb` (bit 21 plus `option`, `N01f`) — and `N18d` is the
 value-driven half: `llvm-mc` assembles `sub x0, x1, #0x1000` to the `-lsl12` word
 `0xd1400420` without a diagnostic (`EXP-0019` §2), so the materializer has to
 reject it on `-lsl0` instead. `sub sp, …` is the extended node as well
@@ -291,6 +298,28 @@ the value half: `llvm-mc` assembles `adds x0, x1, #0x1000` to
 has to reject it on `-lsl0` instead. `adds x0, sp, x2` (`0xab2263e0`) and
 `subs x0, sp, x2` (`0xeb2263e0`) are the extended S nodes, which `0.9.0` does not
 carry, so register 31 in these rows is `xzr` as well.
+
+A64-P12 is the width half of the same widening, and its boundary is both a
+mnemonic bit and a register class. The eight `*_32*` nodes are the eight
+`*_64*` nodes already read with `sf` at bit 31 fixed to `0` (`EXP-0021` §1), so
+the twenty-four rows repeat the six shapes on each mnemonic and differ only in
+that node (`ADR-0019`). `N01k` is the version boundary: the `w` row against
+`0.9.0`, where it does not exist yet — `N01h` and `N01j` are the same shape
+against `0.8.0`/`0.9.0`. `N02c` is the class boundary: the MRS spells every
+shifted-node register `<Wd>`/`<Wn>`/`<Wm>` and `llvm-mc` rejects
+`add w0, w1, x2`, so an `x64` operand on a `w` row is `E-OPERAND-001` on `kind`
+and on `target_type` rather than a second reading of the same 5-bit number.
+`N16d` is the field boundary: `imm6` is six bits but the 32-bit form allocates
+only `0…31` (`lsl #32` is rejected, the `imm6 = 32` word does not decode), so
+the slot carries `excluded: [32 … 63]` and `32` is `E-RANGE-004`. `N18f` is the
+value half, unchanged from the 64-bit rows: `llvm-mc` assembles
+`adds w0, w1, #4096` to `0x31400420` (`-lsl12`) without a diagnostic, so the
+materializer has to reject it on `-lsl0` instead. Register 31 stays legal in
+every slot and means what the node's role says — `wzr` on the shifted rows and
+on `ADDS_32S`/`SUBS_32S` `Rd` (`0x3100143f` is `cmn w1, #5`), `wsp` on
+`ADD_32`/`SUB_32` `Rd`/`Rn` and on `ADDS_32S`/`SUBS_32S` `Rn` — because the
+encoding stores one number, so the vector uses registers 0–30 and the role
+meanings are recorded in `EXP-0021` §2 instead.
 
 ### RV64 (directive §6.3)
 
