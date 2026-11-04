@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P4-b-cond.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "ea259809351277bcd6914f1c5a6bedea6f2f37405bcb98ef553c0fbc7147ec2b",
+  "output_sha256": "67853f38e2b3913bd42e25250f714278aff11d845370c5bae27d542763edfdfa",
+  "size": 12,
+  "records": 0,
+  "notes": "Input (33 B, `a:` / `  b.eq c` / `c:` / `  b.ne a` / `  b.gt a`): `b.eq` +4, `b.ne` -4, `b.gt` -8, with symbols `a` at 0 and `c` at 4. `llvm-mc` resolves all three locally (`llvm-readobj -r` prints an empty relocation list), so no linker is involved and the bytes are the assembler's own. The plan resolves the same displacements with `pcrel_begin` + `scale` shift 2, and states the condition as a `cond4` operand instead of a mnemonic suffix. Measured in `EXP-0014` §3.",
+  "source": "Arm MRS B_only_condbranch, cond at 0+4, imm19 at 5+19"
+}

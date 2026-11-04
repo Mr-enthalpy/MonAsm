@@ -22,19 +22,20 @@ OD-13, OD-14, OD-15); ADR-0004 makes `form_id` the only encoding selector, ADR-0
 takes AArch64 knowledge from the Arm MRS, ADR-0006 pins the MRS packaging by hash
 and licence, ADR-0007 takes RV64 knowledge from the UDB resolved spec, ADR-0008
 makes a memory operand one operand per encoded field, ADR-0009 gives a slot a
-closed `excluded` list, ADR-0010 makes an RV64 low half name its high half, and
-ADR-0011 makes AArch64 `add ..., lsl #12` a form rather than a slot scale. Five
-definition documents are frozen and oracle-verified; the materializer and its
+closed `excluded` list, ADR-0010 makes an RV64 low half name its high half,
+ADR-0011 makes AArch64 `add ..., lsl #12` a form rather than a slot scale, and
+ADR-0012 makes an AArch64 condition a typed operand rather than sixteen forms.
+Six definition documents are frozen and oracle-verified; the materializer and its
 fixture gate are implemented.
 
 | Area | State |
 |---|---|
 | Contract (`docs/fmp-v0/01_contract.md`) | draft, fields marked `TBD` where unproven |
 | Schema (`schema/fmp-v0.schema.json`) | draft, examples validate |
-| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), aarch64 `0.1.0` (4 forms) and `0.2.0` (5 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
+| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms) and `0.3.0` (6 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
 | Prototype (`prototype/`) | workspace compiled; all three slices materialize from the plan |
 | Oracles (`tools/oracle/`) | planned; `llvm-mc` (± `ld.lld`) drives the experiments |
-| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0013 |
+| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0014 |
 
 Read `docs/STATUS.md` for the current phase, gate status, and next action.
 

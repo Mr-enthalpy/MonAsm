@@ -224,6 +224,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.1.0.json` | `monasm.isa.x86` | `sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
+| `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
 | `definitions/rv64/0.1.0.json` | `monasm.isa.riscv` | `sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083` |
 | `definitions/rv64/0.2.0.json` | `monasm.isa.riscv` | `sha256:8329a38faa964f9c69207a48e3bfb45c13fb0ddbaeb829ddcc0dbd1cffa8de10` |
 
@@ -261,30 +262,35 @@ Every row is verified against `llvm-mc` 23.1.2 in `EXP-0004`: each template byte
 string is decoded, and each `ModRM` and immediate/branch field is exercised
 across its whole encoded range.
 
-### 8.2 `aarch64` `0.1.0` and `0.2.0`
+### 8.2 `aarch64` `0.1.0`, `0.2.0` and `0.3.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
 | `aarch64:add/x64-x64-x64-lsl0` | `0000008b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-11`, `EC-13`, `A64-P1` |
 | `aarch64:add/x64-imm12-lsl0` | `00000091` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; imm: `aarch64.imm`/`imm12` → `[10,12]` | 4 | `EC-11`, `EC-12`, `A64-P2` |
-| `aarch64:add/x64-imm12-lsl12` | `00004091` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; imm: `aarch64.imm`/`imm12` → `[10,12]` | 4 | `EC-11`, `EC-12`, `A64-P2` — `0.2.0` only |
+| `aarch64:add/x64-imm12-lsl12` | `00004091` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; imm: `aarch64.imm`/`imm12` → `[10,12]` | 4 | `EC-11`, `EC-12`, `A64-P2` — `0.2.0`+ |
 | `aarch64:bl/imm26` | `00000094` | target: `aarch64.rel`/`imm26` → `[0,26]` | 4 | `A64-P5` |
 | `aarch64:adrp/x64-imm21` | `00000090` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; target: `aarch64.rel`/`imm21` → `[5,19]`, `[29,2]` | 4 | `EC-15`, `EC-17`, `A64-P6` |
+| `aarch64:b.cond/imm19` | `00000054` | imm: `aarch64.cond`/`cond4` → `[0,4]`; target: `aarch64.rel`/`imm19` → `[5,19]` | 4 | `EC-29`, `A64-P4` — `0.3.0` only |
 
-`0.1.0` holds the first, second, fourth and fifth rows; `0.2.0` is a superset that
-adds `aarch64:add/x64-imm12-lsl12` in place (ADR-0011). The two documents share
-four `form_id`s and differ only in that row, so a plan bound to `0.1.0` cannot
-reach the scaled form (`E-FORM-001`, `N01`) even though the newer document has it.
+`0.1.0` holds the first, second, fourth and fifth rows; `0.2.0` adds
+`aarch64:add/x64-imm12-lsl12` (ADR-0011); `0.3.0` repeats all five and adds
+`aarch64:b.cond/imm19` (ADR-0012). Each document therefore shares its earlier rows
+unchanged and differs only in the rows its version introduced, so a plan bound to
+an older version cannot reach a newer form (`E-FORM-001`, `N01`) even though the
+newest document has it.
 
 The templates are little-endian file order, so `0000008b` is the word
 `0x8b000000` in a disassembler. The generator
 (`research/evidence/experiments/EXP-0008/generate_aarch64.py`) derives every
 bit from the MRS node, requires the MRS node name to exist, and refuses to emit
 unless all 32 bits are covered exactly once by a fixed bit or a slot placement;
-`EXP-0008` §2–§3 records the four nodes and the coverage check. Five forms come
-from those four nodes because `ADD_64_addsub_imm` is read twice, once with
-`sh = 0` and once with `sh = 1`; the generator states each pinned value
-explicitly and asserts that `0.1.0` still hashes to its frozen digest.
+`EXP-0008` §2–§3 records the five nodes and the coverage check. Six forms come
+from those five nodes because `ADD_64_addsub_imm` is read twice, once with
+`sh = 0` and once with `sh = 1`, and `B_only_condbranch` contributes one row with
+both of its variable fields as operands; the generator states each pinned value
+explicitly and asserts that `0.1.0` and `0.2.0` still hash to their frozen
+digests.
 
 The `-lsl0`/`-lsl12` suffix on the `add` rows carries a decision the operand list
 does not state, and the name states it instead (`01_contract.md` §7, `ADR-0004`):
@@ -302,6 +308,15 @@ does the `<< 12` on the `-lsl12` one. Writing `add x0, x1, #0x1000` as
 which is exactly what `llvm-mc` does with the plain literal (`EV-26`,
 `EXP-0013` §2). Writing `0x123000` as `-lsl12` is `E-RANGE-001` too (`N18b`),
 because the operand is field content, not the shifted literal.
+
+`aarch64:b.cond/imm19` is the one row whose *condition* is an operand. `cond` is a
+4-bit field, all sixteen values are architecture-defined, and the sixteen rows it
+would otherwise need differ only in that nibble, so `role: imm`,
+`kind: aarch64.cond`, `target_type: cond4` carries it with a `range` of
+`0..15` and no `excluded` list (`EC-29`, ADR-0012). A `cond` of 16 is
+`E-RANGE-001`, not a masked `0`: the low four bits of 16 are `eq`, a different
+branch. The target is `imm19` field content, exactly as `bl`'s `imm26` is, so a
+byte displacement is a `pcrel_begin` + `scale` fixup (`EXP-0014`).
 
 `adrp`'s immediate is one value over two fields: `immhi` holds bits `[20:2]` and
 `immlo` holds `[1:0]`, which is why the slot has two placements in that order
@@ -465,10 +480,10 @@ without a plan error: the input is the definition.
   ADR-0006: the facts come from the Arm MRS 2026-06 OPENSOURCE packaging, and
   the Arm notice ships with the generated table. The format did not need to
   change for it: `adrp`'s split `immhi:immlo` is two placements of one slot, as
-  §4.1 anticipated. `definitions/aarch64/0.1.0.json` and `0.2.0.json` now exist
-  (§8.2); the second is a superset that adds the `-lsl12` row without a format
-  change (ADR-0011). What is missing is coverage, not design: `A64-P3`/`P4`/`P7`/`P8`
-  have no row, so naming them is `E-FORM-001`.
+  §4.1 anticipated. `definitions/aarch64/0.1.0.json`, `0.2.0.json` and `0.3.0.json`
+  now exist (§8.2); each is a superset that adds its own row without a format
+  change (ADR-0011, ADR-0012). What is missing is coverage, not design:
+  `A64-P3`/`P7`/`P8` have no row, so naming them is `E-FORM-001`.
 - The archive is still not vendored and the drop is not a build input: a
   regeneration reads `research/external/arm-mrs/` after `tools/check_mrs.py`
   passes, and the shipped artifact is the JSON plus its digest.

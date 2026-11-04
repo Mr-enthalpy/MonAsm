@@ -1,15 +1,17 @@
-# EXP-0008 — generating the AArch64 tables from four MRS nodes
+# EXP-0008 — generating the AArch64 tables from five MRS nodes
 
-- Date: 2026-11-04 (second document added the same day)
-- Subject: how `definitions/aarch64/0.1.0.json` and `0.2.0.json` were derived, and
-  what they do and do not cover
+- Date: 2026-11-04 (second and third documents added the same day)
+- Subject: how `definitions/aarch64/0.1.0.json`, `0.2.0.json` and `0.3.0.json`
+  were derived, and what they do and do not cover
 - Basis: **experiment** for every field range, template and byte quoted below
 - Reproduce:
   `python tools/check_mrs.py --archive <pinned .tar.gz>`, then
   `python research/evidence/experiments/EXP-0008/generate_aarch64.py`
 
-The script emits both documents. `0.1.0` is frozen and its digest is asserted by
-the script, so a later edit that tries to move it fails instead of shipping.
+The script emits all three documents. `0.1.0` and `0.2.0` are frozen and their
+digests are asserted by the script, so a later edit that tries to move either one
+fails instead of shipping. A form declares the version it starts in (`since`), so
+a later document is always a superset and cannot lose an earlier row.
 
 ## 1. Input
 
@@ -25,12 +27,12 @@ sha256 a1ad2c6538a47cd97d8762791ac5af88bce1d5f6aff096c9b77aef853e76acfe
 BSD-3-Clause licence sentence before the drop may be used (ADR-0006). The file is
 not vendored; the shipped artifact is the JSON table plus its digest.
 
-The four nodes are named exactly as the MRS names them. The generator walks
+The five nodes are named exactly as the MRS names them. The generator walks
 `instructions` recursively, matches the node's `name`, rejects duplicates and
 refuses to run if any node is missing. It does not read aliases, groups or
 descriptions.
 
-## 2. The four nodes and their encode fields
+## 2. The five nodes and their encode fields
 
 `start+width` counts from bit 0 of the 32-bit word. `value` is the MRS
 `encoding.values[].value` string; `x` means the bit is an operand, `0`/`1` means
@@ -104,6 +106,25 @@ the oracle emits `b0000000`. That is the kind of error the two-source rule
 exists to catch, and it is why the fixture compares whole words, not the
 immediate field alone.
 
+### `B_only_condbranch` → `aarch64:b.cond/imm19`
+
+| Field | start+width | MRS value | Our use |
+|---|---|---|---|
+| `op0` | 29+3 | `010` | fixed |
+| — | 26+3 | `101` | fixed |
+| — | 24+2 | `00` | fixed |
+| `imm19` | 5+19 | `xxxxxxxxxxxxxxxxxxx` | slot `target`, signed |
+| `o0` | 4+1 | `0` | fixed |
+| `cond` | 0+4 | `xxxx` | slot `imm`, unsigned, `0..15` |
+
+This node has **two** variable fields, and they take opposite treatments:
+`imm19` is field content of a `target` slot, exactly like `bl`'s `imm26`, while
+`cond` is a 4-bit *operand* (`aarch64.cond` / `cond4`). Sixteen rows that differ
+only in the low nibble would be one instruction spelled sixteen times, so the
+condition is a slot and the form has no `excluded` list: all sixteen values are
+architecture-defined, `AL` and `NV` included (`EXP-0014` §2, ADR-0012). The row
+is emitted into `0.3.0` only.
+
 ## 3. How the template is built
 
 For each node the generator:
@@ -120,7 +141,8 @@ For each node the generator:
 5. checks that the slot's placement widths sum to its declared `range.bits`;
 6. checks that every one of the 32 bits is owned exactly once by a fixed bit, a
    pinned bit, or one slot placement, and that no two owners overlap.
-7. selects the forms for each document version (`in` list; absent means both),
+7. selects the forms for each document version (`since` gate: a form is present in
+   every document at or after its `since`, and absent `since` means all of them),
    renders them, and re-parses the text to confirm the renderer and the builder
    describe the same document before anything is written.
 
@@ -137,17 +159,18 @@ The generated templates are:
 | `aarch64:add/x64-imm12-lsl12` | `00004091` | `0x91400000` |
 | `aarch64:bl/imm26` | `00000094` | `0x94000000` |
 | `aarch64:adrp/x64-imm21` | `00000090` | `0x90000000` |
+| `aarch64:b.cond/imm19` | `00000054` | `0x54000000` |
 
 Templates are stored little-endian, the only byte order v0 definitions declare
 (`07_definition_format.md` §4.1).
 
 ## 4. Oracle
 
-`llvm-mc` 23.1.2 assembles all four forms. It does **not** resolve AArch64
-branches or `adrp`: it emits zeros plus `fixup_aarch64_pcrel_call26`,
-`fixup_aarch64_pcrel_adrp_imm21` or `fixup_aarch64_add_imm12`. For the two forms
-whose bits a fixup owns, the oracle is therefore the LLVM toolchain's own
-resolution:
+`llvm-mc` 23.1.2 assembles all five forms. It does **not** resolve AArch64
+branches or `adrp` when the target is a symbol: it emits zeros plus
+`fixup_aarch64_pcrel_call26`, `fixup_aarch64_pcrel_adrp_imm21` or
+`fixup_aarch64_add_imm12`. For the forms whose bits a fixup owns, the oracle is
+therefore the LLVM toolchain's own resolution:
 
 ```text
 llvm-mc -triple=aarch64 -filetype=obj <input>.s -o out.o
@@ -161,40 +184,51 @@ the pair at `0xff8` and the symbol at `0x1008`: the page delta is `0x1000`, out
 of `adr` range, and the emitted words are `b0000000 91002000`. The exact commands
 and hashes are in each fixture's `.oracle.json`.
 
-The five positive fixtures are:
+`b.cond` is the exception that needed no linker: its three targets are local
+labels in the same section, and `llvm-mc` resolved them itself —
+`llvm-readobj -r` on the object prints an empty relocation list. The bytes are
+therefore the assembler's own, and the fixture records that as oracle metadata
+(`EXP-0014` §3).
+
+The six positive fixtures are:
 
 | Fixture | Document | Bytes | What it proves |
 |---|---|---|---|
 | `A64-P1-add-register` | `0.1.0` | `2000028b c500078b 20001f8b` | three register triples, including `Rm = 31` (`xzr`) |
 | `A64-P2-add-imm12` | `0.1.0` | `20000091 62fc3f91` | both ends of the unsigned imm12 range |
 | `A64-P2-add-imm12-lsl12` | `0.2.0` | `20044091 208c4491 62fc7f91 20004091` | `sh = 1` with field content 1, 291, 4095 and 0 |
+| `A64-P4-b-cond` | `0.3.0` | `20000054 e1ffff54 ccffff54` | three conditions (0, 1, 12) and three displacements (+4, −4, −8) |
 | `A64-P5-bl-local-symbol` | `0.1.0` | `01000094 ffffff97` | `bl` +4 and −4, resolved by the linker |
 | `A64-P6-adrp-lo12-pair` | `0.1.0` | `…b0000000 91002000` at `0xff8`/`0xffc` | `adrp` split field plus the paired `add` |
 
 These were checked against our materializer, not generated by it
-(`AGENTS.md` rule 5). The materializer reproduces all five byte-for-byte and the
-six negative fixtures (`N01`, `N03`, `N12a`, `N14`, `N18a`, `N18b`) reject
-exactly the registered diagnostic sets. `N18a`/`N18b` are the scaled form's other
-half: the first is `0x1000` stated on `-lsl0`, the second `0x123000` on
-`-lsl12`, and both must be `E-RANGE-001` instead of a form switch or a
-pre-scale.
+(`AGENTS.md` rule 5). The materializer reproduces all six byte-for-byte and the
+eight negative fixtures (`N01`, `N03`, `N03-cond`, `N04c`, `N12a`, `N14`, `N18a`,
+`N18b`) reject exactly the registered diagnostic sets. `N18a`/`N18b` are the
+scaled form's other half: the first is `0x1000` stated on `-lsl0`, the second
+`0x123000` on `-lsl12`, and both must be `E-RANGE-001` instead of a form switch or
+a pre-scale. `N03-cond` is `cond = 16` and `N04c` is `imm19 = 262144`: the first
+would mask to `eq` if it were truncated, the second is the first value past the
+signed field, and both must be rejected rather than repaired.
 
 ## 5. What this record does not claim
 
 - **Not exhaustive coverage of the nodes.** The table exercises the register and
   immediate fields at range ends, but it does not enumerate all 2^5 × 2^5 × 2^5
-  register triples, nor every `bl` displacement. `EXP-0004` did that for the
-  seven x86 rows; this slice has five rows and five positive fixtures.
+  register triples, nor every `bl` or `b.cond` displacement. `EXP-0004` did that
+  for the seven x86 rows; this slice has six rows and six positive fixtures, and
+  `EXP-0014` §2 enumerates the sixteen condition values but not their products
+  with the 2^19 displacements.
 - **Not a statement about the other packagings.** Only the archive pinned by
   ADR-0006 was read (`EXP-0006`, `EXP-0007`).
-- **Not an encoding-selection mechanism.** Four MRS nodes are read because four
-  forms exist in the table. The generator is disposable research tooling; the
-  materializer never reads MRS data, never looks a mnemonic up, and only resolves
-  the exact `form_id` a plan names.
-- **`A64-P3`, `A64-P4`, `A64-P7`, `A64-P8` are absent.** Naming them is
-  `E-FORM-001`. The scaled `add` is no longer in this list: it is a row in
-  `0.2.0` (ADR-0011), not a slot-level scaling rule, because the slot holds
-  `imm12` field content in both immediate forms.
+- **Not an encoding-selection mechanism.** Five MRS nodes are read because six
+  forms exist in the table (`ADD_64_addsub_imm` is read twice). The generator is
+  disposable research tooling; the materializer never reads MRS data, never looks
+  a mnemonic up, and only resolves the exact `form_id` a plan names.
+- **`A64-P3`, `A64-P7`, `A64-P8` are absent.** Naming them is `E-FORM-001`. The
+  scaled `add` and `b.cond` are no longer in this list: the first is a row in
+  `0.2.0` (ADR-0011), the second a row in `0.3.0` (ADR-0012), and neither is a
+  slot-level scaling rule or a value-driven form choice.
 - **The scaled `:lo12:` link path is unmeasured.** No fixture pairs `adrp` with
   `add ..., lsl #12`; only the `-lsl0` pair is linked (`A64-P6`).
 
@@ -212,11 +246,22 @@ namespace   monasm.isa.aarch64
 version     0.2.0
 forms       5
 digest      sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed
+
+definition  definitions/aarch64/0.3.0.json
+namespace   monasm.isa.aarch64
+version     0.3.0
+forms       6
+digest      sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb
 ```
 
 The digests are computed over the canonical form of each whole document
 (`01_contract.md` §12, `OD-06`) and printed by `tools/check_definition.py`,
 which also checks that the reading-aid table in `07_definition_format.md` §8.2
 matches the JSON row by row. `definitions/aarch64/NOTICE` reproduces the upstream
-BSD-3-Clause notice and names the archive hash; `0.2.0` needs no second notice
-because it is generated from the same drop and ships under the same terms.
+BSD-3-Clause notice and names the archive hash; `0.2.0` and `0.3.0` need no
+second notice because they are generated from the same drop and ship under the
+same terms.
+
+Because `0.3.0` repeats all five earlier rows verbatim, the only difference from
+`0.2.0` is the added `b.cond` row; the generator's frozen-digest assertions are
+what prove that no earlier row moved while the new one landed.

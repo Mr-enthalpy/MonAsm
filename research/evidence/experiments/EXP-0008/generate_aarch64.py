@@ -19,14 +19,16 @@ What it does, per form:
 5. Refuses to emit unless every one of the 32 bits is covered exactly once by
    either a fixed bit or a slot placement.
 
-Documents are emitted per version. A form appears in a document when its `in`
-list names that version (absent `in` means every version). `0.1.0` stays frozen:
-its digest is asserted below, so a later edit that perturbs it fails loudly
-instead of shipping.
+Documents are emitted per version. A form appears in a document when the
+document's version is at or after the form's `since` (absent `since` means every
+version), so a later document cannot silently lose an earlier form. `0.1.0` and
+`0.2.0` stay frozen: their digests are asserted below, so a later edit that
+perturbs either one fails loudly instead of shipping.
 
 Reads:  research/external/arm-mrs/Instructions.json (pinned by check_mrs.py)
 Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.2.0.json
+        definitions/aarch64/0.3.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -44,11 +46,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
 MRS = os.path.join(ROOT, "research", "external", "arm-mrs", "Instructions.json")
 OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
-VERSIONS = ["0.1.0", "0.2.0"]
+VERSIONS = ["0.1.0", "0.2.0", "0.3.0"]
 
-# The frozen digest of `0.1.0`. Four fixtures name it; it may not move.
+# Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
     "0.1.0": "sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e",
+    "0.2.0": "sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed",
 }
 
 WIDTH = 32
@@ -68,7 +71,8 @@ TARGET_IDENTITY = {
 # order; each entry names the MRS field(s) that carry it (an ADRP immediate is
 # one value split over `immhi` and `immlo`, most significant part first).
 # `pinned` maps an MRS field name to the integer value our form fixes it to.
-# `in` lists the document versions a form belongs to; omit it for all of them.
+# `since` is the first document version that contains the form; omit it for all
+# of them.
 FORMS = [
     {
         "form_id": "aarch64:add/x64-x64-x64-lsl0",
@@ -108,7 +112,7 @@ FORMS = [
         "mrs": "ADD_64_addsub_imm",
         "decision": "sh = 1 (LSL #12), imm12 still field content",
         "pinned": {"sh": 1},
-        "in": ["0.2.0"],
+        "since": "0.2.0",
         "slots": [
             {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
              "from": "reg_number", "target_type": "x64"},
@@ -146,6 +150,26 @@ FORMS = [
              "range": {"signed": True, "bits": 21, "align_bits": 0}},
         ],
     },
+    {
+        # `A64-P4` (ADR-0012). The MRS leaves `cond` (4 bits) and `imm19` open;
+        # the condition is an operand, not a second form, and the displacement is
+        # field content like `bl`'s `imm26` (07_definition_format.md §8.3).
+        # All sixteen conditions are encodable, `al`/`nv` included, so there is
+        # no `excluded` list: the ISA defines every value.
+        "form_id": "aarch64:b.cond/imm19",
+        "mrs": "B_only_condbranch",
+        "decision": "nothing is left open by the MRS",
+        "pinned": {},
+        "since": "0.3.0",
+        "slots": [
+            {"mrs": ["cond"], "role": "imm", "kind": "aarch64.cond",
+             "from": "operand_value", "target_type": "cond4",
+             "range": {"signed": False, "bits": 4, "align_bits": 0}},
+            {"mrs": ["imm19"], "role": "target", "kind": "aarch64.rel",
+             "from": "operand_value", "target_type": "imm19",
+             "range": {"signed": True, "bits": 19, "align_bits": 0}},
+        ],
+    },
 ]
 
 
@@ -158,8 +182,27 @@ def document_for(version):
     }
 
 
+def version_key(version):
+    parts = version.split(".")
+    if len(parts) != 3 or not all(part.isdigit() for part in parts):
+        raise SystemExit("version {0!r} is not <major>.<minor>.<patch>".format(version))
+    return tuple(int(part) for part in parts)
+
+
 def forms_for(version):
-    return [spec for spec in FORMS if version in spec.get("in", VERSIONS)]
+    current = version_key(version)
+    selected = []
+    for spec in FORMS:
+        since = spec.get("since")
+        if since is not None and since not in VERSIONS:
+            raise SystemExit(
+                "{0}: since {1!r} is not a document version".format(
+                    spec["form_id"], since
+                )
+            )
+        if since is None or version_key(since) <= current:
+            selected.append(spec)
+    return selected
 
 
 def quote_value(field):

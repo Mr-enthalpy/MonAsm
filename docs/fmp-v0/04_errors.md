@@ -92,7 +92,12 @@ rejection; `derived` means it follows from a measured byte sequence.
   silently truncating a target that does not fit. Measured 2026-11-04: llvm-mc
   shortens `jmp .+0x81` to `eb 7f` (2 B) but promotes `jmp .+0x82` to
   `e9 7d 00 00 00` (5 B). A materializer that computes a displacement and then
-  truncates it, or re-forms the branch, is rejected here.
+  truncates it, or re-forms the branch, is rejected here. The AArch64 case is the
+  same refusal without a shorter form to promote to: `imm19` holds
+  `[-262144, 262143]` field units, so the reachable byte range is
+  `-1048576 … +1048572`, and `262144` is `N04c` (`EXP-0014` §3 measured both ends;
+  an encoder cannot widen `b.cond` to `b` without changing either the instruction
+  or the condition).
 - `E-FIXUP-003` — observed, F-06 (label path): XirAsm rejects an out-of-range
   label with "does not fit the signed 8-bit displacement". The same condition on
   a planned fixup is this code.
@@ -103,7 +108,11 @@ rejection; `derived` means it follows from a measured byte sequence.
   accepts it by switching forms (`EV-26`, `EXP-0013` §2). A materializer rejects
   it instead (`N18a`); the converse, `0x123000` on `-lsl12`, is `N18b`. The code
   is the same because the failure is the same: the value is not in the named
-  form's field.
+  form's field. The `b.cond` case is the same shape one level down: `cond = 16`
+  is a plausible number for "one past the last condition" but the field is four
+  bits, and masking it yields `0x0`, which is `eq` — an accepted branch on the
+  wrong condition (`N03`, `EXP-0014` §2). The range check is what turns that into
+  a rejection instead of a silently different program.
 - `E-OPERAND-001` — observed, F-10: `c.addi a6, 5` (x16) is rejected because the
   compressed register class is `x8..x15`. A register-class violation is a
   legality rule, never a widening opportunity.

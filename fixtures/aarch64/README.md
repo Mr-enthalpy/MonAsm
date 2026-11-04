@@ -9,24 +9,28 @@ Vectors: `A64-P1` … `A64-P8` in `docs/fmp-v0/06_validation_matrix.md`.
 | `positive/A64-P1-add-register` | `aarch64:add/x64-x64-x64-lsl0` ×3 | `llvm-mc` |
 | `positive/A64-P2-add-imm12` | `aarch64:add/x64-imm12-lsl0` ×2, imm 0 and 4095 | `llvm-mc` |
 | `positive/A64-P2-add-imm12-lsl12` | `aarch64:add/x64-imm12-lsl12` ×4 (`0.2.0`), field content 0, 1, 291, 4095 | `llvm-mc` |
+| `positive/A64-P4-b-cond` | `aarch64:b.cond/imm19` ×3 (`0.3.0`), `b.eq` +4, `b.ne` −4, `b.gt` −8 | `llvm-mc` (no linker: local labels, no relocations) |
 | `positive/A64-P5-bl-local-symbol` | `aarch64:bl/imm26` ×2, +4 and −4 | `llvm-mc` + `ld.lld` |
 | `positive/A64-P6-adrp-lo12-pair` | `aarch64:adrp/x64-imm21` + `aarch64:add/x64-imm12-lsl0`, one `pair_group` | `llvm-mc` + `ld.lld`; relocation kinds read with `llvm-readobj` |
 | `negative/N01-absent-scaled-form` | `aarch64:add/x64-imm12-lsl12` against `0.1.0`, which lacks it | `E-FORM-001` |
 | `negative/N03-imm12-out-of-range` | imm12 = 4096 | `E-RANGE-001` |
+| `negative/N03-cond-out-of-range` | `cond = 16` in a 4-bit field | `E-RANGE-001` |
+| `negative/N04c-bcond-imm19-out-of-range` | `imm19 = 262144`, one past the signed 19-bit field | `E-RANGE-002` |
 | `negative/N12a-pair-without-lo` | two `hi` members in one `pair_group` | `E-FIXUP-007` |
 | `negative/N14-register-wider-than-field` | register 32 in a 5-bit field | `E-OPERAND-004` |
 | `negative/N18a-no-form-switch` | `0x1000` stated on `-lsl0` (legal only as a scaled literal) | `E-RANGE-001` |
 | `negative/N18b-operand-is-field-content` | `0x123000` stated on `-lsl12` (a pre-scaled literal) | `E-RANGE-001` |
 
-`N01` is why the split matters: the scaled form exists, but not in `0.1.0`, so a
-plan bound to `0.1.0` still cannot reach it. The two fixtures that use the
-scaled form name `0.2.0` and its digest.
+`N01` is why the version split matters: a form exists, but not in an older
+document, so a plan bound to `0.1.0` still cannot reach `-lsl12`, and a plan bound
+to `0.2.0` cannot reach `b.cond`. Each fixture names the document it targets and
+that document's digest.
 
-Not yet covered: `A64-P3` (load/store), `A64-P4` (conditional branch), `A64-P7`
-(scattered field) and `A64-P8` (shift/extend modifier). They have no form in
-either document, so `N01` rejects them rather than guessing. A linked `:lo12:`
-inside the `-lsl12` form is measured at the record level (`EXP-0013` §5) but is
-not an address of the symbol, so no fixture links one.
+Not yet covered: `A64-P3` (load/store), `A64-P7` (scattered field) and `A64-P8`
+(shift/extend modifier). They have no form in any document, so `N01` rejects them
+rather than guessing. A linked `:lo12:` inside the `-lsl12` form is measured at
+the record level (`EXP-0013` §5) but is not an address of the symbol, so no
+fixture links one.
 
 ## Two things a reader of the plans should know
 

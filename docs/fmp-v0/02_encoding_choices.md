@@ -77,7 +77,7 @@ not be moved to `frozen` on the strength of an argument alone.
 | EC-15 | AArch64 | Literal load vs `adrp` + `lo12` sequence | Instruction count (INV-03 boundary) | `form variant` (one instruction vs two planned instructions) | A "load from label" request is a plan decision: one literal load or two instructions. | frozen |
 | EC-16 | AArch64 | `mov` alias family: `movz` / `movn` / `orr` immediate / register | Different opcodes | `form variant` (`movz` / `movn` / `orr-imm` / `reg`) | `mov x0,#1` can be `movz` or `orr`; both are legitimate and differ in bytes. | draft |
 | EC-17 | AArch64 | `adr` (±1 MB) vs `adrp` (page) for a symbol address | Different instruction and fixup kind | `form variant` + `fixup field` (`kind`) | Choosing `adrp` when the target is in range changes both bytes and relocation semantics. | frozen |
-| EC-18 | AArch64 | `b.cond` vs `cbz/cbnz` vs `tbz/tbnz` for a conditional transfer | Different forms and operand sets | `form variant` | A planner that says only "branch if zero" has not chosen a form. | draft |
+| EC-18 | AArch64 | `b.cond` vs `cbz/cbnz` vs `tbz/tbnz` for a conditional transfer | Different forms and operand sets | `form variant` | A planner that says only "branch if zero" has not chosen a form. The `b.cond` half now ships as `aarch64:b.cond/imm19`; `cbz`/`tbnz` are absent, so naming one is `E-FORM-001`. | draft |
 | EC-19 | RV64 | Compressed (`c.*`, 2 bytes) vs standard (4 bytes) | 2 vs 4 bytes | `form variant` (the `c.` mnemonic is a different form; `riscv:c.addi/rd-imm6` in `0.2.0`) | With `-mattr=+c`, `addi a0, a0, 1` assembles to `05 05`; the same immediate with `a1` stays `13 85 15 00`, and `c.addi a0, 1` is `05 05` only because it was named. An encoder that picks by register/operand shape violates INV-02. | frozen |
 | EC-20 | RV64 | Compressed register class `x8–x15` (3-bit field) vs full 5-bit register | Legality | `operand type` + definition rule | `c.lw a6, 0(a0)` is rejected ("register must be a GPR from x8 to x15"); `c.lw a2, 0(a0)` is `10 41`. `c.addi a6, 5` is legal (`15 08`): its `xd` is a 5-bit field, so the rule is per form, not per mnemonic prefix. | frozen |
 | EC-21 | RV64 | Absolute vs PC-relative symbol materialization: `lui`+`addi` vs `auipc`+`addi` | Instruction pair and relocation kind | `form variant` + `fixup field` (`kind`) | Choosing PC-relative changes both instructions and the fixup pair. | frozen |
@@ -88,6 +88,7 @@ not be moved to `frozen` on the strength of an argument alone.
 | EC-26 | RV64 | Atomic `aq`/`rl` bits | Bits 26–25 | `operand modifier` (`aq` / `rl`) | `amoadd.w` vs `amoadd.w.aqrl` differ in ordering semantics and bytes. | draft |
 | EC-27 | x86-64 | `89 /r` (`MOV r/m64, r64`) vs `8B /r` (`MOV r64, r/m64`) | Different opcode bytes, same length, same semantics | `form variant` (`rm-r64` / `r64-rm`) | `mov rax, rbx` is both `48 89 d8` and `48 8b c3`; both disassemble to `movq %rbx, %rax` and both are 3 bytes. `expected_size` cannot detect a wrong choice, and no operand distinguishes them; only `expected_digest` can (OD-01). | frozen |
 | EC-28 | x86-64 | Minimal prefix set vs a redundant prefix (`89 d8` vs `40 89 d8`; likewise a redundant `66`, segment or `REX` prefix) | One byte per redundant prefix, identical semantics | `none` — definition rule: emit the minimal prefix set | `40 89 d8` decodes as `movl %ebx, %eax`, exactly like `89 d8`. Two honest implementers could differ by one byte with no observable semantic difference, so the definition must pin minimality and no plan field may request the redundant byte. | frozen |
+| EC-29 | AArch64 | `b.cond` condition: sixteen values in the 4-bit `cond` field | Bits 0–3; no length, opcode or relocation change | `operand type` (`aarch64.cond` / `cond4`) | `b.eq .+4` is `0x54000020` and `b.ne .+4` is `0x54000021`: one nibble apart, both 4 bytes, so a wrong condition is a valid word that branches on the wrong flags. Masking `cond = 16` to four bits yields `0x0`, which is `eq` (`ADR-0012`, `EXP-0014`). | frozen |
 
 ## v0 surface (OD-10)
 
@@ -113,22 +114,28 @@ is what makes the two `mov` forms and the two `add` immediate forms distinct
 without an extra choice field. A plan that names `x86:mov/r64-r64` or
 `x86:add/rm64-imm` is rejected: those ids are not in the v0 definition.
 
-The AArch64 slice is five forms covering five frozen `EC` rows:
+The AArch64 slice is six forms across three documents, covering six frozen `EC`
+rows:
 
-| `form_id` | Encoding | Operand signature | Covers |
-|---|---|---|---|
-| `aarch64:add/x64-x64-x64-lsl0` | `ADD (shifted register)`, `sf=1`, `shift=LSL`, `imm6=0` | dest `x64`, src `x64`, src2 `x64` | EC-11, EC-13 |
-| `aarch64:add/x64-imm12-lsl0` | `ADD (immediate)`, `sf=1`, `sh=0` | dest `x64`, src `x64`, imm `imm12` | EC-11, EC-12 (`sh=0` half) |
-| `aarch64:add/x64-imm12-lsl12` | `ADD (immediate)`, `sf=1`, `sh=1` | dest `x64`, src `x64`, imm `imm12` (field content) | EC-11, EC-12 (`sh=1` half) |
-| `aarch64:bl/imm26` | `BL imm26` | `imm26` target | A64-P5 |
-| `aarch64:adrp/x64-imm21` | `ADRP immlo:immhi` | dest `x64`, `imm21` target | EC-15, EC-17 |
+| `form_id` | Encoding | Operand signature | Table | Covers |
+|---|---|---|---|---|
+| `aarch64:add/x64-x64-x64-lsl0` | `ADD (shifted register)`, `sf=1`, `shift=LSL`, `imm6=0` | dest `x64`, src `x64`, src2 `x64` | all | EC-11, EC-13 |
+| `aarch64:add/x64-imm12-lsl0` | `ADD (immediate)`, `sf=1`, `sh=0` | dest `x64`, src `x64`, imm `imm12` | all | EC-11, EC-12 (`sh=0` half) |
+| `aarch64:add/x64-imm12-lsl12` | `ADD (immediate)`, `sf=1`, `sh=1` | dest `x64`, src `x64`, imm `imm12` (field content) | `0.2.0`+ | EC-11, EC-12 (`sh=1` half) |
+| `aarch64:bl/imm26` | `BL imm26` | `imm26` target | all | A64-P5 |
+| `aarch64:adrp/x64-imm21` | `ADRP immlo:immhi` | dest `x64`, `imm21` target | all | EC-15, EC-17 |
+| `aarch64:b.cond/imm19` | `B.cond`, `o0=0` | cond `cond4`, `imm19` target | `0.3.0`+ | EC-29, A64-P4 |
 
 The `-lsl0`/`-lsl12` suffix is part of the id because the MRS node leaves
 `shift`, `imm6` and `sh` variable; the table pins them and the name says so
 (`07_definition_format.md` §8.2). Both halves of `EC-12` are therefore carried
-by a form variant, not by a value-dependent bit. `-lsl12` is in `0.2.0` only, so
-naming it against `0.1.0` is `E-FORM-001` (`N01`). `A64-P3`/`P4`/`P7`/`P8` have
-no row, so naming them is `E-FORM-001` too.
+by a form variant, not by a value-dependent bit. `-lsl12` is in `0.2.0` and later
+only, so naming it against `0.1.0` is `E-FORM-001` (`N01`).
+
+`b.cond` is the opposite case and shows where the line is: the condition is a
+4-bit *operand* (`EC-29`), so one row covers all sixteen conditions, while the
+`b.cond`-vs-`cbz`-vs-`tbz` choice of instruction is a form variant (`EC-18`).
+`A64-P3`/`P7`/`P8` have no row, so naming them is `E-FORM-001` too.
 
 `EC-05`, `EC-09` and `EC-10` are out of v0. `X86-P9` (explicit encoding family)
 stays deferred, so `vex`/`evex` never appear in a v0 `form_id`.
@@ -290,10 +297,11 @@ The v0 `EC` set is decided (OD-10). What remains is per-row evidence:
 - `EC-05`, `EC-08`, `EC-09`, `EC-10`, `EC-16`, `EC-18`, `EC-23`, `EC-24`,
   `EC-25`, `EC-26` are `draft` and need an observed counterexample before they can
   be frozen. None of them is required by the x86 slice.
-- The AArch64 rows now have a table (ADR-0005, ADR-0006, ADR-0011): EC-11, EC-13,
-  EC-15 and EC-17 are exercised by `definitions/aarch64/0.1.0.json`; EC-12 in both
-  halves, `sh=0` in `0.1.0` and `sh=1` in `0.2.0`. EC-16 and EC-18 stay `draft`
-  and are not in the v0 surface.
+- The AArch64 rows now have a table (ADR-0005, ADR-0006, ADR-0011, ADR-0012):
+  EC-11, EC-13, EC-15 and EC-17 are exercised by `definitions/aarch64/0.1.0.json`;
+  EC-12 in both halves, `sh=0` in `0.1.0` and `sh=1` in `0.2.0`; EC-29 in `0.3.0`,
+  which carries the condition as an operand rather than as sixteen forms. EC-16
+  and EC-18 stay `draft` and are not in the v0 surface.
 - The RV64 source is settled (ADR-0007: the UDB resolved spec, pinned by archive
   hash in `EXP-0009`), and both documents are generated: `definitions/rv64/0.1.0.json`
   and `0.2.0.json` (ADR-0009). `RV-P7` (`c.addi`) needed a format decision before

@@ -124,7 +124,7 @@ defaulted.
 | Rule | `P` | Used by |
 |---|---|---|
 | `none` | not applicable | absolute patches |
-| `pcrel_begin` | address of the fixup site | RISC-V B-type and J-type, AArch64 `b`/`bl` |
+| `pcrel_begin` | address of the fixup site | RISC-V B-type and J-type, AArch64 `b`/`bl`/`b.cond` |
 | `pcrel_end` | address immediately after the instruction that contains the site | x86-64 `rel32` |
 | `pcrel_page` | page base of `P` | AArch64 `adrp` |
 | `pcrel_hi` | address of the paired `hi` member's site | RV64 `addi`/load/store low half (`pcrel_lo12`) |
@@ -249,6 +249,7 @@ The ISA table:
 | x86-64 `rel32` | `R_X86_64_PC32`-style: value = `S + A - P`, `P` = end of instruction | `pc_reference_rule = pcrel_end`, range `i32` |
 | x86-64 PLT/GOT | semantics depend on link-time policy | v0: not expressible; a plan that names it is `E-VERSION-001` (§10) |
 | AArch64 `b`/`bl` | imm26, signed, scaled by 4, `P` = instruction address, ±128 MiB | `pcrel_begin`, `scale(2)`, `range.bits = 26`, `align_bits = 2` |
+| AArch64 `b.cond` | imm19, signed, scaled by 4, `P` = instruction address, −1 MiB…+1048572 B (`imm19` ends at 262143, so the upward end is not a round MiB) | `pcrel_begin`, `scale(2)`, `range.bits = 19`, `align_bits = 2`; the condition is an operand of the form, never a fixup field (`EC-29`) |
 | AArch64 `adrp` | immhi:immlo = `(page(S+A) - page(P)) >> 12`, signed 21 bits | `pcrel_page`, `value_transform = page`, pair `hi` |
 | AArch64 `add :lo12:` | imm12 = `(S+A) & 0xFFF`; `sh` picks `LSL #0`/`#12` and is fixed by the form, not by the fixup | `value_transform = lo12_i`, pair `lo`, same `pair_group` |
 | RV64 B-type | imm12…imm1 scattered; `P` = instruction address; ±4 KiB, 2-byte aligned | `pcrel_begin`, `range.bits = 12`, `align_bits = 1` |
