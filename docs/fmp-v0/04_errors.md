@@ -116,6 +116,9 @@ rejection; `derived` means it follows from a measured byte sequence.
   ranges are the same shape one field over: `imm12` holds `0…4095` field units
   and `imm9` holds `−256…255` signed bytes, so the assembler's `#32760` is `4095`
   while `#32768` has no encoding, and `4096` or `−257` is `N03` (`EXP-0015` §2).
+  The store rows are the same field on the other half of the family, so `−257`
+  on `str/x64-base-imm9-post` and `256` on `stur/x64-base-imm9` are `N03` too
+  (`EXP-0024` §2).
   Widening `imm9` to `imm12` would be a different addressing kind, which is a
   different `form_id`; the materializer may not do it to make the value fit.
 - `E-OPERAND-001` — observed, F-10: `c.addi a6, 5` (x16) is rejected because the

@@ -22,7 +22,7 @@ What it does, per form:
 Documents are emitted per version. A form appears in a document when the
 document's version is at or after the form's `since` (absent `since` means every
 version), so a later document cannot silently lose an earlier form. `0.1.0` …
-`0.8.0` stay frozen: their digests are asserted below, so a later edit that
+`0.12.0` stay frozen: their digests are asserted below, so a later edit that
 perturbs any of them fails loudly instead of shipping.
 
 Reads:  research/external/arm-mrs/Instructions.json (pinned by check_mrs.py)
@@ -38,6 +38,7 @@ Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.10.0.json
         definitions/aarch64/0.11.0.json
         definitions/aarch64/0.12.0.json
+        definitions/aarch64/0.13.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -57,7 +58,7 @@ MRS = os.path.join(ROOT, "research", "external", "arm-mrs", "Instructions.json")
 OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
 VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0",
-            "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0"]
+            "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0"]
 
 # Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
@@ -72,6 +73,7 @@ FROZEN_DIGESTS = {
     "0.9.0": "sha256:99728cd9bd85b8b0768e700e15dd6263171d6261c385ac15ceeb5df6d2cafcff",
     "0.10.0": "sha256:e958d69b4ba93222e7621a1f5c3ebd056ce929e2974a961a03abb7b66f0b247b",
     "0.11.0": "sha256:c5a9aec943f9b195c400380b8416bf63cba944da3fdf0203f90de5baff295002",
+    "0.12.0": "sha256:8a428926568b99f0674785cc674bc066adc452216131706d458b9e3390da03b6",
 }
 
 WIDTH = 32
@@ -277,6 +279,59 @@ FORMS = [
             {"mrs": ["imm12"], "role": "disp", "kind": "aarch64.imm",
              "from": "operand_value", "target_type": "imm12",
              "range": {"signed": False, "bits": 12, "align_bits": 0}},
+        ],
+    },
+    # `A64-P15` (ADR-0022). The store half of the same four addressing kinds:
+    # the three nodes are `STR_64_ldst_immpre`/`immpost` and
+    # `STUR_64_ldst_unscaled`, which are the load rows' shapes with `opc = 00`
+    # and `Rt` as the stored register, so the kind stays a `form_id` and the
+    # `imm9` slot keeps its signed-byte range.
+    {
+        "form_id": "aarch64:str/x64-base-imm9-pre",
+        "mrs": "STR_64_ldst_immpre",
+        "decision": "bits 11-10 = 11 (pre-index); opc = 00 (store); imm9 is signed field content in bytes",
+        "pinned": {},
+        "since": "0.13.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm9"], "role": "disp", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm9",
+             "range": {"signed": True, "bits": 9, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:str/x64-base-imm9-post",
+        "mrs": "STR_64_ldst_immpost",
+        "decision": "bits 11-10 = 01 (post-index); opc = 00 (store); imm9 is signed field content in bytes",
+        "pinned": {},
+        "since": "0.13.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm9"], "role": "disp", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm9",
+             "range": {"signed": True, "bits": 9, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:stur/x64-base-imm9",
+        "mrs": "STUR_64_ldst_unscaled",
+        "decision": "bits 11-10 = 00 (unscaled); opc = 00 (store); imm9 is signed field content in bytes",
+        "pinned": {},
+        "since": "0.13.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "src", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm9"], "role": "disp", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm9",
+             "range": {"signed": True, "bits": 9, "align_bits": 0}},
         ],
     },
     # `A64-P7` (ADR-0014). `MOVZ`'s 2-bit `hw` field selects which 16-bit lane

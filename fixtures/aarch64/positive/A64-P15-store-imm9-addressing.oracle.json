@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P15-store-imm9-addressing.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "1769dfe96e8c3fa720208e01c5ba3bef6b81748580318e59509f88bc248fad82",
+  "output_sha256": "d9c31730b949daf02ecd3eb4a01e9365cbdc183795d3409bb0b89cfd6c3d299c",
+  "size": 32,
+  "records": 0,
+  "notes": "Input (169 B, LF, trailing newline), one instruction per line: `str x0, [x1, #8]!` / `str x2, [x3, #-256]!` / `str x4, [x5], #8` / `str x6, [x7], #255` / `stur x8, [x9, #16]` / `stur x10, [x11, #-1]` / `str x12, [x13]` / `str x14, [x15, #32760]`. Three new forms plus the existing unsigned-offset row: pre-index at both ends of `imm9` (`8`, `-256`), post-index at both ends (`8`, `255`), `stur` with both signs (`16`, `-1`), and two `imm12` stores (`0`, `4095`) that must not move when the store half of the table grows. Every operand is an immediate, so `llvm-readobj -r` prints an empty relocation list and no linker is involved. The plan states the addressing kind in `form_id` (ADR-0022) and `disp` as field content, so `#-256` is `disp = -256` and `#32760` is `disp = 4095`.",
+  "source": "Arm MRS STR_64_ldst_immpre / STR_64_ldst_immpost (opc = 00, imm9 at 12+9, bits 11-10 = 11/01), STUR_64_ldst_unscaled (bits 11-10 = 00), STR_64_ldst_pos (imm12 at 10+12); measured in EXP-0024 §3"
+}

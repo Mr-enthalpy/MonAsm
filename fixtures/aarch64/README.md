@@ -1,6 +1,6 @@
 # AArch64 fixtures
 
-Vectors: `A64-P1` … `A64-P14` in `docs/fmp-v0/06_validation_matrix.md`.
+Vectors: `A64-P1` … `A64-P15` in `docs/fmp-v0/06_validation_matrix.md`.
 
 ## What is here
 
@@ -21,6 +21,7 @@ Vectors: `A64-P1` … `A64-P14` in `docs/fmp-v0/06_validation_matrix.md`.
 | `positive/A64-P12-w-rows` | `aarch64:add/w32-w32-w32-lsl0`, `add/w32-imm12-lsl0` at 4095, `add/w32-imm12-lsl12` at 291, `add/w32-w32-w32-imm6-lsl`/`-lsr`/`-asr`, and the same six `sub/…`, `adds/…` and `subs/…` rows (`0.10.0`); twenty-four instructions, 96 B, registers 0–30 | `llvm-mc` (no linker: registers and immediates only, no relocations) |
 | `positive/A64-P13-ext-family` | the eight `aarch64:sub/x64-x64-*-imm3-*` rows, the eight `adds/…` rows and the eight `subs/…` rows (`0.11.0`), plus `sub sp, x1, w2, uxtb #3`, `adds x0, sp, w1, uxtb` and `subs xzr, x1, w2, uxtb #0`; twenty-seven instructions, 108 B | `llvm-mc` (no linker: registers and immediates only, no relocations) |
 | `positive/A64-P14-cmp-cmn-family` | the forty `aarch64:cmp/…`/`cmn/…` rows (`0.12.0`): four shifted and two immediate rows on each width, the eight `option` rows on `x64`, plus seven register-31 rows (`cmp sp, #5`, `cmp wsp, #5`, `cmp sp, x2`, `cmn sp, #5`, `cmn sp, x2`, `cmp x1, xzr`, `cmp w1, wzr`); forty-seven instructions, 188 B | `llvm-mc` (no linker: registers and immediates only, no relocations) |
+| `positive/A64-P15-store-imm9-addressing` | `aarch64:str/x64-base-imm9-pre` ×2 (`0.13.0`), `str/x64-base-imm9-post` ×2, `stur/x64-base-imm9` ×2, and `str/x64-base-imm12` ×2 at 0 and 4095; eight instructions, 32 B | `llvm-mc` (no linker: immediates only, no relocations) |
 | `negative/N01-absent-scaled-form` | `aarch64:add/x64-imm12-lsl12` against `0.1.0`, which lacks it | `E-FORM-001` |
 | `negative/N01b-absent-register-offset-form` | `aarch64:ldr/x64-base-regoff` (`0.4.0` has no such form) | `E-FORM-001` |
 | `negative/N01d-absent-movz-lane` | `aarch64:movz/x64-imm16-lsl8` (`0.5.0` has four lanes, not eight) | `E-FORM-001` |
@@ -33,13 +34,16 @@ Vectors: `A64-P1` … `A64-P14` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N01k-absent-w-form` | `aarch64:add/w32-w32-w32-lsl0` against `0.9.0`, which does not have the `w` rows yet | `E-FORM-001` |
 | `negative/N01l-absent-32bit-ext-form` | `aarch64:sub/w32-w32-w32-imm3-uxtb`, one of the four `sf = 0` extended nodes, in no document | `E-FORM-001` |
 | `negative/N01m-absent-cmn-alias` | `aarch64:cmn/x64-imm12-lsl0` against `0.11.0`, the `cmn` half of `N01i` | `E-FORM-001` |
+| `negative/N01n-absent-store-imm9-form` | `aarch64:str/x64-base-imm9-pre` against `0.12.0`, which does not have the store `imm9` rows yet | `E-FORM-001` |
 | `negative/N02b-w-source-in-shift-form` | a `w32` operand on the `x`-source `-imm6-lsl` row | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02c-x-dest-on-w-row` | an `x64` destination on `aarch64:add/w32-w32-w32-lsl0` | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02d-ext-x-source-on-w-keyword` | an `x64` source on `aarch64:sub/x64-x64-w32-imm3-uxtb` | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02e-dest-on-cmp-row` | a `dest` operand passed to `aarch64:cmp/x64-x64-lsl0`, whose slots are `src` and `src2` only | `E-OPERAND-002` (`expected: 2`, `found: 3`) |
 | `negative/N03-imm12-out-of-range` | imm12 = 4096 | `E-RANGE-001` |
 | `negative/N03-imm12-disp-out-of-range` | `disp = 4096` on the load/store `imm12` field | `E-RANGE-001` |
-| `negative/N03-imm9-disp-out-of-range` | `disp = −257` on the `imm9` field | `E-RANGE-001` |
+| `negative/N03-imm9-disp-out-of-range` | `disp = −257` on the `ldur` `imm9` field | `E-RANGE-001` |
+| `negative/N03-str-imm9-post-disp-out-of-range` | `disp = −257` on `str/x64-base-imm9-post` | `E-RANGE-001` |
+| `negative/N03-stur-imm9-disp-out-of-range` | `disp = 256` on `stur/x64-base-imm9` | `E-RANGE-001` |
 | `negative/N03-cond-out-of-range` | `cond = 16` in a 4-bit field | `E-RANGE-001` |
 | `negative/N03-imm6-out-of-range` | `imm6 = 64`, one past the shift amount's 6-bit field | `E-RANGE-001` |
 | `negative/N03-imm3-out-of-range` | `imm3 = 8`, one past the extend amount's 3-bit field | `E-RANGE-001` |
@@ -66,17 +70,18 @@ reach the extend rows, a plan bound to `0.7.0` cannot reach the `sub` rows, a
 plan bound to `0.8.0` cannot reach the `adds`/`subs` rows (which is what `N01g`
 now shows for `subs`), a plan bound to `0.9.0` cannot reach the `w` rows
 (`N01k`), a plan bound to `0.10.0` cannot reach the extended
-`sub`/`adds`/`subs` rows (`N01f`), and a plan bound to `0.11.0` cannot reach the
-`cmp`/`cmn` rows (`N01i`, `N01m`). `N01h` and `N01j` are the same shape one
+`sub`/`adds`/`subs` rows (`N01f`), a plan bound to `0.11.0` cannot reach the
+`cmp`/`cmn` rows (`N01i`, `N01m`), and a plan bound to `0.12.0` cannot reach the
+store `imm9` rows (`N01n`). `N01h` and `N01j` are the same shape one
 version earlier for the `w`
 rows of `0.8.0`/`0.9.0`.
 Each fixture names the document it targets and that
 document's digest.
 
-The extended `sf = 0` nodes (`add w0, wsp, w1` is the extended node),
-the load/store
-register-offset and literal kinds, and
-the store's `imm9` kinds are absent for the same reason. A linked `:lo12:` inside
+The extended `sf = 0` nodes (`add w0, wsp, w1` is the extended node)
+and the load/store
+register-offset and literal kinds are absent for the same reason. A linked
+`:lo12:` inside
 the `-lsl12` form is measured at the record level (`EXP-0013` §5) but is not an
 address of the symbol, so no fixture links one.
 
@@ -184,6 +189,18 @@ the table does not carry, and `cmp x1, w2, uxtx #3` is a spelling-only
 permissiveness of the alias path, so the width rule is still `ADR-0016`'s. A plan
 that passes `dest` to a `cmp`/`cmn` row carries one operand too many and is
 `E-OPERAND-002` (`N02e`).
+
+The store rows are the eleventh instance, and the one where the load half was
+already the answer. `A64-P15` covers the three `0.13.0` rows: each is the load
+row's field list with `opc` at `00` and `Rt` as the stored register, so the slots
+are `src`, `base`, `disp` and `disp` keeps the signed-byte `imm9` range
+(`ADR-0022`, `EXP-0024` §1). The vector puts both ends on both writeback kinds
+(`+8`/`−256` pre, `+8`/`255` post) and both signs on `stur` (`+16`/`−1`), so
+`−257` on the post row and `256` on the unscaled row are `E-RANGE-001`
+(`N03-str-imm9-post-disp`, `N03-stur-imm9-disp`). The `imm12` row is in the same
+vector at `0` and `4095` to show that the new rows did not move it. The store
+mnemonic does not name the kind either: `str x0, [x1, #1]` is `0xf8001020` and
+`str x0, [x1, #-8]` is `0xf81f8020`, both read back as `stur` (§2).
 
 **An operand whose bits a fixup owns has an empty payload.** `{"payload": {}}`,
 not a `symbol_id`: `01_contract.md` §8.1 only allows `symbol_id` on a `target`

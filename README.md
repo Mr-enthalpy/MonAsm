@@ -36,20 +36,21 @@ repeat the shapes with the node's `S = 1`), and ADR-0019 makes the 32-bit width
 a form family (`add`/`sub`/`adds`/`subs` repeat the shapes on the `sf = 0`
 nodes, with every register slot `w32`), ADR-0020 makes the extended-register
 mnemonic a form family too (`sub`/`adds`/`subs` repeat the eight `add` extend
-rows with the node's `op`/`S` fixed), and ADR-0021 makes `cmp`/`cmn` a separate
+rows with the node's `op`/`S` fixed), ADR-0021 makes `cmp`/`cmn` a separate
 two-operand alias family (the `subs`/`adds` row with `Rd` pinned to 31 and the
-destination dropped).
-Fifteen definition documents are frozen and oracle-verified; the materializer and
+destination dropped), and ADR-0022 completes the store half of the addressing
+kinds (the load `imm9` layouts with `opc = 00` and the stored register as `src`).
+Sixteen definition documents are frozen and oracle-verified; the materializer and
 its fixture gate are implemented.
 
 | Area | State |
 |---|---|
 | Contract (`docs/fmp-v0/01_contract.md`) | draft, fields marked `TBD` where unproven |
 | Schema (`schema/fmp-v0.schema.json`) | draft, examples validate |
-| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms), `0.8.0` (32 forms), `0.9.0` (44 forms), `0.10.0` (68 forms), `0.11.0` (92 forms) and `0.12.0` (132 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
+| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms), `0.8.0` (32 forms), `0.9.0` (44 forms), `0.10.0` (68 forms), `0.11.0` (92 forms), `0.12.0` (132 forms) and `0.13.0` (135 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
 | Prototype (`prototype/`) | workspace compiled; all three slices materialize from the plan |
 | Oracles (`tools/oracle/`) | planned; `llvm-mc` (± `ld.lld`) drives the experiments |
-| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0023 |
+| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0024 |
 
 Read `docs/STATUS.md` for the current phase, gate status, and next action.
 
