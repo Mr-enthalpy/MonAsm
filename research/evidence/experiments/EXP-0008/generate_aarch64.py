@@ -22,7 +22,7 @@ What it does, per form:
 Documents are emitted per version. A form appears in a document when the
 document's version is at or after the form's `since` (absent `since` means every
 version), so a later document cannot silently lose an earlier form. `0.1.0` …
-`0.3.0` stay frozen: their digests are asserted below, so a later edit that
+`0.4.0` stay frozen: their digests are asserted below, so a later edit that
 perturbs any of them fails loudly instead of shipping.
 
 Reads:  research/external/arm-mrs/Instructions.json (pinned by check_mrs.py)
@@ -30,6 +30,7 @@ Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.2.0.json
         definitions/aarch64/0.3.0.json
         definitions/aarch64/0.4.0.json
+        definitions/aarch64/0.5.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -47,13 +48,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
 MRS = os.path.join(ROOT, "research", "external", "arm-mrs", "Instructions.json")
 OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
-VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0"]
+VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0"]
 
 # Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
     "0.1.0": "sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e",
     "0.2.0": "sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed",
     "0.3.0": "sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb",
+    "0.4.0": "sha256:14d6c2b66669ff45401b8b69d5ce111c13ce6e8ef44f04440b961b8f2133bc78",
 }
 
 WIDTH = 32
@@ -259,6 +261,68 @@ FORMS = [
             {"mrs": ["imm12"], "role": "disp", "kind": "aarch64.imm",
              "from": "operand_value", "target_type": "imm12",
              "range": {"signed": False, "bits": 12, "align_bits": 0}},
+        ],
+    },
+    # `A64-P7` (ADR-0014). `MOVZ`'s 2-bit `hw` field selects which 16-bit lane
+    # the `imm16` content lands in, so the same field value means four different
+    # 64-bit results. The assembly language spells the lane as `lsl #0/#16/#32/
+    # #48` and fixes `imm16` at the field content in [0, 65535], so the lane is a
+    # form-level decision like `add`'s `sh` (ADR-0011) and not a slot transform:
+    # `imm16 << 16*hw` is a property of the row, and `0.5.0` holds all four lanes.
+    {
+        "form_id": "aarch64:movz/x64-imm16-lsl0",
+        "mrs": "MOVZ_64_movewide",
+        "decision": "hw = 0 (LSL #0); imm16 is field content in the low lane",
+        "pinned": {"hw": 0},
+        "since": "0.5.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm16"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm16",
+             "range": {"signed": False, "bits": 16, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:movz/x64-imm16-lsl16",
+        "mrs": "MOVZ_64_movewide",
+        "decision": "hw = 1 (LSL #16); imm16 is field content in bits 31:16",
+        "pinned": {"hw": 1},
+        "since": "0.5.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm16"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm16",
+             "range": {"signed": False, "bits": 16, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:movz/x64-imm16-lsl32",
+        "mrs": "MOVZ_64_movewide",
+        "decision": "hw = 2 (LSL #32); imm16 is field content in bits 47:32",
+        "pinned": {"hw": 2},
+        "since": "0.5.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm16"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm16",
+             "range": {"signed": False, "bits": 16, "align_bits": 0}},
+        ],
+    },
+    {
+        "form_id": "aarch64:movz/x64-imm16-lsl48",
+        "mrs": "MOVZ_64_movewide",
+        "decision": "hw = 3 (LSL #48); imm16 is field content in bits 63:48",
+        "pinned": {"hw": 3},
+        "since": "0.5.0",
+        "slots": [
+            {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["imm16"], "role": "imm", "kind": "aarch64.imm",
+             "from": "operand_value", "target_type": "imm16",
+             "range": {"signed": False, "bits": 16, "align_bits": 0}},
         ],
     },
 ]

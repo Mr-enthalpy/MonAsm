@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P7-movz-lane.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "69d7474bc7c646eb26e5cbef3af53b214edb13a3b1c838276f81cfbd43a645d7",
+  "output_sha256": "a0a4818ad64c188d184d3d01947ad0370f50bf8625aa9d5643b9969c050d617b",
+  "size": 20,
+  "records": 0,
+  "notes": "Input (121 B, LF, trailing newline), one instruction per line with two leading spaces: `movz x0, #0x1234` / `movz x0, #0x1234, lsl #16` / `movz x2, #1, lsl #32` / `movz x5, #0xffff, lsl #48` / `movz x0, #0, lsl #0`. Four forms, one per `hw` value: the same `imm16` content (0x1234) appears on `-lsl0` and `-lsl16`, so the two words differ only in bits 22-21. The `-lsl32` line pins a single high bit of the lane, and the `-lsl48` line pins `imm16 = 0xffff` with `Rd = x5`. Every operand is an immediate, so `llvm-readobj -r` prints an empty relocation list and no linker is involved. The plan names the lane in `form_id` (ADR-0014) and states `imm16` as field content, so the `lsl #48` line is `imm16 = 65535`, not `0xffff000000000000`.",
+  "source": "Arm MRS MOVZ_64_movewide (opc = 10 at 29+2, hw at 21+2, imm16 at 5+16, Rd at 0+5); measured in EXP-0016 §2"
+}

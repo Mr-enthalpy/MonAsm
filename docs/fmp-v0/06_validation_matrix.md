@@ -10,7 +10,7 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 
 | ID | Input condition | Expected | Code | ISAs | Fixture | Status |
 |---|---|---|---|---|---|---|
-| N01 | Plan names a form that leaves a byte-affecting decision open (`x86:mov/r64-r64`, `x86:add/rm64-imm`), a form missing a required component (`x86:mov/rm-r64` without `/legacy`), a renamed variant, or names a variant the definition does not contain | Reject, never append a default variant or match a near neighbour | E-FORM-001 | x86, aarch64, rv64 | `x86_64/negative/N01-absent-form.fmp.json`, `aarch64/negative/N01-absent-scaled-form.fmp.json`, `rv64/negative/N01c-caddi-against-0.1.0.fmp.json` | x86, aarch64 and rv64 passing |
+| N01 | Plan names a form that leaves a byte-affecting decision open (`x86:mov/r64-r64`, `x86:add/rm64-imm`), a form missing a required component (`x86:mov/rm-r64` without `/legacy`), a renamed variant, or names a variant the definition does not contain | Reject, never append a default variant or match a near neighbour | E-FORM-001 | x86, aarch64, rv64 | `x86_64/negative/N01-absent-form.fmp.json`, `aarch64/negative/N01-absent-scaled-form.fmp.json`, `aarch64/negative/N01d-absent-movz-lane.fmp.json`, `rv64/negative/N01c-caddi-against-0.1.0.fmp.json` | x86, aarch64 and rv64 passing |
 | N02 | Operand register class does not match the form | Reject | E-OPERAND-001 | x86, aarch64, rv64 | `x86_64/negative/N02-operand-kind-mismatch.fmp.json` | x86 passing |
 | N03 | Immediate exceeds the field's range | Reject | E-RANGE-001 | x86, aarch64, rv64 | `x86_64/negative/N03-imm8-out-of-range.fmp.json`, `aarch64/negative/N03-imm12-out-of-range.fmp.json`, `aarch64/negative/N03-cond-out-of-range.fmp.json` | x86 and aarch64 passing |
 | N04 | Branch displacement exceeds the form's range | Reject, never expand | E-RANGE-002 / E-FIXUP-003 | x86, aarch64, rv64 | `x86_64/negative/N04a-rel8-out-of-range.fmp.json`, `N04b-rel32-absolute-out-of-range.fmp.json`, `aarch64/negative/N04c-bcond-imm19-out-of-range.fmp.json` | x86 and aarch64 passing |
@@ -27,7 +27,7 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 | N15 | Operand payload is a composite memory operand (`{"mem": {"base": …, "disp": …}}`), not one of the four `fmp/0.1` shapes | Reject at read time, never split it into operands | E-OPERAND-003 | all | `rv64/negative/N15-composite-memory-payload.fmp.json` | rv64 passing |
 | N16 | Operand value is inside the slot's field range but excluded by the form (`c.addi` zero immediate, `c.addi` zero destination) | Reject, never encode the HINT the bytes would mean | E-RANGE-004 | rv64 | `rv64/negative/N16a-caddi-imm-zero.fmp.json`, `rv64/negative/N16b-caddi-rd-zero.fmp.json` | rv64 passing |
 | N17 | RV64 pair half is inconsistent: `N17a` a `pcrel_lo12` low half with a non-zero `addend`, `N17b` a `pcrel_hi` fixup with no `pair_role: lo`, `N17c` a `pcrel_hi` low half in a different section than its `hi` | Reject, never fold the addend in, fall back to `pcrel_begin`, or measure across sections | E-FIXUP-009 / E-FIXUP-007 | rv64 | `rv64/negative/N17a-lo12-addend-nonzero.fmp.json`, `rv64/negative/N17b-pcrel-hi-without-lo-role.fmp.json`, `rv64/negative/N17c-lo-in-other-section.fmp.json` | rv64 passing |
-| N18 | Operand value is legal as a *literal* for the instruction but not inside the named form's field: `0x1000` on `add/x64-imm12-lsl0`, or `0x123000` on `add/x64-imm12-lsl12` | Reject, never switch to the other form or pre-scale the operand | E-RANGE-001 | aarch64 | `aarch64/negative/N18a-no-form-switch.fmp.json`, `aarch64/negative/N18b-operand-is-field-content.fmp.json` | aarch64 passing |
+| N18 | Operand value is legal as a *literal* for the instruction but not inside the named form's field: `0x1000` on `add/x64-imm12-lsl0`, `0x123000` on `add/x64-imm12-lsl12`, or `0x12340000` on `movz/x64-imm16-lsl16` | Reject, never switch to the other form or pre-scale the operand | E-RANGE-001 | aarch64 | `aarch64/negative/N18a-no-form-switch.fmp.json`, `aarch64/negative/N18b-operand-is-field-content.fmp.json`, `aarch64/negative/N18c-movz-pre-scaled-literal.fmp.json` | aarch64 passing |
 
 N13's counterexample is `EXP-0002` W2: a same-length encoder defect turns
 `48 89 d8` (`mov rax, rbx`) into `49 89 d8` (`mov r8, rbx`), both 3 bytes and
@@ -172,10 +172,10 @@ that definition slice lands.
 | A64-P4 | Conditional branch | `b.eq` imm19 | llvm-mc | **passing** — `A64-P4-b-cond` (`b.eq` +4, `b.ne` −4, `b.gt` −8) through `aarch64:b.cond/imm19` with the condition as a `cond4` operand; `N03` rejects `cond = 16` and `N04c` rejects an out-of-range `imm19` |
 | A64-P5 | Unconditional branch/call | `bl` imm26 | llvm-mc + ld.lld | **passing** — `A64-P5-bl-local-symbol` (+4 and −4) |
 | A64-P6 | PC-relative pair | `adrp` + `add #:lo12:` with `pair_group` | llvm-mc + ld.lld + llvm-readobj | **passing** — `A64-P6-adrp-lo12-pair` |
-| A64-P7 | Scattered/scaled field | ins/del of a scaled immediate, or `movz` shift | llvm-mc | planned — no table row |
+| A64-P7 | Scattered/scaled field | `movz` lane selection as four forms, `imm16` scaled by `16·hw` | llvm-mc | **passing** — `A64-P7-movz-lane` (five instructions, four forms: `hw` 0, 1, 2 and 3, with the same `imm16 = 4660` on the first two and 65535/0 at the ends) through `aarch64:movz/x64-imm16-lsl0` … `-lsl48`; `N18c` rejects a pre-scaled literal on `-lsl16` and `N01d` rejects the absent `lsl #8` lane |
 | A64-P8 | Target-specific modifier | shift/extend modifier on a register operand | llvm-mc | planned — no table row |
 
-Definition anchor for A64-P1/P2/P3/P4/P5/P6, measured 2026-11-04: the four base
+Definition anchor for A64-P1/P2/P3/P4/P5/P6/P7, measured 2026-11-04: the four base
 forms live in `definitions/aarch64/0.1.0.json` (digest
 `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e`),
 generated from the Arm MRS 2026-06 drop by `EXP-0008`. `0.2.0` adds the fifth,
@@ -192,16 +192,29 @@ displacement variable; the condition is an operand (`EC-29`, ADR-0012), not
 sixteen forms. `0.4.0` adds the five load/store rows (digest
 `sha256:14d6c2b66669ff45401b8b69d5ce111c13ce6e8ef44f04440b961b8f2133bc78`), one per
 MRS addressing-kind node, with `disp` as field content in 8-byte units (`imm12`)
-or signed bytes (`imm9`) (`EC-14`, ADR-0013); `0.1.0`…`0.3.0` are unchanged.
+or signed bytes (`imm9`) (`EC-14`, ADR-0013); `0.5.0` adds the four `movz` rows
+(digest `sha256:9cec1688b5b9d1a9bd9299e6d0a155885053e7b228ff6eee88f40cef6f34e23e`),
+one per `hw` value, with `imm16` as field content (`EC-30`, ADR-0014);
+`0.1.0`…`0.4.0` are unchanged.
 `llvm-mc` does not resolve AArch64 branch or `adrp` immediates when
 they name a symbol, so A64-P5/P6 take their bytes after
 `ld.lld --image-base=0 -Ttext=0` has resolved the same `(S, P)` pair; the
 relocation kinds were read with `llvm-readobj -r` before linking (see
 `fixtures/aarch64/README.md`). A64-P3 and A64-P4 need no linker: A64-P3's operands
 are all immediates and A64-P4's three targets are local labels in one section, so
-`llvm-mc` resolves both itself and emits no relocations. The eleven negative
-fixtures (`N01` ×2, `N03` ×4, `N04c`, `N12a`, `N14`, `N18a`, `N18b`) exercise
+`llvm-mc` resolves both itself and emits no relocations. A64-P7 needs no linker
+either: its operands are immediates only. The thirteen negative
+fixtures (`N01` ×3, `N03` ×4, `N04c`, `N12a`, `N14`, `N18` ×3) exercise
 these tables with exact diagnostic sets.
+
+N18's `movz` case is the same "literal versus field" shape as `add`'s. `hw`
+selects the lane, so `imm16` is field content in `0…65535` on every one of the
+four rows; `0x12340000` on `-lsl16` is a pre-scaled literal and is
+`E-RANGE-001` (`N18c`), not a switch to `-lsl32`. `llvm-mc` is the boundary here:
+it rejects `movz x0, #0x12340000` outright ("immediate must be an integer in range
+[0, 65535]") and accepts only `lsl #0/#16/#32/#48`, so the four rows are exactly
+the four spellings (`EXP-0016` §2, ADR-0014). `N01d` is the other half: an
+`lsl #8` lane has no row, so it is `E-FORM-001`, not a zero shift.
 
 N03 and N04 gain their AArch64 cases from `b.cond`, and both are the "in range
 but wrong field" shape. `cond = 16` is a legal number for a 4-bit-typed value but
