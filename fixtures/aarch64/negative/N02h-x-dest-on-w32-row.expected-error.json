@@ -1,0 +1,20 @@
+{
+  "errors": [
+    {
+      "code": "E-OPERAND-001",
+      "path": "/instructions/0/operands/0/kind",
+      "detail_keys": [
+        "expected",
+        "found"
+      ]
+    },
+    {
+      "code": "E-OPERAND-001",
+      "path": "/instructions/0/operands/0/target_type",
+      "detail_keys": [
+        "expected",
+        "found"
+      ]
+    }
+  ]
+}

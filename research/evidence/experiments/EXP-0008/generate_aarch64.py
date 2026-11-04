@@ -22,7 +22,7 @@ What it does, per form:
 Documents are emitted per version. A form appears in a document when the
 document's version is at or after the form's `since` (absent `since` means every
 version), so a later document cannot silently lose an earlier form. `0.1.0` …
-`0.14.0` stay frozen: their digests are asserted below, so a later edit that
+`0.15.0` stay frozen: their digests are asserted below, so a later edit that
 perturbs any of them fails loudly instead of shipping.
 
 Reads:  research/external/arm-mrs/Instructions.json (pinned by check_mrs.py)
@@ -41,6 +41,7 @@ Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.13.0.json
         definitions/aarch64/0.14.0.json
         definitions/aarch64/0.15.0.json
+        definitions/aarch64/0.16.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -61,7 +62,7 @@ OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
 VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0",
             "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0",
-            "0.14.0", "0.15.0"]
+            "0.14.0", "0.15.0", "0.16.0"]
 
 # Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
@@ -79,6 +80,7 @@ FROZEN_DIGESTS = {
     "0.12.0": "sha256:8a428926568b99f0674785cc674bc066adc452216131706d458b9e3390da03b6",
     "0.13.0": "sha256:d3876dd37a8441057b586312b3bee410e39594c64806b2c5c59960c06f9c7a5f",
     "0.14.0": "sha256:a90ceac19824fbb00731e040346daa191973652e58522fab72336e24f769a5ba",
+    "0.15.0": "sha256:422ebb83b897b18e010da37539796b0b97cfc9018a47209fc4a6ddc5b14af5d3",
 }
 
 WIDTH = 32
@@ -602,6 +604,251 @@ FORMS = [
         "slots": [
             {"mrs": ["Rt"], "role": "src", "kind": "aarch64.gpr64",
              "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+        ],
+    },
+    # `A64-P18` (ADR-0025). The 32-bit register-offset pair: the same nodes, the
+    # same `option` mapping and the same width pairing as `A64-P17`, but
+    # `size = 10`, so `S = 1` scales the index by the 4-byte access size (`#2`).
+    # `Rt` is a `w` register on both mnemonics; `Rn` and `Rm` stay `x`, so only
+    # the destination/source slot changes width.
+    {
+        "form_id": "aarch64:ldr/w32-base-regoff-lsl0",
+        "mrs": "LDR_32_ldst_regoff",
+        "decision": "option = 011 (LSL, x index), S = 0 (no scale)",
+        "pinned": {"option": 3, "S": 0},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "dest", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+        ],
+    },
+    {
+        "form_id": "aarch64:ldr/w32-base-regoff-lsl2",
+        "mrs": "LDR_32_ldst_regoff",
+        "decision": "option = 011 (LSL, x index), S = 1 (index scaled by 4)",
+        "pinned": {"option": 3, "S": 1},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "dest", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+        ],
+    },
+    {
+        "form_id": "aarch64:ldr/w32-base-regoff-uxtw0",
+        "mrs": "LDR_32_ldst_regoff",
+        "decision": "option = 010 (UXTW, w index), S = 0 (no scale)",
+        "pinned": {"option": 2, "S": 0},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "dest", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+        ],
+    },
+    {
+        "form_id": "aarch64:ldr/w32-base-regoff-uxtw2",
+        "mrs": "LDR_32_ldst_regoff",
+        "decision": "option = 010 (UXTW, w index), S = 1 (index scaled by 4)",
+        "pinned": {"option": 2, "S": 1},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "dest", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+        ],
+    },
+    {
+        "form_id": "aarch64:ldr/w32-base-regoff-sxtw0",
+        "mrs": "LDR_32_ldst_regoff",
+        "decision": "option = 110 (SXTW, w index), S = 0 (no scale)",
+        "pinned": {"option": 6, "S": 0},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "dest", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+        ],
+    },
+    {
+        "form_id": "aarch64:ldr/w32-base-regoff-sxtw2",
+        "mrs": "LDR_32_ldst_regoff",
+        "decision": "option = 110 (SXTW, w index), S = 1 (index scaled by 4)",
+        "pinned": {"option": 6, "S": 1},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "dest", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+        ],
+    },
+    {
+        "form_id": "aarch64:ldr/w32-base-regoff-sxtx0",
+        "mrs": "LDR_32_ldst_regoff",
+        "decision": "option = 111 (SXTX, x index), S = 0 (no scale)",
+        "pinned": {"option": 7, "S": 0},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "dest", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+        ],
+    },
+    {
+        "form_id": "aarch64:ldr/w32-base-regoff-sxtx2",
+        "mrs": "LDR_32_ldst_regoff",
+        "decision": "option = 111 (SXTX, x index), S = 1 (index scaled by 4)",
+        "pinned": {"option": 7, "S": 1},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "dest", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+        ],
+    },
+    {
+        "form_id": "aarch64:str/w32-base-regoff-lsl0",
+        "mrs": "STR_32_ldst_regoff",
+        "decision": "option = 011 (LSL, x index), S = 0 (no scale)",
+        "pinned": {"option": 3, "S": 0},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "src", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+        ],
+    },
+    {
+        "form_id": "aarch64:str/w32-base-regoff-lsl2",
+        "mrs": "STR_32_ldst_regoff",
+        "decision": "option = 011 (LSL, x index), S = 1 (index scaled by 4)",
+        "pinned": {"option": 3, "S": 1},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "src", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+        ],
+    },
+    {
+        "form_id": "aarch64:str/w32-base-regoff-uxtw0",
+        "mrs": "STR_32_ldst_regoff",
+        "decision": "option = 010 (UXTW, w index), S = 0 (no scale)",
+        "pinned": {"option": 2, "S": 0},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "src", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+        ],
+    },
+    {
+        "form_id": "aarch64:str/w32-base-regoff-uxtw2",
+        "mrs": "STR_32_ldst_regoff",
+        "decision": "option = 010 (UXTW, w index), S = 1 (index scaled by 4)",
+        "pinned": {"option": 2, "S": 1},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "src", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+        ],
+    },
+    {
+        "form_id": "aarch64:str/w32-base-regoff-sxtw0",
+        "mrs": "STR_32_ldst_regoff",
+        "decision": "option = 110 (SXTW, w index), S = 0 (no scale)",
+        "pinned": {"option": 6, "S": 0},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "src", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+        ],
+    },
+    {
+        "form_id": "aarch64:str/w32-base-regoff-sxtw2",
+        "mrs": "STR_32_ldst_regoff",
+        "decision": "option = 110 (SXTW, w index), S = 1 (index scaled by 4)",
+        "pinned": {"option": 6, "S": 1},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "src", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+        ],
+    },
+    {
+        "form_id": "aarch64:str/w32-base-regoff-sxtx0",
+        "mrs": "STR_32_ldst_regoff",
+        "decision": "option = 111 (SXTX, x index), S = 0 (no scale)",
+        "pinned": {"option": 7, "S": 0},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "src", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
+            {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+            {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr64",
+             "from": "reg_number", "target_type": "x64"},
+        ],
+    },
+    {
+        "form_id": "aarch64:str/w32-base-regoff-sxtx2",
+        "mrs": "STR_32_ldst_regoff",
+        "decision": "option = 111 (SXTX, x index), S = 1 (index scaled by 4)",
+        "pinned": {"option": 7, "S": 1},
+        "since": "0.16.0",
+        "slots": [
+            {"mrs": ["Rt"], "role": "src", "kind": "aarch64.gpr32",
+             "from": "reg_number", "target_type": "w32"},
             {"mrs": ["Rn"], "role": "base", "kind": "aarch64.gpr64",
              "from": "reg_number", "target_type": "x64"},
             {"mrs": ["Rm"], "role": "index", "kind": "aarch64.gpr64",

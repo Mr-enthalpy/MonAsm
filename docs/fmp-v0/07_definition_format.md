@@ -237,6 +237,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/aarch64/0.13.0.json` | `monasm.isa.aarch64` | `sha256:d3876dd37a8441057b586312b3bee410e39594c64806b2c5c59960c06f9c7a5f` |
 | `definitions/aarch64/0.14.0.json` | `monasm.isa.aarch64` | `sha256:a90ceac19824fbb00731e040346daa191973652e58522fab72336e24f769a5ba` |
 | `definitions/aarch64/0.15.0.json` | `monasm.isa.aarch64` | `sha256:422ebb83b897b18e010da37539796b0b97cfc9018a47209fc4a6ddc5b14af5d3` |
+| `definitions/aarch64/0.16.0.json` | `monasm.isa.aarch64` | `sha256:1e83c6cad91594e8315500f39d0bcffa235edc90c5f47c012555c077a8dbc457` |
 | `definitions/rv64/0.1.0.json` | `monasm.isa.riscv` | `sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083` |
 | `definitions/rv64/0.2.0.json` | `monasm.isa.riscv` | `sha256:8329a38faa964f9c69207a48e3bfb45c13fb0ddbaeb829ddcc0dbd1cffa8de10` |
 
@@ -274,7 +275,7 @@ Every row is verified against `llvm-mc` 23.1.2 in `EXP-0004`: each template byte
 string is decoded, and each `ModRM` and immediate/branch field is exercised
 across its whole encoded range.
 
-### 8.2 `aarch64` `0.1.0` … `0.15.0`
+### 8.2 `aarch64` `0.1.0` … `0.16.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -430,6 +431,22 @@ across its whole encoded range.
 | `aarch64:str/x64-base-regoff-sxtw3` | `00d820f8` | src: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
 | `aarch64:str/x64-base-regoff-sxtx0` | `00e820f8` | src: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
 | `aarch64:str/x64-base-regoff-sxtx3` | `00f820f8` | src: `aarch64.gpr64`/`x64` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P17` |
+| `aarch64:ldr/w32-base-regoff-lsl0` | `006860b8` | dest: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:ldr/w32-base-regoff-lsl2` | `007860b8` | dest: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:ldr/w32-base-regoff-uxtw0` | `004860b8` | dest: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:ldr/w32-base-regoff-uxtw2` | `005860b8` | dest: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:ldr/w32-base-regoff-sxtw0` | `00c860b8` | dest: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:ldr/w32-base-regoff-sxtw2` | `00d860b8` | dest: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:ldr/w32-base-regoff-sxtx0` | `00e860b8` | dest: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:ldr/w32-base-regoff-sxtx2` | `00f860b8` | dest: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:str/w32-base-regoff-lsl0` | `006820b8` | src: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:str/w32-base-regoff-lsl2` | `007820b8` | src: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:str/w32-base-regoff-uxtw0` | `004820b8` | src: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:str/w32-base-regoff-uxtw2` | `005820b8` | src: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:str/w32-base-regoff-sxtw0` | `00c820b8` | src: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:str/w32-base-regoff-sxtw2` | `00d820b8` | src: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:str/w32-base-regoff-sxtx0` | `00e820b8` | src: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:str/w32-base-regoff-sxtx2` | `00f820b8` | src: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
 
 `0.1.0` holds the first, second, fourth and fifth rows; `0.2.0` adds
 `aarch64:add/x64-imm12-lsl12` (ADR-0011); `0.3.0` repeats all five and adds
@@ -446,7 +463,8 @@ forty `cmp`/`cmn` alias rows (ADR-0021); `0.13.0` repeats all one hundred and
 thirty-two and adds the three store `imm9` rows (ADR-0022); `0.14.0` repeats all
 one hundred and thirty-five and adds the literal load row (ADR-0023); `0.15.0`
 repeats all one hundred and thirty-six and adds the sixteen register-offset rows
-(ADR-0024).
+(ADR-0024); `0.16.0` repeats all one hundred and fifty-two and adds the sixteen
+32-bit register-offset rows (ADR-0025).
 Each document therefore shares its earlier rows
 unchanged and differs only in the rows its version introduced, so a plan bound to
 an older version cannot reach a newer form (`E-FORM-001`, `N01`) even though the
@@ -458,8 +476,8 @@ The templates are little-endian file order, so `0000008b` is the word
 bit from the MRS node, requires the MRS node name to exist, and refuses to emit
 unless all 32 bits are covered exactly once by a fixed bit or a slot placement;
 `EXP-0008` §2–§3 records the nodes and the coverage check. The one hundred and
-fifty-two forms come
-from thirty-five encode nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
+sixty-eight forms come
+from thirty-six encode nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
 pinned to 0 and once per shift keyword, `ADD_64_addsub_ext` eight times, once per
 `option` value, `ADD_64_addsub_imm` twice, once with
 `sh = 0` and once with `sh = 1`, `MOVZ_64_movewide` four times, once per `hw`
@@ -476,10 +494,12 @@ addressing-kind bits are fixed and whose `imm12`/`imm9` is the single variable
 field (`ADR-0022` adds the three store `imm9` nodes); `LDR_64_loadlit` is the one
 node with no base register, and its `imm19` is the single variable field
 (`ADR-0023`); `LDR_64_ldst_regoff` and `STR_64_ldst_regoff` are each read eight
-times, once per `option`/`S` pair (`ADR-0024`); the ten `CMP`/`CMN` alias
+times, once per `option`/`S` pair (`ADR-0024`), and the 32-bit pair
+`LDR_32_ldst_regoff`/`STR_32_ldst_regoff` eight times each on the same pattern
+(`ADR-0025`); the ten `CMP`/`CMN` alias
 nodes are read for verification only, because
 they carry no `encoding` and the bytes stay the base node's (`ADR-0021`). The
-generator states each pinned value explicitly and asserts that `0.1.0` … `0.14.0`
+generator states each pinned value explicitly and asserts that `0.1.0` … `0.15.0`
 still hash to their frozen digests.
 
 The literal row's `imm19` follows §8.3's rule, not a slot transform: the slot is
@@ -600,6 +620,16 @@ unallocated, so no spelling reaches them and no row needs to exclude them. Bit
 the assembler reads it as an unscaled offset and demands an integer. Register
 offset has no writeback variant either: `ldr x0, [x1, x2, lsl #3]!` is rejected
 (`EXP-0026` §2), so there is no pre/post row to add here.
+
+The sixteen 32-bit register-offset rows (`ADR-0025`) are the same decision one
+`size` down: `LDR_32_ldst_regoff`/`STR_32_ldst_regoff` fix `size = 10` and
+`opc = 01`/`00`, so the template's top bits change and `S = 1` now means `#2` on
+these 4-byte accesses. `option` keeps its keyword/width pairing from the 64-bit
+rows, and only `Rt` changes class: `dest`/`src` are `aarch64.gpr32`/`w32` while
+`base` and the two `x` index rows stay `aarch64.gpr64`/`x64`. The suffix states
+the amount (`-lsl0` … `-sxtx2`), so `-lsl1` and `-lsl3` are names for nothing at
+this width (`E-FORM-001`, `N01s`), and the same modifier rule holds: `lsl #2` as
+a `modifiers` entry on the `index` is `E-OPERAND-003` (`N19c`).
 
 The four `movz` rows are the fourth form-variant case and the first whose pinned
 field is multi-bit. `hw` (bits 22–21) selects the 16-bit lane, the four values are
@@ -817,12 +847,13 @@ without a plan error: the input is the definition.
   ADR-0006: the facts come from the Arm MRS 2026-06 OPENSOURCE packaging, and
   the Arm notice ships with the generated table. The format did not need to
   change for it: `adrp`'s split `immhi:immlo` is two placements of one slot, as
-  §4.1 anticipated. `definitions/aarch64/0.1.0.json` … `0.15.0.json` now exist
+  §4.1 anticipated. `definitions/aarch64/0.1.0.json` … `0.16.0.json` now exist
   (§8.2); each is a superset that adds its own rows without a format change
-  (ADR-0011 to ADR-0024). What is
-  missing is coverage, not design: the `w`/`b`/`h` load/store widths, the 32-bit
-  extended `add`/`sub` nodes and their aliases, `prfm`, and `movk`/`movn`/the
-  `mov` alias and the 32-bit `movz` lanes have no row. Each is `E-FORM-001` until
+  (ADR-0011 to ADR-0025). What is
+  missing is coverage, not design: the `b`/`h` load/store widths, the signed and
+  extended load rows (`LDRSW`/`LDRSB`/`LDRSH`), `prfm`, the 32-bit
+  extended `add`/`sub` nodes and their aliases, and `movk`/`movn`/the `mov`
+  alias and the 32-bit `movz` lanes have no row. Each is `E-FORM-001` until
   a slice adds it.
 - The archive is still not vendored and the drop is not a build input: a
   regeneration reads `research/external/arm-mrs/` after `tools/check_mrs.py`

@@ -1,6 +1,6 @@
 # AArch64 fixtures
 
-Vectors: `A64-P1` … `A64-P17` in `docs/fmp-v0/06_validation_matrix.md`.
+Vectors: `A64-P1` … `A64-P18` in `docs/fmp-v0/06_validation_matrix.md`.
 
 ## What is here
 
@@ -24,6 +24,7 @@ Vectors: `A64-P1` … `A64-P17` in `docs/fmp-v0/06_validation_matrix.md`.
 | `positive/A64-P15-store-imm9-addressing` | `aarch64:str/x64-base-imm9-pre` ×2 (`0.13.0`), `str/x64-base-imm9-post` ×2, `stur/x64-base-imm9` ×2, and `str/x64-base-imm12` ×2 at 0 and 4095; eight instructions, 32 B | `llvm-mc` (no linker: immediates only, no relocations) |
 | `positive/A64-P16-loadlit` | `aarch64:ldr/x64-imm19` ×6 (`0.14.0`): two symbol targets and four plain field values, both ends of `imm19` included; six instructions, 24 B | `llvm-mc` (no linker: local instruction labels, no relocations) |
 | `positive/A64-P17-regoff` | `aarch64:ldr/x64-base-regoff-*` ×8 and `str/x64-base-regoff-*` ×8 (`0.15.0`), one per `option`/`S` pair, plus four register-31 rows (`sp` in `Rn`, `xzr`/`wzr` in `Rm`); twenty instructions, 80 B | `llvm-mc` (no linker: registers only, no relocations) |
+| `positive/A64-P18-w32regoff` | `aarch64:ldr/w32-base-regoff-*` ×8 and `str/w32-base-regoff-*` ×8 (`0.16.0`), one per `option`/`S` pair at `#0`/`#2`, plus the same four register-31 rows; twenty instructions, 80 B, `w32` destination/source and `x64` base/index | `llvm-mc` (no linker: registers only, no relocations) |
 | `negative/N01-absent-scaled-form` | `aarch64:add/x64-imm12-lsl12` against `0.1.0`, which lacks it | `E-FORM-001` |
 | `negative/N01b-absent-register-offset-form` | `aarch64:ldr/x64-base-regoff` (`0.4.0` has no such form) | `E-FORM-001` |
 | `negative/N01d-absent-movz-lane` | `aarch64:movz/x64-imm16-lsl8` (`0.5.0` has four lanes, not eight) | `E-FORM-001` |
@@ -40,11 +41,15 @@ Vectors: `A64-P1` … `A64-P17` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N01o-absent-loadlit-form` | `aarch64:ldr/x64-imm19` against `0.13.0`, which does not have the literal row yet | `E-FORM-001` |
 | `negative/N01p-regoff-absent-in-previous-version` | `aarch64:ldr/x64-base-regoff-lsl0` against `0.14.0`, which does not have the register-offset rows yet | `E-FORM-001` |
 | `negative/N01q-absent-regoff-shift-one` | `aarch64:ldr/x64-base-regoff-lsl1` against `0.15.0`: only `#0` and `#3` are encodable, so no row exists | `E-FORM-001` |
+| `negative/N01r-w32-regoff-absent-in-previous-version` | `aarch64:ldr/w32-base-regoff-lsl0` against `0.15.0`, which does not have the 32-bit register-offset rows yet | `E-FORM-001` |
+| `negative/N01s-absent-w32-regoff-shift-three` | `aarch64:ldr/w32-base-regoff-lsl3` against `0.16.0`: only `#0` and `#2` are encodable at `size = 10`, so no row exists | `E-FORM-001` |
 | `negative/N02b-w-source-in-shift-form` | a `w32` operand on the `x`-source `-imm6-lsl` row | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02c-x-dest-on-w-row` | an `x64` destination on `aarch64:add/w32-w32-w32-lsl0` | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02d-ext-x-source-on-w-keyword` | an `x64` source on `aarch64:sub/x64-x64-w32-imm3-uxtb` | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02e-dest-on-cmp-row` | a `dest` operand passed to `aarch64:cmp/x64-x64-lsl0`, whose slots are `src` and `src2` only | `E-OPERAND-002` (`expected: 2`, `found: 3`) |
 | `negative/N02f-w-index-on-lsl-row` | a `w32` index on `aarch64:ldr/x64-base-regoff-lsl0`, whose `index` is `x64` | `E-OPERAND-001` (kind and target_type) |
+| `negative/N02g-w-index-on-w32-lsl-row` | a `w32` index on `aarch64:ldr/w32-base-regoff-lsl0`, whose `index` is `x64` | `E-OPERAND-001` (kind and target_type) |
+| `negative/N02h-x-dest-on-w32-row` | an `x64` destination on `aarch64:ldr/w32-base-regoff-lsl0`, whose `dest` is `w32` | `E-OPERAND-001` (kind and target_type) |
 | `negative/N03-imm12-out-of-range` | imm12 = 4096 | `E-RANGE-001` |
 | `negative/N03-imm12-disp-out-of-range` | `disp = 4096` on the load/store `imm12` field | `E-RANGE-001` |
 | `negative/N03-imm9-disp-out-of-range` | `disp = −257` on the `ldur` `imm9` field | `E-RANGE-001` |
@@ -68,6 +73,7 @@ Vectors: `A64-P1` … `A64-P17` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N16e-ext-imm3-excluded` | `imm3 = 5` on `subs/x64-x64-w32-imm3-sxtb`, inside the 3-bit field but not allocated to the extended layout | `E-RANGE-004` |
 | `negative/N19-modifier-is-not-a-carrier` | `{"name": "lsl", "value": 3}` in a `modifiers` entry on `aarch64:add/x64-x64-x64-lsl0` | `E-OPERAND-003` |
 | `negative/N19b-regoff-modifier-is-not-a-carrier` | `{"name": "lsl", "value": 3}` in a `modifiers` entry on the `index` of `aarch64:ldr/x64-base-regoff-lsl0` | `E-OPERAND-003` |
+| `negative/N19c-w32-regoff-modifier-is-not-a-carrier` | `{"name": "lsl", "value": 2}` in a `modifiers` entry on the `index` of `aarch64:ldr/w32-base-regoff-lsl0` | `E-OPERAND-003` |
 | `negative/N20-loadlit-fixup-misaligned` | a `pcrel_begin` literal-load fixup whose symbol is 2 bytes away, so the displacement is not a multiple of 4 | `E-RANGE-003` (`required_align 2`, `value 2`) |
 
 `N01` is why the version split matters: a form exists, but not in an older
@@ -82,8 +88,9 @@ now shows for `subs`), a plan bound to `0.9.0` cannot reach the `w` rows
 `sub`/`adds`/`subs` rows (`N01f`), a plan bound to `0.11.0` cannot reach the
 `cmp`/`cmn` rows (`N01i`, `N01m`), a plan bound to `0.12.0` cannot reach the
 store `imm9` rows (`N01n`), a plan bound to `0.13.0` cannot reach the
-literal load (`N01o`), and a plan bound to `0.14.0` cannot reach the
-register-offset rows (`N01p`). `N01h` and `N01j` are the same shape one
+literal load (`N01o`), a plan bound to `0.14.0` cannot reach the
+register-offset rows (`N01p`), and a plan bound to `0.15.0` cannot reach the
+32-bit register-offset rows (`N01r`). `N01h` and `N01j` are the same shape one
 version earlier for the `w`
 rows of `0.8.0`/`0.9.0`.
 Each fixture names the document it targets and that
@@ -241,6 +248,18 @@ so `-lsl1` is a name for nothing (`E-FORM-001`, `N01q`), and stating `lsl #3` as
 a `modifiers` entry is `E-OPERAND-003` (`N19b`), because a modifier never writes
 the `S` bit. The last four lines put 31 in `Rn` or `Rm`, so the vector pins
 `sp`/`xzr`/`wzr` through the role rather than a register kind.
+
+The 32-bit register offset is the same decision one `size` down, and `A64-P18`
+covers the sixteen `0.16.0` rows (`ADR-0025`, `EXP-0027` §1–§2). The templates'
+top bits change to `0xb8…`, `option` keeps the keyword/width pairing, and `S = 1`
+now scales by the 4-byte access, so the suffixes are `-lsl0`/`-lsl2` (and the
+`uxtw`/`sxtw`/`sxtx` pairs) and `-lsl3` is a name for nothing (`E-FORM-001`,
+`N01s`). Only `Rt` changes class: `dest`/`src` are `w32`, while `base` and the
+`x` index rows stay `x64`, so an `x64` destination is `E-OPERAND-001` (`N02h`)
+and a `w32` index on a `-lsl0` row is the same diagnostic on `index` (`N02g`).
+`lsl #2` as a `modifiers` entry is `E-OPERAND-003` (`N19c`): the scale is the
+`S` bit, and a modifier never writes one. The same four register-31 lines close
+the vector, with `w0` as the loaded/stored register.
 
 **An operand whose bits a fixup owns has an empty payload.** `{"payload": {}}`,
 not a `symbol_id`: `01_contract.md` §8.1 only allows `symbol_id` on a `target`

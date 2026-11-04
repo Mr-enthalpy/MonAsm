@@ -1,15 +1,15 @@
 # EXP-0008 — generating the AArch64 tables from the MRS nodes
 
-- Date: 2026-11-04 (`0.2.0` … `0.14.0` added the same day; `0.15.0` added
-  2026-11-05)
-- Subject: how `definitions/aarch64/0.1.0.json` … `0.15.0.json` were derived, and
+- Date: 2026-11-04 (`0.2.0` … `0.14.0` added the same day; `0.15.0` and
+  `0.16.0` added 2026-11-05)
+- Subject: how `definitions/aarch64/0.1.0.json` … `0.16.0.json` were derived, and
   what they do and do not cover
 - Basis: **experiment** for every field range, template and byte quoted below
 - Reproduce:
   `python tools/check_mrs.py --archive <pinned .tar.gz>`, then
   `python research/evidence/experiments/EXP-0008/generate_aarch64.py`
 
-The script emits all fifteen documents. `0.1.0` … `0.14.0` are frozen and their
+The script emits all sixteen documents. `0.1.0` … `0.15.0` are frozen and their
 digests are asserted by the script, so a later edit that tries to move one fails
 instead of shipping. A form declares the version it starts in (`since`), so a
 later document is always a superset and cannot lose an earlier row.
@@ -406,6 +406,36 @@ field is the 5-bit number and the slot's role tells `sp` from `xzr`/`wzr`.
 coarse `aarch64:ldr/x64-base-regoff` never becomes a form, so `N01b` stays an
 `E-FORM-001` (`N01p` binds a concrete row to `0.14.0` for the same boundary).
 
+### `LDR_32_ldst_regoff` / `STR_32_ldst_regoff` → the sixteen 32-bit register-offset rows
+
+`0.16.0` adds the 32-bit half of the same kind. The nodes are the 64-bit pair with
+`size = 10`, so only the templates' top bits and the `S = 1` amount change; each
+is read eight times, once per `option`/`S` pair:
+
+| Field | start+width | MRS value | Our use |
+|---|---|---|---|
+| `size` | 30+2 | `10` | fixed (32-bit) |
+| — | 28+2 | `11` | fixed |
+| — | 27+1 | `1` | fixed |
+| `VR` | 26+1 | `0` | fixed (no SIMD/FP) |
+| — | 25+1 | `0` | fixed |
+| — | 24+1 | `0` | fixed |
+| `opc` | 22+2 | `01` / `00` | fixed — `LDR Wt` / `STR Wt` |
+| — | 21+1 | `1` | fixed — register-offset kind bit |
+| `Rm` | 16+5 | `xxxxx` | slot `index` (`x64` on `lsl`/`sxtx`, `w32` on `uxtw`/`sxtw`) |
+| `option` | 13+3 | `xxx` | **pinned** per row: `011` LSL, `010` UXTW, `110` SXTW, `111` SXTX |
+| `S` | 12+1 | `x` | **pinned** per row: `0` unscaled, `1` scaled by 4 |
+| — | 11+2 | `10` | fixed — register-offset kind bits |
+| `Rn` | 5+5 | `xxxxx` | slot `base` |
+| `Rt` | 0+5 | `xxxxx` | slot `dest` / `src` (`w32`) |
+
+`option` fixes the index width exactly as at 64 bits, so the `uxtw`/`sxtw` rows
+again take `aarch64.gpr32`/`w32` and the others `aarch64.gpr64`/`x64`. The one
+new slot fact is that `Rt` is `aarch64.gpr32`/`w32` on both mnemonics: the
+access is 4 bytes, so the loaded or stored register is `w`. `EXP-0027` §2
+measures the eight-row ladder at `#0`/`#2` and §3 the rejections; the scale is
+the only decision `ADR-0024` did not already make.
+
 ### `MOVZ_64_movewide` → the four `aarch64:movz/x64-imm16-lsl*` rows
 
 | Field | start+width | MRS value | Our use |
@@ -485,6 +515,22 @@ The generated templates are:
 | `aarch64:str/x64-base-regoff-sxtw3` | `00d820f8` | `0xf820d800` |
 | `aarch64:str/x64-base-regoff-sxtx0` | `00e820f8` | `0xf820e800` |
 | `aarch64:str/x64-base-regoff-sxtx3` | `00f820f8` | `0xf820f800` |
+| `aarch64:ldr/w32-base-regoff-lsl0` | `006860b8` | `0xb8606800` |
+| `aarch64:ldr/w32-base-regoff-lsl2` | `007860b8` | `0xb8607800` |
+| `aarch64:ldr/w32-base-regoff-uxtw0` | `004860b8` | `0xb8604800` |
+| `aarch64:ldr/w32-base-regoff-uxtw2` | `005860b8` | `0xb8605800` |
+| `aarch64:ldr/w32-base-regoff-sxtw0` | `00c860b8` | `0xb860c800` |
+| `aarch64:ldr/w32-base-regoff-sxtw2` | `00d860b8` | `0xb860d800` |
+| `aarch64:ldr/w32-base-regoff-sxtx0` | `00e860b8` | `0xb860e800` |
+| `aarch64:ldr/w32-base-regoff-sxtx2` | `00f860b8` | `0xb860f800` |
+| `aarch64:str/w32-base-regoff-lsl0` | `006820b8` | `0xb8206800` |
+| `aarch64:str/w32-base-regoff-lsl2` | `007820b8` | `0xb8207800` |
+| `aarch64:str/w32-base-regoff-uxtw0` | `004820b8` | `0xb8204800` |
+| `aarch64:str/w32-base-regoff-uxtw2` | `005820b8` | `0xb8205800` |
+| `aarch64:str/w32-base-regoff-sxtw0` | `00c820b8` | `0xb820c800` |
+| `aarch64:str/w32-base-regoff-sxtw2` | `00d820b8` | `0xb820d800` |
+| `aarch64:str/w32-base-regoff-sxtx0` | `00e820b8` | `0xb820e800` |
+| `aarch64:str/w32-base-regoff-sxtx2` | `00f820b8` | `0xb820f800` |
 | `aarch64:movz/x64-imm16-lsl0` | `000080d2` | `0xd2800000` |
 | `aarch64:movz/x64-imm16-lsl16` | `0000a0d2` | `0xd2a00000` |
 | `aarch64:movz/x64-imm16-lsl32` | `0000c0d2` | `0xd2c00000` |
@@ -612,7 +658,7 @@ Templates are stored little-endian, the only byte order v0 definitions declare
 
 ## 4. Oracle
 
-`llvm-mc` 23.1.2 assembles all one hundred and fifty-two forms. It does **not** resolve AArch64
+`llvm-mc` 23.1.2 assembles all one hundred and sixty-eight forms. It does **not** resolve AArch64
 branches or `adrp` when the target is a symbol: it emits zeros plus
 `fixup_aarch64_pcrel_call26`, `fixup_aarch64_pcrel_adrp_imm21` or
 `fixup_aarch64_add_imm12`. For the forms whose bits a fixup owns, the oracle is
@@ -641,7 +687,7 @@ is an immediate, so there is no relocation in the first place. `A64-P8` and
 `A64-P12` (`EXP-0021` §3), `A64-P13` (`EXP-0022` §3) and `A64-P14` (`EXP-0023`
 §3).
 
-The eighteen positive fixtures are:
+The nineteen positive fixtures are:
 
 | Fixture | Document | Bytes | What it proves |
 |---|---|---|---|
@@ -663,12 +709,14 @@ The eighteen positive fixtures are:
 | `A64-P15-store-imm9-addressing` | `0.13.0` | `208c00f8 620c10f8 a48400f8 e6f40ff8 280101f8 6af11ff8 ac0100f9 eefd3ff9` | the store `imm9` kinds at both ends: pre-index `+8`/`−256`, post-index `+8`/`255`, `stur` `+16`/`−1`, and the `imm12` row at `0`/`4095` unchanged |
 | `A64-P16-loadlit` | `0.14.0` | `40000058 e1ffff58 e2ff7f58 03008058 84ffff58 25000058` | one form, six values: two symbol targets (`+2`/`−4` field units), plain `−1`/`1`, and both field ends (`262143`/`−262144`) |
 | `A64-P17-regoff` | `0.15.0` | `206862f8 417863f8 624864f8 835865f8 a4c866f8 c5d867f8 e6e868f8 07f969f8 206822f8 417823f8 624824f8 835825f8 a4c826f8 c5d827f8 e6e828f8 07f929f8 e06b62f8 20787ff8 e07b22f8 20487ff8` | one instruction per register-offset row: all eight `option`/`S` pairs on `ldr` and `str`, then four register-31 rows (`sp` in `Rn`, `xzr`/`wzr` in `Rm`) |
+| `A64-P18-w32regoff` | `0.16.0` | `206862b8 417863b8 624864b8 835865b8 a4c866b8 c5d867b8 e6e868b8 07f969b8 206822b8 417823b8 624824b8 835825b8 a4c826b8 c5d827b8 e6e828b8 07f929b8 e06b62b8 20787fb8 e07b22b8 20487fb8` | one instruction per 32-bit register-offset row: all eight `option`/`S` pairs on `ldr` and `str` at `#0`/`#2`, then the same four register-31 rows, with a `w32` destination/source and `x64` base and index |
 
 These were checked against our materializer, not generated by it
-(`AGENTS.md` rule 5). The materializer reproduces all eighteen byte-for-byte and the
-forty-five negative fixtures (`N01`, `N01b`, `N01d`, `N01e`, `N01f`, `N01g`,
+(`AGENTS.md` rule 5). The materializer reproduces all nineteen byte-for-byte and the
+fifty negative fixtures (`N01`, `N01b`, `N01d`, `N01e`, `N01f`, `N01g`,
 `N01h`, `N01i`, `N01j`, `N01k`, `N01l`, `N01m`, `N01n`, `N01o`, `N01p`, `N01q`,
-`N02b`, `N02c`, `N02d`, `N02e`, `N02f`, `N03`, `N03-cond`, `N03-imm12-disp`,
+`N01r`, `N01s`,
+`N02b`, `N02c`, `N02d`, `N02e`, `N02f`, `N02g`, `N02h`, `N03`, `N03-cond`, `N03-imm12-disp`,
 `N03-imm3`, `N03-imm6`,
 `N03-imm9-disp`, `N03-str-imm9-post-disp`, `N03-stur-imm9-disp`, `N04c`, `N04d`,
 `N12a`, `N14`, `N16c`, `N16d`, `N16e`, `N18a`, `N18b`, `N18c`, `N18d`, `N18e`,
@@ -739,7 +787,13 @@ against `0.14.0` (the version boundary), `N01q` is the `-lsl1` spelling that
 names no row, `N02f` is a `w32` index on a `-lsl0` row (`E-OPERAND-001` on
 `kind` and `target_type`), and `N19b` states `lsl #3` as a modifier on the
 `index` (`E-OPERAND-003`; a modifier never writes the `S` bit) (`EXP-0026`
-§2–§4, ADR-0024).
+§2–§4, ADR-0024). The 32-bit register-offset rows add five: `N01r` is
+`aarch64:ldr/w32-base-regoff-lsl0` against `0.15.0` (the version boundary),
+`N01s` is the `-lsl3` spelling that names no row at this width, `N02g` is a
+`w32` index on a `-lsl0` row and `N02h` an `x64` destination on it
+(`E-OPERAND-001` on `kind` and `target_type` for both), and `N19c` states
+`lsl #2` as a modifier on the `index` (`E-OPERAND-003`, the 32-bit twin of
+`N19b`) (`EXP-0027` §2–§4, ADR-0025).
 
 ## 5. What this record does not claim
 
@@ -749,7 +803,7 @@ names no row, `N02f` is a `w32` index on a `-lsl0` row (`E-OPERAND-001` on
   `sub`, `adds`, `subs`, `w`, extended `sub`/`adds`/`subs`, `cmp`/`cmn`, store
   `imm9`, literal load or register-offset value.
   `EXP-0004` did that for the seven x86 rows; this slice has one hundred and
-  fifty-two rows and eighteen positive fixtures, and `EXP-0014` §2 enumerates the sixteen condition
+  sixty-eight rows and nineteen positive fixtures, and `EXP-0014` §2 enumerates the sixteen condition
   values but not their products with the 2^19 displacements; `EXP-0015` §2
   measures both ends of `imm12` and `imm9` but not every value in between,
   `EXP-0016` §2 measures all four `hw` values but two `imm16` values,
@@ -763,11 +817,13 @@ names no row, `N02f` is a `w32` index on a `-lsl0` row (`E-OPERAND-001` on
   rows, `EXP-0025` §2 measures both ends of `imm19`, three values inside it
   and five rejections on the literal row, and `EXP-0026` §2–§3 measures the
   `option`/`S` ladder, five register-31 rows and fourteen rejections, with §4
-  reproducing all sixteen register-offset rows.
+  reproducing all sixteen register-offset rows; `EXP-0027` §2–§3 measures the
+  same ladder at `size = 10` with four more register-31 rows and eleven
+  rejections, and §4 reproduces the sixteen 32-bit rows.
 - **Not a statement about the other packagings.** Only the archive pinned by
   ADR-0006 was read (`EXP-0006`, `EXP-0007`).
-- **Not an encoding-selection mechanism.** Forty-five MRS nodes are read because
-  one hundred and fifty-two forms exist in the table (thirty-five encode nodes,
+- **Not an encoding-selection mechanism.** Forty-six MRS nodes are read because
+  one hundred and sixty-eight forms exist in the table (thirty-six encode nodes,
   most of them read more than once, plus ten `CMP`/`CMN` alias nodes read only for
   verification; `ADD_64_addsub_shift` is read four times,
   `ADD_64_addsub_ext` eight times, `ADD_64_addsub_imm` twice,
@@ -780,7 +836,8 @@ names no row, `N02f` is a `w32` index on a `-lsl0` row (`E-OPERAND-001` on
   `SUBS_32_addsub_shift` four times, `SUBS_32S_addsub_imm` twice,
   `SUB_64_addsub_ext`, `ADDS_64S_addsub_ext` and `SUBS_64S_addsub_ext` eight
   times each, `LDR_64_loadlit` once, the eight offset load/store nodes once
-  each, and `LDR_64_ldst_regoff`/`STR_64_ldst_regoff` eight times each). The
+  each, and `LDR_64_ldst_regoff`/`STR_64_ldst_regoff` eight times each, and
+  `LDR_32_ldst_regoff`/`STR_32_ldst_regoff` eight times each). The
   generator is
   disposable research tooling; the materializer never reads MRS data, never looks
   a mnemonic up, and only resolves the exact `form_id` a plan names.
@@ -793,13 +850,14 @@ names no row, `N02f` is a `w32` index on a `-lsl0` row (`E-OPERAND-001` on
   `0.5.0` (ADR-0014), `0.6.0` (ADR-0015), `0.7.0` (ADR-0016),
   `0.8.0` (ADR-0017), `0.9.0` (ADR-0018), `0.10.0` (ADR-0019),
   `0.11.0` (ADR-0020), `0.12.0` (ADR-0021), `0.13.0` (ADR-0022),
-  `0.14.0` (ADR-0023) and `0.15.0` (ADR-0024)
+  `0.14.0` (ADR-0023), `0.15.0` (ADR-0024) and `0.16.0` (ADR-0025)
   respectively, none of them a
   slot-level scaling rule or a value-driven form choice; the ten `cmp`/`cmn`
   alias nodes are verification sources for those rows rather than byte sources,
   and the two 32-bit extended aliases stay unread because their base rows do.
   `N01f`, `N01g`,
-  `N01h`, `N01j`, `N01k`, `N01i`, `N01m`, `N01n`, `N01o`, `N01p` and `N01q` name
+  `N01h`, `N01j`, `N01k`, `N01i`, `N01m`, `N01n`, `N01o`, `N01p`, `N01q`,
+  `N01r` and `N01s` name
   a row against a
   version that predates it, so they stay version boundaries rather than absences.
 - **The scaled `:lo12:` link path is unmeasured.** No fixture pairs `adrp` with
@@ -897,13 +955,19 @@ namespace   monasm.isa.aarch64
 version     0.15.0
 forms       152
 digest      sha256:422ebb83b897b18e010da37539796b0b97cfc9018a47209fc4a6ddc5b14af5d3
+
+definition  definitions/aarch64/0.16.0.json
+namespace   monasm.isa.aarch64
+version     0.16.0
+forms       168
+digest      sha256:1e83c6cad91594e8315500f39d0bcffa235edc90c5f47c012555c077a8dbc457
 ```
 
 The digests are computed over the canonical form of each whole document
 (`01_contract.md` §12, `OD-06`) and printed by `tools/check_definition.py`,
 which also checks that the reading-aid table in `07_definition_format.md` §8.2
 matches the JSON row by row. `definitions/aarch64/NOTICE` reproduces the upstream
-BSD-3-Clause notice and names the archive hash; `0.2.0` … `0.15.0` need
+BSD-3-Clause notice and names the archive hash; `0.2.0` … `0.16.0` need
 no second notice because they are generated from the same drop and ship under the
 same terms.
 
@@ -928,6 +992,8 @@ verbatim, the only difference from `0.12.0` is the three store `imm9` rows;
 because `0.14.0` repeats all one hundred and thirty-five earlier rows verbatim,
 the only difference from `0.13.0` is the literal load row; because `0.15.0`
 repeats all one hundred and thirty-six earlier rows verbatim, the only difference
-from `0.14.0` is the sixteen register-offset rows. The
+from `0.14.0` is the sixteen register-offset rows; and because `0.16.0` repeats
+all one hundred and fifty-two earlier rows verbatim, the only difference from
+`0.15.0` is the sixteen 32-bit register-offset rows. The
 generator's frozen-digest assertions are what prove
 that no earlier row moved while a new one landed.

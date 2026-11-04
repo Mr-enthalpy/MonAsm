@@ -73,7 +73,7 @@ not be moved to `frozen` on the strength of an argument alone.
 | EC-11 | AArch64 | 32-bit (`w`) vs 64-bit (`x`) variant | Different `sf` bit, different semantics | `form variant` (`w32-…` / `x64-…`) + `operand type` guard (`aarch64.gpr32`/`w32` vs `aarch64.gpr64`/`x64`) | `add w0,w1,w2` is `0x0b020020` and `add x0,x1,x2` is `0x8b020020`: bit 31 alone, and the operand values are identical, so no operand field could carry the choice. The width is which MRS node the row came from (`ADD_32_addsub_shift` vs `ADD_64_addsub_shift`, `sf` at 31+1), and the register class is a second, independent guard: the nodes spell `<Wd>`/`<Wn>`/`<Wm>` and `llvm-mc` rejects `add w0, w1, x2`; an `x64` operand on a `w` row is `E-OPERAND-001` (`N02c`, `EXP-0021` §2). | frozen |
 | EC-12 | AArch64 | `add/sub` immediate: imm12 vs imm12 shifted by 12 | Different `sh` bit and range | `form variant` (`imm12` / `imm12-scaled`) | `add x0,x1,#1` and `add x0,x1,#1,lsl #12` are both legal spellings of different values. The `sub` rows in `0.8.0` carry the same pair: `sub x0, x1, #4096` is encodable only as `-lsl12` (`imm12 = 1`), `llvm-mc` picks that form without a diagnostic, and naming `-lsl0` is `E-RANGE-001` (`N18d`, `EXP-0019` §2). | frozen |
 | EC-13 | AArch64 | Shifted-register vs extended-register form | Different `shift`/`option` fields | `form variant` (`shifted-reg` / `extended-reg`) | `add x0,x1,x2,lsl #3` vs `add x0,x1,w2,uxtw #3` share a mnemonic but not an encoding. The flag-setting spelling repeats it: `adds x0,x1,x2,lsl #3` is `0xab020c20` while `adds x0,x1,w2,uxtw #3` is `0xab224c20`, so the same split lands on the `S = 1` nodes (`EXP-0020` §2, ADR-0018). | frozen |
-| EC-14 | AArch64 | Load/store addressing: unsigned-offset vs pre-index vs post-index vs unscaled vs register-offset | Different addressing bits (bit 24, bits 11–10) and writeback semantics | `form variant` (`unsigned-offset` / `pre-index` / `post-index` / `unscaled` / `register-offset`) | llvm-mc 23.1.2: `ldr x0,[x1,#16]` is `0xf9400820` (`imm12 = 2`, unsigned-offset) while `ldur x0,[x1,#16]` is `0xf8410020` (`imm9 = 16`, unscaled). Worse, `ldr x0,[x1,#1]` emits `0xf8401020`, which `llvm-objdump` reads back as `ldur`: the mnemonic does not name the form, so the assembler silently switches instruction on the offset's value (INV-02). The store half is the same: `str x0,[x1,#8]!` is `0xf8008c20` (pre-index, `opc = 00`) and `str x0,[x1,#1]` emits `0xf8001020`, read back as `stur` (`EXP-0024` §2). The register-offset kind is the same split once more: `ldr x0,[x1,x2]` is `0xf8626820` (bit 21 = 1, bits 11–10 = `10`), a word none of the four offset spellings produces, and `lsl #0` versus `lsl #3` moves only bit 12 (`EXP-0026` §1). | frozen |
+| EC-14 | AArch64 | Load/store addressing: unsigned-offset vs pre-index vs post-index vs unscaled vs register-offset | Different addressing bits (bit 24, bits 11–10) and writeback semantics | `form variant` (`unsigned-offset` / `pre-index` / `post-index` / `unscaled` / `register-offset`) | llvm-mc 23.1.2: `ldr x0,[x1,#16]` is `0xf9400820` (`imm12 = 2`, unsigned-offset) while `ldur x0,[x1,#16]` is `0xf8410020` (`imm9 = 16`, unscaled). Worse, `ldr x0,[x1,#1]` emits `0xf8401020`, which `llvm-objdump` reads back as `ldur`: the mnemonic does not name the form, so the assembler silently switches instruction on the offset's value (INV-02). The store half is the same: `str x0,[x1,#8]!` is `0xf8008c20` (pre-index, `opc = 00`) and `str x0,[x1,#1]` emits `0xf8001020`, read back as `stur` (`EXP-0024` §2). The register-offset kind is the same split once more: `ldr x0,[x1,x2]` is `0xf8626820` (bit 21 = 1, bits 11–10 = `10`), a word none of the four offset spellings produces, and `lsl #0` versus `lsl #3` moves only bit 12 (`EXP-0026` §1). The 32-bit node repeats it at `size = 10`: `ldr w0,[x1,x2]` is `0xb8626820` and `lsl #2` is `0xb8627820` (`EXP-0027` §1–§2). | frozen |
 | EC-15 | AArch64 | Literal load vs `adrp` + `lo12` sequence | Instruction count (INV-03 boundary) | `form variant` (one instruction vs two planned instructions) | A "load from label" request is a plan decision: one literal load or two instructions. llvm-mc 23.1.2: `ldr x0, #-4` is one 4-byte word (`0x58ffffe0`), while the same address takes `adrp` + `add :lo12:` — two planned instructions with a pair-grouped fixup. Its reach is `−1048576 … +1048572` bytes and the reference is the instruction address (`pcrel_begin`, `EXP-0025` §2). Both halves now have rows (`aarch64:ldr/x64-imm19` in `0.14.0`, `aarch64:adrp/x64-imm21` since `0.1.0`), so the choice is the plan's and neither is inferred from the distance. | frozen |
 | EC-16 | AArch64 | `mov` alias family: `movz` / `movn` / `orr` immediate / register | Different opcodes | `form variant` (`movz` / `movn` / `orr-imm` / `reg`) | `mov x0,#1` can be `movz` or `orr`; both are legitimate and differ in bytes. | draft |
 | EC-17 | AArch64 | `adr` (±1 MB) vs `adrp` (page) for a symbol address | Different instruction and fixup kind | `form variant` + `fixup field` (`kind`) | Choosing `adrp` when the target is in range changes both bytes and relocation semantics. | frozen |
@@ -118,7 +118,7 @@ is what makes the two `mov` forms and the two `add` immediate forms distinct
 without an extra choice field. A plan that names `x86:mov/r64-r64` or
 `x86:add/rm64-imm` is rejected: those ids are not in the v0 definition.
 
-The AArch64 slice is one hundred and fifty-two forms across fifteen documents,
+The AArch64 slice is one hundred and sixty-eight forms across sixteen documents,
 covering eleven frozen `EC` rows:
 
 | `form_id` | Encoding | Operand signature | Table | Covers |
@@ -154,6 +154,22 @@ covering eleven frozen `EC` rows:
 | `aarch64:str/x64-base-regoff-sxtw3` | `STR (register)`, `option=110`, `S=1` | src `x64`, base `x64`, index `w32` | `0.15.0`+ | EC-14, A64-P17 |
 | `aarch64:str/x64-base-regoff-sxtx0` | `STR (register)`, `option=111`, `S=0` | src `x64`, base `x64`, index `x64` | `0.15.0`+ | EC-14, A64-P17 |
 | `aarch64:str/x64-base-regoff-sxtx3` | `STR (register)`, `option=111`, `S=1` | src `x64`, base `x64`, index `x64` | `0.15.0`+ | EC-14, A64-P17 |
+| `aarch64:ldr/w32-base-regoff-lsl0` | `LDR (register)`, `size=10`, `option=011`, `S=0` | dest `w32`, base `x64`, index `x64` | `0.16.0`+ | EC-14, A64-P18 |
+| `aarch64:ldr/w32-base-regoff-lsl2` | `LDR (register)`, `size=10`, `option=011`, `S=1` | dest `w32`, base `x64`, index `x64` | `0.16.0`+ | EC-14, A64-P18 |
+| `aarch64:ldr/w32-base-regoff-uxtw0` | `LDR (register)`, `size=10`, `option=010`, `S=0` | dest `w32`, base `x64`, index `w32` | `0.16.0`+ | EC-14, A64-P18 |
+| `aarch64:ldr/w32-base-regoff-uxtw2` | `LDR (register)`, `size=10`, `option=010`, `S=1` | dest `w32`, base `x64`, index `w32` | `0.16.0`+ | EC-14, A64-P18 |
+| `aarch64:ldr/w32-base-regoff-sxtw0` | `LDR (register)`, `size=10`, `option=110`, `S=0` | dest `w32`, base `x64`, index `w32` | `0.16.0`+ | EC-14, A64-P18 |
+| `aarch64:ldr/w32-base-regoff-sxtw2` | `LDR (register)`, `size=10`, `option=110`, `S=1` | dest `w32`, base `x64`, index `w32` | `0.16.0`+ | EC-14, A64-P18 |
+| `aarch64:ldr/w32-base-regoff-sxtx0` | `LDR (register)`, `size=10`, `option=111`, `S=0` | dest `w32`, base `x64`, index `x64` | `0.16.0`+ | EC-14, A64-P18 |
+| `aarch64:ldr/w32-base-regoff-sxtx2` | `LDR (register)`, `size=10`, `option=111`, `S=1` | dest `w32`, base `x64`, index `x64` | `0.16.0`+ | EC-14, A64-P18 |
+| `aarch64:str/w32-base-regoff-lsl0` | `STR (register)`, `size=10`, `opc=00`, `option=011`, `S=0` | src `w32`, base `x64`, index `x64` | `0.16.0`+ | EC-14, A64-P18 |
+| `aarch64:str/w32-base-regoff-lsl2` | `STR (register)`, `size=10`, `opc=00`, `option=011`, `S=1` | src `w32`, base `x64`, index `x64` | `0.16.0`+ | EC-14, A64-P18 |
+| `aarch64:str/w32-base-regoff-uxtw0` | `STR (register)`, `size=10`, `opc=00`, `option=010`, `S=0` | src `w32`, base `x64`, index `w32` | `0.16.0`+ | EC-14, A64-P18 |
+| `aarch64:str/w32-base-regoff-uxtw2` | `STR (register)`, `size=10`, `opc=00`, `option=010`, `S=1` | src `w32`, base `x64`, index `w32` | `0.16.0`+ | EC-14, A64-P18 |
+| `aarch64:str/w32-base-regoff-sxtw0` | `STR (register)`, `size=10`, `opc=00`, `option=110`, `S=0` | src `w32`, base `x64`, index `w32` | `0.16.0`+ | EC-14, A64-P18 |
+| `aarch64:str/w32-base-regoff-sxtw2` | `STR (register)`, `size=10`, `opc=00`, `option=110`, `S=1` | src `w32`, base `x64`, index `w32` | `0.16.0`+ | EC-14, A64-P18 |
+| `aarch64:str/w32-base-regoff-sxtx0` | `STR (register)`, `size=10`, `opc=00`, `option=111`, `S=0` | src `w32`, base `x64`, index `x64` | `0.16.0`+ | EC-14, A64-P18 |
+| `aarch64:str/w32-base-regoff-sxtx2` | `STR (register)`, `size=10`, `opc=00`, `option=111`, `S=1` | src `w32`, base `x64`, index `x64` | `0.16.0`+ | EC-14, A64-P18 |
 | `aarch64:movz/x64-imm16-lsl0` | `MOVZ`, `sf=1`, `opc=10`, `hw=00` | dest `x64`, imm `imm16` (field content) | `0.5.0`+ | EC-30, A64-P7 |
 | `aarch64:movz/x64-imm16-lsl16` | `MOVZ`, `hw=01` | dest `x64`, imm `imm16` (field content) | `0.5.0`+ | EC-30, A64-P7 |
 | `aarch64:movz/x64-imm16-lsl32` | `MOVZ`, `hw=10` | dest `x64`, imm `imm16` (field content) | `0.5.0`+ | EC-30, A64-P7 |
@@ -434,6 +450,14 @@ byte-affecting and neither is a payload, which is why the coarse
 `N01p` binds it against `0.14.0`). There is no register-offset `ldur`, and no
 writeback spelling: the assembler rejects both (`EXP-0026` §2).
 
+The sixteen 32-bit rows are the same decision at `size = 10` (`ADR-0025`). The
+templates' top bits change, `option` keeps the same keyword/width pairing, and
+`S = 1` now means `#2`, so the suffixes are `-lsl2` … `-sxtx2` and `-lsl3` names
+no row (`N01s`). Only `Rt` changes class: `dest`/`src` are `w32` while `base` and
+the `x` index rows stay `x64`, which is why an `x64` destination is
+`E-OPERAND-001` (`N02h`). A modifier carrying `lsl #2` is still `E-OPERAND-003`
+(`N19c`): the scale is the `S` bit, and a modifier never writes one.
+
 `EC-05`, `EC-09` and `EC-10` are out of v0. `X86-P9` (explicit encoding family)
 stays deferred, so `vex`/`evex` never appear in a v0 `form_id`.
 
@@ -616,7 +640,10 @@ The v0 `EC` set is decided (OD-10). What remains is per-row evidence:
   (ADR-0020), and `0.12.0` the forty `cmp`/`cmn` aliases (ADR-0021). `0.13.0`
   completes the store `imm9` kinds (ADR-0022), `0.14.0` adds the literal load
   (ADR-0023), and `0.15.0` adds the sixteen register-offset rows (ADR-0024), so
-  every load/store addressing kind the MRS drop carries now has a row.
+  every load/store addressing kind the MRS drop carries now has a row. `0.16.0`
+  repeats them at `size = 10` for the `w` width (ADR-0025), which changes the
+  `S = 1` amount to `#2` and the destination class to `w32`; the `b`/`h` widths
+  and the signed/extended loads still have no row.
 - The RV64 source is settled (ADR-0007: the UDB resolved spec, pinned by archive
   hash in `EXP-0009`), and both documents are generated: `definitions/rv64/0.1.0.json`
   and `0.2.0.json` (ADR-0009). `RV-P7` (`c.addi`) needed a format decision before

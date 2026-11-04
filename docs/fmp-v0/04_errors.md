@@ -46,7 +46,7 @@ Rules:
 | E-FORM-001 | `form_id` is not present in the pinned definition | `form_id`, `namespace`, `version` | N01 |
 | E-OPERAND-001 | Operand kind or register class does not match the form | `expected`, `found` | N02 |
 | E-OPERAND-002 | Operand count or role sequence mismatch | `expected`, `found` | N02e |
-| E-OPERAND-003 | Operand payload malformed for its kind | `kind`, `reason` | N19, N19b |
+| E-OPERAND-003 | Operand payload malformed for its kind | `kind`, `reason` | N19, N19b, N19c |
 | E-OPERAND-004 | Operand value is not representable in the slot's field width (register number wider than the encoded field) | `target_type`, `value`, `field_bits` | N14 |
 | E-RANGE-001 | Immediate outside the legal encoding range | `min`, `max`, `value`, `target_type` | N03, N18a, N18b |
 | E-RANGE-002 | Displacement or branch offset outside the legal range | `min`, `max`, `value`, `bits`, `align_bits` | N04 |
@@ -144,7 +144,8 @@ rejection; `derived` means it follows from a measured byte sequence.
   writes a bit. `{ "name": "lsl", "value": 3 }` on the `src2` of
   `aarch64:add/x64-x64-x64-lsl0` would have to move `shift`/`imm6` to be honoured,
   and the same entry on the `index` of `aarch64:ldr/x64-base-regoff-lsl0` would
-  have to set `S`. Both are refused (`N19`, `N19b`); accepting and ignoring them
+  have to set `S`. These are refused (`N19`, `N19b`, `N19c`); accepting and
+  ignoring them
   would emit the unshifted word and report success.
 - `E-SIZE-001` — observed, `EXP-0002` W1: a definition drift that changes the
   encoded length is caught by `expected_size` alone.
