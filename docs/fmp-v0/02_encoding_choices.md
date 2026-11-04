@@ -71,7 +71,7 @@ not be moved to `frozen` on the strength of an argument alone.
 | EC-09 | x86-64 | Legacy SSE vs VEX vs EVEX for the same operation | Prefix family, 2–4 bytes, register reach | `encoding family` (`legacy` / `vex` / `evex`) | `vaddps xmm0,xmm1,xmm2` fits 2-byte VEX but is also expressible in EVEX. | draft (deferred, `X86-P9`) |
 | EC-10 | x86-64 | `LOCK` / `REP` / segment prefix presence | One or more prefix bytes | `operand modifier` (`lock` / `rep` / `segment`) | `lock add [rax], ebx` vs plain `add` differ only by `F0`, with different semantics. | draft |
 | EC-11 | AArch64 | 32-bit (`w`) vs 64-bit (`x`) variant | Different `sf` bit, different semantics | `operand type` (`wreg` / `xreg`) | `add w0,w1,w2` vs `add x0,x1,x2` differ in one bit and in overflow behavior. | frozen |
-| EC-12 | AArch64 | `add/sub` immediate: imm12 vs imm12 shifted by 12 | Different `sh` bit and range | `form variant` (`imm12` / `imm12-scaled`) | `add x0,x1,#1` and `add x0,x1,#1,lsl #12` are both legal spellings of different values. | frozen |
+| EC-12 | AArch64 | `add/sub` immediate: imm12 vs imm12 shifted by 12 | Different `sh` bit and range | `form variant` (`imm12` / `imm12-scaled`) | `add x0,x1,#1` and `add x0,x1,#1,lsl #12` are both legal spellings of different values. The `sub` rows in `0.8.0` carry the same pair: `sub x0, x1, #4096` is encodable only as `-lsl12` (`imm12 = 1`), `llvm-mc` picks that form without a diagnostic, and naming `-lsl0` is `E-RANGE-001` (`N18d`, `EXP-0019` §2). | frozen |
 | EC-13 | AArch64 | Shifted-register vs extended-register form | Different `shift`/`option` fields | `form variant` (`shifted-reg` / `extended-reg`) | `add x0,x1,x2,lsl #3` vs `add x0,x1,w2,uxtw #3` share a mnemonic but not an encoding. | frozen |
 | EC-14 | AArch64 | Load/store addressing: unsigned-offset vs pre-index vs post-index vs unscaled vs register-offset | Different addressing bits (bit 24, bits 11–10) and writeback semantics | `form variant` (`unsigned-offset` / `pre-index` / `post-index` / `unscaled` / `register-offset`) | llvm-mc 23.1.2: `ldr x0,[x1,#16]` is `0xf9400820` (`imm12 = 2`, unsigned-offset) while `ldur x0,[x1,#16]` is `0xf8410020` (`imm9 = 16`, unscaled). Worse, `ldr x0,[x1,#1]` emits `0xf8401020`, which `llvm-objdump` reads back as `ldur`: the mnemonic does not name the form, so the assembler silently switches instruction on the offset's value (INV-02). | frozen |
 | EC-15 | AArch64 | Literal load vs `adrp` + `lo12` sequence | Instruction count (INV-03 boundary) | `form variant` (one instruction vs two planned instructions) | A "load from label" request is a plan decision: one literal load or two instructions. | frozen |
@@ -117,7 +117,7 @@ is what makes the two `mov` forms and the two `add` immediate forms distinct
 without an extra choice field. A plan that names `x86:mov/r64-r64` or
 `x86:add/rm64-imm` is rejected: those ids are not in the v0 definition.
 
-The AArch64 slice is twenty-six forms across seven documents, covering ten frozen
+The AArch64 slice is thirty-two forms across eight documents, covering ten frozen
 `EC` rows:
 
 | `form_id` | Encoding | Operand signature | Table | Covers |
@@ -148,6 +148,12 @@ The AArch64 slice is twenty-six forms across seven documents, covering ten froze
 | `aarch64:add/x64-x64-w32-imm3-sxth` | `ADD (extended register)`, `option=101` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.7.0`+ | EC-13, EC-32, A64-P9 |
 | `aarch64:add/x64-x64-w32-imm3-sxtw` | `ADD (extended register)`, `option=110` | dest `x64`, src `x64`, src2 `w32`, imm `imm3` (0–4) | `0.7.0`+ | EC-13, EC-32, A64-P9 |
 | `aarch64:add/x64-x64-x64-imm3-sxtx` | `ADD (extended register)`, `option=111` | dest `x64`, src `x64`, src2 `x64`, imm `imm3` (0–4) | `0.7.0`+ | EC-13, EC-32, A64-P9 |
+| `aarch64:sub/x64-x64-x64-lsl0` | `SUB (shifted register)`, `op=1`, `shift=LSL`, `imm6=0` | dest `x64`, src `x64`, src2 `x64` | `0.8.0`+ | A64-P10 |
+| `aarch64:sub/x64-imm12-lsl0` | `SUB (immediate)`, `op=1`, `sh=0` | dest `x64`, src `x64`, imm `imm12` | `0.8.0`+ | EC-12 (`sub` half), A64-P10 |
+| `aarch64:sub/x64-imm12-lsl12` | `SUB (immediate)`, `sh=1` | dest `x64`, src `x64`, imm `imm12` (field content) | `0.8.0`+ | EC-12 (`sub` half), A64-P10 |
+| `aarch64:sub/x64-x64-x64-imm6-lsl` | `SUB (shifted register)`, `shift=LSL` | dest `x64`, src `x64`, src2 `x64`, imm `imm6` | `0.8.0`+ | EC-31, A64-P10 |
+| `aarch64:sub/x64-x64-x64-imm6-lsr` | `SUB (shifted register)`, `shift=LSR` | dest `x64`, src `x64`, src2 `x64`, imm `imm6` | `0.8.0`+ | EC-31, A64-P10 |
+| `aarch64:sub/x64-x64-x64-imm6-asr` | `SUB (shifted register)`, `shift=ASR` | dest `x64`, src `x64`, src2 `x64`, imm `imm6` | `0.8.0`+ | EC-31, A64-P10 |
 
 The `-lsl0`/`-lsl12` suffix is part of the id because the MRS node leaves
 `shift`, `imm6` and `sh` variable; the table pins them and the name says so
@@ -159,6 +165,14 @@ only, so naming it against `0.1.0` is `E-FORM-001` (`N01`). The
 for the 2-bit `shift` selector, with the amount as the last operand, and
 `-imm3-uxtb` … `-imm3-sxtx` is the same device for the 3-bit `option` selector
 of the extended-register node.
+
+The six `sub` rows use the first two devices again with one difference: the
+mnemonic is not a field at all. `SUB_64_addsub_imm` and `SUB_64_addsub_shift` are
+the `ADD_64` nodes with `op` at 30+1 fixed to `1`, so `sub` is a different node
+rather than a value of an operand, and the `form_id`'s mnemonic component is what
+carries it (`A64-P10`, ADR-0017). `sh`, the shift keyword and `imm6` are treated
+exactly as the `add` rows treat them, including the `lsl #0` overlap, and a
+literal outside the named `sh` half is `E-RANGE-001` (`N18d`).
 
 `b.cond` is the opposite case and shows where the line is: the condition is a
 4-bit *operand* (`EC-29`), so one row covers all sixteen conditions, while the
@@ -195,8 +209,10 @@ keyword, and the amount is `imm3` field content: the field is three bits, but
 only `0…4` are allocated, so the slot states `bits: 3` plus `excluded: [5, 6, 7]`
 (`ADR-0009`). `imm3 = 8` is `E-RANGE-001` (`N03-imm3`), `imm3 = 5` is
 `E-RANGE-004` (`N16c`), a `w` operand on `-imm3-uxtx` or on a shifted row is
-`E-OPERAND-001` (`N02b`), and `sub`/`adds`/`subs`/the 32-bit node stay out
-(`E-FORM-001`, `N01f`).
+`E-OPERAND-001` (`N02b`), and the extended `sub` node, `adds`/`subs` and the
+`sf = 0` node stay out (`E-FORM-001`, `N01f`, `N01g`, `N01h`). Those last three
+are separate slices: each fixes a different bit (`option` with bit 21, `S`,
+`sf`), so none of them is a modifier of a row in this table.
 
 The five load/store rows carry `EC-14` and are the AArch64 half of `ADR-0008`:
 the address is `base` + `disp`, never one memory payload, and the addressing
@@ -382,8 +398,10 @@ The v0 `EC` set is decided (OD-10). What remains is per-row evidence:
   EC-16 (the `mov` alias family) and EC-18 stay `draft` and are not in the v0
   surface: EC-30 decides the lane *inside* `movz` and does not decide which
   lowering a `mov` request becomes. EC-13 is now carried in both halves:
-  shifted-register by `0.1.0` and `0.6.0`, extended-register by `0.7.0`.
-  `sub`, the `w` rows and the load/store kinds listed above still have no row.
+  shifted-register by `0.1.0` and `0.6.0`, extended-register by `0.7.0`. `0.8.0`
+  adds the `sub` halves of EC-12 and EC-31 (ADR-0017); the `w` rows, `adds`/`subs`
+  and the extended `sub` node still have no row, and neither do the load/store
+  kinds listed above.
 - The RV64 source is settled (ADR-0007: the UDB resolved spec, pinned by archive
   hash in `EXP-0009`), and both documents are generated: `definitions/rv64/0.1.0.json`
   and `0.2.0.json` (ADR-0009). `RV-P7` (`c.addi`) needed a format decision before

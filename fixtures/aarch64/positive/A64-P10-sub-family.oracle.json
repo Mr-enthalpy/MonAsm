@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P10-sub-family.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "865dc3980cdc476fb9fef77013e229134876d75728acea5c031443e0534ed89d",
+  "output_sha256": "a83770708689f5cc0fea5fd016f3189fbd6d56e673b318142b6a89ba8fba8953",
+  "size": 24,
+  "records": 0,
+  "notes": "Input (151 B, LF, trailing newline), one instruction per line with two leading spaces: `sub x3, x4, x5` / `sub x6, x7, #4095` / `sub x9, x10, #291, lsl #12` / `sub x12, x13, x14, lsl #3` / `sub x15, x16, x17, lsr #7` / `sub x18, x19, x20, asr #63`. One instruction per `sub` row: the unshifted register row, both `sh` values of the immediate row, and all three shift keywords. Every row uses distinct registers, so a register-field slip cannot hide behind another row; the immediate row is exercised at 4095 (all twelve bits set) and at 291 with `lsl #12` (field content, not the pre-scaled literal); `lsr #7` and `asr #63` move bits 23-22 and pin the top of `imm6`. `llvm-mc -show-encoding` prints `sub x3, x4, x5` for the first line, i.e. the `-lsl0` spelling. Every operand is a register or an immediate, so `llvm-readobj -r` prints an empty relocation list and no linker is involved.",
+  "source": "Arm MRS SUB_64_addsub_shift and SUB_64_addsub_imm (op at 30+1 = 1, shift at 22+2, imm6 at 10+6, sh at 22+1, imm12 at 10+12); measured in EXP-0019 §2"
+}

@@ -1,6 +1,6 @@
 # AArch64 fixtures
 
-Vectors: `A64-P1` … `A64-P9` in `docs/fmp-v0/06_validation_matrix.md`.
+Vectors: `A64-P1` … `A64-P10` in `docs/fmp-v0/06_validation_matrix.md`.
 
 ## What is here
 
@@ -16,11 +16,14 @@ Vectors: `A64-P1` … `A64-P9` in `docs/fmp-v0/06_validation_matrix.md`.
 | `positive/A64-P7-movz-lane` | `aarch64:movz/x64-imm16-lsl0` ×2, `-lsl16`, `-lsl32`, `-lsl48` (`0.5.0`); five instructions, 20 B | `llvm-mc` (no linker: immediates only, no relocations) |
 | `positive/A64-P8-shift-modifier` | `aarch64:add/x64-x64-x64-imm6-lsl`, `-imm6-lsr`, `-imm6-asr` (`0.6.0`); six instructions, 24 B | `llvm-mc` (no linker: registers and immediates only, no relocations) |
 | `positive/A64-P9-extend-modifier` | six `aarch64:add/x64-x64-w32-imm3-*` rows and `-x64-imm3-uxtx`/`-imm3-sxtx` (`0.7.0`); eight instructions, 32 B | `llvm-mc` (no linker: registers and immediates only, no relocations) |
+| `positive/A64-P10-sub-family` | `aarch64:sub/x64-x64-x64-lsl0`, `sub/x64-imm12-lsl0` at 4095, `sub/x64-imm12-lsl12` at 291, `sub/x64-x64-x64-imm6-lsl`/`-lsr`/`-asr` (`0.8.0`); six instructions, 24 B | `llvm-mc` (no linker: registers and immediates only, no relocations) |
 | `negative/N01-absent-scaled-form` | `aarch64:add/x64-imm12-lsl12` against `0.1.0`, which lacks it | `E-FORM-001` |
 | `negative/N01b-absent-register-offset-form` | `aarch64:ldr/x64-base-regoff` (`0.4.0` has no such form) | `E-FORM-001` |
 | `negative/N01d-absent-movz-lane` | `aarch64:movz/x64-imm16-lsl8` (`0.5.0` has four lanes, not eight) | `E-FORM-001` |
 | `negative/N01e-absent-extend-form` | `aarch64:add/x64-x64-w64-uxtw-imm3`, an extend spelling against `0.6.0` | `E-FORM-001` |
-| `negative/N01f-absent-sub-ext` | `aarch64:sub/x64-x64-w32-imm3-uxtb` (`0.7.0` has `add`, not `sub`) | `E-FORM-001` |
+| `negative/N01f-absent-sub-ext` | `aarch64:sub/x64-x64-w32-imm3-uxtb` (`0.8.0` has the immediate and shifted `sub` nodes, not the extended one) | `E-FORM-001` |
+| `negative/N01g-absent-flag-form` | `aarch64:subs/x64-x64-x64-lsl0` (`S = 1` is a different node) | `E-FORM-001` |
+| `negative/N01h-absent-32bit-form` | `aarch64:sub/w32-w32-w32-lsl0` (`sf = 0` is a different node) | `E-FORM-001` |
 | `negative/N02b-w-source-in-shift-form` | a `w32` operand on the `x`-source `-imm6-lsl` row | `E-OPERAND-001` (kind and target_type) |
 | `negative/N03-imm12-out-of-range` | imm12 = 4096 | `E-RANGE-001` |
 | `negative/N03-imm12-disp-out-of-range` | `disp = 4096` on the load/store `imm12` field | `E-RANGE-001` |
@@ -34,6 +37,7 @@ Vectors: `A64-P1` … `A64-P9` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N18a-no-form-switch` | `0x1000` stated on `-lsl0` (legal only as a scaled literal) | `E-RANGE-001` |
 | `negative/N18b-operand-is-field-content` | `0x123000` stated on `-lsl12` (a pre-scaled literal) | `E-RANGE-001` |
 | `negative/N18c-movz-pre-scaled-literal` | `0x12340000` stated on `movz/x64-imm16-lsl16` (a pre-scaled literal) | `E-RANGE-001` |
+| `negative/N18d-sub-no-form-switch` | `4096` stated on `sub/x64-imm12-lsl0` (encodable only as `-lsl12`) | `E-RANGE-001` |
 | `negative/N16c-imm3-excluded` | `imm3 = 5`, inside the 3-bit field but not allocated to `add` extended | `E-RANGE-004` |
 | `negative/N19-modifier-is-not-a-carrier` | `{"name": "lsl", "value": 3}` in a `modifiers` entry on `aarch64:add/x64-x64-x64-lsl0` | `E-OPERAND-003` |
 
@@ -41,11 +45,13 @@ Vectors: `A64-P1` … `A64-P9` in `docs/fmp-v0/06_validation_matrix.md`.
 document, so a plan bound to `0.1.0` still cannot reach `-lsl12`, a plan bound
 to `0.2.0` cannot reach `b.cond`, a plan bound to `0.3.0` cannot reach the
 load/store rows, a plan bound to `0.4.0` cannot reach the `movz` lanes, a plan
-bound to `0.5.0` cannot reach the shift rows, and a plan bound to `0.6.0` cannot
-reach the extend rows. Each fixture names the document it targets and that
+bound to `0.5.0` cannot reach the shift rows, a plan bound to `0.6.0` cannot
+reach the extend rows, and a plan bound to `0.7.0` cannot reach the `sub` rows.
+Each fixture names the document it targets and that
 document's digest.
 
-`sub`, the `w`-width rows, the load/store register-offset and literal kinds, and
+`subs`, the `w`-width rows, the extended `sub` node, the load/store
+register-offset and literal kinds, and
 the store's `imm9` kinds are absent for the same reason. A linked `:lo12:` inside
 the `-lsl12` form is measured at the record level (`EXP-0013` §5) but is not an
 address of the symbol, so no fixture links one.
@@ -65,7 +71,9 @@ ISA, because the multiplier belongs to the field and not to a slot transform.
 The same rule covers the scaled immediate: `A64-P2-add-imm12-lsl12` holds
 `imm12` content (0…4095) and the form's `sh = 1` does the `<< 12`. Stating
 `0x1000` there, or stating it on `-lsl0`, is `E-RANGE-001` (`N18a`/`N18b`), never
-a form switch.
+a form switch. `A64-P10` repeats both halves on `sub` (`0.8.0`): 291 on
+`-imm12-lsl12` is field content, 4095 on `-imm12-lsl0` is the field's top, and
+4096 on `-imm12-lsl0` is `E-RANGE-001` (`N18d`).
 
 The load/store rows are the third instance. Their `disp` is the field, so the
 unit is per row: the two unsigned-offset rows count 8-byte units for the `x`

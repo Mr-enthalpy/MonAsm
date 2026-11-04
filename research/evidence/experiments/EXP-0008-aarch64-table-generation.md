@@ -1,14 +1,14 @@
 # EXP-0008 — generating the AArch64 tables from the MRS nodes
 
-- Date: 2026-11-04 (documents `0.2.0` … `0.7.0` added the same day)
-- Subject: how `definitions/aarch64/0.1.0.json` … `0.7.0.json` were derived, and
+- Date: 2026-11-04 (documents `0.2.0` … `0.8.0` added the same day)
+- Subject: how `definitions/aarch64/0.1.0.json` … `0.8.0.json` were derived, and
   what they do and do not cover
 - Basis: **experiment** for every field range, template and byte quoted below
 - Reproduce:
   `python tools/check_mrs.py --archive <pinned .tar.gz>`, then
   `python research/evidence/experiments/EXP-0008/generate_aarch64.py`
 
-The script emits all seven documents. `0.1.0` … `0.6.0` are frozen and their
+The script emits all eight documents. `0.1.0` … `0.7.0` are frozen and their
 digests are asserted by the script, so a later edit that tries to move one fails
 instead of shipping. A form declares the version it starts in (`since`), so a
 later document is always a superset and cannot lose an earlier row.
@@ -27,7 +27,7 @@ sha256 a1ad2c6538a47cd97d8762791ac5af88bce1d5f6aff096c9b77aef853e76acfe
 BSD-3-Clause licence sentence before the drop may be used (ADR-0006). The file is
 not vendored; the shipped artifact is the JSON table plus its digest.
 
-The twelve nodes are named exactly as the MRS names them. The generator walks
+The fourteen nodes are named exactly as the MRS names them. The generator walks
 `instructions` recursively, matches the node's `name`, rejects duplicates and
 refuses to run if any node is missing. It does not read aliases, groups or
 descriptions.
@@ -109,6 +109,27 @@ differ only in the pinned `sh`, which is why the second one is a second row and
 not a scaled slot: the operand is `[0, 4095]` in both, and the instruction
 applies the `<< 12` (`07_definition_format.md` §8.3, ADR-0011). The scaled form
 is emitted into `0.2.0` only, so `0.1.0` stays byte-identical.
+
+### `SUB_64_addsub_shift` / `SUB_64_addsub_imm` → the six `aarch64:sub/…` rows
+
+These are field-for-field the two `ADD_64` nodes above with `op` at 30+1 fixed to
+`1` instead of `0`; nothing else in either layout changes (`EXP-0019` §1). The
+generator therefore reads them with the same slot specs and pins only the field
+the `add` rows already pin:
+
+| Node | `op` (30+1) | Pinned per row | Slots | Rows |
+|---|---|---|---|---|
+| `SUB_64_addsub_shift` | `1` | `shift` (22+2): `00`/`01`/`10`; `imm6` `000000` on `-lsl0` | `dest`/`src`/`src2`, plus `imm` (`imm6`) on the three `-imm6-*` rows | `-lsl0`, `-imm6-lsl`, `-imm6-lsr`, `-imm6-asr` |
+| `SUB_64_addsub_imm` | `1` | `sh` (22+1): `0`/`1` | `dest`/`src`/`imm` (`imm12`) | `-lsl0`, `-lsl12` |
+
+`0.8.0` reads each node once per row, so the mnemonic is the form family: the
+node fixes `op`, no plan field names it, and no row pins it by hand
+(ADR-0017). `ror` is unallocated here as it is on the shifted `add` node, so the
+keyword set is still three wide, and `lsl #0` on `-imm6-lsl` is the same word as
+`-lsl0`, exactly as for `add` (`EXP-0019` §2). The `S = 1` nodes
+(`SUBS_64_addsub_shift`, `SUBS_64S_addsub_imm`), the `sf = 0` pair and
+`SUB_64_addsub_ext` are not read: each fixes a different bit, so each is its own
+slice and naming one is `E-FORM-001` (`N01f`, `N01g`, `N01h`).
 
 ### `BL_only_branch_imm` → `aarch64:bl/imm26`
 
@@ -278,13 +299,19 @@ The generated templates are:
 | `aarch64:add/x64-x64-w32-imm3-sxth` | `00a0208b` | `0x8b20a000` |
 | `aarch64:add/x64-x64-w32-imm3-sxtw` | `00c0208b` | `0x8b20c000` |
 | `aarch64:add/x64-x64-x64-imm3-sxtx` | `00e0208b` | `0x8b20e000` |
+| `aarch64:sub/x64-x64-x64-lsl0` | `000000cb` | `0xcb000000` |
+| `aarch64:sub/x64-imm12-lsl0` | `000000d1` | `0xd1000000` |
+| `aarch64:sub/x64-imm12-lsl12` | `000040d1` | `0xd1400000` |
+| `aarch64:sub/x64-x64-x64-imm6-lsl` | `000000cb` | `0xcb000000` |
+| `aarch64:sub/x64-x64-x64-imm6-lsr` | `000040cb` | `0xcb400000` |
+| `aarch64:sub/x64-x64-x64-imm6-asr` | `000080cb` | `0xcb800000` |
 
 Templates are stored little-endian, the only byte order v0 definitions declare
 (`07_definition_format.md` §4.1).
 
 ## 4. Oracle
 
-`llvm-mc` 23.1.2 assembles all twenty-six forms. It does **not** resolve AArch64
+`llvm-mc` 23.1.2 assembles all thirty-two forms. It does **not** resolve AArch64
 branches or `adrp` when the target is a symbol: it emits zeros plus
 `fixup_aarch64_pcrel_call26`, `fixup_aarch64_pcrel_adrp_imm21` or
 `fixup_aarch64_add_imm12`. For the forms whose bits a fixup owns, the oracle is
@@ -309,9 +336,9 @@ therefore the assembler's own, and the fixture records that as oracle metadata
 (`EXP-0014` §3). `A64-P3` is the same case for a different reason: every operand
 is an immediate, so there is no relocation in the first place. `A64-P8` and
 `A64-P9` are the same case again: registers and immediates only (`EXP-0017` §3,
-`EXP-0018` §3).
+`EXP-0018` §3), and so is `A64-P10` (`EXP-0019` §3).
 
-The ten positive fixtures are:
+The eleven positive fixtures are:
 
 | Fixture | Document | Bytes | What it proves |
 |---|---|---|---|
@@ -325,12 +352,14 @@ The ten positive fixtures are:
 | `A64-P7-movz-lane` | `0.5.0` | `804682d2 8046a2d2 2200c0d2 e5ffffd2 000080d2` | all four `hw` values, with `imm16 = 0x1234` on the first two so only the lane differs |
 | `A64-P8-shift-modifier` | `0.6.0` | `200c028b 201c428b 20fc828b 83fc058b 2000028b 2000428b` | all three `shift` values, `imm6` at 0 and 63, and the `lsl #0` overlap with `-lsl0` |
 | `A64-P9-extend-modifier` | `0.7.0` | `8300258b e630288b 494d2b8b ac912e8b 0fa2318b 72d2348b d562378b 38f33a8b` | all eight `option` values, six `w` sources and two `x` sources, `imm3` at 0 and 4, and distinct `Rd`/`Rn`/`Rm` in every row |
+| `A64-P10-sub-family` | `0.8.0` | `830005cb e6fc3fd1 498d44d1 ac0d0ecb 0f1e51cb 72fe94cb` | one instruction per `sub` row: `-lsl0`, `imm12` at 4095 and 291<<12, and all three shift keywords with `imm6` at 3, 7 and 63 |
 
 These were checked against our materializer, not generated by it
-(`AGENTS.md` rule 5). The materializer reproduces all ten byte-for-byte and the
-twenty negative fixtures (`N01`, `N01b`, `N01d`, `N01e`, `N01f`, `N02b`, `N03`,
+(`AGENTS.md` rule 5). The materializer reproduces all eleven byte-for-byte and the
+twenty-three negative fixtures (`N01`, `N01b`, `N01d`, `N01e`, `N01f`, `N01g`,
+`N01h`, `N02b`, `N03`,
 `N03-cond`, `N03-imm12-disp`, `N03-imm3`, `N03-imm6`, `N03-imm9-disp`, `N04c`,
-`N12a`, `N14`, `N16c`, `N18a`, `N18b`, `N18c`, `N19`) reject exactly the
+`N12a`, `N14`, `N16c`, `N18a`, `N18b`, `N18c`, `N18d`, `N19`) reject exactly the
 registered diagnostic sets.
 `N18a`/`N18b` are the
 scaled form's other half: the first is `0x1000` stated on `-lsl0`, the second
@@ -351,7 +380,12 @@ rows add four: `N03-imm3` is an amount of `8` (the first value past the 3-bit
 field), `N16c` is `5` (inside the field, unallocated, so the closed `excluded`
 list rejects it rather than emitting the word), `N02b` is a `w32` operand on an
 `x`-source row (the class is the form's, `E-OPERAND-001`), and `N01f` is the
-`sub` node, which `0.7.0` does not carry (`EXP-0018` §2, ADR-0016).
+*extended* `sub` node, which even `0.8.0` does not carry (`EXP-0018` §2,
+ADR-0016, narrowed by ADR-0017). The `sub` rows add three: `N01g` is
+`aarch64:subs/x64-x64-x64-lsl0` (`S = 1` is a different node), `N01h` is
+`aarch64:sub/w32-w32-w32-lsl0` (`sf = 0` is a different pair of nodes), and
+`N18d` is `4096` on `sub/x64-imm12-lsl0`, which only fits `-lsl12` and must be
+`E-RANGE-001` rather than a form switch (`EXP-0019` §2, ADR-0017).
 
 ## 5. What this record does not claim
 
@@ -359,29 +393,32 @@ list rejects it rather than emitting the word), `N02b` is a `w32` operand on an
   immediate fields at range ends, but it does not enumerate all 2^5 × 2^5 × 2^5
   register triples, nor every `bl`, `b.cond`, load/store, `movz`, shift or extend
   value.
-  `EXP-0004` did that for the seven x86 rows; this slice has twenty-six rows and
-  ten positive fixtures, and `EXP-0014` §2 enumerates the sixteen condition
+  `EXP-0004` did that for the seven x86 rows; this slice has thirty-two rows and
+  eleven positive fixtures, and `EXP-0014` §2 enumerates the sixteen condition
   values but not their products with the 2^19 displacements; `EXP-0015` §2
   measures both ends of `imm12` and `imm9` but not every value in between,
   `EXP-0016` §2 measures all four `hw` values but two `imm16` values,
-  `EXP-0017` §2 measures both ends of `imm6` on two of the three keywords, and
-  `EXP-0018` §2 measures `imm3` at 0 and 4 but not 1, 2 or 3 on every row.
+  `EXP-0017` §2 measures both ends of `imm6` on two of the three keywords,
+  `EXP-0018` §2 measures `imm3` at 0 and 4 but not 1, 2 or 3 on every row, and
+  `EXP-0019` §3 measures one value per `sub` row.
 - **Not a statement about the other packagings.** Only the archive pinned by
   ADR-0006 was read (`EXP-0006`, `EXP-0007`).
-- **Not an encoding-selection mechanism.** Twelve MRS nodes are read because
-  twenty-six forms exist in the table (`ADD_64_addsub_shift` is read four times,
+- **Not an encoding-selection mechanism.** Fourteen MRS nodes are read because
+  thirty-two forms exist in the table (`ADD_64_addsub_shift` is read four times,
   `ADD_64_addsub_ext` eight times, `ADD_64_addsub_imm` twice,
-  `MOVZ_64_movewide` four times). The generator is
+  `MOVZ_64_movewide` four times, `SUB_64_addsub_shift` four times and
+  `SUB_64_addsub_imm` twice). The generator is
   disposable research tooling; the materializer never reads MRS data, never looks
   a mnemonic up, and only resolves the exact `form_id` a plan names.
-- **`sub`, `adds`/`subs` and the 32-bit node are absent.** They are other nodes
-  with their own `op`/`S`/`sf` pins, so naming one is `E-FORM-001` (`N01f`). The
-  scaled `add`, `b.cond`, load/store, `movz`, shift and extend rows are no longer
-  in this list: the first is a row in `0.2.0` (ADR-0011), the second a row in
-  `0.3.0` (ADR-0012), five are rows in `0.4.0` (ADR-0013), four are rows in
-  `0.5.0` (ADR-0014), three are rows in `0.6.0` (ADR-0015) and eight are rows in
-  `0.7.0` (ADR-0016), none of them a slot-level scaling rule or a value-driven
-  form choice.
+- **The extended `sub` node, `adds`/`subs` and the 32-bit nodes are absent.** They
+  are other nodes with their own `op`/bit-21/`S`/`sf` pins, so naming one is
+  `E-FORM-001` (`N01f`, `N01g`, `N01h`). The
+  scaled `add`, `b.cond`, load/store, `movz`, shift, extend and `sub` rows are no
+  longer in this list: the first is a row in `0.2.0` (ADR-0011), the second a row
+  in `0.3.0` (ADR-0012), five are rows in `0.4.0` (ADR-0013), four are rows in
+  `0.5.0` (ADR-0014), three are rows in `0.6.0` (ADR-0015), eight are rows in
+  `0.7.0` (ADR-0016) and six are rows in `0.8.0` (ADR-0017), none of them a
+  slot-level scaling rule or a value-driven form choice.
 - **The scaled `:lo12:` link path is unmeasured.** No fixture pairs `adrp` with
   `add ..., lsl #12`; only the `-lsl0` pair is linked (`A64-P6`).
 
@@ -429,13 +466,19 @@ namespace   monasm.isa.aarch64
 version     0.7.0
 forms       26
 digest      sha256:1bb920356476cea20688b2d6596d787f3cf99aedebe7240b1af8227f64d29053
+
+definition  definitions/aarch64/0.8.0.json
+namespace   monasm.isa.aarch64
+version     0.8.0
+forms       32
+digest      sha256:9f82b566af004aaa9f0471151497d65acb45c3a7b46e4240345d21f4e330bc35
 ```
 
 The digests are computed over the canonical form of each whole document
 (`01_contract.md` §12, `OD-06`) and printed by `tools/check_definition.py`,
 which also checks that the reading-aid table in `07_definition_format.md` §8.2
 matches the JSON row by row. `definitions/aarch64/NOTICE` reproduces the upstream
-BSD-3-Clause notice and names the archive hash; `0.2.0` … `0.7.0` need
+BSD-3-Clause notice and names the archive hash; `0.2.0` … `0.8.0` need
 no second notice because they are generated from the same drop and ship under the
 same terms.
 
@@ -444,8 +487,9 @@ Because `0.3.0` repeats all five earlier rows verbatim, the only difference from
 verbatim, the only difference from `0.3.0` is the five load/store rows; because
 `0.5.0` repeats all eleven earlier rows verbatim, the only difference from `0.4.0`
 is the four `movz` rows; because `0.6.0` repeats all fifteen earlier rows
-verbatim, the only difference from `0.5.0` is the three shift rows; and because
+verbatim, the only difference from `0.5.0` is the three shift rows; because
 `0.7.0` repeats all eighteen earlier rows verbatim, the only difference from
-`0.6.0` is the eight extend rows. The
+`0.6.0` is the eight extend rows; and because `0.8.0` repeats all twenty-six
+earlier rows verbatim, the only difference from `0.7.0` is the six `sub` rows. The
 generator's frozen-digest assertions are what prove
 that no earlier row moved while a new one landed.
