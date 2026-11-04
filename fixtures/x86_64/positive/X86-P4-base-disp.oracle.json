@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj P4.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "manual+disassembly",
+  "input_sha256": "ab92314b65aefa5293a215e1a03fb76f426c7e6f396ccb125dac6976dc0c0ebb",
+  "output_sha256": "fc9a38e6d91ec566efda0379f209b896f94fbab9205efe005f70938afbc35ea3",
+  "size": 51,
+  "records": 0,
+  "notes": "The assembled part exercises `mod=01`/`mod=10` on `%rbp` and the SIB shape for `%rsp`: `movq 0(%rbp),%rax` is 48 8b 45 00 (not RIP), `movq 4096(%rbp),%rbx` is 48 8b 9d 00 10 00 00, `movq 8(%rsp),%rsi` is 48 8b 74 24 08, and the two stores use opcode 89. The appended 48 8b 85 08 00 00 00 is `mod=10` with a displacement that would fit `disp8`; llvm-mc never selects it from a mnemonic, so it is derived from the ModRM rule and verified by `llvm-mc -disassemble`, which prints `movq 8(%rbp), %rax`. It pins that the disp32 form is not shortened (INV-02).",
+  "disassembly": "movq\t8(%rbp), %rax"
+}

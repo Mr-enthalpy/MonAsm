@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-05
-Phase: **3 in progress (x86, AArch64 and RV64 slices): twenty-one definition documents, the materializer and the fixture gate are in place; every AArch64 and RV64 coverage row and six of the eight x86 rows are carried, so widening is coverage work with its own ADR per slice**
+Phase: **3 in progress (x86, AArch64 and RV64 slices): twenty-two definition documents, the materializer and the fixture gate are in place; every AArch64 and RV64 coverage row and seven of the eight x86 rows are carried, so widening is coverage work with its own ADR per slice**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -14,7 +14,7 @@ this file plus `AGENTS.md` alone.
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
-| 3 | Three-ISA vertical prototype | **in progress**: twenty-one definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 6 positive and 19 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 11 negative, all passing the two-source gate |
+| 3 | Three-ISA vertical prototype | **in progress**: twenty-two definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 7 positive and 22 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 11 negative, all passing the two-source gate |
 | 4 | Invariants, negative tests, replay | not started |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
@@ -24,8 +24,8 @@ this file plus `AGENTS.md` alone.
 |---|---|---|
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
-| G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: 24 of 34 rows are frozen; the 10 rows still `draft` are EC-05, EC-08, EC-09, EC-10, EC-16, EC-18, EC-23, EC-24, EC-25 and EC-26, and none of them is needed by the three slices as they stand |
-| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 6 positive, 19 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 11 negative) |
+| G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: 25 of 35 rows are frozen; the 10 rows still `draft` are EC-05, EC-08, EC-09, EC-10, EC-16, EC-18, EC-23, EC-24, EC-25 and EC-26, and none of them is needed by the three slices as they stand |
+| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 7 positive, 22 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 11 negative) |
 
 ## Decisions
 
@@ -58,6 +58,7 @@ this file plus `AGENTS.md` alone.
 | ADR-0025 | The 32-bit register offset is the same `option` family at `size = 10`: `0.16.0` adds sixteen rows, `ldr`/`str` × `{lsl,uxtw,sxtw,sxtx}{0,2}`, from `LDR_32_ldst_regoff`/`STR_32_ldst_regoff`, which are the 64-bit pair with `size = 10` and the same `opc` split; `option` keeps its keyword/width pairing (`lsl`/`sxtx` take `x64`, `uxtw`/`sxtw` take `w32`), `S` is still the only scale carrier but means `#2` on a 4-byte access, and only `Rt` changes class (`w32`), so `dest`/`src` are `aarch64.gpr32`/`w32` while `base` and the `x` index rows stay `x64`; `-lsl3` has no row at this width (`N01s`), a `w32` index on `-lsl0` or an `x64` destination is `E-OPERAND-001` (`N02g`/`N02h`), a modifier stating `lsl #2` is `E-OPERAND-003` (`N19c`), `N01r` is the `0.15.0` boundary, the `b`/`h` widths, the signed/extended loads and `prfm` stay out, and no schema or Rust change is needed | accepted 2026-11-05 |
 | ADR-0026 | `movk`/`movn` are the `movz` lane family one `opc` over: `0.17.0` adds eight rows, four `hw` lanes on each of `MOVK_64_movewide` (`opc = 11`) and `MOVN_64_movewide` (`opc = 00`), so the mnemonic is the node and no plan field names the operation (`EC-16`); `sf = 1`, `hw` at 21+2 and `Rd` at 0+5 are unchanged, `imm16` stays unsigned field content in `0…65535`, and `movn` stores the raw field rather than its complement; `-lsl8` has no row (`N01t`), the `w` lanes and the `mov` alias stay out (`N01v`/`N01w`), a `w32` destination is `E-OPERAND-001` (`N02i`), `imm16 = 65536` or a pre-scaled literal is `E-RANGE-001` (`N03-movk-imm16`, `N18g`), and no schema or Rust change is needed | accepted 2026-11-05 |
 | ADR-0027 | A RIP-relative memory operand is a form with no base register: `0.2.0` adds two rows, `x86:mov/r64-riprel32/legacy` (`REX.W 8B /r`, `mod = 00`, `r/m = 101`) and `x86:mov/riprel32-r64/legacy` (`REX.W 89 /r`), so the opcode direction is still the form (`EC-27`) and the addressing shape is the form rather than an operand value (`EC-34`); `ModRM.reg` is the destination or source at `[19,3]`, `disp32` is the last field at `[24,32]`, and the displacement is a `target` operand (`x86.rel`/`riprel32`, signed 32) with a `pcrel_end` fixup and `addend 0`, because RIP is not in `x86.gpr64` and no slot carries its number; `disp32 = 2147483648` is `E-RANGE-002` (`N04e`), an extra `base` is `E-OPERAND-002` (`N02j`), `N01x` is the `0.1.0` boundary, and an operand/fixup target mismatch is `E-FIXUP-001` (`N07b`); base+disp8/disp32 (`X86-P4`), SIB, the `0x67` prefix (`X86-P5`) and `moffs` stay out, and no schema or Rust change is needed | accepted 2026-11-05 |
+| ADR-0028 | Base+displacement is eight rows across four shapes: `0.3.0` adds load/store × `disp8`/`disp32` × base-in-`r/m`/`%rsp`-fixed, so `mod` and the SIB byte are template rather than operand-driven; the general rows carry `base` at `[16,3]` with `excluded: [4]` (`%rsp` would force a SIB byte, `E-RANGE-004`), the `%rsp` rows fix `r/m = 100`, `SIB = 24` and the base, `disp8`/`disp32` are signed field content, `disp8 = 128` is `E-RANGE-001` (`N03-disp8-out-of-range`), `%rsp` on a general row is `E-RANGE-004` (`N16f`), `N01y` is the `0.2.0` boundary, and index/scale, `mod = 00`, `r8`–`r15`, `0x67` and `moffs` stay out | accepted 2026-11-05 |
 
 ## Settled decisions (contract level)
 
@@ -73,7 +74,7 @@ this file plus `AGENTS.md` alone.
 | OD-10 | v0 ships only the forms the slices use; the definition table is the feature surface and absence is `E-FORM-001` | `02_encoding_choices.md`, "v0 surface"; ADR-0004 |
 | OD-11 | A byte-affecting decision is carried by `form_id`, a typed operand, a fixup field or a target field — never by a separate choice list | ADR-0004; `02_encoding_choices.md` |
 | OD-12 | RV64 facts come from the UDB resolved spec (`sha256:be184986…`), pinned per node; riscv-opcodes is the upstream cross-check and `llvm-mc` the oracle | ADR-0007; `EXP-0009`; `EXP-0010`; `definitions/rv64/NOTICE` |
-| OD-13 | A memory operand is field-level: `base`/`disp` are separate operands and the addressing form is a `form_id` variant; a composite `{"mem": …}` payload is `E-OPERAND-003` | ADR-0008; ADR-0013 (AArch64 half); ADR-0027 (x86 RIP half); `EXP-0011`; `EXP-0015`; `EXP-0029`; `N15`; `N01b`; `X86-P6` |
+| OD-13 | A memory operand is field-level: `base`/`disp` are separate operands and the addressing form is a `form_id` variant; a composite `{"mem": …}` payload is `E-OPERAND-003` | ADR-0008; ADR-0013 (AArch64 half); ADR-0027 (x86 RIP half); ADR-0028 (x86 base+disp half); `EXP-0011`; `EXP-0015`; `EXP-0029`; `EXP-0030`; `N15`; `N01b`; `X86-P6`; `X86-P4` |
 | OD-14 | A slot may exclude a closed list of exact values inside its domain; the rejection is `E-RANGE-004`, the check is a lookup, and an absent key means no exclusion | ADR-0009; `EXP-0012`; `N16a`/`N16b` |
 | OD-15 | A `hi`/`lo` pair expresses RISC-V's "the low half names the high half" with `pcrel_hi` (P = the paired `hi`'s site) and `pcrel_lo12` (mask the displaced value), a zero `lo` addend, and a 1:N group | ADR-0010; psABI `riscv-elf.adoc:1578-1605`; `RV-P8-pcrel-pair`, `RV-P8-pcrel-pair-resolved`; `N17a`/`N17b` |
 
@@ -136,7 +137,12 @@ content, so the offset kinds are five rows in `aarch64/0.4.0.json`, the store
 trio joins them in `0.13.0.json`, the literal in `0.14.0.json` and register
 offset in `0.15.0.json` and `0.16.0.json`, so every addressing kind the drop
 carries now has a row at both the `x` and `w` widths that have one;
-`N01b` still rejects the coarse register-offset id (`ADR-0024`/`ADR-0025`). OD-14 is settled by
+`N01b` still rejects the coarse register-offset id (`ADR-0024`/`ADR-0025`). The
+x86 half is pinned by ADR-0027 and ADR-0028: `disp32` with no base is a
+`target` operand with a `pcrel_end` fixup, and base+disp8/disp32 is a `base`
+operand plus a `disp` operand whose width is the form's, with `%rsp` either a
+fixed-base form or `E-RANGE-004` (`X86-P6`, `X86-P4`, `EXP-0029`, `EXP-0030`).
+OD-14 is settled by
 ADR-0009: `EXP-0012` §2 measured that
 `c.addi a0, 0` (`01 05`) and `c.addi x0, 1` (`05 00`) are reserved HINTs despite
 being inside the declared range, so the slot excludes `0` and
@@ -165,9 +171,8 @@ not cover is caught only by the weaker size check; it is now settled, and
    The memory-operand question is closed: `OD-13`/ADR-0008 chose one operand per
    field, `RV-P3` now passes, `A64-P3` is closed by `0.4.0`/ADR-0013, and
    `X86-P6` is closed by `0.2.0`/ADR-0027, the one shape with no base register
-   (`mod = 00`, `r/m = 101`, `disp32`). `X86-P4` carries a precondition
-   (enumerate and measure one `form_id` per base+disp variant, plus a SIB
-   decision for `%rsp`/`%r12`) rather than an open question. The non-zero question is
+   (`mod = 00`, `r/m = 101`, `disp32`), and `X86-P4` by `0.3.0`/ADR-0028, which
+   enumerated the eight base+disp rows and the `%rsp` SIB pair. The non-zero question is
    closed too: `OD-14`/ADR-0009 added `excluded`, and `RV-P7` now passes
    (`EXP-0012`).
 2. Extend the AArch64 coverage, one vertical slice at a time. All eight directive
@@ -239,9 +244,14 @@ not cover is caught only by the weaker size check; it is now settled, and
    operand, `X86-P6-rip-relative` matches `llvm-mc` (43 bytes, one
    `R_X86_64_PC32` record), and
    `N01x`/`N02j`/`N04e`/`N07b` pin the version boundary, the extra `base`, the
-   field end and the operand/fixup mismatch. The remaining x86 gaps are
-   `X86-P4` (base+disp8/disp32 plus SIB) and `X86-P5` (`0x66`/high-byte), each
-   with its own enumerated variant list and ADR before any row lands.
+   field end and the operand/fixup mismatch. `X86-P4` is closed by `0.3.0`:
+   ADR-0028 added the eight base+displacement rows plus the `%rsp` SIB pair,
+   `X86-P4-base-disp` matches `llvm-mc` (51 bytes, no record), and
+   `N01y`/`N03-disp8-out-of-range`/`N16f` pin the version boundary, the `disp8`
+   field end and the `%rsp` exclusion. The only remaining x86 gap is `X86-P5`
+   (`0x66` and the high-byte register rule), which needs its own enumerated
+   prefix list and ADR before any row lands; `X86-P9` stays outside v0 with the
+   extension families (`OD-10`).
 4. Close the remaining contract debt:
    - `OD-05` (unknown fields/extensions) and `OD-08` (canonical wire form);
    - the Level 1 artifact envelope, which is deferred by `OD-03` and is not
@@ -254,13 +264,17 @@ Phase 3 output so far: the Rust workspace under `prototype/` (`fmp-model` for th
 strict JSON reader and the plan/definition binders, `fmp-validate` for contract
 §13 steps 2–7, `fmp-materialize` for encoding and the two fixup modes,
 `fmp-cli` with exit codes 0/1/2); the frozen tables
-`definitions/x86_64/0.1.0.json` (seven forms, digest `sha256:c6bfa9…`) and
+`definitions/x86_64/0.1.0.json` (seven forms, digest `sha256:c6bfa9…`),
 `0.2.0.json` (nine forms, digest `sha256:d9c088ca…`, the two RIP-relative
-rows);
+rows) and `0.3.0.json` (seventeen forms, digest `sha256:02500bf7…`, the eight
+base+displacement rows);
 `EXP-0004` (223 decoded byte strings across the seven `0.1.0` rows, plus the
-`OD-06` digest measurement); `EXP-0005` (6 positive fixtures against LLVM
-23.1.2, with the two decode-only caveats); `EXP-0029` (the RIP-relative fields,
-the signed `disp32` ends and the record offset); and 19 negative fixtures whose
+`OD-06` digest measurement); `EXP-0005` (7 positive fixtures against LLVM
+23.1.2, with the solve-by-disassembly caveat on two instructions); `EXP-0029` (the
+RIP-relative fields,
+the signed `disp32` ends and the record offset); `EXP-0030` (the base+disp
+fields, the `%rsp` SIB byte and the signed `disp8`/`disp32` ends); and 22
+negative fixtures whose
 complete diagnostic sets — code, JSON Pointer, detail keys — are compared for
 exact equality. `E-OPERAND-004`/`N14` (an operand wider than its field) is one
 of them.

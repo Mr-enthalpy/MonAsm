@@ -61,7 +61,7 @@ not be moved to `frozen` on the strength of an argument alone.
 | ID | ISA | Legal outputs | Observable difference | Carrier | Counterexample if the carrier is removed | Status |
 |---|---|---|---|---|---|---|
 | EC-01 | x86-64 | `add r/m64, imm` as sign-extended imm8 (`83 /0 ib`) vs imm32 (`81 /0 id`) | 4 vs 7 bytes with `REX.W` | `form variant` (`rm64-imm8` / `rm64-imm32`) | `add rax, 1` is legal both ways (`48 83 c0 01`, `48 81 c0 01 00 00 00`); an encoder that picks by value violates INV-02 and shifts every later offset. | frozen |
-| EC-02 | x86-64 | Memory displacement as disp8 (mod=01) vs disp32 (mod=10) | 1 vs 4 displacement bytes | `form variant` (`mem-disp8` / `mem-disp32`) | `mov rax, [rbp-8]` → `48 8b 45 f8` (disp8); `[rbp-200]` → disp32. `0.2.0` exercises the RIP-relative shape (`EC-34`) but neither base+disp half, so this row's carrier stays decided and unexercised until `X86-P4`. | frozen |
+| EC-02 | x86-64 | Memory displacement as disp8 (mod=01) vs disp32 (mod=10) | 1 vs 4 displacement bytes | `form variant` (`mem-disp8` / `mem-disp32`) | `mov rax, [rbp-8]` → `48 8b 45 f8` (disp8); `[rbp-200]` → disp32. Both halves are now forms: `0.2.0` took the RIP shape (`EC-34`) and `0.3.0` took base+disp8/disp32, including `%rsp` (`EC-35`, `ADR-0028`). | frozen |
 | EC-03 | x86-64 | Relative branch rel8 (`EB`) vs rel32 (`E9`) | 2 vs 5 bytes | `form variant` (`rel8` / `rel32`) | llvm-mc 23.1.2: `jmp .+0x81` → `eb 7f` (2 B) but `jmp .+0x82` → `e9 7d 00 00 00` (5 B). One byte of target distance changes the instruction length; that is relaxation, not encoding (INV-04). | frozen |
 | EC-04 | x86-64 | Accumulator form (`05 id`, `B8+rd`) vs ModRM form (`81 /0 id`, `C7 /0 id`) | Different opcode byte; the accumulator form is one byte shorter because it has no ModRM | `form variant` (`rax-imm32` / `rm64-imm32`) | `add rax, 300` → `48 05 2c 01 00 00` (6 B) or `48 81 c0 2c 01 00 00` (7 B); `mov eax, 300` → `b8 2c 01 00 00` (5 B) or `c7 c0 2c 01 00 00` (6 B). Both tools pick the accumulator and neither exposes the other. | frozen |
 | EC-05 | x86-64 | `moffs` absolute form (`A0-A3`) vs ModRM with disp32 | Different length and prefix behavior | `form variant` (`moffs` / `mem-abs32`) | `mov al, [0x1234]` has two legal encodings with different sizes. | draft |
@@ -94,6 +94,7 @@ not be moved to `frozen` on the strength of an argument alone.
 | EC-32 | AArch64 | Extend keyword and amount on an extended-register source: `uxtb`/`uxth`/`uxtw`/`sxtb`/`sxth`/`sxtw` (a `w` source) or `uxtx`/`sxtx` (an `x` source), each with `imm3` in `0…4` (`option` at 15–13, `imm3` at 12–10, bit 21 = 1) | Bits 15–13 and 12–10, plus the register class the keyword implies | `form variant` for the keyword (`-imm3-uxtb` … `-imm3-sxtx`), `operand type` for the amount (`aarch64.imm` / `imm3`) | `llvm-mc` 23.1.2: `add x0, x1, w2, uxtb #0` is `0x8b220020` and `add x0, x1, w2, uxth #4` is `0x8b223020`; all three register fields are identical and only bits 15–13 and 12–10 differ, so a plan stating only the registers could not tell the rows apart. The register class is the second counterexample: `option = 3` (`uxtx`) consumes an `x` register, and the assembler rejects `uxtw` on an `x` source and `uxtx` on a `w` one, so a single row with a free `option` and a free register class would emit a legal word for an illegal plan. The amount is not a signed 3-bit range: values `5`, `6`, `7` fit the field but are unallocated, which is why `imm3` is a `0…4` domain plus a closed `excluded` list rather than a wider range (`ADR-0016`, `EXP-0018`). | frozen |
 | EC-33 | AArch64 | `cmp`/`cmn` alias vs the `subs`/`adds` row with `Rd = 31` | One fixed `Rd` field and a shorter operand list | `form variant` (`cmp/…` / `cmn/…` as two-operand rows) | `cmp x1, x2` is `0xeb02003f`, the same word as `subs xzr, x1, x2`, while `subs x0, x1, x2` is `0xeb020020`. A single `subs` row with a free `Rd` would emit `cmp`'s word or a `subs` word depending on an operand value, and would make the plan spell a destination register the mnemonic cannot name; the alias is its own two-operand form with `Rd` pinned (`ADR-0021`, `EXP-0023` §2). | frozen |
 | EC-34 | x86-64 | RIP-relative vs base+disp addressing: `mod = 00`, `r/m = 101` is RIP + `disp32`; the same `r/m` under `mod = 01`/`10` is a base register | 7 bytes with `disp32` and no base vs 4/7 bytes with a base; the base's identity selects the shape | `form variant` (`riprel32` / `mem-disp8` / `mem-disp32`) | `llvm-mc` 23.1.2: `movq 16(%rip), %rax` is `48 8b 05 10 00 00 00` and contains no base register, while `movq 0(%rbp), %rax` is `48 8b 45 00` because `mod = 00`, `r/m = 101` would mean RIP. A single `mov/r64-mem` over `base`/`disp` would have to read the base's value to choose `mod`, and RIP has no GPR number for that operand; the form is the only carrier (`ADR-0027`, `EXP-0029`). | frozen |
+| EC-35 | x86-64 | SIB byte presence: `%rsp` as a base forces `r/m = 100` and a SIB byte whose `base` is also `100`, while any other base of the same width uses `r/m = base` and no SIB | One extra byte and one different ModRM `r/m`; the base's identity selects the shape | `form variant` (`-base-disp8`/`-base-disp32` vs `-rsp-disp8`/`-rsp-disp32`, base fixed in the latter) | `llvm-mc` 23.1.2: `movq 8(%rsp), %rsi` is `48 8b 74 24 08` (ModRM `74`, SIB `24`) and `movq 8(%rbp), %rcx` is `48 8b 4d 08` (ModRM `4d`, no SIB). The same register number 4 is legal in both; if one row accepted it and inserted the SIB byte from the operand value, the instruction length would change with an operand (`INV-04`). The `%rsp` rows therefore fix the base and exclude 4 from the general rows (`E-RANGE-004`, `N16f`) (`ADR-0028`, `EXP-0030`). | frozen |
 
 ## v0 surface (OD-10)
 
@@ -102,7 +103,7 @@ surface: a variant that is absent cannot be selected, repaired or approximated,
 and naming it is `E-FORM-001`. There is no feature flag and no partially
 implemented form.
 
-The x86-64 slice is nine forms covering five frozen `EC` rows:
+The x86-64 slice is seventeen forms covering seven frozen `EC` rows:
 
 | `form_id` | Bytes | Operand signature | Covers |
 |---|---|---|---|
@@ -115,6 +116,14 @@ The x86-64 slice is nine forms covering five frozen `EC` rows:
 | `x86:jmp/rel32/legacy` | `E9 cd` | `rel32` target | EC-03 |
 | `x86:mov/r64-riprel32/legacy` | `REX.W 8B /r`, `mod=00`, `r/m=101` | dest `r64`, target `riprel32` (`pcrel_end`) | EC-34, X86-P6 |
 | `x86:mov/riprel32-r64/legacy` | `REX.W 89 /r`, `mod=00`, `r/m=101` | src `r64`, target `riprel32` (`pcrel_end`) | EC-34, X86-P6 |
+| `x86:mov/r64-base-disp8/legacy` | `REX.W 8B /r`, `mod=01`, `r/m=base` | dest `r64`, base `rm64` (not `%rsp`), disp `disp8` | EC-02, EC-35, X86-P4 |
+| `x86:mov/r64-base-disp32/legacy` | `REX.W 8B /r`, `mod=10`, `r/m=base` | dest `r64`, base `rm64` (not `%rsp`), disp `disp32` | EC-02, EC-35, X86-P4 |
+| `x86:mov/base-disp8-r64/legacy` | `REX.W 89 /r`, `mod=01`, `r/m=base` | src `r64`, base `rm64` (not `%rsp`), disp `disp8` | EC-02, EC-35, X86-P4 |
+| `x86:mov/base-disp32-r64/legacy` | `REX.W 89 /r`, `mod=10`, `r/m=base` | src `r64`, base `rm64` (not `%rsp`), disp `disp32` | EC-02, EC-35, X86-P4 |
+| `x86:mov/r64-rsp-disp8/legacy` | `REX.W 8B /r`, `mod=01`, `r/m=100`, `SIB=24` | dest `r64`, disp `disp8`, base fixed to `rsp` | EC-02, EC-35, X86-P4 |
+| `x86:mov/r64-rsp-disp32/legacy` | `REX.W 8B /r`, `mod=10`, `r/m=100`, `SIB=24` | dest `r64`, disp `disp32`, base fixed to `rsp` | EC-02, EC-35, X86-P4 |
+| `x86:mov/rsp-disp8-r64/legacy` | `REX.W 89 /r`, `mod=01`, `r/m=100`, `SIB=24` | src `r64`, disp `disp8`, base fixed to `rsp` | EC-02, EC-35, X86-P4 |
+| `x86:mov/rsp-disp32-r64/legacy` | `REX.W 89 /r`, `mod=10`, `r/m=100`, `SIB=24` | src `r64`, disp `disp32`, base fixed to `rsp` | EC-02, EC-35, X86-P4 |
 
 The variant names the operand signature as the ISA opcode table spells it, which
 is what makes the two `mov` forms and the two `add` immediate forms distinct

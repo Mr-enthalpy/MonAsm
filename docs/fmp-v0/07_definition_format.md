@@ -131,9 +131,9 @@ increasing, each inside the slot's representable domain: `range` for
 the list is rejected with `E-RANGE-004` even though `range` accepts it; an
 absent key means no value is excluded, and an empty list is a definition error
 because it is not a statement. The check is a lookup, never an expression
-(`INV-06`), so "legal" remains decidable by inspection. No v0 x86 or AArch64
-slot declares one; `riscv:c.addi/rd-imm6` is the first, excluding `0` on both
-slots (§8.5).
+(`INV-06`), so "legal" remains decidable by inspection. No AArch64 slot declares
+one; on x86 the base slots of the non-SIB rows exclude `%rsp` (`ADR-0028`);
+`riscv:c.addi/rd-imm6` was the first user, excluding `0` on both slots (§8.5).
 
 ### 4.1 Placements
 
@@ -223,6 +223,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 |---|---|---|
 | `definitions/x86_64/0.1.0.json` | `monasm.isa.x86` | `sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad` |
 | `definitions/x86_64/0.2.0.json` | `monasm.isa.x86` | `sha256:d9c088cacb9d20dcf8b801cbdb978996ed31d2e70b631897a905d179207991ac` |
+| `definitions/x86_64/0.3.0.json` | `monasm.isa.x86` | `sha256:02500bf74d5c3db7816a30aca6c9c4d8fc7c5097306bc742f51284636c487c10` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -245,7 +246,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.2.0`
+### 8.1 `x86-64` `0.1.0` … `0.3.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -258,11 +259,20 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:jmp/rel32/legacy` | `e900000000` | target: `x86.rel`/`rel32` → `[8,32]` | 5 | `EC-03` |
 | `x86:mov/r64-riprel32/legacy` | `488b0500000000` | dest: `x86.gpr64`/`r64` → `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `EC-34`, `X86-P6` — `0.2.0`+ |
 | `x86:mov/riprel32-r64/legacy` | `48890500000000` | src: `x86.gpr64`/`r64` → `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `EC-34`, `X86-P6` — `0.2.0`+ |
+| `x86:mov/r64-base-disp8/legacy` | `488b4000` | dest: `x86.gpr64`/`r64` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
+| `x86:mov/r64-base-disp32/legacy` | `488b8000000000` | dest: `x86.gpr64`/`r64` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
+| `x86:mov/base-disp8-r64/legacy` | `48894000` | src: `x86.gpr64`/`r64` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
+| `x86:mov/base-disp32-r64/legacy` | `48898000000000` | src: `x86.gpr64`/`r64` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
+| `x86:mov/r64-rsp-disp8/legacy` | `488b442400` | dest: `x86.gpr64`/`r64` → `[19,3]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
+| `x86:mov/r64-rsp-disp32/legacy` | `488b842400000000` | dest: `x86.gpr64`/`r64` → `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
+| `x86:mov/rsp-disp8-r64/legacy` | `4889442400` | src: `x86.gpr64`/`r64` → `[19,3]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
+| `x86:mov/rsp-disp32-r64/legacy` | `4889842400000000` | src: `x86.gpr64`/`r64` → `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
 
 Placements are written `[bit_offset, width]`. `[16,3]` is the low three bits of
-byte 2, which is `ModRM.rm`; `[19,3]` is `ModRM.reg`; `[24,8]` is byte 3. The two
-`ModRM` bits above them (`bits 6–7` of byte 2) are `mod = 0b11`, part of the
-template and not owned by any operand.
+byte 2, which is `ModRM.rm`; `[19,3]` is `ModRM.reg`; `[24,8]` is byte 3. In the
+register-to-register rows the two `ModRM` bits above them (`bits 6–7` of byte 2)
+are `mod = 0b11`, part of the template and not owned by any operand; the
+memory rows fix `mod = 0b01`/`0b10` the same way.
 
 `x86:add/rax-imm32/legacy` has no `dest` slot: the register is fixed by the
 opcode (`REX.W 05 id`), which is exactly why `rax-imm32` and `rm64-imm32` are two
@@ -285,8 +295,16 @@ field. The displacement is a `target` operand with `kind: x86.rel`, not a `disp`
 because the form has no base register: RIP is not in `x86.gpr64` and no slot
 carries it (`ADR-0027`). A symbol reference uses `pcrel_end` with `addend = 0`;
 the measured `L1` at `0x20` with the instruction at offset `7` gives
-`12 00 00 00` (`EXP-0029` §4). Base+disp8/disp32, SIB shapes, the `0x67`
-address-size prefix and `moffs` remain absent.
+`12 00 00 00` (`EXP-0029` §4).
+
+`0.3.0` adds the eight base+displacement rows: load and store × `disp8`/`disp32`
+× base-in-`r/m`/`%rsp`-fixed. The general rows put the base in `ModRM.rm` at
+`[16,3]` and exclude register 4 (`%rsp`) with `E-RANGE-004`, because `%rsp`
+forces a SIB byte; the `%rsp` rows fix `r/m = 100`, `SIB = 24` and the base
+inside the template, so their `disp` starts at bit 32. `disp8` is signed 8 bits
+and `disp32` signed 32 bits, and a value outside the named row's field is
+`E-RANGE-001` rather than a re-formed instruction (`ADR-0028`, `EC-35`). Index
+and scale, `mod = 00`, the `0x67` address-size prefix and `moffs` remain absent.
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 

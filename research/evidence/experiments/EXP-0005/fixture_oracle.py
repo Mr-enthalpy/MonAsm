@@ -88,6 +88,23 @@ CASES = [
         ),
     },
     {
+        "stem": "X86-P4-base-disp",
+        "asm": "P4.asm",
+        "suffix": bytes.fromhex("488b8508000000"),
+        "records": 0,
+        "kind": "manual+disassembly",
+        "notes": (
+            "The assembled part exercises `mod=01`/`mod=10` on `%rbp` and the SIB shape "
+            "for `%rsp`: `movq 0(%rbp),%rax` is 48 8b 45 00 (not RIP), `movq "
+            "4096(%rbp),%rbx` is 48 8b 9d 00 10 00 00, `movq 8(%rsp),%rsi` is 48 8b 74 "
+            "24 08, and the two stores use opcode 89. The appended 48 8b 85 08 00 00 00 "
+            "is `mod=10` with a displacement that would fit `disp8`; llvm-mc never "
+            "selects it from a mnemonic, so it is derived from the ModRM rule and "
+            "verified by `llvm-mc -disassemble`, which prints `movq 8(%rbp), %rax`. It "
+            "pins that the disp32 form is not shortened (INV-02)."
+        ),
+    },
+    {
         "stem": "X86-P6-rip-relative",
         "asm": "P6.asm",
         "suffix": b"",
@@ -171,7 +188,9 @@ def assemble_bytes(asm_path):
 
 
 def disassemble(data):
-    out = run([LLVM_MC, "-triple=x86_64", "-disassemble"], stdin=data)
+    # `llvm-mc -disassemble` reads hex tokens from stdin, not raw bytes.
+    text = " ".join("0x%02x" % byte for byte in data) + "\n"
+    out = run([LLVM_MC, "-triple=x86_64", "-disassemble"], stdin=text.encode("ascii"))
     return out.decode("utf-8", "replace").strip()
 
 

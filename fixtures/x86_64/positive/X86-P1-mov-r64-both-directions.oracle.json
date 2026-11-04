@@ -8,5 +8,5 @@
   "size": 6,
   "records": 0,
   "notes": "First instruction is emitted by llvm-mc (`movq %rbx, %rax` -> 48 89 d8). The second is the 8B /r encoding of the same move, which llvm-mc will not select from a mnemonic; its bytes are verified by `llvm-mc -disassemble`, which prints `movq %rbx, %rax`.",
-  "disassembly": ""
+  "disassembly": "movq\t%rbx, %rax"
 }

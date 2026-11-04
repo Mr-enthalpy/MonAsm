@@ -1,7 +1,7 @@
 # EXP-0005 — x86-64 positive fixtures, measured with LLVM
 
-- Date: 2026-11-04 (extended 2026-11-05 with `X86-P6`)
-- Subject: `fixtures/x86_64/positive/` — the six bytes-emitting vectors
+- Date: 2026-11-04 (extended 2026-11-05 with `X86-P6` and `X86-P4`)
+- Subject: `fixtures/x86_64/positive/` — the seven bytes-emitting vectors
 - Toolchain: LLVM 23.1.2 (`llvm-mc`, `llvm-objcopy`, `llvm-readobj`), Python 3.8
 - Basis: **experiment** for every byte below
 - Reproduce: `python fixture_oracle.py` (rewrites), or
@@ -28,6 +28,7 @@ LLVM agree, not that a function agrees with itself.
 | `X86-P2-add-imm8-and-imm32` | `addq $1,%rax`; `addq $300,%rbx` | `4883c001 4881c32c010000` | 11 | `llvm-mc` |
 | `X86-P3-two-legal-encodings` | `addq $300,%rax`; `addq $300,%rbx` | `48052c010000 4881c32c010000` | 13 | `llvm-mc` |
 | `X86-P7-short-and-near-branch` | `jmp .+0x81`; `jmp .+0x82` | `eb7f e97d000000` | 7 | `llvm-mc` |
+| `X86-P4-base-disp` | `%rbp` at 0; `disp8 = 8`/`-1`; `disp32 = 4096`; `%rsp` SIB pair; both stores; `disp32 = 8` | `488b4500 488b4d08 488b50ff 488b9d00100000 488b742408 488bbc2400100000 48894510 4889942400100000 488b8508000000` | 51 | `llvm-mc` + `manual+disassembly` |
 | `X86-P6-rip-relative` | `movq 16(%rip),%rax`; local load/store against `L1` at `0x20`; `movq ext(%rip),%rbx` | `488b0510000000 488b0d12000000` + 2×`00` + `48891509000000` + 9×`00` + `aabbccdd 488b1d00000000` | 43 | `llvm-mc` + `llvm-readobj` |
 | `X86-P8-local-and-external-branch` | `jmp L1` (resolved); `jmp ext` (recorded) | `e9cb000000` + 200×`00` + `4889d8 4883c001 e900000000` | 217 | `llvm-mc` + `llvm-readobj` |
 
@@ -37,8 +38,9 @@ path: the plan names a form, the table places the fields, and the bytes match.
 
 ## 3. Cases LLVM cannot emit from assembly text
 
-Three bytes in the table are not produced by `llvm-mc` from a mnemonic. They are
-**decode-verified**, not assembled, and the oracle record says so:
+Three instructions in the fixtures are not produced by `llvm-mc` from a
+mnemonic. They are **decode-verified**, not assembled, and the oracle record says
+so:
 
 - `X86-P1`'s second instruction (`REX.W 8B /r`). Assembling `movq %rbx, %rax`
   always yields `48 89 d8`; `48 8b c3` is verified by disassembly
@@ -51,6 +53,11 @@ Three bytes in the table are not produced by `llvm-mc` from a mnemonic. They are
   `EXP-0004`. The fixture pairs `05 id` on `%rax` with `81 /0 id` on `%rbx`,
   which keeps every byte measured while still showing the two forms are
   different plans with identical semantics.
+- `X86-P4`'s last instruction (`mod = 10`, `disp32 = 8`). `llvm-mc` always picks
+  `mod = 01` for `8(%rbp)`, so the `disp32` form with a value that fits `disp8`
+  is derived from the ModRM rule and verified by `llvm-mc -disassemble`, which
+  prints `movq 8(%rbp), %rax`. It pins that the plan's named width is not
+  shortened (`INV-02`).
 
 ## 4. Branch notes
 
@@ -73,7 +80,7 @@ Three bytes in the table are not produced by `llvm-mc` from a mnemonic. They are
 
 | File | Meaning |
 |---|---|
-| `P1.asm` … `P8.asm` | The assembled source, one per fixture |
+| `P1.asm` … `P8.asm` | The assembled source, one per fixture (`P4.asm` is `X86-P4`) |
 | `fixture_oracle.py` | Regenerates `*.expected.bin` and `*.oracle.json`; `--check` verifies |
 | `../fixtures/x86_64/positive/*.fmp.json` | The plans |
 | `../fixtures/x86_64/positive/*.expected.bin` | Oracle bytes |
