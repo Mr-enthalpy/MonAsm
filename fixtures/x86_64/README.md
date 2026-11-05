@@ -1,6 +1,6 @@
 # x86-64 fixtures
 
-Vectors: `X86-P1` … `X86-P22` in `docs/fmp-v0/06_validation_matrix.md`.
+Vectors: `X86-P1` … `X86-P23` in `docs/fmp-v0/06_validation_matrix.md`.
 
 ## Positive vectors present
 
@@ -28,6 +28,7 @@ Vectors: `X86-P1` … `X86-P22` in `docs/fmp-v0/06_validation_matrix.md`.
 | X86-P20 | `X86-P20-vex-ymm-memory` | `EXP-0045` (the `ymm` operand selects VEX.256; no directive needed) |
 | X86-P21 | `X86-P21-mov-mem-8-16` | `EXP-0046` (the `movw`/`movb` mnemonic selects the width; no directive needed) |
 | X86-P22 | `X86-P22-mov-mem-base-ext` | `EXP-0047` (the same mnemonic rule; `r8`–`r15` bases force the `-base-ext` rows) |
+| X86-P23 | `X86-P23-mov-mem-sib` | `EXP-0048` (the same mnemonic rule; `%rsp`/`%r12` bases force the fixed-base `SIB` rows) |
 
 `X86-P6` ships in `definitions/x86_64/0.2.0.json` as two forms with
 `mod = 00`, `r/m = 101` and `disp32` as the last field (`ADR-0027`). `X86-P4`
@@ -90,15 +91,22 @@ eight `-base-ext` rows (word and REX-less low-byte, load/store × `disp8`/
 registers split 0–3 on the new rows and 4–7 on the widened ones, so one
 `(register, base)` pair names one row; `%rsp`/`%r12` stay out of both windows
 and the high-byte rows cannot extend, because the `REX` byte renames `ah`–`bh`
-(`ADR-0045`).
+(`ADR-0045`). `X86-P23` ships in `0.19.0` as the two bases that slice left
+out: twenty-eight fixed-base `SIB` rows — word, REX-less low byte, high
+byte and `40`-prefixed byte, load/store × `disp8`/`disp32`, at `%rsp` and
+`%r12` — because `%rsp` spends a `SIB` byte and `%r12` spends `REX.B` on
+top, so the base is a template fact and the row carries only the register and
+the displacement. The high-byte family gets `%rsp` only, since
+`movb %ah, 8(%r12)` has no encoding, and `ModRM` plus the displacement move
+one byte later with the `SIB` (`ADR-0046`).
 
 ## Negative fixtures present
 
 | Vector | Fixture | Code |
 |---|---|---|
-| N01 | `negative/N01-absent-form`, `negative/N01x-absent-riprel-form`, `negative/N01y-absent-basedisp-form`, `negative/N01z-absent-16bit-form`, `negative/N01aa-absent-unfamilied-vmovaps-form`, `negative/N01ab-vex-form-absent-in-0.4.0`, `negative/N01ac-absent-r12-base-form`, `negative/N01ad-absent-index-scale-form`, `negative/N01ae-absent-sse-memory-form`, `negative/N01af-absent-base-ext-row-on-0.9.0`, `negative/N01ag-absent-xmm-ext-row-on-0.10.0`, `negative/N01ah-absent-no-disp-row-on-0.11.0`, `negative/N01ai-absent-ymm-row-on-0.13.0`, `negative/N01aj-legacy-has-no-ymm-width`, `negative/N01ak-absent-ymm-memory-row-on-0.14.0`, `negative/N01al-absent-vex256-memory-row`, `negative/N01am-absent-vex256-base-ext-row-on-0.15.0`, `negative/N01an-absent-mov-memory-r16-row-on-0.16.0`, `negative/N01ao-absent-mov-memory-base-ext-row-on-0.17.0` | `E-FORM-001` |
-| N02 | `negative/N02-operand-kind-mismatch`, `negative/N02j-base-on-riprel-form`, `negative/N02k-high-byte-operand-on-rex-form`, `negative/N02l-zmm-operand-on-xmm-evex-form`, `negative/N02m-dest-on-store-row`, `negative/N02n-zmm-operand-on-ymm-row`, `negative/N02o-zmm-operand-on-ymm-memory-row`, `negative/N02p-disp8x16-unit-on-disp8x32-row`, `negative/N02q-zmm-operand-on-vex256-memory-row`, `negative/N02r-gpr32-operand-on-mov-memory-r16-row`, `negative/N02s-r8h-operand-on-mov-memory-rex-row`, `negative/N02t-r8h-operand-on-mov-memory-base-ext-row` | `E-OPERAND-001`, `E-OPERAND-002` |
-| N03 | `negative/N03-imm8-out-of-range`, `negative/N03-disp8-out-of-range`, `negative/N03c-scale-is-field-content`, `negative/N03d-evex-disp8-content-out-of-range`, `negative/N03e-disp8x32-content-out-of-range`, `negative/N03f-disp8-content-out-of-range-vex256`, `negative/N03g-disp8-content-out-of-range-mov-memory` | `E-RANGE-001` |
+| N01 | `negative/N01-absent-form`, `negative/N01x-absent-riprel-form`, `negative/N01y-absent-basedisp-form`, `negative/N01z-absent-16bit-form`, `negative/N01aa-absent-unfamilied-vmovaps-form`, `negative/N01ab-vex-form-absent-in-0.4.0`, `negative/N01ac-absent-r12-base-form`, `negative/N01ad-absent-index-scale-form`, `negative/N01ae-absent-sse-memory-form`, `negative/N01af-absent-base-ext-row-on-0.9.0`, `negative/N01ag-absent-xmm-ext-row-on-0.10.0`, `negative/N01ah-absent-no-disp-row-on-0.11.0`, `negative/N01ai-absent-ymm-row-on-0.13.0`, `negative/N01aj-legacy-has-no-ymm-width`, `negative/N01ak-absent-ymm-memory-row-on-0.14.0`, `negative/N01al-absent-vex256-memory-row`, `negative/N01am-absent-vex256-base-ext-row-on-0.15.0`, `negative/N01an-absent-mov-memory-r16-row-on-0.16.0`, `negative/N01ao-absent-mov-memory-base-ext-row-on-0.17.0`, `negative/N01ap-absent-mov-memory-sib-row-on-0.18.0`, `negative/N01aq-absent-high-byte-r12-row` | `E-FORM-001` |
+| N02 | `negative/N02-operand-kind-mismatch`, `negative/N02j-base-on-riprel-form`, `negative/N02k-high-byte-operand-on-rex-form`, `negative/N02l-zmm-operand-on-xmm-evex-form`, `negative/N02m-dest-on-store-row`, `negative/N02n-zmm-operand-on-ymm-row`, `negative/N02o-zmm-operand-on-ymm-memory-row`, `negative/N02p-disp8x16-unit-on-disp8x32-row`, `negative/N02q-zmm-operand-on-vex256-memory-row`, `negative/N02r-gpr32-operand-on-mov-memory-r16-row`, `negative/N02s-r8h-operand-on-mov-memory-rex-row`, `negative/N02t-r8h-operand-on-mov-memory-base-ext-row`, `negative/N02u-gpr16-operand-on-mov-memory-sib-row` | `E-OPERAND-001`, `E-OPERAND-002` |
+| N03 | `negative/N03-imm8-out-of-range`, `negative/N03-disp8-out-of-range`, `negative/N03c-scale-is-field-content`, `negative/N03d-evex-disp8-content-out-of-range`, `negative/N03e-disp8x32-content-out-of-range`, `negative/N03f-disp8-content-out-of-range-vex256`, `negative/N03g-disp8-content-out-of-range-mov-memory`, `negative/N03h-disp8-content-out-of-range-mov-memory-sib` | `E-RANGE-001` |
 | N04 | `negative/N04a-rel8-out-of-range`, `N04b-rel32-absolute-out-of-range`, `N04e-riprel32-literal-out-of-range` | `E-RANGE-002`, `E-FIXUP-003` |
 | N05 | `negative/N05-expected-size-mismatch` | `E-SIZE-001` |
 | N06 | `negative/N06-extension-list-mismatch` | `E-TARGET-001` |
@@ -108,8 +116,8 @@ and the high-byte rows cannot extend, because the `REX` byte renames `ah`–`bh`
 | N10 | `negative/N10-definition-digest-mismatch` | `E-DEF-001` |
 | N11 | `negative/N11-fragment-gap` | `E-LAYOUT-002` |
 | N13 | `negative/N13-expected-digest-mismatch` | `E-BYTE-001` |
-| N14 | `negative/N14-register-wider-than-field`, `negative/N14b-xmm8-wider-than-field`, `negative/N14c-extended-register-on-old-table`, `negative/N14d-register-16-on-extended-table`, `negative/N14e-xmm8-on-sse-memory-row`, `negative/N14f-base8-on-vex-row`, `negative/N14g-base8-on-evex-row`, `negative/N14h-base16-on-base-ext-row`, `negative/N14i-xmm16-wider-than-field`, `negative/N14j-xmm8-on-3bit-legacy-row`, `negative/N14k-xmm8-source-on-2byte-vex-row`, `negative/N14l-base16-on-no-disp-row`, `negative/N14m-xmm16-on-0.12.0-evex-row`, `negative/N14n-xmm32-on-5bit-evex-row`, `negative/N14o-xmm16-on-4bit-vex-row`, `negative/N14p-ymm16-on-4bit-vex-row`, `negative/N14q-zmm32-on-5bit-evex-row`, `negative/N14r-ymm32-on-5bit-evex-memory-row`, `negative/N14s-ymm16-on-4bit-vex256-memory-row`, `negative/N14t-base8-on-3bit-mov-memory-row`, `negative/N14u-base16-on-4bit-mov-memory-base-row` | `E-OPERAND-004` |
-| N16 | `negative/N16f-rsp-on-non-sib-form`, `negative/N16g-low-byte-number-four-without-rex`, `negative/N16h-r12-on-general-base-form`, `negative/N16i-index-rsp-excluded`, `negative/N16j-base-rsp-excluded`, `negative/N16k-low-base-on-base-ext-row`, `negative/N16l-r12-on-base-ext-row`, `negative/N16m-low-xmm-on-xmm-ext-row`, `negative/N16n-low-source-on-vex-src-ext-row`, `negative/N16o-rsp-on-no-disp-row`, `negative/N16p-rbp-on-no-disp-row`, `negative/N16q-low-base-on-no-disp-base-ext-row`, `negative/N16r-rbp-on-vex256-no-disp-row`, `negative/N16s-r12-on-vex256-base-ext-row`, `negative/N16t-high-byte-number-on-rexless-mov-memory-row`, `negative/N16u-rsp-on-mov-memory-r16-row`, `negative/N16v-low-base-on-mov-memory-base-ext-row`, `negative/N16w-r12-on-mov-memory-base-ext-row`, `negative/N16x-r12-on-widened-mov-memory-rex-row` | `E-RANGE-004` |
+| N14 | `negative/N14-register-wider-than-field`, `negative/N14b-xmm8-wider-than-field`, `negative/N14c-extended-register-on-old-table`, `negative/N14d-register-16-on-extended-table`, `negative/N14e-xmm8-on-sse-memory-row`, `negative/N14f-base8-on-vex-row`, `negative/N14g-base8-on-evex-row`, `negative/N14h-base16-on-base-ext-row`, `negative/N14i-xmm16-wider-than-field`, `negative/N14j-xmm8-on-3bit-legacy-row`, `negative/N14k-xmm8-source-on-2byte-vex-row`, `negative/N14l-base16-on-no-disp-row`, `negative/N14m-xmm16-on-0.12.0-evex-row`, `negative/N14n-xmm32-on-5bit-evex-row`, `negative/N14o-xmm16-on-4bit-vex-row`, `negative/N14p-ymm16-on-4bit-vex-row`, `negative/N14q-zmm32-on-5bit-evex-row`, `negative/N14r-ymm32-on-5bit-evex-memory-row`, `negative/N14s-ymm16-on-4bit-vex256-memory-row`, `negative/N14t-base8-on-3bit-mov-memory-row`, `negative/N14u-base16-on-4bit-mov-memory-base-row`, `negative/N14v-register8-on-mov-memory-sib-row` | `E-OPERAND-004` |
+| N16 | `negative/N16f-rsp-on-non-sib-form`, `negative/N16g-low-byte-number-four-without-rex`, `negative/N16h-r12-on-general-base-form`, `negative/N16i-index-rsp-excluded`, `negative/N16j-base-rsp-excluded`, `negative/N16k-low-base-on-base-ext-row`, `negative/N16l-r12-on-base-ext-row`, `negative/N16m-low-xmm-on-xmm-ext-row`, `negative/N16n-low-source-on-vex-src-ext-row`, `negative/N16o-rsp-on-no-disp-row`, `negative/N16p-rbp-on-no-disp-row`, `negative/N16q-low-base-on-no-disp-base-ext-row`, `negative/N16r-rbp-on-vex256-no-disp-row`, `negative/N16s-r12-on-vex256-base-ext-row`, `negative/N16t-high-byte-number-on-rexless-mov-memory-row`, `negative/N16u-rsp-on-mov-memory-r16-row`, `negative/N16v-low-base-on-mov-memory-base-ext-row`, `negative/N16w-r12-on-mov-memory-base-ext-row`, `negative/N16x-r12-on-widened-mov-memory-rex-row`, `negative/N16y-low-byte-number-on-mov-memory-sib-rex-row` | `E-RANGE-004` |
 
 `N06` (extension-list mismatch) now has an x86 case: `0.5.0` declares
 `avx`/`avx512f`/`avx512vl` for its EVEX.128 row, and a plan that omits them is

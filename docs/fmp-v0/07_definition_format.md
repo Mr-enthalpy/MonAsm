@@ -258,6 +258,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.16.0.json` | `monasm.isa.x86` | `sha256:64ea1acf467afb2f858a5cb2967839445a5ffecac164a5f1b61931cb8fb3b99e` |
 | `definitions/x86_64/0.17.0.json` | `monasm.isa.x86` | `sha256:eb8370255811a2364550bf98ae106f8f972c9a3e54e94d1aeb98ddde921fbcd0` |
 | `definitions/x86_64/0.18.0.json` | `monasm.isa.x86` | `sha256:e1281b0c11d7e2bed9bd1ec7fa5404dadca2c82959376cbe3edfd9ff56b9e33d` |
+| `definitions/x86_64/0.19.0.json` | `monasm.isa.x86` | `sha256:dddc678fe0abc6fa03c2e61c8fcafef2570b496775a11a25e1ab29e01bfe5130` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -280,7 +281,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.18.0`
+### 8.1 `x86-64` `0.1.0` … `0.19.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -411,6 +412,34 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:mov/r8-base-ext-disp32/legacy` | `418a8000000000` | dest: `x86.gpr8`/`r8` → `[19,3]` (excl 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | EC-02, EC-06, EC-27, EC-28, EC-35, EC-36, EC-38, X86-P22 |
 | `x86:mov/base-ext-disp8-r8/legacy` | `41884000` | src: `x86.gpr8`/`r8` → `[19,3]` (excl 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | EC-02, EC-06, EC-27, EC-28, EC-35, EC-36, EC-38, X86-P22 |
 | `x86:mov/base-ext-disp32-r8/legacy` | `41888000000000` | src: `x86.gpr8`/`r8` → `[19,3]` (excl 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | EC-02, EC-06, EC-27, EC-28, EC-35, EC-36, EC-38, X86-P22 |
+| `x86:mov/r16-rsp-disp8/legacy` | `668b442400` | dest: `x86.gpr16`/`r16` → `[19,3]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | EC-02, EC-27, EC-35, EC-36, X86-P23 |
+| `x86:mov/r16-rsp-disp32/legacy` | `668b842400000000` | dest: `x86.gpr16`/`r16` → `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | EC-02, EC-27, EC-35, EC-36, X86-P23 |
+| `x86:mov/r16-r12-disp8/legacy` | `66418b442400` | dest: `x86.gpr16`/`r16` → `[27,3]`; disp: `x86.imm`/`disp8` → `[40,8]` | 6 | EC-02, EC-27, EC-35, EC-36, X86-P23 |
+| `x86:mov/r16-r12-disp32/legacy` | `66418b842400000000` | dest: `x86.gpr16`/`r16` → `[27,3]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | EC-02, EC-27, EC-35, EC-36, X86-P23 |
+| `x86:mov/rsp-disp8-r16/legacy` | `6689442400` | src: `x86.gpr16`/`r16` → `[19,3]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | EC-02, EC-27, EC-35, EC-36, X86-P23 |
+| `x86:mov/rsp-disp32-r16/legacy` | `6689842400000000` | src: `x86.gpr16`/`r16` → `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | EC-02, EC-27, EC-35, EC-36, X86-P23 |
+| `x86:mov/r12-disp8-r16/legacy` | `664189442400` | src: `x86.gpr16`/`r16` → `[27,3]`; disp: `x86.imm`/`disp8` → `[40,8]` | 6 | EC-02, EC-27, EC-35, EC-36, X86-P23 |
+| `x86:mov/r12-disp32-r16/legacy` | `664189842400000000` | src: `x86.gpr16`/`r16` → `[27,3]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | EC-02, EC-27, EC-35, EC-36, X86-P23 |
+| `x86:mov/r8-rsp-disp8/legacy` | `8a442400` | dest: `x86.gpr8`/`r8` → `[11,3]` (excl 4, 5, 6, 7); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/r8-rsp-disp32/legacy` | `8a842400000000` | dest: `x86.gpr8`/`r8` → `[11,3]` (excl 4, 5, 6, 7); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/r8-r12-disp8/legacy` | `418a442400` | dest: `x86.gpr8`/`r8` → `[19,3]` (excl 4, 5, 6, 7); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/r8-r12-disp32/legacy` | `418a842400000000` | dest: `x86.gpr8`/`r8` → `[19,3]` (excl 4, 5, 6, 7); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/rsp-disp8-r8/legacy` | `88442400` | src: `x86.gpr8`/`r8` → `[11,3]` (excl 4, 5, 6, 7); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/rsp-disp32-r8/legacy` | `88842400000000` | src: `x86.gpr8`/`r8` → `[11,3]` (excl 4, 5, 6, 7); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/r12-disp8-r8/legacy` | `4188442400` | src: `x86.gpr8`/`r8` → `[19,3]` (excl 4, 5, 6, 7); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/r12-disp32-r8/legacy` | `4188842400000000` | src: `x86.gpr8`/`r8` → `[19,3]` (excl 4, 5, 6, 7); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/r8h-rsp-disp8/legacy` | `8a642400` | dest: `x86.gpr8h`/`r8h` → `[11,3]` (excl 0, 1, 2, 3); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/r8h-rsp-disp32/legacy` | `8aa42400000000` | dest: `x86.gpr8h`/`r8h` → `[11,3]` (excl 0, 1, 2, 3); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/rsp-disp8-r8h/legacy` | `88642400` | src: `x86.gpr8h`/`r8h` → `[11,3]` (excl 0, 1, 2, 3); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/rsp-disp32-r8h/legacy` | `88a42400000000` | src: `x86.gpr8h`/`r8h` → `[11,3]` (excl 0, 1, 2, 3); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/r8-rsp-disp8-rex/legacy` | `408a642400` | dest: `x86.gpr8`/`r8` → `[19,3]` (excl 0, 1, 2, 3); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/r8-rsp-disp32-rex/legacy` | `408aa42400000000` | dest: `x86.gpr8`/`r8` → `[19,3]` (excl 0, 1, 2, 3); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/r8-r12-disp8-rex/legacy` | `418a642400` | dest: `x86.gpr8`/`r8` → `[19,3]` (excl 0, 1, 2, 3); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/r8-r12-disp32-rex/legacy` | `418aa42400000000` | dest: `x86.gpr8`/`r8` → `[19,3]` (excl 0, 1, 2, 3); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/rsp-disp8-r8-rex/legacy` | `4088642400` | src: `x86.gpr8`/`r8` → `[19,3]` (excl 0, 1, 2, 3); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/rsp-disp32-r8-rex/legacy` | `4088a42400000000` | src: `x86.gpr8`/`r8` → `[19,3]` (excl 0, 1, 2, 3); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/r12-disp8-r8-rex/legacy` | `4188642400` | src: `x86.gpr8`/`r8` → `[19,3]` (excl 0, 1, 2, 3); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
+| `x86:mov/r12-disp32-r8-rex/legacy` | `4188a42400000000` | src: `x86.gpr8`/`r8` → `[19,3]` (excl 0, 1, 2, 3); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | EC-02, EC-27, EC-28, EC-35, EC-36, X86-P23 |
 
 Placements are written `[bit_offset, width]`, with ` inverted` appended when the
 chunk is complemented. In the legacy SSE row
@@ -738,9 +767,28 @@ row because `movb %ah, 8(%r8)` cannot be encoded. A low base on an extension
 row is `E-RANGE-004` (`N16v`), `%r12` on either window is the same code
 (`N16w`, `N16x`), base `16` is `E-OPERAND-004` (`N14u`), `x86.gpr8h` on a new
 byte row is `E-OPERAND-001` plus `E-RANGE-004` (`N02t`), and naming a new row
-against `0.17.0` is `E-FORM-001` (`N01ao`). Still deferred on this axis: the
-`%rsp`/`%r12` SIB rows, `mod = 00` for the GPR rows, and the four-bit
-`r8b`–`r15b`/`r8w`–`r15w` registers.
+against `0.17.0` is `E-FORM-001` (`N01ao`). Still deferred on this axis: `mod
+= 00` for the GPR rows and the four-bit `r8b`–`r15b`/`r8w`–`r15w` registers.
+
+`0.19.0` adds the two bases `0.18.0` left out (`ADR-0046`). `%rsp` forces
+`r/m = 100` and spends a `SIB` byte (`24`), and `%r12` spends the same byte
+plus `REX.B`, so the base leaves the operand list and enters the template:
+twenty-eight fixed-base rows carry only the register and the displacement, the
+shape `0.3.0`/`0.7.0` gave `movq`. The prefixes are template bytes, so `ModRM`
+and the displacement move one byte later than on the `-base-disp*` rows — the
+word `%rsp` pair keeps `[19,3]`/`[32,8]`, the word `%r12` pair reads
+`[27,3]`/`[40,8]`, the REX-less byte `%rsp` pair `[11,3]`/`[24,8]`, and every
+row whose template carries a `REX` byte `[19,3]`/`[32,8]`. The register
+windows do not move: the low-byte rows still carry 0–3, the `40` rows 4–7, and
+the high-byte rows 4–7 with `%rsp` only, because `movb %ah, 8(%r12)` has no
+encoding — the `REX.B` byte that names `%r12` renames `ah` to `spl`. Naming a
+row against `0.18.0` is `E-FORM-001` (`N01ap`), the absent high-byte `%r12` row
+is the same code (`N01aq`), a `x86.gpr16` operand on a byte row is two
+`E-OPERAND-001` (`N02u`), content `128` on a `disp8` slot is `E-RANGE-001`
+(`N03h`), register `8` is `E-OPERAND-004` (`N14v`), and number `0` on a `40`
+row is `E-RANGE-004` (`N16y`). Still deferred on this axis: `mod = 00` for the
+GPR rows, index/scale under these opcodes, the `0x67` address-size prefix, and
+the four-bit `r8b`–`r15b`/`r8w`–`r15w` registers.
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 

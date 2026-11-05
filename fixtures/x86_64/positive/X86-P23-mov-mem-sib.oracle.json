@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0048/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "0f9fb3420f7147e3bd07ea37aafd985cfa5db2de142a1114d6d7a69359f30c43",
+  "output_sha256": "fcc30907a8fb5e79f04401bcae20c840fff13a6309af2f10a4bfc63c60e1c451",
+  "size": 178,
+  "records": 0,
+  "notes": "Twenty-eight fixed-base SIB instructions, one per 0.19.0 row. Instructions 1-8 are the word rows: load/store, %rsp and %r12, disp8 (content 8) and disp32 (content 128); the %r12 form is one byte longer because it adds REX.B. Instructions 9-16 are the REX-less low-byte rows, 17-20 the high-byte rows (%rsp only, since movb %ah, 8(%r12) has no encoding), and 21-28 the template-40 rows. Every row spends the SIB byte 24 (base 100, index 100) and the displacement lands one byte later than on the corresponding -base-disp row: bit 32/40 on the word rows, 24/32 on the byte rows, and 32 on the 40 rows. input_sha256 is fixture.asm (the source above); output_sha256 is the 178-byte .text."
+}
