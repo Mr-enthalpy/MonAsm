@@ -1,0 +1,16 @@
+movaps 8(%rsp), %xmm0
+movaps 8(%r12), %xmm1
+movaps 128(%rsp), %xmm2
+movaps 128(%r12), %xmm3
+movaps %xmm4, 8(%rsp)
+movaps %xmm5, 8(%r12)
+movaps %xmm6, 128(%rsp)
+movaps %xmm7, 128(%r12)
+vmovaps 8(%rsp), %xmm8
+vmovaps 8(%r12), %xmm9
+vmovaps 128(%rsp), %xmm14
+vmovaps 128(%r12), %xmm15
+vmovaps %xmm8, 8(%rsp)
+vmovaps %xmm9, 8(%r12)
+vmovaps %xmm14, 128(%rsp)
+vmovaps %xmm15, 128(%r12)

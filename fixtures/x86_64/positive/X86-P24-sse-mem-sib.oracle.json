@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0049/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "93dabe03b1a46cbf7a68a1ea52f4c0d634a8cb2ff58efe37399696d0d3952bda",
+  "output_sha256": "a8419c5c4e433df991705b3cb2257580fd281743ffdca051e4166e1aa356cb44",
+  "size": 120,
+  "records": 0,
+  "notes": "Sixteen fixed-base SIB instructions, one per 0.20.0 row. Instructions 1-8 are the legacy movaps rows: load and store, %rsp and %r12, disp8 (content 8) and disp32 (content 128), running xmm0-xmm7. A %r12 base adds the 41 REX.B byte, so 5/6 and 8/9 bytes. Instructions 9-16 are the VEX vmovaps rows in the same order, running xmm8-xmm15: the row already carries the inverted R bit, so a high register clears it (c5 f8 -> c5 78, c4 c1 78 -> c4 41 78) and the length is unchanged. %r12 forces the three-byte prefix, so 6/7 and 9/10 bytes. Every row spends the SIB byte 24 (scale 00, index 100, base 100); the base identity lives in REX.B / the VEX B bit, never in the SIB. The displacement lands one byte later than on the corresponding -base-disp row: bit 32/40 on the legacy rows and 40/48 on the VEX rows. input_sha256 is fixture.asm (the source above); output_sha256 is the 120-byte .text."
+}
