@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0036/P11.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "ee132884c9b64c1af57292821447c86535c81417e7d87644051b6ccbcba0f33e",
+  "output_sha256": "9cb771540e5da04bce8afb9df35e5d06c32bfe3fe1ba006a11ac3c5499ca5ad0",
+  "size": 93,
+  "records": 0,
+  "notes": "Seventeen `mov` instructions with an extended base. The general rows only add REX.B: `movq 8(%r8),%r9` is 4d 8b 48 08 (R for r9, B for r8), `movq 8(%r11),%rax` is 49 8b 43 08, `movq 8(%r13),%r15` is 4d 8b 7d 08, `movq 8(%r14),%rcx` is 49 8b 4e 08, `movq 8(%r15),%rdx` is 49 8b 57 08, and the signed disp8 ends are 49 8b 53 ff (-1 over r11) and 49 8b 47 7f (127 over r15). The disp32 rows are 4d 8b 88 80 00 00 00 (128 over r8) and 4d 8b bd 80 00 00 00 (128 over r13). `%rsp` and `%r12` share the SIB shape and differ only in REX.B: 4c 8b 4c 24 08 vs 4d 8b 4c 24 08 at disp8, 4c 8b bc 24 80 00 00 00 vs 4d 8b bc 24 80 00 00 00 at disp32; the store directions repeat the same pairs (4c/4d 89 4c 24 08 and 4c/4d 89 bc 24 80 00 00 00), and 4d 89 bd 80 00 00 00 is the general store over r13. Every displacement value fits the width of the form the plan names, so llvm-mc's own disp8/disp32 choice coincides with the named form and no promotion is being relied on."
+}

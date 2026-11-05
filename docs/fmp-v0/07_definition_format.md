@@ -237,6 +237,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.4.0.json` | `monasm.isa.x86` | `sha256:ee2141cbb17f338c5b4a9de0302076bb2416838c09f7c44e2ca097cb142a2682` |
 | `definitions/x86_64/0.5.0.json` | `monasm.isa.x86` | `sha256:24256f0c427447ee8db5506d7b395e3682dbb3b0317f0effa1ed3c4f75cc0aeb` |
 | `definitions/x86_64/0.6.0.json` | `monasm.isa.x86` | `sha256:79952b5dc726d18378651498ee35452645d08a4f7a66a133679bc86efa5839f5` |
+| `definitions/x86_64/0.7.0.json` | `monasm.isa.x86` | `sha256:8c40c948a3a103b7d0668a4539f5cc8bc95e3cdba12b62c0c6a00bbc2ee92f1c` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -259,7 +260,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.6.0`
+### 8.1 `x86-64` `0.1.0` … `0.7.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -272,14 +273,18 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:jmp/rel32/legacy` | `e900000000` | target: `x86.rel`/`rel32` → `[8,32]` | 5 | `EC-03` |
 | `x86:mov/r64-riprel32/legacy` | `488b0500000000` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `EC-06`, `EC-34`, `X86-P6` — 4-bit dest from `0.6.0` |
 | `x86:mov/riprel32-r64/legacy` | `48890500000000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `EC-06`, `EC-34`, `X86-P6` — 4-bit src from `0.6.0` |
-| `x86:mov/r64-base-disp8/legacy` | `488b4000` | dest: `x86.gpr64`/`r64` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
-| `x86:mov/r64-base-disp32/legacy` | `488b8000000000` | dest: `x86.gpr64`/`r64` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
-| `x86:mov/base-disp8-r64/legacy` | `48894000` | src: `x86.gpr64`/`r64` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
-| `x86:mov/base-disp32-r64/legacy` | `48898000000000` | src: `x86.gpr64`/`r64` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
-| `x86:mov/r64-rsp-disp8/legacy` | `488b442400` | dest: `x86.gpr64`/`r64` → `[19,3]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
-| `x86:mov/r64-rsp-disp32/legacy` | `488b842400000000` | dest: `x86.gpr64`/`r64` → `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
-| `x86:mov/rsp-disp8-r64/legacy` | `4889442400` | src: `x86.gpr64`/`r64` → `[19,3]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
-| `x86:mov/rsp-disp32-r64/legacy` | `4889842400000000` | src: `x86.gpr64`/`r64` → `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
+| `x86:mov/r64-base-disp8/legacy` | `488b4000` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]` (excl 4, 12); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | `EC-02`, `EC-06`, `EC-35`, `X86-P4` — 4-bit from `0.7.0` |
+| `x86:mov/r64-base-disp32/legacy` | `488b8000000000` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]` (excl 4, 12); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | `EC-02`, `EC-06`, `EC-35`, `X86-P4` — 4-bit from `0.7.0` |
+| `x86:mov/r64-rsp-disp8/legacy` | `488b442400` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-02`, `EC-06`, `EC-35`, `X86-P4` — 4-bit dest from `0.7.0` |
+| `x86:mov/r64-r12-disp8/legacy` | `498b442400` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-06`, `EC-35`, `X86-P11` — `0.7.0`+ |
+| `x86:mov/r64-rsp-disp32/legacy` | `488b842400000000` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-06`, `EC-35`, `X86-P4` — 4-bit dest from `0.7.0` |
+| `x86:mov/r64-r12-disp32/legacy` | `498b842400000000` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-06`, `EC-35`, `X86-P11` — `0.7.0`+ |
+| `x86:mov/base-disp8-r64/legacy` | `48894000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]` (excl 4, 12); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | `EC-02`, `EC-06`, `EC-35`, `X86-P4` — 4-bit from `0.7.0` |
+| `x86:mov/base-disp32-r64/legacy` | `48898000000000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]` (excl 4, 12); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | `EC-02`, `EC-06`, `EC-35`, `X86-P4` — 4-bit from `0.7.0` |
+| `x86:mov/rsp-disp8-r64/legacy` | `4889442400` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-02`, `EC-06`, `EC-35`, `X86-P4` — 4-bit src from `0.7.0` |
+| `x86:mov/r12-disp8-r64/legacy` | `4989442400` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-06`, `EC-35`, `X86-P11` — `0.7.0`+ |
+| `x86:mov/rsp-disp32-r64/legacy` | `4889842400000000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-06`, `EC-35`, `X86-P4` — 4-bit src from `0.7.0` |
+| `x86:mov/r12-disp32-r64/legacy` | `4989842400000000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-06`, `EC-35`, `X86-P11` — `0.7.0`+ |
 | `x86:mov/rm16-r16/legacy` | `6689c0` | dest: `x86.gpr16`/`rm16` → `[16,3]`; src: `x86.gpr16`/`r16` → `[19,3]` | 3 | `EC-36`, `X86-P5` — `0.4.0`+ |
 | `x86:mov/r16-rm16/legacy` | `668bc0` | dest: `x86.gpr16`/`r16` → `[19,3]`; src: `x86.gpr16`/`rm16` → `[16,3]` | 3 | `EC-36`, `X86-P5` — `0.4.0`+ |
 | `x86:mov/rm8h-r8h/legacy` | `88e4` | dest: `x86.gpr8h`/`rm8h` → `[8,3]` (excl 0, 1, 2, 3); src: `x86.gpr8h`/`r8h` → `[11,3]` (excl 0, 1, 2, 3) | 2 | `EC-36`, `X86-P5` — `0.4.0`+ |
@@ -306,7 +311,10 @@ so `r8`–`r15` are not encodable there: the template's `REX` byte is `0x48`, an
 no extension bit is declared for those registers. A plan that names
 `mov rax, r9` against `0.5.0` is rejected `E-OPERAND-004`; it is not emitted as
 `48 89 c8`, which decodes as `movq %rcx, %rax`. `0.6.0` widens those slots to
-four bits (`ADR-0033`); a plan that names `0.5.0` keeps the 3-bit table.
+four bits (`ADR-0033`); a plan that names `0.5.0` keeps the 3-bit table. `0.7.0`
+does the same for the base+displacement rows (`ADR-0034`): the register operand
+is `[2,1]` + `[19,3]`, and the base is `[0,1]` + `[16,3]`; `0.6.0` and earlier
+keep the 3-bit reading.
 
 Every row is verified against `llvm-mc` 23.1.2 in `EXP-0004`: each template byte
 string is decoded, and each `ModRM` and immediate/branch field is exercised
@@ -328,6 +336,15 @@ inside the template, so their `disp` starts at bit 32. `disp8` is signed 8 bits
 and `disp32` signed 32 bits, and a value outside the named row's field is
 `E-RANGE-001` rather than a re-formed instruction (`ADR-0028`, `EC-35`). Index
 and scale, `mod = 00`, the `0x67` address-size prefix and `moffs` remain absent.
+
+`0.7.0` widens the family to four bits (`ADR-0034`): the four general rows get a
+4-bit base and a 4-bit register operand, and the four `%rsp` rows get the wider
+register operand. `r8`–`r11`, `r13`–`r15` need only `REX.B` at `[0,1]`, so they
+use the general rows, which now exclude both SIB-forcing values: `4` (`%rsp`) and
+`12` (`%r12`). `%r12` has the same low three bits as `%rsp`, so it is four
+fixed-base rows of its own with `REX = 0x49` instead of `0x48`; the `%rsp` rows
+are unchanged. `REX.X` is still unexercised: it extends a `SIB` index, and no row
+has an index operand.
 
 `0.4.0` adds the five prefix rows: two 16-bit directions with `0x66` as
 template byte 0, the high-byte row, and the low-byte pair split by REX. The
