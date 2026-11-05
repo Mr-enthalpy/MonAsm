@@ -15,7 +15,7 @@ this file plus `AGENTS.md` alone.
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
 | 3 | Three-ISA vertical prototype | **in progress**: twenty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 9 positive and 30 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate |
-| 4 | Invariants, negative tests, replay | not started |
+| 4 | Invariants, negative tests, replay | **in progress**: `EXP-R1`/`R2`/`R4`/`R5`/`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs` (`EXP-0033`); `EXP-R3` is `unverified` because only one host exists |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
 ## Gates
@@ -82,14 +82,10 @@ this file plus `AGENTS.md` alone.
 
 ## Open decisions
 
-See `docs/fmp-v0/05_open_decisions.md`. Blocking items currently:
-
-| ID | Question | Blocks |
-|---|---|---|
-| OD-05 | Unknown fields and extensions | AC-10, Q10 |
-| OD-08 | Canonical wire form | AC-07 |
-
-OD-05 and OD-08 do not block the x86 slice. OD-07 is settled by ADR-0005 and
+See `docs/fmp-v0/05_open_decisions.md`. **No item blocks the slices:** every
+`OD-*` row is accepted as of 2026-11-05, with `OD-05` (unknown fields) settled by
+ADR-0031 and `OD-08` (canonical wire form) by ADR-0032. The Level 1 artifact
+envelope stays deferred by `OD-03`. OD-07 is settled by ADR-0005 and
 pinned by ADR-0006, and the AArch64 tables it authorised now exist: five MRS
 nodes generated the forms in `definitions/aarch64/0.1.0.json`, the same nodes
 generated `0.2.0.json` with one extra row for the `sh = 1` half of `A64-P2`
@@ -266,10 +262,10 @@ not cover is caught only by the weaker size check; it is now settled, and
    `N01aa`/`N01ab`/`N02l`/`N06`/`N14b` pin the absent family, the `0.4.0`
    boundary, the `zmm` operand, the extension-list mismatch and the `xmm8`
    field end. No `X86-P*` row remains outside v0.
-4. Close the remaining contract debt:
-   - `OD-05` (unknown fields/extensions) and `OD-08` (canonical wire form);
-   - the Level 1 artifact envelope, which is deferred by `OD-03` and is not
-     needed by the Level 0 gate.
+4. Contract debt is closed: `OD-05` (unknown fields/extensions) by ADR-0031,
+   pinned by `N21a`/`N21b` and the definition unit test, and `OD-08` (canonical
+   wire form) by ADR-0032, pinned by `EXP-R4`. The Level 1 artifact envelope
+   stays deferred by `OD-03` and is not needed by the Level 0 gate.
 5. Keep `python tools/check_ids.py`, `python tools/check_definition.py` and
    `python tools/check_rv64_source.py` green after every change, and keep
    `cargo test --workspace` green: it is the fixture gate, not a smoke test.

@@ -778,6 +778,29 @@ mod tests {
         assert!(format!("{error:?}").contains("x86.gpr8h"));
     }
 
+    /// `ADR-0031`: a definition is a closed object too, so a newer table cannot
+    /// smuggle a rule past an older loader by adding a field the loader ignores.
+    #[test]
+    fn unknown_definition_field_is_rejected() {
+        let text = document(&form(
+            "x86:mov/rm-r64/legacy",
+            "4889c0",
+            r#"{"role":"dest","kind":"x86.gpr64","target_type":"rm64","from":"reg_number","modifiers":[],"placements":[{"bit_offset":16,"width":3}]}"#,
+        ))
+        .replacen(
+            "\"forms\"",
+            "\"future_form_family\":1,\"forms\"",
+            1,
+        );
+        let error = read(text.as_bytes()).expect_err("a closed definition must reject the field");
+        assert_eq!(error.code(), codes::E_DEF_001);
+        assert!(
+            error.message().contains("future_form_family"),
+            "{}",
+            error.message()
+        );
+    }
+
     /// The same rule seen from the other side: without REX, value 4 is `ah`, so a
     /// `x86.gpr8` slot that accepts it would name the wrong register.
     #[test]

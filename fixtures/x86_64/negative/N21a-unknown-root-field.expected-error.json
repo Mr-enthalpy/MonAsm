@@ -1,0 +1,6 @@
+{
+  "errors": [
+    { "code": "E-PLAN-003", "path": "", "detail_keys": ["field", "object"] }
+  ],
+  "phase": "read"
+}

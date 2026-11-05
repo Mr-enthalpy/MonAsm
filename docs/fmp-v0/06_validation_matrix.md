@@ -30,6 +30,7 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 | N18 | Operand value is legal as a *literal* for the instruction but not inside the named form's field: `0x1000` on `add/x64-imm12-lsl0`, `0x123000` on `add/x64-imm12-lsl12`, `0x12340000` on `movz/x64-imm16-lsl16`, `0x12340000` on `movk/x64-imm16-lsl16`, `4096` on `sub/x64-imm12-lsl0`, `4096` on `adds/x64-imm12-lsl0`, or `4096` on `adds/w32-imm12-lsl0` | Reject, never switch to the other form or pre-scale the operand | E-RANGE-001 | aarch64 | `aarch64/negative/N18a-no-form-switch.fmp.json`, `aarch64/negative/N18b-operand-is-field-content.fmp.json`, `aarch64/negative/N18c-movz-pre-scaled-literal.fmp.json`, `aarch64/negative/N18d-sub-no-form-switch.fmp.json`, `aarch64/negative/N18e-adds-no-form-switch.fmp.json`, `aarch64/negative/N18f-w-adds-no-form-switch.fmp.json`, `aarch64/negative/N18g-movk-pre-scaled-literal.fmp.json` | aarch64 passing |
 | N19 | A byte-affecting variation is stated as an operand `modifiers` entry the slot does not permit (`{"name": "lsl", "value": 3}` on `aarch64:add/x64-x64-x64-lsl0`, `{"name": "lsl", "value": 3}` on the `index` of `aarch64:ldr/x64-base-regoff-lsl0`, or `{"name": "lsl", "value": 2}` on the `index` of `aarch64:ldr/w32-base-regoff-lsl0`) | Reject, never emit the word the unshifted form would produce | E-OPERAND-003 | aarch64 | `aarch64/negative/N19-modifier-is-not-a-carrier.fmp.json`, `aarch64/negative/N19b-regoff-modifier-is-not-a-carrier.fmp.json`, `aarch64/negative/N19c-w32-regoff-modifier-is-not-a-carrier.fmp.json` | aarch64 passing |
 | N20 | A fixup's pre-transform displacement is not a multiple of the slot's unit (`align_bits`), e.g. a literal load whose symbol is 2 bytes away | Reject, never round the displacement | E-RANGE-003 | aarch64, rv64, x86 | `aarch64/negative/N20-loadlit-fixup-misaligned.fmp.json` | aarch64 passing (`required_align 2`, `value 2`, at `/fixups/0/value_transform`) |
+| N21 | A plan or definition object carries a field the current format does not declare | Reject at read time, never ignore or carry the value | E-PLAN-003 / E-DEF-001 | x86 (plan), all (definition) | `x86_64/negative/N21a-unknown-root-field.fmp.json`, `x86_64/negative/N21b-unknown-instruction-field.fmp.json` | x86 passing (root path `""`, instruction path `/instructions/0`, detail keys `field`/`object`); the definition half is the unit test `unknown_definition_field_is_rejected` (`ADR-0031`) |
 
 N13's counterexample is `EXP-0002` W2: a same-length encoder defect turns
 `48 89 d8` (`mov rax, rbx`) into `49 89 d8` (`mov r8, rbx`), both 3 bytes and
@@ -88,12 +89,12 @@ raw commands in `research/evidence/experiments/EXP-0001-xirasm-boundary-probes.m
 
 | ID | Experiment | Method | Observable | Status |
 |---|---|---|---|---|
-| EXP-R1 | Repeated execution | Materialize the same plan 100 times in one process; compare bytes, fixup records, fingerprints | Byte equality | planned |
-| EXP-R2 | Cross-process | Run the CLI in N independent processes; compare hashes of artifacts | Hash equality | planned |
-| EXP-R3 | Different host environment | Run on a second OS/compiler/host where available; otherwise mark unverified | Hash equality or explicit `unverified` | planned |
-| EXP-R4 | Serialization replay | Serialize → parse → materialize; compare with direct materialization | Byte equality | planned |
-| EXP-R5 | Definition perturbation | Swap the definition for a modified one; expect E-DEF-001, not silent bytes | Error identity | planned |
-| EXP-R6 | Negative determinism | Repeat an invalid plan; compare error identity (code+path+detail keys), ignoring `message` | Identity equality | planned |
+| EXP-R1 | Repeated execution | Materialize the same plan 100 times in one process; compare bytes, fixup records, fingerprints | Byte equality | **passing** — 38 positive fixtures × 100 runs, canonical artifact equal (`EXP-0033` §1) |
+| EXP-R2 | Cross-process | Run the CLI in N independent processes; compare hashes of artifacts | Hash equality | **passing** — 3 plans × 4 CLI processes, canonical artifact equal to the in-process result (`EXP-0033` §2) |
+| EXP-R3 | Different host environment | Run on a second OS/compiler/host where available; otherwise mark unverified | Hash equality or explicit `unverified` | **unverified** — one Windows host; WSL has no distribution, no second machine was used (`EXP-0033` §6) |
+| EXP-R4 | Serialization replay | Serialize → parse → materialize; compare with direct materialization | Byte equality | **passing** — 38 positives × canonical and pretty round trips (`EXP-0033` §3) |
+| EXP-R5 | Definition perturbation | Swap the definition for a modified one; expect E-DEF-001, not silent bytes | Error identity | **passing** — a changed template is `E-DEF-001` at `/definition_identity/digest`, a renamed version is `E-DEF-002`; neither emits bytes (`EXP-0033` §4) |
+| EXP-R6 | Negative determinism | Repeat an invalid plan; compare error identity (code+path+detail keys), ignoring `message` | Identity equality | **passing** — 99 negatives × 100 runs (`EXP-0033` §5) |
 
 EXP-R3 must not be claimed unless actually executed. "Not tested on a second
 host" is the honest result.
@@ -108,9 +109,9 @@ host" is the honest result.
 | AC-04 | Encoding ambiguity proven absent | x86 `imm8`/`imm32`, `rel8`/`rel32`, `89`/`8B`, the `88`/`40 88`/`88h` register sets and the `legacy`/`vex`/`evex` families, plus RV64 `c.*` vs standard, are distinct `form_id`s; per-`EC` negative test per `02_encoding_choices.md`, "Validation obligation" | **satisfied for the frozen rows** (2026-11-05): each of the 27 frozen `EC` rows names a carrier that the fixtures reject when falsified (form variants through `N01`, operand classes through `N02`, excluded values through `N16`); the nine `draft` rows are outside the v0 surface and are listed in `02_encoding_choices.md`, "Open work" |
 | AC-05 | Fixups validated | x86 `rel32`; AArch64 `adrp`+`:lo12:`; RV64 `auipc`+`lo12` or B-type scatter | **satisfied** (2026-11-05): `X86-P8-local-and-external-branch` (`rel32` record), `X86-P6-rip-relative` (`R_X86_64_PC32`), `A64-P6-adrp-lo12-pair` (`adrp`+`lo12`), `RV-P8-pcrel-pair` (three records) and `RV-P8-pcrel-pair-resolved` (linked arithmetic) |
 | AC-06 | Strict rejection | All applicable N01–N13 with recorded codes | **satisfied for N01–N20 as applicable** (2026-11-05): every row has at least one fixture whose code, JSON Pointer and detail keys are compared exactly; N12 is not applicable to x86 v0 (single-site `rel32`), and N06 is exercised on x86 and rv64 |
-| AC-07 | Deterministic replay | EXP-R1, EXP-R2, EXP-R4, EXP-R5 | planned |
+| AC-07 | Deterministic replay | EXP-R1, EXP-R2, EXP-R4, EXP-R5 | **satisfied for one host** (2026-11-05): `EXP-R1`/`R2`/`R4`/`R5` pass, and `R6` covers negative identity (`EXP-0033`); `EXP-R3` stays `unverified`, so cross-platform replay is not claimed |
 | AC-08 | Reuse boundary backed by source evidence | `90_boundary_audit.md` with revision, file, symbol, line range | **done** for XirAsm; LLVM internals deferred (see audit §8) |
-| AC-09 | Unresolved problems stated | `05_open_decisions.md` with blocking impact, no "later" hand-waving | in progress |
+| AC-09 | Unresolved problems stated | `05_open_decisions.md` with blocking impact, no "later" hand-waving | **satisfied** (2026-11-05): every `OD-*` row is accepted, including OD-05 (ADR-0031) and OD-08 (ADR-0032); the only deferred item is the Level 1 envelope, which OD-03 records as out of scope |
 | AC-10 | Executable next step | Final report §H: modules, order, gates, blockers | planned |
 
 ## 4. Positive vectors

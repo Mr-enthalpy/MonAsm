@@ -61,8 +61,12 @@ Rules:
 - All lists have a specified order (§12); the materializer MUST NOT sort input
   lists implicitly, and MUST reject out-of-order lists (`E-LAYOUT-004`) rather
   than fixing them.
-- Unknown fields are rejected in v0 unless they are inside a versioned extension
-  object (OD-05).
+- Every object is closed. An unknown field is rejected at the level that carries
+  it (`E-PLAN-003`; the definition loader reports `E-DEF-001`), never ignored or
+  carried. There is no `x_*` namespace and no extension object in `fmp/0.1`
+  (OD-05, ADR-0031); a new field is a new `format_version` or definition
+  `version`. `target_identity.enabled_extensions` is an equality-checked target
+  set (`E-TARGET-001`), not an extension mechanism.
 - The plan contains no expressions, variables, includes, or references to
   external files (`INV-06`).
 
@@ -488,6 +492,12 @@ envelope is assembled, so an artifact is either complete and correct or absent.
 - Canonical JSON: keys sorted by Unicode code point, no insignificant
   whitespace, UTF-8 without BOM, LF newlines, integers only, no duplicate keys,
   `null` omitted when the field is optional and absent.
+- Canonical JSON is the v0 wire form for fingerprints, definition digests and
+  replay records (OD-08, ADR-0032). The reader accepts any valid JSON spelling of
+  the same *value*; canonicalization is applied after parsing, because a
+  whitespace difference cannot change an emitted byte. Duplicate keys are
+  rejected (`E-PLAN-004`) rather than resolved; a BOM is `E-PLAN-005`. A binary
+  transport, if ever added, is a new `format_version`, not a second spelling.
 - `sections` are serialized in `output_contract.section_order` order;
   `fragments` by `offset`; `instructions` by `(section_id, offset)`;
   `fixups` by `fixup_record_order`; `symbols` by `symbol_order` if present,
@@ -528,5 +538,6 @@ no partial artifact is returned.
 
 Fields marked `draft` above are tracked in `05_open_decisions.md`, with the
 blocking acceptance criterion for each. The integer/address model is OD-09 and
-is now settled in §3.1; the canonical wire form (OD-08) still affects §12 and
-must be settled before the first fixture is frozen.
+is now settled in §3.1. The unknown-field rule (OD-05) is settled by ADR-0031 and
+the canonical wire form (OD-08) by ADR-0032, so §12 no longer carries an open
+decision.
