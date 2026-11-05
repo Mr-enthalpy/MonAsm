@@ -1,0 +1,12 @@
+movb (%rax), %r8b
+movb (%r8), %r8b
+movb 8(%rax), %r16b
+movb 8(%rax), %ah
+movb 8(%r8), %ah
+movb 8(%rax), %spl
+movb 8(%r12), %spl
+movl 8(%rax), %r8d
+movq 8(%rax), %r8
+movw 8(%rax), %r8w
+movb 8(%rax), %al
+movb 8(%r8), %al

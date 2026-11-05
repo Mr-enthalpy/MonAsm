@@ -1,0 +1,12 @@
+movb 8(%rax), %r8b
+movb 200(%r8), %r15b
+movb 8(%rsp), %r9b
+movb 200(%rsp), %r14b
+movb 8(%r12), %r10b
+movb 200(%r12), %r11b
+movb %r8b, 8(%rax)
+movb %r15b, 200(%r8)
+movb %r9b, 8(%rsp)
+movb %r14b, 200(%rsp)
+movb %r10b, 8(%r12)
+movb %r11b, 200(%r12)

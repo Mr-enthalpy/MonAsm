@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0059/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "fbef6d94f7271cef25e51e514c493151434b0bcbdd0cb7cb61c17f7d811ac399",
+  "output_sha256": "9d10760a4199b0470e25b3f7f0d506f0580b4f4a10adaec7f4817d9479c16528",
+  "size": 74,
+  "records": 0,
+  "notes": "One byte-width mov per 0.30.0 row, twelve instructions, 74 bytes: load and store for the plain base, %rsp and %r12 windows, each at disp8 and disp32. Every row carries REX.R = 1 (the register's fourth bit); REX = 44 when REX.B = 0 and REX = 45 when the base is %r8-%r15. The plain-base rows put the base in ModRM.rm with mod = 01 and a displacement byte, %rsp is ModRM.r/m = 100 with SIB = 24, and %r12 is the same SIB byte with REX.B = 1. The register is ModRM.reg: %r8b is 000, %r15b is 111, %r14b is 110, %r11b is 011. Displacements are 8 and 200, and the disp8/disp32 choice is the row's target type, never the value. The mod = 00 no-displacement shape (44 8a 00) is a third legal encoding that no byte row carries, and movabsb (A0/A2) is a fourth. input_sha256 is fixture.asm (the source above); output_sha256 is the 74-byte .text."
+}
