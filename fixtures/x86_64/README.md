@@ -1,6 +1,6 @@
 # x86-64 fixtures
 
-Vectors: `X86-P1` … `X86-P30` in `docs/fmp-v0/06_validation_matrix.md`.
+Vectors: `X86-P1` … `X86-P31` in `docs/fmp-v0/06_validation_matrix.md`.
 
 ## Positive vectors present
 
@@ -36,6 +36,7 @@ Vectors: `X86-P1` … `X86-P30` in `docs/fmp-v0/06_validation_matrix.md`.
 | X86-P28 | `X86-P28-evex-mem-sib-nobase-index` | `EXP-0053` (the same family rule; `SIB.base = 101` at `mod = 00` drops the base and forces `disp32`, so the rows are eleven bytes at all three widths) |
 | X86-P29 | `X86-P29-evex-mem-sib-absolute` | `EXP-0054` (the same family rule; `SIB = 25` at `mod = 00` drops both the base and the index and makes the four-byte address the only operand, so the rows are eleven bytes at all three widths) |
 | X86-P30 | `X86-P30-gpr-mov-abs32` | `EXP-0055` (the same shape under the 64-bit GPR `mov` opcodes: `ModRM = 04`, `SIB = 25`, a four-bit raw register slot and a four-byte address, so both directions are eight bytes; `moffs` is a second legal encoding and has no row) |
+| X86-P31 | `X86-P31-gpr32-mov-abs32` | `EXP-0056` (the same shape at 32-bit width, split by register window: the low rows have no `REX` byte and are seven bytes, the `-ext` rows carry `REX = 44` and are eight bytes, and both keep `ModRM = 04`, `SIB = 25` and a four-byte signed address) |
 
 `X86-P6` ships in `definitions/x86_64/0.2.0.json` as two forms with
 `mod = 00`, `r/m = 101` and `disp32` as the last field (`ADR-0027`). `X86-P4`
@@ -154,6 +155,15 @@ rows — load and store, `disp32` only — with the same `ModRM = 04` and
 written raw (`[19,3]` plus `REX.R`), and the address is four bytes even for
 `0` (`ADR-0053`). `moffs` (`A0`–`A3`) is the second legal encoding at ten bytes
 and has no row, so `EC-05` is frozen (`N01bf`).
+
+`X86-P31` takes the shape to 32-bit width in `0.27.0`, where the same
+instruction has two legal lengths: `0x1234, %eax` is
+`8b 04 25 34 12 00 00` (seven bytes, no `REX` byte, the register in the
+three-bit `ModRM.reg`), while `0x1234, %r8d` is
+`44 8b 04 25 34 12 00 00` (eight bytes, `REX.R` at `[2,1]` with `0`–`7`
+excluded). Both directions are mirrored, and the address stays four bytes
+even for `0` (`ADR-0054`). Register `0` on an `-ext` row is `E-RANGE-004`
+(`N16ad`), because the template's `REX.R = 1` already means `%r8d`.
 
 ## Negative fixtures present
 

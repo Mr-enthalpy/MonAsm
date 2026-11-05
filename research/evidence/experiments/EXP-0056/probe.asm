@@ -1,0 +1,14 @@
+movl 0x1234, %eax
+movl %eax, 0x1234
+movl 0x0, %eax
+movl -1, %eax
+movl 0x7fffffff, %eax
+movl -2147483648, %edi
+movl 0x1234, %esp
+movl 0x1234, %r8d
+movl %r8d, 0x1234
+movl -1, %r15d
+movl %r10d, 0x0
+movl 0x1234, %r12d
+movl 0x1234, %r13d
+movl 0x1234, %r14d
