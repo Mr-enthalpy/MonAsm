@@ -68,18 +68,24 @@ inverts `B̄`/`R̄`), and the EVEX `disp8` carrying the compressed field content
 to `r8`–`r15` through a window per family: the four EVEX rows widen in place
 (their prefix already carries `B̄`), while legacy and VEX add eight
 `-base-ext` rows because reaching the high base adds a `REX` byte or a third
-VEX byte, and a placement's new `invert` flag writes `B̄` complemented.
-Twenty-nine definition documents are frozen and oracle-verified; the materializer
+VEX byte, and a placement's new `invert` flag writes `B̄` complemented. ADR-0038
+takes the SSE register to `xmm8`–`xmm15` through a window per family: the EVEX
+register-direct pair and the VEX/EVEX memory rows widen in place (`R̄` at bit 15,
+`B̄` at bit 13 for the EVEX source), while legacy adds three `REX.R`/`REX.B`
+register windows and four memory rows, and VEX adds a `C5 78 29` source window
+and a `C4 41 78 28` both-high window; the two legal VEX spellings of a high
+source make the opcode-29 row a pinned `EC-09` decision.
+Thirty definition documents are frozen and oracle-verified; the materializer
 and its fixture gate are implemented.
 
 | Area | State |
 |---|---|
 | Contract (`docs/fmp-v0/01_contract.md`) | draft, fields marked `TBD` where unproven |
 | Schema (`schema/fmp-v0.schema.json`) | draft, examples validate |
-| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), `0.2.0` (9 forms), `0.3.0` (17 forms), `0.4.0` (22 forms), `0.5.0` (25 forms), `0.6.0` (25 forms), `0.7.0` (29 forms), `0.8.0` (33 forms), `0.9.0` (45 forms) and `0.10.0` (53 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms), `0.8.0` (32 forms), `0.9.0` (44 forms), `0.10.0` (68 forms), `0.11.0` (92 forms), `0.12.0` (132 forms), `0.13.0` (135 forms), `0.14.0` (136 forms), `0.15.0` (152 forms), `0.16.0` (168 forms) and `0.17.0` (176 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
+| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), `0.2.0` (9 forms), `0.3.0` (17 forms), `0.4.0` (22 forms), `0.5.0` (25 forms), `0.6.0` (25 forms), `0.7.0` (29 forms), `0.8.0` (33 forms), `0.9.0` (45 forms), `0.10.0` (53 forms) and `0.11.0` (62 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms), `0.8.0` (32 forms), `0.9.0` (44 forms), `0.10.0` (68 forms), `0.11.0` (92 forms), `0.12.0` (132 forms), `0.13.0` (135 forms), `0.14.0` (136 forms), `0.15.0` (152 forms), `0.16.0` (168 forms) and `0.17.0` (176 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
 | Prototype (`prototype/`) | workspace compiled; all three slices materialize from the plan |
 | Oracles (`tools/oracle/`) | planned; `llvm-mc` (± `ld.lld`) drives the experiments |
-| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0039 |
+| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0040 |
 
 Read `docs/STATUS.md` for the current phase, gate status, and next action.
 

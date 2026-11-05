@@ -96,7 +96,8 @@ of template to an operand value (`INV-04`). Hence two disjoint rows.
 `%r12` is excluded from both windows (`E-RANGE-004`), exactly as `%rsp` is, and
 the `SIB` shape is still not a form under these opcodes. `xmm8` would add a
 second extension bit to every family, and in legacy it would multiply the
-window count by four (`REX.R` × `REX.B`); it is deferred to its own slice.
+window count by four (`REX.R` × `REX.B`); it is deferred to its own slice,
+which landed as `ADR-0038` / `EXP-0040`.
 
 `8(%r9)` and `-8(%r10)`/`-16(%r10)` were also measured as ordinary bases:
 `41 0f 28 41 08`, `c4 c1 78 28 41 08`, `62 d1 7c 08 28 81 08 00 00 00` (EVEX

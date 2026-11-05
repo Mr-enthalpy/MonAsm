@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0040/P15.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "84e9e8c60c87314a3a25761ff740c9c0514040c56f844e4e5803caa249cdf366",
+  "output_sha256": "8b90dc8584225038019f697a6cbf490520cb8a54297069456b99c7731d299305",
+  "size": 128,
+  "records": 0,
+  "notes": "Twenty-three instructions put `xmm8`-`xmm15` in every SSE family. Legacy grows a `REX` byte (`44`/`41`/`45` for dest, src or both), VEX keeps four bytes when only the source is high by using the store opcode 29 (`c5 78 29 c8`), and needs the three-byte `C4` form when both are high (`c4 41 78 28 c1`). EVEX keeps its six-byte register-direct form and its seven-byte `disp8*16` memory form. The last eleven instructions cover the widened memory rows: legacy `44`/`45` with a 4-bit base, VEX `c5 78`/`c4 41 78`, and EVEX `P0 = 71`/`51`. `input_sha256` is P15.asm (578 bytes, the source above); `output_sha256` is the 128-byte .text."
+}

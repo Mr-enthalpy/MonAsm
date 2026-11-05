@@ -250,6 +250,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.8.0.json` | `monasm.isa.x86` | `sha256:e55f694ae29e90854c8352aba60202cbd060d6333aff2a69b2e54978910155f5` |
 | `definitions/x86_64/0.9.0.json` | `monasm.isa.x86` | `sha256:cc538253ba2d8a111ee16a8d5a8db1aa6efaaed75270889eed20f0f2f5ed6eb8` |
 | `definitions/x86_64/0.10.0.json` | `monasm.isa.x86` | `sha256:0c10ff1c373eea2fe6098e67da3047081b34a5779d9ec492c47069ac73613442` |
+| `definitions/x86_64/0.11.0.json` | `monasm.isa.x86` | `sha256:d9669be62267ecd90d69dc9f936bcb947948b8c1ec7c7ba0670eb63f32de0570` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -272,7 +273,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.10.0`
+### 8.1 `x86-64` `0.1.0` … `0.11.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -297,38 +298,47 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:mov/r12-disp8-r64/legacy` | `4989442400` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-06`, `EC-35`, `X86-P11` — `0.7.0`+ |
 | `x86:mov/rsp-disp32-r64/legacy` | `4889842400000000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-06`, `EC-35`, `X86-P4` — 4-bit src from `0.7.0` |
 | `x86:mov/r12-disp32-r64/legacy` | `4989842400000000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-06`, `EC-35`, `X86-P11` — `0.7.0`+ |
-| `x86:mov/r64-base-index-disp8/legacy` | `488b440000` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]`; index: `x86.gpr64`/`sib_index` → `[1,1]`, `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-35`, `EC-37`, `X86-P12` — `0.8.0`+ |
-| `x86:mov/r64-base-index-disp32/legacy` | `488b840000000000` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]`; index: `x86.gpr64`/`sib_index` → `[1,1]`, `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-35`, `EC-37`, `X86-P12` — `0.8.0`+ |
-| `x86:mov/base-index-disp8-r64/legacy` | `4889440000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]`; index: `x86.gpr64`/`sib_index` → `[1,1]`, `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-35`, `EC-37`, `X86-P12` — `0.8.0`+ |
-| `x86:mov/base-index-disp32-r64/legacy` | `4889840000000000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]`; index: `x86.gpr64`/`sib_index` → `[1,1]`, `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-35`, `EC-37`, `X86-P12` — `0.8.0`+ |
 | `x86:mov/rm16-r16/legacy` | `6689c0` | dest: `x86.gpr16`/`rm16` → `[16,3]`; src: `x86.gpr16`/`r16` → `[19,3]` | 3 | `EC-36`, `X86-P5` — `0.4.0`+ |
 | `x86:mov/r16-rm16/legacy` | `668bc0` | dest: `x86.gpr16`/`r16` → `[19,3]`; src: `x86.gpr16`/`rm16` → `[16,3]` | 3 | `EC-36`, `X86-P5` — `0.4.0`+ |
 | `x86:mov/rm8h-r8h/legacy` | `88e4` | dest: `x86.gpr8h`/`rm8h` → `[8,3]` (excl 0, 1, 2, 3); src: `x86.gpr8h`/`r8h` → `[11,3]` (excl 0, 1, 2, 3) | 2 | `EC-36`, `X86-P5` — `0.4.0`+ |
 | `x86:mov/rm8-r8/legacy` | `88c0` | dest: `x86.gpr8`/`rm8` → `[8,3]` (excl 4, 5, 6, 7); src: `x86.gpr8`/`r8` → `[11,3]` (excl 4, 5, 6, 7) | 2 | `EC-36`, `X86-P5` — `0.4.0`+ |
 | `x86:mov/rm8-r8-rex/legacy` | `4088e0` | dest: `x86.gpr8`/`rm8` → `[16,3]` (excl 0, 1, 2, 3); src: `x86.gpr8`/`r8` → `[19,3]` (excl 0, 1, 2, 3) | 3 | `EC-36`, `X86-P5` — `0.4.0`+ |
 | `x86:movaps/xmm-xmm/legacy` | `0f28c0` | dest: `x86.xmm`/`xmm` → `[19,3]`; src: `x86.xmm`/`xmm` → `[16,3]` | 3 | `EC-09`, `X86-P9` — `0.5.0`+ |
-| `x86:vmovaps/xmm-xmm/vex` | `c5f828c0` | dest: `x86.xmm`/`xmm` → `[27,3]`; src: `x86.xmm`/`xmm` → `[24,3]` | 4 | `EC-09`, `X86-P9` — `0.5.0`+ |
-| `x86:vmovaps/xmm-xmm/evex` | `62f17c0828c0` | dest: `x86.xmm`/`xmm` → `[43,3]`; src: `x86.xmm`/`xmm` → `[40,3]` | 6 | `EC-09`, `X86-P9` — `0.5.0`+ |
+| `x86:vmovaps/xmm-xmm/vex` | `c5f828c0` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; src: `x86.xmm`/`xmm` → `[24,3]` | 4 | `EC-09`, `X86-P15` — dest 4-bit from `0.11.0`; src stays 3-bit |
+| `x86:vmovaps/xmm-xmm/evex` | `62f17c0828c0` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[43,3]`; src: `x86.xmm`/`xmm` → `[13,1]` inverted, `[40,3]` | 6 | `EC-09`, `X86-P15` — both 4-bit from `0.11.0` |
+| `x86:mov/r64-base-index-disp8/legacy` | `488b440000` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]`; index: `x86.gpr64`/`sib_index` → `[1,1]`, `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-35`, `EC-37`, `X86-P12` — `0.8.0`+ |
+| `x86:mov/r64-base-index-disp32/legacy` | `488b840000000000` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]`; index: `x86.gpr64`/`sib_index` → `[1,1]`, `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-35`, `EC-37`, `X86-P12` — `0.8.0`+ |
+| `x86:mov/base-index-disp8-r64/legacy` | `4889440000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]`; index: `x86.gpr64`/`sib_index` → `[1,1]`, `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-35`, `EC-37`, `X86-P12` — `0.8.0`+ |
+| `x86:mov/base-index-disp32-r64/legacy` | `4889840000000000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]`; index: `x86.gpr64`/`sib_index` → `[1,1]`, `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-35`, `EC-37`, `X86-P12` — `0.8.0`+ |
 | `x86:movaps/xmm-base-disp8/legacy` | `0f284000` | dest: `x86.xmm`/`xmm` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | `EC-02`, `EC-09`, `EC-35`, `EC-38`, `X86-P13` — `0.9.0`+ |
 | `x86:movaps/xmm-base-disp32/legacy` | `0f288000000000` | dest: `x86.xmm`/`xmm` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | `EC-02`, `EC-09`, `EC-35`, `EC-38`, `X86-P13` — `0.9.0`+ |
 | `x86:movaps/base-disp8-xmm/legacy` | `0f294000` | src: `x86.xmm`/`xmm` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `X86-P13` — `0.9.0`+ |
 | `x86:movaps/base-disp32-xmm/legacy` | `0f298000000000` | src: `x86.xmm`/`xmm` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `X86-P13` — `0.9.0`+ |
-| `x86:vmovaps/xmm-base-disp8/vex` | `c5f8284000` | dest: `x86.xmm`/`xmm` → `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-09`, `EC-35`, `EC-38`, `X86-P13` — `0.9.0`+ |
-| `x86:vmovaps/xmm-base-disp32/vex` | `c5f8288000000000` | dest: `x86.xmm`/`xmm` → `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-09`, `EC-35`, `EC-38`, `X86-P13` — `0.9.0`+ |
-| `x86:vmovaps/base-disp8-xmm/vex` | `c5f8294000` | src: `x86.xmm`/`xmm` → `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `X86-P13` — `0.9.0`+ |
-| `x86:vmovaps/base-disp32-xmm/vex` | `c5f8298000000000` | src: `x86.xmm`/`xmm` → `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `X86-P13` — `0.9.0`+ |
-| `x86:vmovaps/xmm-base-disp8x16/evex` | `62f17c08284000` | dest: `x86.xmm`/`xmm` → `[43,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[40,3]` (excl 4, 12); disp: `x86.imm`/`disp8x16` → `[48,8]` | 7 | `EC-09`, `EC-35`, `EC-38`, `EC-39`, `EC-40`, `X86-P13` — 4-bit base from `0.10.0` |
-| `x86:vmovaps/xmm-base-disp32/evex` | `62f17c08288000000000` | dest: `x86.xmm`/`xmm` → `[43,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[40,3]` (excl 4, 12); disp: `x86.imm`/`disp32` → `[48,32]` | 10 | `EC-09`, `EC-35`, `EC-38`, `EC-39`, `EC-40`, `X86-P13` — 4-bit base from `0.10.0` |
-| `x86:vmovaps/base-disp8x16-xmm/evex` | `62f17c08294000` | src: `x86.xmm`/`xmm` → `[43,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[40,3]` (excl 4, 12); disp: `x86.imm`/`disp8x16` → `[48,8]` | 7 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `EC-39`, `EC-40`, `X86-P13` — 4-bit base from `0.10.0` |
-| `x86:vmovaps/base-disp32-xmm/evex` | `62f17c08298000000000` | src: `x86.xmm`/`xmm` → `[43,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[40,3]` (excl 4, 12); disp: `x86.imm`/`disp32` → `[48,32]` | 10 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `EC-39`, `EC-40`, `X86-P13` — 4-bit base from `0.10.0` |
+| `x86:vmovaps/xmm-base-disp8/vex` | `c5f8284000` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-09`, `EC-35`, `EC-38`, `X86-P15` — `xmm` 4-bit from `0.11.0` |
+| `x86:vmovaps/xmm-base-disp32/vex` | `c5f8288000000000` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-09`, `EC-35`, `EC-38`, `X86-P15` — `xmm` 4-bit from `0.11.0` |
+| `x86:vmovaps/base-disp8-xmm/vex` | `c5f8294000` | src: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `X86-P15` — `xmm` 4-bit from `0.11.0` |
+| `x86:vmovaps/base-disp32-xmm/vex` | `c5f8298000000000` | src: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `X86-P15` — `xmm` 4-bit from `0.11.0` |
+| `x86:vmovaps/xmm-base-disp8x16/evex` | `62f17c08284000` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[43,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[40,3]` (excl 4, 12); disp: `x86.imm`/`disp8x16` → `[48,8]` | 7 | `EC-09`, `EC-35`, `EC-38`, `EC-39`, `EC-40`, `X86-P15` — `xmm` 4-bit from `0.11.0`; base 4-bit from `0.10.0` |
+| `x86:vmovaps/xmm-base-disp32/evex` | `62f17c08288000000000` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[43,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[40,3]` (excl 4, 12); disp: `x86.imm`/`disp32` → `[48,32]` | 10 | `EC-09`, `EC-35`, `EC-38`, `EC-39`, `EC-40`, `X86-P15` — `xmm` 4-bit from `0.11.0`; base 4-bit from `0.10.0` |
+| `x86:vmovaps/base-disp8x16-xmm/evex` | `62f17c08294000` | src: `x86.xmm`/`xmm` → `[15,1]` inverted, `[43,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[40,3]` (excl 4, 12); disp: `x86.imm`/`disp8x16` → `[48,8]` | 7 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `EC-39`, `EC-40`, `X86-P15` — `xmm` 4-bit from `0.11.0`; base 4-bit from `0.10.0` |
+| `x86:vmovaps/base-disp32-xmm/evex` | `62f17c08298000000000` | src: `x86.xmm`/`xmm` → `[15,1]` inverted, `[43,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[40,3]` (excl 4, 12); disp: `x86.imm`/`disp32` → `[48,32]` | 10 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `EC-39`, `EC-40`, `X86-P15` — `xmm` 4-bit from `0.11.0`; base 4-bit from `0.10.0` |
 | `x86:movaps/xmm-base-ext-disp8/legacy` | `400f284000` | dest: `x86.xmm`/`xmm` → `[27,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-02`, `EC-06`, `EC-09`, `EC-35`, `EC-38`, `X86-P14` — `0.10.0`+ |
 | `x86:movaps/xmm-base-ext-disp32/legacy` | `400f288000000000` | dest: `x86.xmm`/`xmm` → `[27,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-06`, `EC-09`, `EC-35`, `EC-38`, `X86-P14` — `0.10.0`+ |
 | `x86:movaps/base-ext-disp8-xmm/legacy` | `400f294000` | src: `x86.xmm`/`xmm` → `[27,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-06`, `EC-09`, `EC-27`, `EC-35`, `EC-38`, `X86-P14` — `0.10.0`+ |
 | `x86:movaps/base-ext-disp32-xmm/legacy` | `400f298000000000` | src: `x86.xmm`/`xmm` → `[27,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-06`, `EC-09`, `EC-27`, `EC-35`, `EC-38`, `X86-P14` — `0.10.0`+ |
-| `x86:vmovaps/xmm-base-ext-disp8/vex` | `c4c178284000` | dest: `x86.xmm`/`xmm` → `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `EC-09`, `EC-35`, `EC-38`, `EC-40`, `X86-P14` — `0.10.0`+ |
-| `x86:vmovaps/xmm-base-ext-disp32/vex` | `c4c178288000000000` | dest: `x86.xmm`/`xmm` → `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-09`, `EC-35`, `EC-38`, `EC-40`, `X86-P14` — `0.10.0`+ |
-| `x86:vmovaps/base-ext-disp8-xmm/vex` | `c4c178294000` | src: `x86.xmm`/`xmm` → `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `EC-40`, `X86-P14` — `0.10.0`+ |
-| `x86:vmovaps/base-ext-disp32-xmm/vex` | `c4c178298000000000` | src: `x86.xmm`/`xmm` → `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `EC-40`, `X86-P14` — `0.10.0`+ |
+| `x86:vmovaps/xmm-base-ext-disp8/vex` | `c4c178284000` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `EC-09`, `EC-35`, `EC-38`, `EC-40`, `X86-P15` — `xmm` 4-bit from `0.11.0` |
+| `x86:vmovaps/xmm-base-ext-disp32/vex` | `c4c178288000000000` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-09`, `EC-35`, `EC-38`, `EC-40`, `X86-P15` — `xmm` 4-bit from `0.11.0` |
+| `x86:vmovaps/base-ext-disp8-xmm/vex` | `c4c178294000` | src: `x86.xmm`/`xmm` → `[15,1]` inverted, `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `EC-40`, `X86-P15` — `xmm` 4-bit from `0.11.0` |
+| `x86:vmovaps/base-ext-disp32-xmm/vex` | `c4c178298000000000` | src: `x86.xmm`/`xmm` → `[15,1]` inverted, `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `EC-40`, `X86-P15` — `xmm` 4-bit from `0.11.0` |
+| `x86:movaps/xmm-ext-xmm/legacy` | `400f28c0` | dest: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); src: `x86.xmm`/`xmm` → `[24,3]` | 4 | `EC-06`, `EC-09`, `X86-P15` — dest `REX.R` from `0.11.0` |
+| `x86:movaps/xmm-xmm-ext/legacy` | `400f28c0` | dest: `x86.xmm`/`xmm` → `[27,3]`; src: `x86.xmm`/`xmm` → `[0,1]`, `[24,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7) | 4 | `EC-06`, `EC-09`, `X86-P15` — src `REX.B` from `0.11.0` |
+| `x86:movaps/xmm-ext-xmm-ext/legacy` | `400f28c0` | dest: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); src: `x86.xmm`/`xmm` → `[0,1]`, `[24,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7) | 4 | `EC-06`, `EC-09`, `X86-P15` — both `REX` bits from `0.11.0` |
+| `x86:vmovaps/xmm-xmm-src-ext/vex` | `c5f829c0` | dest: `x86.xmm`/`xmm` → `[24,3]`; src: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7) | 4 | `EC-09`, `EC-40`, `X86-P15` — `R̄` + opcode 29 from `0.11.0` |
+| `x86:vmovaps/xmm-xmm-both-ext/vex` | `c4e17828c0` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[35,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); src: `x86.xmm`/`xmm` → `[13,1]` inverted, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7) | 5 | `EC-09`, `EC-40`, `X86-P15` — `R̄`/`B̄` from `0.11.0` |
+| `x86:movaps/xmm-ext-base-disp8/legacy` | `400f284000` | dest: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 4, 12); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-02`, `EC-06`, `EC-09`, `EC-35`, `EC-38`, `X86-P15` — dest `REX.R` + 4-bit base from `0.11.0` |
+| `x86:movaps/xmm-ext-base-disp32/legacy` | `400f288000000000` | dest: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 4, 12); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-06`, `EC-09`, `EC-35`, `EC-38`, `X86-P15` — dest `REX.R` + 4-bit base from `0.11.0` |
+| `x86:movaps/base-disp8-xmm-ext/legacy` | `400f294000` | src: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 4, 12); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-06`, `EC-09`, `EC-27`, `EC-35`, `EC-38`, `X86-P15` — src `REX.R` + 4-bit base from `0.11.0` |
+| `x86:movaps/base-disp32-xmm-ext/legacy` | `400f298000000000` | src: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 4, 12); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-06`, `EC-09`, `EC-27`, `EC-35`, `EC-38`, `X86-P15` — src `REX.R` + 4-bit base from `0.11.0` |
 
 Placements are written `[bit_offset, width]`, with ` inverted` appended when the
 chunk is complemented. In the legacy SSE row
@@ -338,7 +348,11 @@ is `ModRM.reg`; the VEX and EVEX rows are the same two fields at `[24,3]`/
 `[24,8]` is byte 3. The `0.10.0` extension rows move `ModRM` one byte further
 (`[24,3]`/`[27,3]` after `40 0F 28`, `[32,3]`/`[35,3]` after `C4 C1 78`), and
 the base's fourth bit sits at `[0,1]` (legacy `REX.B`) or `[13,1]` inverted
-(VEX and EVEX `B̄`). In the register-to-register rows the two `ModRM` bits
+(VEX and EVEX `B̄`). The `0.11.0` rows put the `xmm` register's fourth bit in
+`REX.R` at `[2,1]` or `REX.B` at `[0,1]` (legacy), or in the inverted `R̄` at
+`[15,1]` when the register is `ModRM.reg` and the inverted `B̄` at `[13,1]`
+when it is `ModRM.rm` (EVEX register-direct source, and every VEX/EVEX base).
+In the register-to-register rows the two `ModRM` bits
 above them (`bits 6–7` of `ModRM`) are `mod = 0b11`, part of the template and
 not owned by any operand; the memory rows fix `mod = 0b01`/`0b10` the same way.
 
@@ -494,7 +508,34 @@ with `REX.B` at `[0,1]`, VEX `C4 C1 78 28 /r` with the inverted `B̄` at `[13,1]
 The two windows are disjoint by `excluded`: the low rows exclude `8`–`15` and
 the extension rows exclude `0`–`7` (plus `12`, which still forces a `SIB` byte),
 so no plan can name a base and get two encodings. `xmm8` remains
-`E-OPERAND-004`; the register slot is unchanged at three bits.
+`E-OPERAND-004` on those rows; `0.11.0` takes the register next.
+
+`0.11.0` widens the SSE register to `xmm8`–`xmm15` (`ADR-0038`). The EVEX
+register-direct rows widen in place: `dest` gains `[15,1]` inverted and `src`
+gains `[13,1]` inverted, because in a register-direct EVEX instruction the
+destination is `ModRM.reg` and the source is `ModRM.rm`. Every VEX and EVEX
+memory row widens its `xmm` slot in place at `[15,1]` inverted (`ModRM.reg`),
+so a high register does not change the instruction length. The legacy family
+cannot widen in place, because reaching a high register adds the `REX` byte
+the low row does not have: three `40 0F 28 /r` windows cover dest-high
+(`44 0f 28 c1`, `REX.R` at `[2,1]`), src-high (`41 0f 28 c1`, `REX.B` at
+`[0,1]`) and both-high (`45 0f 28 c1`), and each excludes the low values of
+the slot it extends. Per-slot `excluded` cannot express the cross product
+"(dest low and src low)", so the all-low corner stays with the 3-byte
+`0f28c0` row. Four `40 0F 28/29 /r` memory rows combine a 4-bit `xmm` at
+`[2,1]` + `[27,3]` with a 4-bit base at `[0,1]` + `[24,3]`: the `REX` byte is
+present for `REX.R`, so `REX.B` comes for free and one row covers base `0`–`15`
+minus `%rsp`/`%r12` (`excluded: [4, 12]`). The VEX register-direct shape splits
+by which operand is high: the existing two-byte row keeps its 3-bit source,
+`c5 78 29 /r` (`xmm-xmm-src-ext`) puts a high source in `ModRM.reg` with a
+3-bit destination in `rm`, and `c4 41 78 28 /r` (`xmm-xmm-both-ext`) carries
+both fourth bits in `R̄`/`B̄`. `llvm-mc` measures both `c5 78 29 c0` (4 bytes)
+and `c4 c1 78 28 c0` (5 bytes) for `vmovaps %xmm8, %xmm0`; the table pins the
+four-byte opcode-29 form, because choosing by width or by family would make two
+honest implementations emit different lengths (`INV-02`). `xmm16` is
+`E-OPERAND-004` (`N14i`), `xmm8` on the 3-bit legacy register-direct row is
+`E-OPERAND-004` (`N14j`/`N14k`), and a low `xmm` on an extension row is
+`E-RANGE-004` (`N16m`, `N16n`).
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 

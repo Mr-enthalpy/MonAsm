@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-05
-Phase: **3 in progress (x86, AArch64 and RV64 slices): twenty-nine definition documents, the materializer and the fixture gate are in place; every AArch64 and RV64 coverage row and all nine v0 x86 rows are carried, so widening is coverage work with its own ADR per slice**
+Phase: **3 in progress (x86, AArch64 and RV64 slices): thirty definition documents, the materializer and the fixture gate are in place; every AArch64 and RV64 coverage row and all nine v0 x86 rows are carried, so widening is coverage work with its own ADR per slice**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -14,7 +14,7 @@ this file plus `AGENTS.md` alone.
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
-| 3 | Three-ISA vertical prototype | **in progress**: twenty-nine definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 14 positive and 50 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate |
+| 3 | Three-ISA vertical prototype | **in progress**: thirty definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 15 positive and 56 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate |
 | 4 | Invariants, negative tests, replay | **in progress**: `EXP-R1`/`R2`/`R4`/`R5`/`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs` (`EXP-0033`); `EXP-R3` is `unverified` because only one host exists |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
@@ -25,7 +25,7 @@ this file plus `AGENTS.md` alone.
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
 | G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: 31 of 40 rows are frozen; the 9 rows still `draft` are EC-05, EC-08, EC-10, EC-16, EC-18, EC-23, EC-24, EC-25 and EC-26, and none of them is needed by the three slices as they stand |
-| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 14 positive, 50 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 12 negative) |
+| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 15 positive, 56 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 12 negative) |
 
 ## Decisions
 
@@ -68,6 +68,7 @@ this file plus `AGENTS.md` alone.
 | ADR-0035 | The SIB index and scale are operands and `REX.X` extends the index: `0.8.0` adds four `base + index*scale + disp` rows whose template fixes `r/m = 100` and the `SIB` byte; `base` is four bits with no exclusion (`%rsp`/`%r12` are ordinary bases), `index` is four bits excluding `4` (`SIB.index = 100` with `REX.X = 0` means "no index", `E-RANGE-004`), and the scale is the two-bit field content `0…3` carried as `role: imm`/`kind: x86.scale`/`target_type: scale2`, never the multiplier (`E-RANGE-001`); `mod = 00` and a base-only `SIB` row stay out | accepted 2026-11-05 |
 | ADR-0036 | The SSE memory operand is one family and EVEX `disp8` is compressed: `0.9.0` adds twelve `movaps`/`vmovaps` rows (load/store × `disp8`/`disp32` × `legacy`/`vex`/`evex`); the base and the `xmm` register stay three bits in all three families because the legacy templates have no `REX`, two-byte `C5` has no `B`, and EVEX's `B̄`/`R̄` are inverted (so `r8`/`xmm8` are `E-OPERAND-004`, `%rsp` is `E-RANGE-004`); the EVEX `disp8` operand is the compressed field content (`target_type: disp8x16`, unit 16, `-128…127`), while `disp32` carries the byte offset (`EC-38`, `EC-39`) | accepted 2026-11-05 |
 | ADR-0037 | The SSE base reaches `r8`–`r15` through a per-family window: `0.10.0` widens the four EVEX rows in place (base `[13,1]` inverted + `[40,3]`, `excluded: [4, 12]`, because `62 f1 …` and `62 d1 …` are the same length) and adds eight `-base-ext` rows for legacy (`40 0F 28/29 /r`, `REX.B` at `[0,1]`) and three-byte VEX (`C4 C1 78 28/29 /r`, inverted `B̄` at `[13,1]`), because reaching the high base adds a byte; the two windows exclude each other's values, so exactly one row encodes a base; `placement.invert` (default false) writes its chunk complemented, which is `EC-40`, and the `xmm` slot stays three bits (`xmm8` is `E-OPERAND-004`); `%r12` stays `E-RANGE-004` in both windows | accepted 2026-11-05 |
+| ADR-0038 | The SSE register reaches `xmm8`–`xmm15` through per-family windows: `0.11.0` widens `x86.xmm` to four bits, keeps the EVEX register-direct pair and the VEX/EVEX memory rows in place (`R̄` at bit 15 for `ModRM.reg`, `B̄` at bit 13 for the EVEX source and every EVEX/VEX base), and adds three legacy `40 0F 28 /r` register windows (`REX.R`/`REX.B`, the all-low corner staying with the 3-byte row), two VEX register windows (`C5 78 29 /r` for a high source with a low destination, `C4 41 78 28 /r` for both high) and four `REX.R` legacy memory rows whose `REX` byte also carries a 4-bit base; `llvm-mc` encodes `vmovaps %xmm8, %xmm0` as both `c5 78 29 c0` (four bytes) and `c4 c1 78 28 c0` (five), so the table pins the opcode-29 form (`EC-09`); per-slot `excluded` keeps every window disjoint and `xmm16` is `E-OPERAND-004` | accepted 2026-11-05 |
 
 ## Settled decisions (contract level)
 
@@ -302,10 +303,21 @@ not cover is caught only by the weaker size check; it is now settled, and
    with inverted `B̄`), the two windows excluding each other's values;
    `X86-P14-sse-base-ext` matches `llvm-mc` (104 bytes, no record), and
    `N01af`/`N14h`/`N16k`/`N16l` pin the `0.9.0` boundary, the 4-bit field end
-   and the two out-of-window values. Every directive
+   and the two out-of-window values. `X86-P15` is the register counterpart:
+   `0.11.0` (`ADR-0038`) widens `x86.xmm` to four bits, keeps the EVEX
+   register-direct pair and the VEX/EVEX memory rows in place (`R̄` at bit 15
+   for `ModRM.reg`, `B̄` at bit 13 for the EVEX source and every EVEX/VEX
+   base), and adds three legacy register windows (`REX.R`/`REX.B`), two VEX
+   register windows (`C5 78 29` for a high source with a low destination,
+   `C4 41 78 28` for both high) and four legacy memory rows whose `REX.R` byte
+   also carries a 4-bit base; `X86-P15-sse-xmm-ext` matches `llvm-mc` (128
+   bytes, no record), the two legal VEX spellings of `vmovaps %xmm8, %xmm0`
+   (`c5 78 29 c0`, four bytes; `c4 c1 78 28 c0`, five) are the `EC-09`
+   counterexample, and `N01ag`/`N14i`/`N14j`/`N14k`/`N16m`/`N16n` pin the
+   boundary, the field ends and the two out-of-window values. Every directive
    §6.1 row is carried; the remaining widening is the 8/16-bit rows,
-   `xmm8`–`xmm15`, a `SIB` base under the SSE opcodes, `mod = 00` and the `0x67`
-   prefix.
+   a `SIB` base under the SSE opcodes, `mod = 00`, the `0x67` prefix and
+   `xmm16`–`xmm31`.
 4. Contract debt is closed: `OD-05` (unknown fields/extensions) by ADR-0031,
    pinned by `N21a`/`N21b` and the definition unit test, and `OD-08` (canonical
    wire form) by ADR-0032, pinned by `EXP-R4`. The Level 1 artifact envelope
@@ -329,9 +341,12 @@ rows widened from 3-bit to 4-bit register fields), `0.7.0.json` (twenty-nine
 forms, digest `sha256:8c40c948…`, the twelve base+disp rows widened to a 4-bit
 base and the four fixed-base `%r12` rows), `0.8.0.json` (thirty-three forms,
 digest `sha256:e55f694a…`, the four `SIB` index/scale rows), `0.9.0.json`
-(forty-five forms, digest `sha256:cc538253…`, the twelve SSE memory rows) and
+(forty-five forms, digest `sha256:cc538253…`, the twelve SSE memory rows),
 `0.10.0.json` (fifty-three forms, digest `sha256:0c10ff1c…`, the four widened
-EVEX base slots and the eight `-base-ext` rows);
+EVEX base slots and the eight `-base-ext` rows) and `0.11.0.json` (sixty-two
+forms, digest `sha256:d9669be6…`, the three legacy register windows, two VEX
+register windows and four legacy memory rows, with the VEX/EVEX `xmm` slots
+widened in place);
 `EXP-0004` (223 decoded byte strings across the seven `0.1.0` rows, plus the
 `OD-06` digest measurement); `EXP-0005` (9 positive fixtures against LLVM
 23.1.2, with the decode-verified caveat on five instructions); `EXP-0029` (the
@@ -346,7 +361,9 @@ and the `E-RANGE-004` exclusion); `EXP-0037` (the `SIB` scale contents, the
 `REX.X`-extended index, the `%riz` "no index" measurement and the multiplier
 rejection); `EXP-0038` (the three SSE memory families, the family-dependent
 base reach and the EVEX `disp8` content); `EXP-0039` (the `r8`–`r15` SSE base
-windows, the `REX`/third-VEX-byte length change and the inverted `B̄`); and 50
+windows, the `REX`/third-VEX-byte length change and the inverted `B̄`);
+`EXP-0040` (the `xmm8`–`xmm15` register windows, the `REX.R`/`REX.B` and
+`R̄`/`B̄` placements and the two legal VEX spellings of a high source); and 56
 negative fixtures whose
 complete diagnostic sets — code, JSON Pointer, detail keys — are compared for
 exact equality. `E-OPERAND-004`/`N14` (an operand wider than its field) is one
