@@ -1,0 +1,368 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "x86",
+    "isa_variant": "x86-64",
+    "execution_mode": "64",
+    "enabled_extensions": ["avx", "avx512f", "avx512vl"],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.x86",
+    "version": "0.15.0",
+    "digest": "sha256:305e96047cf870f963c7115ec1ecb205cdb48d83e629b67d5eb8db7720a014a4"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [".text"],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": 192,
+      "fragments": [
+        { "offset": 0, "size": 6, "kind": "instruction", "instruction_id": "I0001" },
+        { "offset": 6, "size": 6, "kind": "instruction", "instruction_id": "I0002" },
+        { "offset": 12, "size": 6, "kind": "instruction", "instruction_id": "I0003" },
+        { "offset": 18, "size": 6, "kind": "instruction", "instruction_id": "I0004" },
+        { "offset": 24, "size": 7, "kind": "instruction", "instruction_id": "I0005" },
+        { "offset": 31, "size": 7, "kind": "instruction", "instruction_id": "I0006" },
+        { "offset": 38, "size": 7, "kind": "instruction", "instruction_id": "I0007" },
+        { "offset": 45, "size": 7, "kind": "instruction", "instruction_id": "I0008" },
+        { "offset": 52, "size": 10, "kind": "instruction", "instruction_id": "I0009" },
+        { "offset": 62, "size": 10, "kind": "instruction", "instruction_id": "I0010" },
+        { "offset": 72, "size": 7, "kind": "instruction", "instruction_id": "I0011" },
+        { "offset": 79, "size": 7, "kind": "instruction", "instruction_id": "I0012" },
+        { "offset": 86, "size": 10, "kind": "instruction", "instruction_id": "I0013" },
+        { "offset": 96, "size": 6, "kind": "instruction", "instruction_id": "I0014" },
+        { "offset": 102, "size": 6, "kind": "instruction", "instruction_id": "I0015" },
+        { "offset": 108, "size": 6, "kind": "instruction", "instruction_id": "I0016" },
+        { "offset": 114, "size": 6, "kind": "instruction", "instruction_id": "I0017" },
+        { "offset": 120, "size": 7, "kind": "instruction", "instruction_id": "I0018" },
+        { "offset": 127, "size": 7, "kind": "instruction", "instruction_id": "I0019" },
+        { "offset": 134, "size": 7, "kind": "instruction", "instruction_id": "I0020" },
+        { "offset": 141, "size": 7, "kind": "instruction", "instruction_id": "I0021" },
+        { "offset": 148, "size": 10, "kind": "instruction", "instruction_id": "I0022" },
+        { "offset": 158, "size": 10, "kind": "instruction", "instruction_id": "I0023" },
+        { "offset": 168, "size": 7, "kind": "instruction", "instruction_id": "I0024" },
+        { "offset": 175, "size": 7, "kind": "instruction", "instruction_id": "I0025" },
+        { "offset": 182, "size": 10, "kind": "instruction", "instruction_id": "I0026" }
+      ]
+    }
+  ],
+  "symbols": [],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "x86:vmovaps/ymm-base/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0002",
+      "section_id": ".text",
+      "offset": 6,
+      "form_id": "x86:vmovaps/base-ymm/evex",
+      "operands": [
+        { "role": "src", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0003",
+      "section_id": ".text",
+      "offset": 12,
+      "form_id": "x86:vmovaps/ymm-base/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 31 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 8 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0004",
+      "section_id": ".text",
+      "offset": 18,
+      "form_id": "x86:vmovaps/base-ymm/evex",
+      "operands": [
+        { "role": "src", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 31 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 8 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0005",
+      "section_id": ".text",
+      "offset": 24,
+      "form_id": "x86:vmovaps/ymm-base-disp8x32/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8x32", "payload": { "value": 1 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0006",
+      "section_id": ".text",
+      "offset": 31,
+      "form_id": "x86:vmovaps/ymm-base-disp8x32/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8x32", "payload": { "value": -1 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0007",
+      "section_id": ".text",
+      "offset": 38,
+      "form_id": "x86:vmovaps/ymm-base-disp8x32/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8x32", "payload": { "value": 127 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0008",
+      "section_id": ".text",
+      "offset": 45,
+      "form_id": "x86:vmovaps/ymm-base-disp8x32/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8x32", "payload": { "value": -128 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0009",
+      "section_id": ".text",
+      "offset": 52,
+      "form_id": "x86:vmovaps/ymm-base-disp32/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp32", "payload": { "value": 28 }, "modifiers": [] }
+      ],
+      "expected_size": 10
+    },
+    {
+      "instruction_id": "I0010",
+      "section_id": ".text",
+      "offset": 62,
+      "form_id": "x86:vmovaps/ymm-base-disp32/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp32", "payload": { "value": 4096 }, "modifiers": [] }
+      ],
+      "expected_size": 10
+    },
+    {
+      "instruction_id": "I0011",
+      "section_id": ".text",
+      "offset": 72,
+      "form_id": "x86:vmovaps/ymm-base-disp8x32/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 31 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 8 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8x32", "payload": { "value": 1 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0012",
+      "section_id": ".text",
+      "offset": 79,
+      "form_id": "x86:vmovaps/base-disp8x32-ymm/evex",
+      "operands": [
+        { "role": "src", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 31 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 8 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8x32", "payload": { "value": -1 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0013",
+      "section_id": ".text",
+      "offset": 86,
+      "form_id": "x86:vmovaps/base-disp32-ymm/evex",
+      "operands": [
+        { "role": "src", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 31 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 8 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp32", "payload": { "value": 28 }, "modifiers": [] }
+      ],
+      "expected_size": 10
+    },
+    {
+      "instruction_id": "I0014",
+      "section_id": ".text",
+      "offset": 96,
+      "form_id": "x86:vmovaps/zmm-base/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0015",
+      "section_id": ".text",
+      "offset": 102,
+      "form_id": "x86:vmovaps/base-zmm/evex",
+      "operands": [
+        { "role": "src", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0016",
+      "section_id": ".text",
+      "offset": 108,
+      "form_id": "x86:vmovaps/zmm-base/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 31 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 8 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0017",
+      "section_id": ".text",
+      "offset": 114,
+      "form_id": "x86:vmovaps/base-zmm/evex",
+      "operands": [
+        { "role": "src", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 31 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 8 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0018",
+      "section_id": ".text",
+      "offset": 120,
+      "form_id": "x86:vmovaps/zmm-base-disp8x64/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8x64", "payload": { "value": 1 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0019",
+      "section_id": ".text",
+      "offset": 127,
+      "form_id": "x86:vmovaps/zmm-base-disp8x64/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8x64", "payload": { "value": -1 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0020",
+      "section_id": ".text",
+      "offset": 134,
+      "form_id": "x86:vmovaps/zmm-base-disp8x64/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8x64", "payload": { "value": 127 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0021",
+      "section_id": ".text",
+      "offset": 141,
+      "form_id": "x86:vmovaps/zmm-base-disp8x64/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8x64", "payload": { "value": -128 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0022",
+      "section_id": ".text",
+      "offset": 148,
+      "form_id": "x86:vmovaps/zmm-base-disp32/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp32", "payload": { "value": 60 }, "modifiers": [] }
+      ],
+      "expected_size": 10
+    },
+    {
+      "instruction_id": "I0023",
+      "section_id": ".text",
+      "offset": 158,
+      "form_id": "x86:vmovaps/zmm-base-disp32/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp32", "payload": { "value": 8192 }, "modifiers": [] }
+      ],
+      "expected_size": 10
+    },
+    {
+      "instruction_id": "I0024",
+      "section_id": ".text",
+      "offset": 168,
+      "form_id": "x86:vmovaps/zmm-base-disp8x64/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 31 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 8 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8x64", "payload": { "value": 1 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0025",
+      "section_id": ".text",
+      "offset": 175,
+      "form_id": "x86:vmovaps/base-disp8x64-zmm/evex",
+      "operands": [
+        { "role": "src", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 31 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 8 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8x64", "payload": { "value": -1 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0026",
+      "section_id": ".text",
+      "offset": 182,
+      "form_id": "x86:vmovaps/base-disp32-zmm/evex",
+      "operands": [
+        { "role": "src", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 31 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 8 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp32", "payload": { "value": 60 }, "modifiers": [] }
+      ],
+      "expected_size": 10
+    }
+  ],
+  "fixups": []
+}

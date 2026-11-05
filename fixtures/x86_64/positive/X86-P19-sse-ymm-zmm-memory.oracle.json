@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0044/P19.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "a66fc88cb310ea2c79e871fd042c3ede9edd1f9d75f61324df52560e575f2278",
+  "output_sha256": "407f90f137a16d8edcf193017ea24f68b0c4ec3a34323521524a2d8a654c107c",
+  "size": 192,
+  "records": 0,
+  "notes": "Twenty-six EVEX memory instructions at ymm and zmm width. Instructions 1-4 are the no-displacement rows at both widths, with base rax and base r8 and the full five-bit register reach (ymm31/zmm31 through R? at bit 15 and R?' at bit 12). Instructions 5-8 are disp8*32 with field contents 1, -1, 127 and -128, i.e. byte offsets 32, -32, 4064 and -4096: the same eight-bit field the 0.9.0 xmm row uses, with N = 32 instead of 16. Instructions 9-10 are the disp32 promotions, 28 (not a multiple of 32) and 4096 (one past the disp8*32 range). Instruction 11 combines base r8 with ymm31 so B? (bit 13), R? (bit 15) and R?' (bit 12) all carry a one in one instruction. Instructions 14-26 repeat every shape at zmm width: the only byte that differs from the ymm twin is P2 (28 vs 48), and the unit is 64, so -8192 and 8128 are the field extremes and 60/8192 promote to disp32. `input_sha256` is P19.asm (743 bytes, the source above); `output_sha256` is the 192-byte .text."
+}
