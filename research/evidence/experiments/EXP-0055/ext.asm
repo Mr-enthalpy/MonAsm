@@ -1,0 +1,5 @@
+movl 0x1234, %r8d
+movq 0x1234, %r15
+movq %r8, 0x1234
+movq 0x1234, %r9
+movq %r10, 0x1234

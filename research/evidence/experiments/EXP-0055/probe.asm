@@ -1,0 +1,13 @@
+movq 0x1234, %rax
+movq %rax, 0x1234
+movq 0x0, %rax
+movq -1, %rax
+movq 0x7fffffff, %rax
+movq 0x1234, %r8
+movq %r15, 0x1234
+movq -2147483648, %rdi
+movabsq 0x1234, %rax
+movabsq %rax, 0x1234
+movq 0x1234(%rax), %rax
+movq 0x1234(%rip), %rax
+movq 0x1234(,%rax,4), %rax

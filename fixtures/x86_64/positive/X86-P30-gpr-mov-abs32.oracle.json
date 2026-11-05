@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0055/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "fa4f4f7c73ae84159f1804df0968107d7c7a9331679744a0ae437b4c53945836",
+  "output_sha256": "4ed75958b838dacfb75704bd25243c14cc47ed4bb346a8ec8d4f202cdb9ddc18",
+  "size": 48,
+  "records": 0,
+  "notes": "Six 64-bit mov instructions with a 32-bit absolute address, one per 0.26.0 row (three per direction), eight bytes each (48 bytes total). In every instruction ModRM is 04 (mod 00, r/m 100) and the SIB byte is the constant 25: scale 00, index 100 (\"no index\") and base 101 (\"no base, disp32\"). The register is ModRM.reg plus the raw REX.R at bit 2, so %rax and %rdi keep the template's 48 (04 and 3c in ModRM) while %r15, %r8 and %r10 set it (4c; 3c, 04 and 14). The address is always four bytes, even for 0, and the field is signed: -1 is ff ff ff ff and -2147483648 is 00 00 00 80. movabsq (A1/A3) is a second legal encoding at ten bytes and is not a row; llvm-mc switches to it by itself for 0x80000000. input_sha256 is fixture.asm (the source above); output_sha256 is the 48-byte .text."
+}
