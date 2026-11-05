@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0045/P20.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "5d120f3f2ebbc8ef580abababd46700002ece01365dcbaefa8cac969bd2e7eec",
+  "output_sha256": "a42f3ec7d528bcd4ba1f5ac80d20cb876f673a452ee4f7de318592862b708fe6",
+  "size": 144,
+  "records": 0,
+  "notes": "Twenty-four VEX.256 memory instructions. Instructions 1-10 are the two-byte C5 FC shapes with base rax: the no-displacement pair, disp8 at field contents 32, -32, 127 and -128 (plain unscaled bytes, unlike EVEX disp8*N), disp32 at 128 and -129, and two instructions with ymm8 so the fourth destination bit (R-bar at bit 15) is exercised against a low base. Instructions 11-18 repeat the set with the three-byte C4 C1 7C prefix and base r8, where B-bar at bit 13 carries the base extension and ModRM moves one byte later. Instructions 19-22 combine base r8 with ymm8 so B-bar and R-bar both carry in one instruction. Instructions 23-24 are the disp32 stores at both windows. `input_sha256` is P20.asm (the source above); `output_sha256` is the 144-byte .text."
+}

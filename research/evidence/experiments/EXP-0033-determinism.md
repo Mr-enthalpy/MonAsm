@@ -98,17 +98,18 @@ is available: WSL has no distribution installed and no second machine was used.
 **Cross-platform determinism is `unverified`.** This record does not turn a
 same-host result into a cross-host claim.
 
-## 7. Re-run after `X86-P10` … `X86-P18`
+## 7. Re-run after `X86-P10` … `X86-P20`
 
 The same suite was re-run on 2026-11-05 after `0.6.0` and the `r8`–`r15`
 fixtures landed, again after `0.7.0` and `X86-P11`, a third time after
 `0.8.0` and `X86-P12`, a fourth time after `0.9.0` and `X86-P13`, a fifth
 time after `0.10.0` and `X86-P14`, a sixth time after `0.11.0` and
 `X86-P15`, a seventh time after `0.12.0` and `X86-P16`, an eighth time
-after `0.13.0` and `X86-P17`, a ninth time after `0.14.0` and `X86-P18`, and a
-tenth time after `0.15.0` and `X86-P19`.
+after `0.13.0` and `X86-P17`, a ninth time after `0.14.0` and `X86-P18`, a
+tenth time after `0.15.0` and `X86-P19`, and an eleventh time after `0.16.0`
+and `X86-P20`.
 The corpus is now
-**48 positive and 144 negative** fixtures (x86 19/75, AArch64 20/57, RV64 9/12).
-Result: all five tests still pass, with the same method (`EXP-R1` 48 × 100,
-`EXP-R2` 12 processes, `EXP-R4` 48 × 2, `EXP-R5` unchanged, `EXP-R6` 144 × 100). The counts in §1–§5 are the original
+**49 positive and 150 negative** fixtures (x86 20/81, AArch64 20/57, RV64 9/12).
+Result: all five tests still pass, with the same method (`EXP-R1` 49 × 100,
+`EXP-R2` 12 processes, `EXP-R4` 49 × 2, `EXP-R5` unchanged, `EXP-R6` 150 × 100). The counts in §1–§5 are the original
 run's; this section records the current corpus instead of rewriting them.

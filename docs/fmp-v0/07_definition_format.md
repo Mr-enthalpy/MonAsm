@@ -255,6 +255,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.13.0.json` | `monasm.isa.x86` | `sha256:79eabc2d19a7cf3cac84c857afd6a11b4f15063c7526f17f8782ace0b5ea3431` |
 | `definitions/x86_64/0.14.0.json` | `monasm.isa.x86` | `sha256:3126af72d83ec4ee8e0e34abfde924a73e7b41866fb2c3b8fc3152821d691a5b` |
 | `definitions/x86_64/0.15.0.json` | `monasm.isa.x86` | `sha256:305e96047cf870f963c7115ec1ecb205cdb48d83e629b67d5eb8db7720a014a4` |
+| `definitions/x86_64/0.16.0.json` | `monasm.isa.x86` | `sha256:64ea1acf467afb2f858a5cb2967839445a5ffecac164a5f1b61931cb8fb3b99e` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -277,7 +278,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.15.0`
+### 8.1 `x86-64` `0.1.0` … `0.16.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -372,6 +373,18 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:vmovaps/base-disp32-zmm/evex` | `62f17c48298000000000` | src: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[40,3]` (excl 4, 12); disp: `x86.imm`/`disp32` → `[48,32]` | 10 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `EC-39`, `EC-40`, `X86-P19` |
 | `x86:vmovaps/zmm-base/evex` | `62f17c482800` | dest: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[40,3]` (excl 4, 5, 12, 13) | 6 | `EC-02`, `EC-09`, `EC-34`, `EC-35`, `EC-40`, `X86-P19` |
 | `x86:vmovaps/base-zmm/evex` | `62f17c482900` | src: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[40,3]` (excl 4, 5, 12, 13) | 6 | `EC-02`, `EC-09`, `EC-27`, `EC-34`, `EC-35`, `EC-40`, `X86-P19` |
+| `x86:vmovaps/ymm-base-disp8/vex` | `c5fc284000` | dest: `x86.ymm`/`ymm` → `[15,1]` inverted, `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-09`, `EC-35`, `EC-38`, `X86-P20` |
+| `x86:vmovaps/ymm-base-disp32/vex` | `c5fc288000000000` | dest: `x86.ymm`/`ymm` → `[15,1]` inverted, `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-09`, `EC-35`, `EC-38`, `X86-P20` |
+| `x86:vmovaps/base-disp8-ymm/vex` | `c5fc294000` | src: `x86.ymm`/`ymm` → `[15,1]` inverted, `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `X86-P20` |
+| `x86:vmovaps/base-disp32-ymm/vex` | `c5fc298000000000` | src: `x86.ymm`/`ymm` → `[15,1]` inverted, `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `X86-P20` |
+| `x86:vmovaps/ymm-base-ext-disp8/vex` | `c4c17c284000` | dest: `x86.ymm`/`ymm` → `[15,1]` inverted, `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `EC-09`, `EC-35`, `EC-38`, `EC-40`, `X86-P20` |
+| `x86:vmovaps/ymm-base-ext-disp32/vex` | `c4c17c288000000000` | dest: `x86.ymm`/`ymm` → `[15,1]` inverted, `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-09`, `EC-35`, `EC-38`, `EC-40`, `X86-P20` |
+| `x86:vmovaps/base-ext-disp8-ymm/vex` | `c4c17c294000` | src: `x86.ymm`/`ymm` → `[15,1]` inverted, `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `EC-40`, `X86-P20` |
+| `x86:vmovaps/base-ext-disp32-ymm/vex` | `c4c17c298000000000` | src: `x86.ymm`/`ymm` → `[15,1]` inverted, `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12); disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-09`, `EC-27`, `EC-35`, `EC-38`, `EC-40`, `X86-P20` |
+| `x86:vmovaps/ymm-base/vex` | `c5fc2800` | dest: `x86.ymm`/`ymm` → `[15,1]` inverted, `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4, 5) | 4 | `EC-02`, `EC-09`, `EC-34`, `EC-35`, `X86-P20` |
+| `x86:vmovaps/base-ymm/vex` | `c5fc2900` | src: `x86.ymm`/`ymm` → `[15,1]` inverted, `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4, 5) | 4 | `EC-02`, `EC-09`, `EC-27`, `EC-34`, `EC-35`, `X86-P20` |
+| `x86:vmovaps/ymm-base-ext/vex` | `c4c17c2800` | dest: `x86.ymm`/`ymm` → `[15,1]` inverted, `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 12, 13) | 5 | `EC-02`, `EC-09`, `EC-35`, `EC-40`, `X86-P20` |
+| `x86:vmovaps/base-ext-ymm/vex` | `c4c17c2900` | src: `x86.ymm`/`ymm` → `[15,1]` inverted, `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 12, 13) | 5 | `EC-02`, `EC-09`, `EC-27`, `EC-35`, `EC-40`, `X86-P20` |
 
 Placements are written `[bit_offset, width]`, with ` inverted` appended when the
 chunk is complemented. In the legacy SSE row
@@ -645,8 +658,24 @@ exclusions are unchanged — `%rsp`/`%r12` on the displacement rows, plus
 `%rbp`/`%r13` on the `mod = 00` rows (`EC-02`, `EC-35`). Naming `disp8x16` on a
 `disp8x32` row is `E-OPERAND-001` (`N02p`), content `128` is `E-RANGE-001`
 (`N03e`), `ymm32` is outside the five-bit field (`N14r`), and VEX.256 memory
-stays out of every document because it needs no new fact: `vmovaps 32(%rax),
+stays out of `0.15.0` because it needs no new fact: `vmovaps 32(%rax),
 %ymm0` is `c5 fc 28 40 20`, a plain unscaled byte (`N01al`).
+
+`0.16.0` adds that VEX.256 memory coverage without adding a fact (`ADR-0043`).
+Twelve rows mirror the VEX memory rows of `0.11.0`/`0.12.0` at `L = 1`: the two
+base windows (`c5 fc …` for a low base, `c4 c1 7c …` for `r8`–`r15`), each with
+the `disp8` pair, the `disp32` pair and the `mod = 00` pair. Every placement is
+the VEX.128 one — `R̄` at `[15,1]` inverted plus `[27,3]`/`[35,3]`, the base at
+`[24,3]` or `[13,1]` inverted plus `[32,3]`, and the displacement at
+`[32,8]`/`[32,32]` or `[40,8]`/`[40,32]` — and only the vector kind/target_type
+change from `xmm` to `ymm`. VEX has no compressed unit, so `32(%rax)` is the
+plain signed byte `20` and `128` promotes to `disp32` rather than a scaled
+content (`EC-02`, `EC-35`). The base windows are unchanged: `%rsp` is excluded
+on the two-byte rows, `%r12` on the three-byte rows, and `%rbp`/`%r13` join on
+the no-displacement rows. A `zmm` operand is `E-OPERAND-001` (`N02q`), `ymm16`
+is `E-OPERAND-004` (`N14s`), `%rbp` and `%r12` are `E-RANGE-004` (`N16r`,
+`N16s`), content `128` is `E-RANGE-001` (`N03f`), and naming either window
+against `0.15.0` is `E-FORM-001` (`N01al`, `N01am`).
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 

@@ -108,7 +108,7 @@ surface: a variant that is absent cannot be selected, repaired or approximated,
 and naming it is `E-FORM-001`. There is no feature flag and no partially
 implemented form.
 
-The x86-64 slice is ninety-one forms covering fourteen frozen `EC` rows:
+The x86-64 slice is one hundred and three forms covering fourteen frozen `EC` rows:
 
 | `form_id` | Bytes | Operand signature | Covers |
 |---|---|---|---|
@@ -203,6 +203,18 @@ The x86-64 slice is ninety-one forms covering fourteen frozen `EC` rows:
 | `x86:vmovaps/base-disp32-zmm/evex` | `62 F1 7C 48 29 /r`, `mod=10`, `r/m=base`, `R̄`/`R̄'`/`B̄` inverted | src `zmm` (0–31), base `rm64` (4 bits, not `%rsp`/`%r12`), disp `disp32` | EC-09, EC-27, EC-35, EC-38, EC-39, EC-40, X86-P19 |
 | `x86:vmovaps/zmm-base/evex` | `62 F1 7C 48 28 /r`, `mod=00`, `r/m=base`, `R̄`/`R̄'`/`B̄` inverted | dest `zmm` (0–31), base `rm64` (0–15, not `%rsp`/`%rbp`/`%r12`/`%r13`) | EC-02, EC-09, EC-34, EC-35, EC-40, X86-P19 |
 | `x86:vmovaps/base-zmm/evex` | `62 F1 7C 48 29 /r`, `mod=00`, `r/m=base`, `R̄`/`R̄'`/`B̄` inverted | src `zmm` (0–31), base `rm64` (0–15, not `%rsp`/`%rbp`/`%r12`/`%r13`) | EC-02, EC-09, EC-27, EC-34, EC-35, EC-40, X86-P19 |
+| `x86:vmovaps/ymm-base-disp8/vex` | `C5 FC 28 /r`, `mod=01`, `r/m=base`, `L = 1`, `R̄` inverted | dest `ymm` (0–15), base `rm64` (0–7, not `%rsp`), disp `disp8` | EC-09, EC-35, EC-38, X86-P20 |
+| `x86:vmovaps/ymm-base-disp32/vex` | `C5 FC 28 /r`, `mod=10`, `r/m=base`, `L = 1`, `R̄` inverted | dest `ymm` (0–15), base `rm64` (0–7, not `%rsp`), disp `disp32` | EC-09, EC-35, EC-38, X86-P20 |
+| `x86:vmovaps/base-disp8-ymm/vex` | `C5 FC 29 /r`, `mod=01`, `r/m=base`, `L = 1`, `R̄` inverted | src `ymm` (0–15), base `rm64` (0–7, not `%rsp`), disp `disp8` | EC-09, EC-27, EC-35, EC-38, X86-P20 |
+| `x86:vmovaps/base-disp32-ymm/vex` | `C5 FC 29 /r`, `mod=10`, `r/m=base`, `L = 1`, `R̄` inverted | src `ymm` (0–15), base `rm64` (0–7, not `%rsp`), disp `disp32` | EC-09, EC-27, EC-35, EC-38, X86-P20 |
+| `x86:vmovaps/ymm-base-ext-disp8/vex` | `C4 C1 7C 28 /r`, `mod=01`, `r/m=base`, `L = 1`, `R̄`/`B̄` inverted | dest `ymm` (0–15), base `rm64` (8–15, not `%r12`), disp `disp8` | EC-09, EC-35, EC-38, EC-40, X86-P20 |
+| `x86:vmovaps/ymm-base-ext-disp32/vex` | `C4 C1 7C 28 /r`, `mod=10`, `r/m=base`, `L = 1`, `R̄`/`B̄` inverted | dest `ymm` (0–15), base `rm64` (8–15, not `%r12`), disp `disp32` | EC-09, EC-35, EC-38, EC-40, X86-P20 |
+| `x86:vmovaps/base-ext-disp8-ymm/vex` | `C4 C1 7C 29 /r`, `mod=01`, `r/m=base`, `L = 1`, `R̄`/`B̄` inverted | src `ymm` (0–15), base `rm64` (8–15, not `%r12`), disp `disp8` | EC-09, EC-27, EC-35, EC-38, EC-40, X86-P20 |
+| `x86:vmovaps/base-ext-disp32-ymm/vex` | `C4 C1 7C 29 /r`, `mod=10`, `r/m=base`, `L = 1`, `R̄`/`B̄` inverted | src `ymm` (0–15), base `rm64` (8–15, not `%r12`), disp `disp32` | EC-09, EC-27, EC-35, EC-38, EC-40, X86-P20 |
+| `x86:vmovaps/ymm-base/vex` | `C5 FC 28 /r`, `mod=00`, `r/m=base`, `L = 1`, `R̄` inverted | dest `ymm` (0–15), base `rm64` (0–7, not `%rsp`/`%rbp`) | EC-02, EC-09, EC-34, EC-35, X86-P20 |
+| `x86:vmovaps/base-ymm/vex` | `C5 FC 29 /r`, `mod=00`, `r/m=base`, `L = 1`, `R̄` inverted | src `ymm` (0–15), base `rm64` (0–7, not `%rsp`/`%rbp`) | EC-02, EC-09, EC-27, EC-34, EC-35, X86-P20 |
+| `x86:vmovaps/ymm-base-ext/vex` | `C4 C1 7C 28 /r`, `mod=00`, `r/m=base`, `L = 1`, `R̄`/`B̄` inverted | dest `ymm` (0–15), base `rm64` (8–15, not `%r12`/`%r13`) | EC-02, EC-09, EC-35, EC-40, X86-P20 |
+| `x86:vmovaps/base-ext-ymm/vex` | `C4 C1 7C 29 /r`, `mod=00`, `r/m=base`, `L = 1`, `R̄`/`B̄` inverted | src `ymm` (0–15), base `rm64` (8–15, not `%r12`/`%r13`) | EC-02, EC-09, EC-27, EC-35, EC-40, X86-P20 |
 
 The variant names the operand signature as the ISA opcode table spells it, which
 is what makes the two `mov` forms and the two `add` immediate forms distinct
@@ -607,9 +619,22 @@ is a multiple of 32. A single `disp8` slot with the unit derived at
 materialization would have to read `P2` to find the divisor and would reject
 `4064` as out of range; the unit lives in `target_type`, and naming `disp8x16`
 on a `disp8x32` row is `E-OPERAND-001` (`N02p`, `N03e`, `EXP-0044`). VEX.256
-memory stays out of the table because it adds no contract fact — `vmovaps
+memory stays out of `0.15.0` because it adds no contract fact — `vmovaps
 32(%rax), %ymm0` is `c5 fc 28 40 20`, a plain unscaled `disp8` byte — so naming
-`x86:vmovaps/ymm-base-disp8/vex` is `E-FORM-001` (`N01al`).
+`x86:vmovaps/ymm-base-disp8/vex` is `E-FORM-001` there (`N01al`).
+
+`0.16.0` adds that coverage without adding a fact (`ADR-0043`). Twelve VEX.256
+rows mirror the twelve VEX memory rows of `0.11.0`/`0.12.0` at `L = 1`: the
+low-base window (`C5 FC`, three-bit base, `%rsp` excluded) and the high-base
+window (`C4 C1 7C`, `B̄` at bit 13 inverted, `r8`–`r15` minus `%r12`), each with
+the `disp8` pair, the `disp32` pair and the `mod = 00` pair. The vector slot is
+the same four bits (`R̄` at 15 inverted plus `ModRM.reg` at 27 or 35), now
+`x86.ymm`/`ymm`; `ymm8` with a low base is `c5 7c 28 00` and with base `r8` is
+`c4 41 7c 28 00`. VEX has no compression, so the displacement payload is the
+plain signed byte and needs no `disp8xN` name (`EC-02`, `EC-35`). A `zmm`
+operand is `E-OPERAND-001` (`N02q`), `ymm16` is `E-OPERAND-004` (`N14s`),
+`%rbp`/`%r12` are `E-RANGE-004` (`N16r`, `N16s`), and content `128` is
+`E-RANGE-001` (`N03f`, `EXP-0045`).
 
 The RV64 slice is eight forms across two documents, generated from the pinned UDB
 nodes (ADR-0007, ADR-0009). Seven base-`I` forms are in `0.1.0`; `c.addi` joins
