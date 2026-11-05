@@ -1,0 +1,14 @@
+movw 0x1234, %ax
+movw %ax, 0x1234
+movw 0x0, %ax
+movw -1, %ax
+movw 0x7fff, %ax
+movw -32768, %di
+movw 0x1234, %sp
+movw 0x1234, %r8w
+movw %r8w, 0x1234
+movw -1, %r15w
+movw %r10w, 0x0
+movw 0x1234, %r12w
+movw 0x1234, %r13w
+movw 0x1234, %r14w

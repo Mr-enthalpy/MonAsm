@@ -1,6 +1,6 @@
 # x86-64 fixtures
 
-Vectors: `X86-P1` … `X86-P31` in `docs/fmp-v0/06_validation_matrix.md`.
+Vectors: `X86-P1` … `X86-P32` in `docs/fmp-v0/06_validation_matrix.md`.
 
 ## Positive vectors present
 
@@ -37,6 +37,7 @@ Vectors: `X86-P1` … `X86-P31` in `docs/fmp-v0/06_validation_matrix.md`.
 | X86-P29 | `X86-P29-evex-mem-sib-absolute` | `EXP-0054` (the same family rule; `SIB = 25` at `mod = 00` drops both the base and the index and makes the four-byte address the only operand, so the rows are eleven bytes at all three widths) |
 | X86-P30 | `X86-P30-gpr-mov-abs32` | `EXP-0055` (the same shape under the 64-bit GPR `mov` opcodes: `ModRM = 04`, `SIB = 25`, a four-bit raw register slot and a four-byte address, so both directions are eight bytes; `moffs` is a second legal encoding and has no row) |
 | X86-P31 | `X86-P31-gpr32-mov-abs32` | `EXP-0056` (the same shape at 32-bit width, split by register window: the low rows have no `REX` byte and are seven bytes, the `-ext` rows carry `REX = 44` and are eight bytes, and both keep `ModRM = 04`, `SIB = 25` and a four-byte signed address) |
+| X86-P32 | `X86-P32-gpr16-mov-abs32` | `EXP-0057` (the same shape at 16-bit width behind the `66` prefix: the low rows are eight bytes with no `REX` byte, the `-ext` rows insert `REX = 44` and are nine, and the address stays a signed 32-bit field, so `-32768` is `00 80 ff ff` and `0x80000000` leaves the row for `movabsw`) |
 
 `X86-P6` ships in `definitions/x86_64/0.2.0.json` as two forms with
 `mod = 00`, `r/m = 101` and `disp32` as the last field (`ADR-0027`). `X86-P4`
@@ -164,6 +165,17 @@ three-bit `ModRM.reg`), while `0x1234, %r8d` is
 excluded). Both directions are mirrored, and the address stays four bytes
 even for `0` (`ADR-0054`). Register `0` on an `-ext` row is `E-RANGE-004`
 (`N16ad`), because the template's `REX.R = 1` already means `%r8d`.
+
+`X86-P32` takes the shape to 16-bit width in `0.28.0`, where the
+operand-size prefix `66` comes first: `0x1234, %ax` is
+`66 8b 04 25 34 12 00 00` (eight bytes, no `REX` byte, the register in
+the three-bit `ModRM.reg`), while `0x1234, %r8w` is
+`66 44 8b 04 25 34 12 00 00` (nine bytes, `REX.R` at `[10,1]` with `0`–`7`
+excluded). Both directions are mirrored, and the address does not narrow
+with the operand: `-32768` is `00 80 ff ff` and `0x80000000` switches
+`llvm-mc` to `movabsw` (`ADR-0055`). Register `0` on an `-ext` row is
+`E-RANGE-004` (`N16ae`), because the template's `REX.R = 1` already
+means `%r8w`.
 
 ## Negative fixtures present
 

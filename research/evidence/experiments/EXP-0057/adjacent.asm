@@ -1,0 +1,13 @@
+movq 0x1234, %rax
+movq %rax, 0x1234
+movl 0x1234, %eax
+movl %eax, 0x1234
+movb 0x1234, %al
+movb %al, 0x1234
+movb %ah, 0x1234
+movabsw 0x1234, %ax
+movw 0x1234, %r16w
+movw 0x1234, %r31w
+movw -1, %r8w
+movw 0x7fff, %r8w
+movw %r10w, 0
