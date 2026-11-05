@@ -241,8 +241,13 @@ def check_definition(path: Path, errors):
 def check_prefix_kinds(slots, template, spot, errors):
     """`ADR-0029`: a REX prefix re-labels 8-bit register numbers 4-7 as
     `spl`/`bpl`/`sil`/`dil`, so a high-byte slot cannot sit in a REX template
-    and a REX-less low-byte slot must exclude 4-7."""
-    rex = bool(template) and 0x40 <= template[0] <= 0x4F
+    and a REX-less low-byte slot must exclude 4-7.
+
+    The `0x66` operand-size prefix can precede the REX byte (`ADR-0045`), so
+    the search starts after it; `0x40`-`0x4F` is a REX prefix and never an
+    opcode in 64-bit mode."""
+    prefix = template[1:] if template[:1] == b"\x66" else template
+    rex = bool(prefix) and 0x40 <= prefix[0] <= 0x4F
     for index, slot in enumerate(slots):
         kind = slot.get("kind")
         if kind == "x86.gpr8h" and rex:

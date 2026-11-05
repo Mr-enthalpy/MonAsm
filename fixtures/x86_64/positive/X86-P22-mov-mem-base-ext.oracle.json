@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0047/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "3473cfec5d064123754433341630f1ee3c1a0561616f62f068fa9eba9bf6a423",
+  "output_sha256": "df40d5882811d5b5da78e60b9ae9d5ca84945fca43b2d0faf2a487b5a3621a83",
+  "size": 100,
+  "records": 0,
+  "notes": "Eighteen 8/16-bit mov memory instructions on the 0.18.0 extension windows. Instructions 1-7 are the four word -base-ext rows: r8/r9/r10/r11/r13/r14/r15 bases, both disp8 ends (127, -128) and both disp32 promotions (128, -129). Instructions 8-13 are the REX-less low-byte -base-ext rows, the same bases and displacement widths. Instructions 14-18 are the widened template-40 rows: instruction 14 keeps base 0 (rax) as the counterexample that a low base still encodes with REX.B = 0 and the same four bytes as 0.17.0, while 15-18 use r8, r9 and r15 in both directions at both displacement widths. Every base is a high register except instruction 14; %rsp and %r12 are deferred (ADR-0045) and measured in probes.txt. `input_sha256` is fixture.asm (the source above); `output_sha256` is the 100-byte .text."
+}

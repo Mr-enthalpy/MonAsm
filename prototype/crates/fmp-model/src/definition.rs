@@ -330,7 +330,13 @@ fn bind_form(value: &json::Json, path: String) -> Result<Form, Diagnostic> {
     // `ah`/`ch`/`dh`/`bh` to `spl`/`bpl`/`sil`/`dil`, so the high-byte kind can
     // only sit in a template without a leading REX byte, and a REX-less low-byte
     // slot must not accept 4–7 (they would encode the high bytes instead).
-    let rex_prefixed = matches!(template.first(), Some(byte) if (0x40..=0x4f).contains(byte));
+    // `ADR-0045`: the `0x66` operand-size prefix can precede the REX byte, and
+    // `0x40`–`0x4F` is a REX prefix rather than an opcode in 64-bit mode.
+    let prefix = match template.first() {
+        Some(0x66) => &template[1..],
+        _ => &template[..],
+    };
+    let rex_prefixed = matches!(prefix.first(), Some(byte) if (0x40..=0x4f).contains(byte));
     for (index, slot) in slots.iter().enumerate() {
         if slot.kind == "x86.gpr8h" && rex_prefixed {
             return Err(load_error(
@@ -782,6 +788,16 @@ mod tests {
     #[test]
     fn high_byte_kind_is_rejected_on_a_rex_form() {
         let text = document(&form("x86:mov/rm8h-r8h/legacy", "4088e0", HIGH_SLOT));
+        let error = read(text.as_bytes()).expect_err("a REX form must not carry x86.gpr8h");
+        assert_eq!(error.code(), codes::E_DEF_001);
+        assert!(format!("{error:?}").contains("x86.gpr8h"));
+    }
+
+    /// `ADR-0045`: the `0x66` operand-size prefix sits in front of the REX byte
+    /// on the word memory rows, so the REX check must look past it.
+    #[test]
+    fn high_byte_kind_is_rejected_behind_the_operand_size_prefix() {
+        let text = document(&form("x86:mov/rm8h-r8h/legacy", "664188e0", HIGH_SLOT));
         let error = read(text.as_bytes()).expect_err("a REX form must not carry x86.gpr8h");
         assert_eq!(error.code(), codes::E_DEF_001);
         assert!(format!("{error:?}").contains("x86.gpr8h"));
