@@ -1,0 +1,16 @@
+	{evex}	vmovaps	(%rbp,%rax), %xmm0      # encoding: [0x62,0xf1,0x7c,0x08,0x28,0x44,0x05,0x00]
+	{evex}	vmovaps	(%rbp,%rax), %xmm0      # encoding: [0x62,0xf1,0x7c,0x08,0x28,0x44,0x05,0x00]
+
+
+
+
+	{evex}	vmovaps	8(%rsp,%rax), %xmm0     # encoding: [0x62,0xf1,0x7c,0x08,0x28,0x84,0x04,0x08,0x00,0x00,0x00]
+research/evidence/experiments/EXP-0052/reject.asm:10:17: error: invalid base+index expression
+{evex} vmovaps (%rax,%rsp,1), %xmm0
+                ^
+research/evidence/experiments/EXP-0052/reject.asm:13:27: error: scale factor in address must be 1, 2, 4 or 8
+{evex} vmovaps (%rsp,%rax,16), %xmm0
+                          ^
+research/evidence/experiments/EXP-0052/reject.asm:16:31: error: invalid register name
+{evex} vmovaps (%rsp,%rax,1), %xmm32
+                              ^~~~~~
