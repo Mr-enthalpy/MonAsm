@@ -103,9 +103,9 @@ same-host result into a cross-host claim.
 The same suite was re-run on 2026-11-05 after `0.6.0` and the `r8`–`r15`
 fixtures landed, again after `0.7.0` and `X86-P11`, a third time after
 `0.8.0` and `X86-P12`, a fourth time after `0.9.0` and `X86-P13`, a fifth
-time after `0.10.0` and `X86-P14`, and a sixth time after `0.11.0` and
-`X86-P15`. The corpus is now
-**44 positive and 125 negative** fixtures (x86 15/56, AArch64 20/57, RV64 9/12).
-Result: all five tests still pass, with the same method (`EXP-R1` 44 × 100,
-`EXP-R2` 12 processes, `EXP-R4` 44 × 2, `EXP-R5` unchanged, `EXP-R6` 125 × 100). The counts in §1–§5 are the original
+time after `0.10.0` and `X86-P14`, a sixth time after `0.11.0` and
+`X86-P15`, and a seventh time after `0.12.0` and `X86-P16`. The corpus is now
+**45 positive and 130 negative** fixtures (x86 16/61, AArch64 20/57, RV64 9/12).
+Result: all five tests still pass, with the same method (`EXP-R1` 45 × 100,
+`EXP-R2` 12 processes, `EXP-R4` 45 × 2, `EXP-R5` unchanged, `EXP-R6` 130 × 100). The counts in §1–§5 are the original
 run's; this section records the current corpus instead of rewriting them.

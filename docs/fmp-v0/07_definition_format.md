@@ -251,6 +251,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.9.0.json` | `monasm.isa.x86` | `sha256:cc538253ba2d8a111ee16a8d5a8db1aa6efaaed75270889eed20f0f2f5ed6eb8` |
 | `definitions/x86_64/0.10.0.json` | `monasm.isa.x86` | `sha256:0c10ff1c373eea2fe6098e67da3047081b34a5779d9ec492c47069ac73613442` |
 | `definitions/x86_64/0.11.0.json` | `monasm.isa.x86` | `sha256:d9669be62267ecd90d69dc9f936bcb947948b8c1ec7c7ba0670eb63f32de0570` |
+| `definitions/x86_64/0.12.0.json` | `monasm.isa.x86` | `sha256:a74ae09e3f9d2596f2e99edde80d6a487e8596efc05d87e59d6409f82ebf35ae` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -273,7 +274,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.11.0`
+### 8.1 `x86-64` `0.1.0` … `0.12.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -339,6 +340,18 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:movaps/xmm-ext-base-disp32/legacy` | `400f288000000000` | dest: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 4, 12); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-06`, `EC-09`, `EC-35`, `EC-38`, `X86-P15` — dest `REX.R` + 4-bit base from `0.11.0` |
 | `x86:movaps/base-disp8-xmm-ext/legacy` | `400f294000` | src: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 4, 12); disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-06`, `EC-09`, `EC-27`, `EC-35`, `EC-38`, `X86-P15` — src `REX.R` + 4-bit base from `0.11.0` |
 | `x86:movaps/base-disp32-xmm-ext/legacy` | `400f298000000000` | src: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 4, 12); disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-06`, `EC-09`, `EC-27`, `EC-35`, `EC-38`, `X86-P15` — src `REX.R` + 4-bit base from `0.11.0` |
+| `x86:movaps/xmm-base/legacy` | `0f2800` | dest: `x86.xmm`/`xmm` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4, 5) | 3 | `EC-02`, `EC-09`, `EC-34`, `EC-35`, `X86-P16` — `mod = 00` from `0.12.0` |
+| `x86:movaps/base-xmm/legacy` | `0f2900` | src: `x86.xmm`/`xmm` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4, 5) | 3 | `EC-02`, `EC-09`, `EC-27`, `EC-34`, `EC-35`, `X86-P16` — `mod = 00` from `0.12.0` |
+| `x86:movaps/xmm-ext-base/legacy` | `440f2800` | dest: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 4, 5, 12, 13) | 4 | `EC-02`, `EC-06`, `EC-09`, `EC-34`, `EC-35`, `X86-P16` — `mod = 00` from `0.12.0` |
+| `x86:movaps/base-xmm-ext/legacy` | `440f2900` | src: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 4, 5, 12, 13) | 4 | `EC-02`, `EC-06`, `EC-09`, `EC-27`, `EC-34`, `EC-35`, `X86-P16` — `mod = 00` from `0.12.0` |
+| `x86:movaps/xmm-base-ext/legacy` | `410f2800` | dest: `x86.xmm`/`xmm` → `[27,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12, 13) | 4 | `EC-02`, `EC-06`, `EC-09`, `EC-34`, `EC-35`, `X86-P16` — `mod = 00` from `0.12.0` |
+| `x86:movaps/base-ext-xmm/legacy` | `410f2900` | src: `x86.xmm`/`xmm` → `[27,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12, 13) | 4 | `EC-02`, `EC-06`, `EC-09`, `EC-27`, `EC-34`, `EC-35`, `X86-P16` — `mod = 00` from `0.12.0` |
+| `x86:vmovaps/xmm-base/vex` | `c5f82800` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4, 5) | 4 | `EC-02`, `EC-09`, `EC-34`, `EC-35`, `X86-P16` — `mod = 00` from `0.12.0` |
+| `x86:vmovaps/base-xmm/vex` | `c5f82900` | src: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; base: `x86.gpr64`/`rm64` → `[24,3]` (excl 4, 5) | 4 | `EC-02`, `EC-09`, `EC-27`, `EC-34`, `EC-35`, `X86-P16` — `mod = 00` from `0.12.0` |
+| `x86:vmovaps/xmm-base-ext/vex` | `c4c1782800` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 12, 13) | 5 | `EC-02`, `EC-09`, `EC-35`, `EC-40`, `X86-P16` — `mod = 00` from `0.12.0` |
+| `x86:vmovaps/base-ext-xmm/vex` | `c4c1782900` | src: `x86.xmm`/`xmm` → `[15,1]` inverted, `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 12, 13) | 5 | `EC-02`, `EC-09`, `EC-27`, `EC-35`, `EC-40`, `X86-P16` — `mod = 00` from `0.12.0` |
+| `x86:vmovaps/xmm-base/evex` | `62f17c082800` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[43,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[40,3]` (excl 4, 5, 12, 13) | 6 | `EC-02`, `EC-09`, `EC-34`, `EC-35`, `EC-40`, `X86-P16` — `mod = 00` from `0.12.0` |
+| `x86:vmovaps/base-xmm/evex` | `62f17c082900` | src: `x86.xmm`/`xmm` → `[15,1]` inverted, `[43,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[40,3]` (excl 4, 5, 12, 13) | 6 | `EC-02`, `EC-09`, `EC-27`, `EC-34`, `EC-35`, `EC-40`, `X86-P16` — `mod = 00` from `0.12.0` |
 
 Placements are written `[bit_offset, width]`, with ` inverted` appended when the
 chunk is complemented. In the legacy SSE row
@@ -354,7 +367,8 @@ the base's fourth bit sits at `[0,1]` (legacy `REX.B`) or `[13,1]` inverted
 when it is `ModRM.rm` (EVEX register-direct source, and every VEX/EVEX base).
 In the register-to-register rows the two `ModRM` bits
 above them (`bits 6–7` of `ModRM`) are `mod = 0b11`, part of the template and
-not owned by any operand; the memory rows fix `mod = 0b01`/`0b10` the same way.
+not owned by any operand; the memory rows fix `mod = 0b00`/`0b01`/`0b10` the
+same way.
 
 `x86:add/rax-imm32/legacy` has no `dest` slot: the register is fixed by the
 opcode (`REX.W 05 id`), which is exactly why `rax-imm32` and `rm64-imm32` are two
@@ -536,6 +550,28 @@ honest implementations emit different lengths (`INV-02`). `xmm16` is
 `E-OPERAND-004` (`N14i`), `xmm8` on the 3-bit legacy register-direct row is
 `E-OPERAND-004` (`N14j`/`N14k`), and a low `xmm` on an extension row is
 `E-RANGE-004` (`N16m`, `N16n`).
+
+`0.12.0` adds the no-displacement shape, `mod = 00` (`ADR-0039`). Twelve rows:
+legacy low/low (`0f 28 00`, `0f 29 00`), legacy high `xmm` with any legal base
+(`44 0f 28 00`, whose `REX` byte already exists for `REX.R`, so it carries
+`REX.B` too), legacy low `xmm` with a high base (`41 0f 28 00`), the two-byte
+VEX low-base pair (`c5 f8 28 00`), the three-byte VEX high-base pair
+(`c4 c1 78 28 00`), and the EVEX pair (`62 f1 7c 08 28 00`). No row has a `disp`
+slot: the shape ends at the `ModRM` byte, and the materializer never reads the
+base to choose a `mod`. Two base values are outside the shape rather than
+silently repaired. `%rsp`/`%r12` force a `SIB` byte (`0f 28 04 24`,
+`41 0f 28 04 24`) and stay excluded; `%rbp`/`%r13` collide with
+`mod = 00, r/m = 101`, which is `RIP + disp32`, so `llvm-mc` emits the `disp8`
+shape with a zero displacement (`0f 28 45 00`, `41 0f 28 45 00`). Both are
+`E-RANGE-004` on the new rows (`N16o`, `N16p`) and a plan that wants those bases
+names the existing `disp8` row with `disp = 0`. A zero displacement and no
+displacement are different encodings (`0f 28 40 00` versus `0f 28 00`), which
+is why the width stays a form (`EC-02`). A base `16` is `E-OPERAND-004`
+(`N14l`), a low base on `41 0F 28 /r` is `E-RANGE-004` (`N16q`), and `0.11.0`
+has no such row at all (`N01ah`, `E-FORM-001`). Still absent: a base-only `SIB`
+row under these opcodes, an SSE RIP-relative row, `mod = 00` for the GPR rows,
+`0x67`, 8/16-bit memory widths, EVEX masking, `ymm`/`zmm`, `movapd` and
+`xmm16`–`xmm31`.
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 

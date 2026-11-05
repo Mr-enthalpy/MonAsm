@@ -61,7 +61,7 @@ not be moved to `frozen` on the strength of an argument alone.
 | ID | ISA | Legal outputs | Observable difference | Carrier | Counterexample if the carrier is removed | Status |
 |---|---|---|---|---|---|---|
 | EC-01 | x86-64 | `add r/m64, imm` as sign-extended imm8 (`83 /0 ib`) vs imm32 (`81 /0 id`) | 4 vs 7 bytes with `REX.W` | `form variant` (`rm64-imm8` / `rm64-imm32`) | `add rax, 1` is legal both ways (`48 83 c0 01`, `48 81 c0 01 00 00 00`); an encoder that picks by value violates INV-02 and shifts every later offset. | frozen |
-| EC-02 | x86-64 | Memory displacement as disp8 (mod=01) vs disp32 (mod=10) | 1 vs 4 displacement bytes | `form variant` (`mem-disp8` / `mem-disp32`) | `mov rax, [rbp-8]` → `48 8b 45 f8` (disp8); `[rbp-200]` → disp32. Both halves are now forms: `0.2.0` took the RIP shape (`EC-34`) and `0.3.0` took base+disp8/disp32, including `%rsp` (`EC-35`, `ADR-0028`). `0.9.0` adds the SSE memory rows, where the EVEX `disp8` field is compressed (`EC-39`, `ADR-0036`). | frozen |
+| EC-02 | x86-64 | Memory displacement as none (`mod=00`), disp8 (`mod=01`) or disp32 (`mod=10`) | 0 vs 1 vs 4 displacement bytes | `form variant` (`mem-disp0` / `mem-disp8` / `mem-disp32`) | `mov rax, [rbp-8]` → `48 8b 45 f8` (disp8); `[rbp-200]` → disp32. The no-displacement shape is a third legal encoding, not a zero value: `movaps (%rax), %xmm0` is `0f 28 00` (3 B), `0f 28 40 00` (4 B, `mod = 01`, `disp8 = 0`) decodes as the same instruction, and `llvm-mc -disassemble` reads both identically. All three widths are now forms: `0.2.0` took the RIP shape (`EC-34`), `0.3.0` took base+disp8/disp32 (`EC-35`, `ADR-0028`), and `0.12.0` takes the no-displacement SSE rows (`ADR-0039`, `EXP-0041`); the EVEX `disp8` field is compressed (`EC-39`, `ADR-0036`). | frozen |
 | EC-03 | x86-64 | Relative branch rel8 (`EB`) vs rel32 (`E9`) | 2 vs 5 bytes | `form variant` (`rel8` / `rel32`) | llvm-mc 23.1.2: `jmp .+0x81` → `eb 7f` (2 B) but `jmp .+0x82` → `e9 7d 00 00 00` (5 B). One byte of target distance changes the instruction length; that is relaxation, not encoding (INV-04). | frozen |
 | EC-04 | x86-64 | Accumulator form (`05 id`, `B8+rd`) vs ModRM form (`81 /0 id`, `C7 /0 id`) | Different opcode byte; the accumulator form is one byte shorter because it has no ModRM | `form variant` (`rax-imm32` / `rm64-imm32`) | `add rax, 300` → `48 05 2c 01 00 00` (6 B) or `48 81 c0 2c 01 00 00` (7 B); `mov eax, 300` → `b8 2c 01 00 00` (5 B) or `c7 c0 2c 01 00 00` (6 B). Both tools pick the accumulator and neither exposes the other. | frozen |
 | EC-05 | x86-64 | `moffs` absolute form (`A0-A3`) vs ModRM with disp32 | Different length and prefix behavior | `form variant` (`moffs` / `mem-abs32`) | `mov al, [0x1234]` has two legal encodings with different sizes. | draft |
@@ -108,7 +108,7 @@ surface: a variant that is absent cannot be selected, repaired or approximated,
 and naming it is `E-FORM-001`. There is no feature flag and no partially
 implemented form.
 
-The x86-64 slice is sixty-two forms covering fourteen frozen `EC` rows:
+The x86-64 slice is seventy-four forms covering fourteen frozen `EC` rows:
 
 | `form_id` | Bytes | Operand signature | Covers |
 |---|---|---|---|
@@ -174,6 +174,18 @@ The x86-64 slice is sixty-two forms covering fourteen frozen `EC` rows:
 | `x86:movaps/xmm-ext-base-disp32/legacy` | `REX.R 0F 28 /r`, `mod=10`, `r/m=base` | dest `xmm` (8–15), base `rm64` (0–15, not `%rsp`/`%r12`), disp `disp32` | EC-02, EC-06, EC-09, EC-35, EC-38, X86-P15 |
 | `x86:movaps/base-disp8-xmm-ext/legacy` | `REX.R 0F 29 /r`, `mod=01`, `r/m=base` | src `xmm` (8–15), base `rm64` (0–15, not `%rsp`/`%r12`), disp `disp8` | EC-06, EC-09, EC-27, EC-35, EC-38, X86-P15 |
 | `x86:movaps/base-disp32-xmm-ext/legacy` | `REX.R 0F 29 /r`, `mod=10`, `r/m=base` | src `xmm` (8–15), base `rm64` (0–15, not `%rsp`/`%r12`), disp `disp32` | EC-06, EC-09, EC-27, EC-35, EC-38, X86-P15 |
+| `x86:movaps/xmm-base/legacy` | `0F 28 /r`, `mod=00`, `r/m=base` | dest `xmm` (0–7), base `rm64` (0–7, not `%rsp`/`%rbp`) | EC-02, EC-09, EC-34, EC-35, X86-P16 |
+| `x86:movaps/base-xmm/legacy` | `0F 29 /r`, `mod=00`, `r/m=base` | src `xmm` (0–7), base `rm64` (0–7, not `%rsp`/`%rbp`) | EC-02, EC-09, EC-27, EC-34, EC-35, X86-P16 |
+| `x86:movaps/xmm-ext-base/legacy` | `REX.R 0F 28 /r`, `mod=00`, `r/m=base` | dest `xmm` (8–15), base `rm64` (0–15, not `%rsp`/`%rbp`/`%r12`/`%r13`) | EC-02, EC-06, EC-09, EC-34, EC-35, X86-P16 |
+| `x86:movaps/base-xmm-ext/legacy` | `REX.R 0F 29 /r`, `mod=00`, `r/m=base` | src `xmm` (8–15), base `rm64` (0–15, not `%rsp`/`%rbp`/`%r12`/`%r13`) | EC-02, EC-06, EC-09, EC-27, EC-34, EC-35, X86-P16 |
+| `x86:movaps/xmm-base-ext/legacy` | `REX.B 0F 28 /r`, `mod=00`, `r/m=base` | dest `xmm` (0–7), base `rm64` (8–15, not `%r12`/`%r13`) | EC-02, EC-06, EC-09, EC-34, EC-35, X86-P16 |
+| `x86:movaps/base-ext-xmm/legacy` | `REX.B 0F 29 /r`, `mod=00`, `r/m=base` | src `xmm` (0–7), base `rm64` (8–15, not `%r12`/`%r13`) | EC-02, EC-06, EC-09, EC-27, EC-34, EC-35, X86-P16 |
+| `x86:vmovaps/xmm-base/vex` | `C5 F8 28 /r`, `mod=00`, `r/m=base` | dest `xmm` (0–15), base `rm64` (0–7, not `%rsp`/`%rbp`) | EC-02, EC-09, EC-34, EC-35, X86-P16 |
+| `x86:vmovaps/base-xmm/vex` | `C5 F8 29 /r`, `mod=00`, `r/m=base` | src `xmm` (0–15), base `rm64` (0–7, not `%rsp`/`%rbp`) | EC-02, EC-09, EC-27, EC-34, EC-35, X86-P16 |
+| `x86:vmovaps/xmm-base-ext/vex` | `C4 C1 78 28 /r`, `mod=00`, `r/m=base`, `R̄`/`B̄` inverted | dest `xmm` (0–15), base `rm64` (8–15, not `%r12`/`%r13`) | EC-02, EC-09, EC-35, EC-40, X86-P16 |
+| `x86:vmovaps/base-ext-xmm/vex` | `C4 C1 78 29 /r`, `mod=00`, `r/m=base`, `R̄`/`B̄` inverted | src `xmm` (0–15), base `rm64` (8–15, not `%r12`/`%r13`) | EC-02, EC-09, EC-27, EC-35, EC-40, X86-P16 |
+| `x86:vmovaps/xmm-base/evex` | `62 F1 7C 08 28 /r`, `mod=00`, `r/m=base`, `R̄`/`B̄` inverted | dest `xmm` (0–15), base `rm64` (0–15, not `%rsp`/`%rbp`/`%r12`/`%r13`) | EC-02, EC-09, EC-34, EC-35, EC-40, X86-P16 |
+| `x86:vmovaps/base-xmm/evex` | `62 F1 7C 08 29 /r`, `mod=00`, `r/m=base`, `R̄`/`B̄` inverted | src `xmm` (0–15), base `rm64` (0–15, not `%rsp`/`%rbp`/`%r12`/`%r13`) | EC-02, EC-09, EC-27, EC-34, EC-35, EC-40, X86-P16 |
 
 The variant names the operand signature as the ISA opcode table spells it, which
 is what makes the two `mov` forms and the two `add` immediate forms distinct
@@ -579,8 +591,9 @@ of its identity:
 
 The two memory forms decompose the address into `base` + `disp` rather than one
 payload operand, and the addressing form is the `form_id` (ADR-0008, `OD-13`).
-That is the same carrier `EC-02` names for x86's disp8/disp32 split, and it is
-what keeps an encoder from choosing `mod` from the displacement's value.
+That is the same carrier `EC-02` names for x86's no-displacement/disp8/disp32
+split, and it is what keeps an encoder from choosing `mod` from the
+displacement's value.
 
 `EC-19` is carried by `riscv:c.addi/rd-imm6`: `0.2.0` names the compressed form,
 `0.1.0` does not, and a plan that asks for it against `0.1.0` is `E-FORM-001`
