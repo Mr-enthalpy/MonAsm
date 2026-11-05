@@ -80,18 +80,23 @@ across the three families, because `0f 28 00` (three bytes) and `0f 28 40 00`
 (four bytes, `disp8 = 0`) decode as the same instruction and the assembler
 canonicalizes a zero displacement to the short form; `%rsp`/`%r12` (a `SIB`
 byte) and `%rbp`/`%r13` (`r/m = 101` is RIP) stay outside and must name the
-`disp8` row with `0`.
-Thirty-one definition documents are frozen and oracle-verified; the materializer
+`disp8` row with `0`. ADR-0040 takes the EVEX register to `xmm16`–`xmm31` by
+widening the `xmm` slot of the seven EVEX rows from four bits to five in place:
+bit 4 is the inverted `R̄'` for `ModRM.reg` and, in register form, the inverted
+`X̄` for `ModRM.rm` (`vmovaps %xmm31, %xmm30` is `62 01 7c 08 28 f7`). No row is
+added and no length changes; the memory rows have no `SIB` field, so `X̄` keeps
+its template value there, and legacy/VEX have no second extension bit at all.
+Thirty-two definition documents are frozen and oracle-verified; the materializer
 and its fixture gate are implemented.
 
 | Area | State |
 |---|---|
 | Contract (`docs/fmp-v0/01_contract.md`) | draft, fields marked `TBD` where unproven |
 | Schema (`schema/fmp-v0.schema.json`) | draft, examples validate |
-| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), `0.2.0` (9 forms), `0.3.0` (17 forms), `0.4.0` (22 forms), `0.5.0` (25 forms), `0.6.0` (25 forms), `0.7.0` (29 forms), `0.8.0` (33 forms), `0.9.0` (45 forms), `0.10.0` (53 forms), `0.11.0` (62 forms) and `0.12.0` (74 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms), `0.8.0` (32 forms), `0.9.0` (44 forms), `0.10.0` (68 forms), `0.11.0` (92 forms), `0.12.0` (132 forms), `0.13.0` (135 forms), `0.14.0` (136 forms), `0.15.0` (152 forms), `0.16.0` (168 forms) and `0.17.0` (176 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
+| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), `0.2.0` (9 forms), `0.3.0` (17 forms), `0.4.0` (22 forms), `0.5.0` (25 forms), `0.6.0` (25 forms), `0.7.0` (29 forms), `0.8.0` (33 forms), `0.9.0` (45 forms), `0.10.0` (53 forms), `0.11.0` (62 forms), `0.12.0` (74 forms) and `0.13.0` (74 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms), `0.8.0` (32 forms), `0.9.0` (44 forms), `0.10.0` (68 forms), `0.11.0` (92 forms), `0.12.0` (132 forms), `0.13.0` (135 forms), `0.14.0` (136 forms), `0.15.0` (152 forms), `0.16.0` (168 forms) and `0.17.0` (176 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
 | Prototype (`prototype/`) | workspace compiled; all three slices materialize from the plan |
 | Oracles (`tools/oracle/`) | planned; `llvm-mc` (± `ld.lld`) drives the experiments |
-| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0041 |
+| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0042 |
 
 Read `docs/STATUS.md` for the current phase, gate status, and next action.
 

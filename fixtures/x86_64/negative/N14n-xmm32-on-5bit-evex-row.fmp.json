@@ -1,0 +1,50 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "x86",
+    "isa_variant": "x86-64",
+    "execution_mode": "64",
+    "enabled_extensions": ["avx", "avx512f", "avx512vl"],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.x86",
+    "version": "0.13.0",
+    "digest": "sha256:79eabc2d19a7cf3cac84c857afd6a11b4f15063c7526f17f8782ace0b5ea3431"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [".text"],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": 6,
+      "fragments": [
+        { "offset": 0, "size": 6, "kind": "instruction", "instruction_id": "I0001" }
+      ]
+    }
+  ],
+  "symbols": [],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "x86:vmovaps/xmm-xmm/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.xmm", "target_type": "xmm", "payload": { "reg": 32 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.xmm", "target_type": "xmm", "payload": { "reg": 0 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    }
+  ],
+  "fixups": []
+}

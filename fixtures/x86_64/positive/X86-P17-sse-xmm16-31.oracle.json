@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0042/P17.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "14ff36adf656db650777089970fdba33266c322f0822855af93da00614ec9265",
+  "output_sha256": "031dd545745db514785d57346f6faefae9aa2dd39ae5c2160f40c461687fdfc2",
+  "size": 112,
+  "records": 0,
+  "notes": "Sixteen EVEX instructions put `xmm16`–`xmm31` in both ModRM fields. The first five are register-direct and force EVEX (VEX cannot reach past 15): `%xmm16, %xmm0` is `62 b1` (R-bar'=1 for the low destination, X-bar=0 for the high source), `%xmm0, %xmm16` is `62 e1`, `%xmm24, %xmm24` is `62 01`, and `%xmm31, %xmm30` / `%xmm30, %xmm31` differ only in the last ModRM byte (`f7`/`fe`). The next four are no-displacement memory loads and stores at `%xmm16` and `%xmm31` over `%rax` and `%r8`, six bytes each. The last seven exercise the displacement shapes: `disp8*16` content `127` (`2032`) and `-1` (`-16`), and `disp32` for the promoted `8` and for `2056` over `%r8`. Every instruction stays the same length as its low-register twin; no byte is added for the fifth register bit. `input_sha256` is P17.asm (399 bytes, the source above); `output_sha256` is the 112-byte .text."
+}

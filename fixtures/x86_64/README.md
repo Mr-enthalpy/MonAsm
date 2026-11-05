@@ -1,6 +1,6 @@
 # x86-64 fixtures
 
-Vectors: `X86-P1` … `X86-P16` in `docs/fmp-v0/06_validation_matrix.md`.
+Vectors: `X86-P1` … `X86-P17` in `docs/fmp-v0/06_validation_matrix.md`.
 
 ## Positive vectors present
 
@@ -22,6 +22,7 @@ Vectors: `X86-P1` … `X86-P16` in `docs/fmp-v0/06_validation_matrix.md`.
 | X86-P14 | `X86-P14-sse-base-ext` | `EXP-0039` (`{evex}` forces the EVEX family) |
 | X86-P15 | `X86-P15-sse-xmm-ext` | `EXP-0040` (`{evex}` forces the EVEX family) |
 | X86-P16 | `X86-P16-sse-no-disp` | `EXP-0041` (`{evex}` forces the EVEX family) |
+| X86-P17 | `X86-P17-sse-xmm16-31` | `EXP-0042` (the operand selects EVEX; no `{evex}` needed) |
 
 `X86-P6` ships in `definitions/x86_64/0.2.0.json` as two forms with
 `mod = 00`, `r/m = 101` and `disp32` as the last field (`ADR-0027`). `X86-P4`
@@ -50,7 +51,11 @@ in `0.12.0` as the no-displacement shape: six legacy, four VEX and two EVEX rows
 with `mod = 00` and no `disp` slot, because `0f 28 00` (three bytes) and
 `0f 28 40 00` (four bytes, `disp8 = 0`) decode as the same instruction; `%rsp`/
 `%r12` (a `SIB` byte) and `%rbp`/`%r13` (`r/m = 101` is RIP) stay outside and
-name the `disp8` row with displacement `0` (`ADR-0039`).
+name the `disp8` row with displacement `0` (`ADR-0039`). `X86-P17` ships in
+`0.13.0` as the fifth EVEX register bit: the same seven EVEX rows get a 5-bit
+`xmm` slot in place, with the inverted `R̄'` at bit 12 for `ModRM.reg` and the
+inverted `X̄` at bit 14 for a register-direct `ModRM.rm`, so `vmovaps %xmm31,
+%xmm30` is `62 01 7c 08 28 f7` with no new row and no length change (`ADR-0040`).
 
 ## Negative fixtures present
 
@@ -68,7 +73,7 @@ name the `disp8` row with displacement `0` (`ADR-0039`).
 | N10 | `negative/N10-definition-digest-mismatch` | `E-DEF-001` |
 | N11 | `negative/N11-fragment-gap` | `E-LAYOUT-002` |
 | N13 | `negative/N13-expected-digest-mismatch` | `E-BYTE-001` |
-| N14 | `negative/N14-register-wider-than-field`, `negative/N14b-xmm8-wider-than-field`, `negative/N14c-extended-register-on-old-table`, `negative/N14d-register-16-on-extended-table`, `negative/N14e-xmm8-on-sse-memory-row`, `negative/N14f-base8-on-vex-row`, `negative/N14g-base8-on-evex-row`, `negative/N14h-base16-on-base-ext-row`, `negative/N14i-xmm16-wider-than-field`, `negative/N14j-xmm8-on-3bit-legacy-row`, `negative/N14k-xmm8-source-on-2byte-vex-row`, `negative/N14l-base16-on-no-disp-row` | `E-OPERAND-004` |
+| N14 | `negative/N14-register-wider-than-field`, `negative/N14b-xmm8-wider-than-field`, `negative/N14c-extended-register-on-old-table`, `negative/N14d-register-16-on-extended-table`, `negative/N14e-xmm8-on-sse-memory-row`, `negative/N14f-base8-on-vex-row`, `negative/N14g-base8-on-evex-row`, `negative/N14h-base16-on-base-ext-row`, `negative/N14i-xmm16-wider-than-field`, `negative/N14j-xmm8-on-3bit-legacy-row`, `negative/N14k-xmm8-source-on-2byte-vex-row`, `negative/N14l-base16-on-no-disp-row`, `negative/N14m-xmm16-on-0.12.0-evex-row`, `negative/N14n-xmm32-on-5bit-evex-row`, `negative/N14o-xmm16-on-4bit-vex-row` | `E-OPERAND-004` |
 | N16 | `negative/N16f-rsp-on-non-sib-form`, `negative/N16g-low-byte-number-four-without-rex`, `negative/N16h-r12-on-general-base-form`, `negative/N16i-index-rsp-excluded`, `negative/N16j-base-rsp-excluded`, `negative/N16k-low-base-on-base-ext-row`, `negative/N16l-r12-on-base-ext-row`, `negative/N16m-low-xmm-on-xmm-ext-row`, `negative/N16n-low-source-on-vex-src-ext-row`, `negative/N16o-rsp-on-no-disp-row`, `negative/N16p-rbp-on-no-disp-row`, `negative/N16q-low-base-on-no-disp-base-ext-row` | `E-RANGE-004` |
 
 `N06` (extension-list mismatch) now has an x86 case: `0.5.0` declares
