@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0038/P13.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "6ea0dd8828a9e92d5d9bb5813dda11936a9ae41e2028f894c64698177f49fbdf",
+  "output_sha256": "ff1502f30e775a9b3c4901c358a5ac8555b793797e4aa522f992189377d2ee45",
+  "size": 96,
+  "records": 0,
+  "notes": "Fourteen SSE memory instructions: legacy `movaps` and two-byte-VEX `vmovaps` load/store in both displacement widths, then EVEX `vmovaps` forced with `{evex}` so the assembler does not choose VEX. The EVEX `disp8` rows carry the compressed content: 16 bytes is 1, -16 is 0xff and 2032 is 0x7f; the EVEX `8(%rax)` and `8(%rbp)` lines are `disp32` because 8 is not a multiple of 16, and the plan names the `disp32` row rather than relying on promotion. `input_sha256` is P13.asm (844 bytes, the source above); `output_sha256` is the 96-byte .text."
+}
