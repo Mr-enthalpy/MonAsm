@@ -260,6 +260,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.18.0.json` | `monasm.isa.x86` | `sha256:e1281b0c11d7e2bed9bd1ec7fa5404dadca2c82959376cbe3edfd9ff56b9e33d` |
 | `definitions/x86_64/0.19.0.json` | `monasm.isa.x86` | `sha256:dddc678fe0abc6fa03c2e61c8fcafef2570b496775a11a25e1ab29e01bfe5130` |
 | `definitions/x86_64/0.20.0.json` | `monasm.isa.x86` | `sha256:b8bd1ed3ed38d71f6b19cc1854c9252df13850127c4e9433981a3a45f49d0f99` |
+| `definitions/x86_64/0.21.0.json` | `monasm.isa.x86` | `sha256:30af3fec5c2f50e3ab30fb30d32e6b2e71f4520dbdb2660c6c9de1767b7b1160` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -282,7 +283,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.20.0`
+### 8.1 `x86-64` `0.1.0` … `0.21.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -457,6 +458,30 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:vmovaps/rsp-disp32-xmm/vex` | `c5f829842400000000` | src: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | EC-02, EC-09, EC-27, EC-35, EC-38, X86-P24 |
 | `x86:vmovaps/r12-disp8-xmm/vex` | `c4c17829442400` | src: `x86.xmm`/`xmm` → `[15,1]` inverted, `[35,3]`; disp: `x86.imm`/`disp8` → `[48,8]` | 7 | EC-02, EC-06, EC-09, EC-27, EC-35, EC-38, X86-P24 |
 | `x86:vmovaps/r12-disp32-xmm/vex` | `c4c17829842400000000` | src: `x86.xmm`/`xmm` → `[15,1]` inverted, `[35,3]`; disp: `x86.imm`/`disp32` → `[48,32]` | 10 | EC-02, EC-06, EC-09, EC-27, EC-35, EC-38, X86-P24 |
+| `x86:vmovaps/xmm-rsp-disp8x16/evex` | `62f17c0828442400` | dest: `x86.xmm`/`xmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp8x16` → `[56,8]` | 8 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/xmm-rsp-disp32/evex` | `62f17c0828842400000000` | dest: `x86.xmm`/`xmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/xmm-r12-disp8x16/evex` | `62d17c0828442400` | dest: `x86.xmm`/`xmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp8x16` → `[56,8]` | 8 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/xmm-r12-disp32/evex` | `62d17c0828842400000000` | dest: `x86.xmm`/`xmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/rsp-disp8x16-xmm/evex` | `62f17c0829442400` | src: `x86.xmm`/`xmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp8x16` → `[56,8]` | 8 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/rsp-disp32-xmm/evex` | `62f17c0829842400000000` | src: `x86.xmm`/`xmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/r12-disp8x16-xmm/evex` | `62d17c0829442400` | src: `x86.xmm`/`xmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp8x16` → `[56,8]` | 8 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/r12-disp32-xmm/evex` | `62d17c0829842400000000` | src: `x86.xmm`/`xmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/ymm-rsp-disp8x32/evex` | `62f17c2828442400` | dest: `x86.ymm`/`ymm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp8x32` → `[56,8]` | 8 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/ymm-rsp-disp32/evex` | `62f17c2828842400000000` | dest: `x86.ymm`/`ymm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/ymm-r12-disp8x32/evex` | `62d17c2828442400` | dest: `x86.ymm`/`ymm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp8x32` → `[56,8]` | 8 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/ymm-r12-disp32/evex` | `62d17c2828842400000000` | dest: `x86.ymm`/`ymm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/rsp-disp8x32-ymm/evex` | `62f17c2829442400` | src: `x86.ymm`/`ymm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp8x32` → `[56,8]` | 8 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/rsp-disp32-ymm/evex` | `62f17c2829842400000000` | src: `x86.ymm`/`ymm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/r12-disp8x32-ymm/evex` | `62d17c2829442400` | src: `x86.ymm`/`ymm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp8x32` → `[56,8]` | 8 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/r12-disp32-ymm/evex` | `62d17c2829842400000000` | src: `x86.ymm`/`ymm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/zmm-rsp-disp8x64/evex` | `62f17c4828442400` | dest: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp8x64` → `[56,8]` | 8 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/zmm-rsp-disp32/evex` | `62f17c4828842400000000` | dest: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/zmm-r12-disp8x64/evex` | `62d17c4828442400` | dest: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp8x64` → `[56,8]` | 8 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/zmm-r12-disp32/evex` | `62d17c4828842400000000` | dest: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/rsp-disp8x64-zmm/evex` | `62f17c4829442400` | src: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp8x64` → `[56,8]` | 8 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/rsp-disp32-zmm/evex` | `62f17c4829842400000000` | src: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/r12-disp8x64-zmm/evex` | `62d17c4829442400` | src: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp8x64` → `[56,8]` | 8 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
+| `x86:vmovaps/r12-disp32-zmm/evex` | `62d17c4829842400000000` | src: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | EC-09, EC-35, EC-38, EC-39, X86-P25 |
 
 Placements are written `[bit_offset, width]`, with ` inverted` appended when the
 chunk is complemented. In the legacy SSE row
@@ -825,6 +850,25 @@ already reach `xmm8`–`xmm15`. Naming a row against `0.19.0` is `E-FORM-001`
 `128` on a `disp8` slot is `E-RANGE-001` (`N03i`). Still deferred on this axis:
 the EVEX `SIB` base, the `ymm`/`zmm` memory rows, the legacy `REX.R` window,
 `mod = 00`, index/scale under these opcodes, and the SSE RIP-relative row.
+
+`0.21.0` gives the EVEX `vmovaps` memory rows the same two bases
+(`ADR-0048`). Here the base costs no prefix byte: `B̄` is already in
+`P0`, so `%rsp` and `%r12` are the same length and differ only in that byte
+(`62 f1 ...` vs `62 d1 ...`). Twenty-four fixed-base rows carry the register
+and the displacement; the prefix does not grow, so the vector slot stays
+`[12,1]` inverted + `[15,1]` inverted + `[43,3]` and only the displacement
+moves, from `[48,...]` to `[56,...]`. The `disp8*N` content is the `disp / N`
+the general rows use, so `16`/`32`/`64` are content `1` at the three widths,
+and `8(%rsp)` promotes to `disp32` rather than truncating. The five-bit
+field already reaches `xmm16`–`xmm31`, and a high register only clears
+`R̄`/`R̄'` in `P0`. Naming a row against `0.20.0` is `E-FORM-001`
+(`N01at`), the absent `mod = 00` shape is the same code (`N01au`), a
+`x86.gpr64` operand on an `xmm` row is two `E-OPERAND-001` (`N02x`), a third
+`base` operand is `E-OPERAND-002` (`N02y`), content `128` on a `disp8x16`
+slot is `E-RANGE-001` (`N03j`), and register `32` is `E-OPERAND-004`
+(`N14x`). Still deferred on this axis: `mod = 00` with a `SIB` base,
+index/scale under these opcodes, the other EVEX SSE memory mnemonics, and
+EVEX masking.
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 

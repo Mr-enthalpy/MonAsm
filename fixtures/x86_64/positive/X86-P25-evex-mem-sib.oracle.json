@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0050/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "0b639b4030dcdf27fd46d25170b80e28eab84592dd593d3c0b991866d543dfc9",
+  "output_sha256": "eb1a580470187dd24e033558020abc20261a5043f134811fce99c5e5685374a8",
+  "size": 228,
+  "records": 0,
+  "notes": "Twenty-four fixed-base SIB instructions, one per 0.21.0 row. Instructions 1-8 are the xmm rows (N = 16) and run xmm0-xmm7; 9-16 are the ymm rows (N = 32) and run ymm8-ymm15; 17-24 are the zmm rows (N = 64) and run zmm16-zmm23. Within each eight the order is load rsp, load r12, load rsp disp32, load r12 disp32, store rsp, store r12, store rsp disp32, store r12 disp32. Every row spends exactly one byte on the SIB byte 24 (scale 00, index 100, base 100); %r12 costs no extra prefix because the base's fourth bit is already the inverted B-bar in P0 (62 f1 -> 62 d1). The displacement therefore sits one byte later than on the corresponding -base-disp rows: bit 56 instead of 48. disp8*N content is the displacement divided by the width unit: 1 for 16/32/64 and 2 for 64/128 at ymm/zmm width. Length is 8 bytes for disp8*N and 11 for disp32 on every row. High registers only clear the inverted R-bar/R-bar-prime bits (62 f1 -> 62 e1 for xmm20, 62 d1 -> 62 41 for zmm30). input_sha256 is fixture.asm (the source above); output_sha256 is the 228-byte .text."
+}
