@@ -1,0 +1,12 @@
+{
+  "errors": [
+    {
+      "code": "E-OPERAND-001",
+      "path": "/instructions/0/operands/2/kind",
+      "detail_keys": [
+        "expected",
+        "found"
+      ]
+    }
+  ]
+}
