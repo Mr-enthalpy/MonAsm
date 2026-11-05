@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0058/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "21323476cd2e7d7e8d44cecdee524503a789c7a7fca4a83c5b27d25cc57dde01",
+  "output_sha256": "46b3918fe091ea87db5b79f82784ccee9fa7316524eecd884e4d72237b1ea41e",
+  "size": 60,
+  "records": 0,
+  "notes": "One 8-bit mov per 0.29.0 row, eight instructions, 60 bytes: four seven-byte instructions with no REX byte (the low %al-%bl window and the high %ah-%bh window) and four eight-byte instructions with a REX byte (REX = 40 for %spl-%dil and REX = 44 for %r8b-%r15b). Every row is opcode 8a (load) or 88 (store), ModRM mod 00 r/m 100 and the constant SIB byte 25: scale 00, index 100 (\"no index\") and base 101 (\"no base, disp32\"). ModRM.reg carries the register: %al is 04, %bl is 1c, %ah is 24, %dh is 34, %spl is 24 under REX = 40, %dil is 3c, %r8b is 04 under REX = 44 and %r15b is 3c. The address is always four bytes, even for 0, and the field is signed: -1 is ff ff ff ff, -32768 is 00 80 ff ff and 2147483647 is ff ff ff 7f. movabsb (A0/A2) is a second legal encoding at nine bytes and is not a row. input_sha256 is fixture.asm (the source above); output_sha256 is the 60-byte .text."
+}

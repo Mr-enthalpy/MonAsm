@@ -1,0 +1,290 @@
+#!/usr/bin/env python3
+"""Emit the nine `X86-P33` negative fixtures.
+
+Each case names a `0.29.0` 8-bit absolute-address row and violates exactly one
+rule: the row is absent from `0.28.0` (low load and extended store), a `base`
+operand is supplied to a row with no register in its address, the address
+carries the `disp8` target type instead of `disp32`, a 16-bit register is
+supplied to a byte row, the high-byte register kind is supplied to the low-byte
+row, the address content is one past the signed end point, the register is one
+past the four-bit field, or the excluded low window is named on a `REX = 40`
+row.
+
+Usage (from the repository root):
+
+    python research/evidence/experiments/EXP-0058/fixture_negatives_p33.py
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[4]
+TARGET = ROOT / "fixtures/x86_64/negative"
+
+VERSION = "0.29.0"
+DIGEST = "sha256:cf78fac0b9c9b9828e74559bec9f612b609468ea2894c94c6e3e5b131c3951e6"
+PREVIOUS = "sha256:1c1e66235356f959a7d7d01801aae4b76ba63c5571b4234d0dfa41fea4df1854"
+
+HEADER = """{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "x86",
+    "isa_variant": "x86-64",
+    "execution_mode": "64",
+    "enabled_extensions": ["avx", "avx512f", "avx512vl"],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.x86",
+    "version": "%s",
+    "digest": "%s"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [".text"],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": %d,
+      "fragments": [
+        { "offset": 0, "size": %d, "kind": "instruction", "instruction_id": "I0001" }
+      ]
+    }
+  ],
+  "symbols": [],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "%s",
+      "operands": [
+%s
+      ],
+      "expected_size": %d
+    }
+  ],
+  "fixups": []
+}
+"""
+
+
+def operand(role, kind, target_type, payload) -> str:
+    return ('        { "role": "%s", "kind": "%s", "target_type": "%s", '
+            '"payload": %s, "modifiers": [] }'
+            % (role, kind, target_type, json.dumps(payload)))
+
+
+def reg(role, kind, target_type, number) -> str:
+    return operand(role, kind, target_type, {"reg": number})
+
+
+def disp(target_type, value) -> str:
+    return operand("disp", "x86.imm", target_type, {"value": value})
+
+
+# `dest`, `0x1234, %al`: the first row of the fixture.
+FULL = [
+    reg("dest", "x86.gpr8", "r8", 0),
+    disp("disp32", 4660),
+]
+
+CASES = [
+    # The low load row is new in 0.29.0, so 0.28.0 must reject the name rather
+    # than reuse the memory row.
+    (
+        "N01bk-absent-gpr8-mov-abs32-load-row-on-0.28.0",
+        "0.28.0",
+        PREVIOUS,
+        7,
+        "x86:mov/r8-abs32/legacy",
+        FULL,
+        [{
+            "code": "E-FORM-001",
+            "path": "/instructions/0/form_id",
+            "detail_keys": ["form_id", "namespace", "version"],
+        }],
+    ),
+    # The `REX = 44` store row is a separate row with its own boundary.
+    (
+        "N01bl-absent-gpr8-mov-abs32-ext-store-row-on-0.28.0",
+        "0.28.0",
+        PREVIOUS,
+        8,
+        "x86:mov/abs32-r8-ext/legacy",
+        [
+            reg("src", "x86.gpr8", "r8", 8),
+            disp("disp32", 4660),
+        ],
+        [{
+            "code": "E-FORM-001",
+            "path": "/instructions/0/form_id",
+            "detail_keys": ["form_id", "namespace", "version"],
+        }],
+    ),
+    # The absolute row has no register in its address: a base operand is one
+    # operand too many, and `SIB.base = 101` is a template bit.
+    (
+        "N02ap-extra-base-operand-on-gpr8-mov-abs32-row",
+        VERSION,
+        DIGEST,
+        7,
+        "x86:mov/r8-abs32/legacy",
+        [FULL[0], reg("base", "x86.gpr64", "rm64", 0), FULL[1]],
+        [{
+            "code": "E-OPERAND-002",
+            "path": "/instructions/0/operands",
+            "detail_keys": ["expected", "found"],
+        }],
+    ),
+    # The address is four bytes; `disp8` is the target type of a different
+    # field, and the row's unit may not be re-derived from the value.
+    (
+        "N02aq-address-carried-as-disp8-on-gpr8-mov-abs32-row",
+        VERSION,
+        DIGEST,
+        7,
+        "x86:mov/r8-abs32/legacy",
+        [FULL[0], disp("disp8", 0)],
+        [{
+            "code": "E-OPERAND-001",
+            "path": "/instructions/0/operands/1/target_type",
+            "detail_keys": ["expected", "found"],
+        }],
+    ),
+    # A 16-bit register on a byte row is a different name on both axes; the
+    # width is not recoverable from the register number.
+    (
+        "N02ar-gpr16-operand-on-gpr8-mov-abs32-row",
+        VERSION,
+        DIGEST,
+        7,
+        "x86:mov/r8-abs32/legacy",
+        [
+            reg("dest", "x86.gpr16", "r16", 0),
+            disp("disp32", 4660),
+        ],
+        [
+            {
+                "code": "E-OPERAND-001",
+                "path": "/instructions/0/operands/0/kind",
+                "detail_keys": ["expected", "found"],
+            },
+            {
+                "code": "E-OPERAND-001",
+                "path": "/instructions/0/operands/0/target_type",
+                "detail_keys": ["expected", "found"],
+            },
+        ],
+    ),
+    # `%ah`-`%bh` and `%al`-`%bl` share one three-bit field but not one row:
+    # the high-byte kind on the low-byte row is a different name on both axes.
+    (
+        "N02as-gpr8h-operand-on-gpr8-mov-abs32-row",
+        VERSION,
+        DIGEST,
+        7,
+        "x86:mov/r8-abs32/legacy",
+        [
+            reg("dest", "x86.gpr8h", "r8h", 4),
+            disp("disp32", 4660),
+        ],
+        [
+            {
+                "code": "E-OPERAND-001",
+                "path": "/instructions/0/operands/0/kind",
+                "detail_keys": ["expected", "found"],
+            },
+            {
+                "code": "E-OPERAND-001",
+                "path": "/instructions/0/operands/0/target_type",
+                "detail_keys": ["expected", "found"],
+            },
+            {
+                "code": "E-RANGE-004",
+                "path": "/instructions/0/operands/0/payload/reg",
+                "detail_keys": ["excluded", "target_type", "value"],
+            },
+        ],
+    ),
+    # `disp32` is signed 32-bit content; 2147483648 is one past the field, and
+    # `llvm-mc` silently switches to `movabsb` there, which a plan may not do.
+    (
+        "N03p-disp32-past-end-on-gpr8-mov-abs32-row",
+        VERSION,
+        DIGEST,
+        7,
+        "x86:mov/r8-abs32/legacy",
+        [FULL[0], disp("disp32", 2147483648)],
+        [{
+            "code": "E-RANGE-001",
+            "path": "/instructions/0/operands/1/payload/value",
+            "detail_keys": ["min", "max", "value", "target_type"],
+        }],
+    ),
+    # The extended register slot is four bits; 16 is outside the field
+    # (`llvm-mc` would reach for the APX `d5` prefix, which the row does not
+    # carry).
+    (
+        "N14ac-register-16-on-gpr8-mov-abs32-row",
+        VERSION,
+        DIGEST,
+        8,
+        "x86:mov/r8-ext-abs32/legacy",
+        [
+            reg("dest", "x86.gpr8", "r8", 16),
+            disp("disp32", 4660),
+        ],
+        [{
+            "code": "E-OPERAND-004",
+            "path": "/instructions/0/operands/0/payload/reg",
+            "detail_keys": ["target_type", "value", "field_bits"],
+        }],
+    ),
+    # `REX = 40` is what relabels 4-7 to `%spl`-`%dil`, so the low window is
+    # excluded: `%al` would encode `%spl` at the same byte.
+    (
+        "N16af-register-0-on-gpr8-mov-abs32-rex-row",
+        VERSION,
+        DIGEST,
+        8,
+        "x86:mov/r8-rex-abs32/legacy",
+        [
+            reg("dest", "x86.gpr8", "r8", 0),
+            disp("disp32", 4660),
+        ],
+        [{
+            "code": "E-RANGE-004",
+            "path": "/instructions/0/operands/0/payload/reg",
+            "detail_keys": ["target_type", "value", "excluded"],
+        }],
+    ),
+]
+
+
+def main() -> int:
+    for name, version, digest, size, form_id, operands, errors in CASES:
+        body = ",\n".join(operands)
+        plan = HEADER % (version, digest, size, size, form_id, body, size)
+        plan_path = TARGET / ("%s.fmp.json" % name)
+        with plan_path.open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(plan)
+        error_path = TARGET / ("%s.expected-error.json" % name)
+        with error_path.open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(json.dumps({"errors": errors}, indent=2) + "\n")
+    print("%d negative fixtures" % len(CASES))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

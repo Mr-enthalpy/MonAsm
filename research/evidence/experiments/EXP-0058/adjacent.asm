@@ -1,0 +1,11 @@
+movb 0x7fffffff, %al
+movb 0x80000000, %al
+movb %al, 0x80000000
+movabsb 0x1234, %al
+movw 0x1234, %ax
+movl 0x1234, %eax
+movq 0x1234, %rax
+movb 0x1234, %r16b
+movb 0x1234, %r31b
+movb %r8b, 0x80000000
+movb 0xffffffff, %al
