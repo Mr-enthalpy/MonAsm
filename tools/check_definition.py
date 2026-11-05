@@ -182,8 +182,19 @@ def check_definition(path: Path, errors):
                 continue
             total = 0
             for placement in placements:
-                if set(placement) != {"bit_offset", "width"}:
-                    fail(errors, slot_spot, "placement keys must be bit_offset,width")
+                if not {"bit_offset", "width"} <= set(placement) or set(placement) - {
+                    "bit_offset",
+                    "width",
+                    "invert",
+                }:
+                    fail(
+                        errors,
+                        slot_spot,
+                        "placement keys must be bit_offset,width[,invert]",
+                    )
+                    continue
+                if "invert" in placement and not isinstance(placement["invert"], bool):
+                    fail(errors, slot_spot, "placement.invert must be a boolean")
                     continue
                 offset = placement["bit_offset"]
                 width = placement["width"]
@@ -294,9 +305,13 @@ def check_excluded(slot, spot, width_bits, errors):
 
 
 def render_slot_cell(slot) -> str:
-    placements = ", ".join(
-        "`[%d,%d]`" % (p["bit_offset"], p["width"]) for p in slot["placements"]
-    )
+    pieces = []
+    for placement in slot["placements"]:
+        piece = "`[%d,%d]`" % (placement["bit_offset"], placement["width"])
+        if placement.get("invert"):
+            piece += " inverted"
+        pieces.append(piece)
+    placements = ", ".join(pieces)
     cell = "%s: `%s`/`%s` \u2192 %s" % (
         slot["role"],
         slot["kind"],
@@ -352,13 +367,28 @@ def check_doc_table(documents, errors):
                 )
 
 
+def version_key(path: Path):
+    """Order tables by numeric version, oldest first.
+
+    §8 keeps one row per `form_id` and reads the newest table that still has it,
+    so `0.10.0` must be processed after `0.9.0`. A plain `sorted()` compares
+    file names as text and puts `0.10.0` between `0.1.0` and `0.2.0`, which
+    would let the older row win.
+    """
+    try:
+        parts = tuple(int(part) for part in path.stem.split("."))
+    except ValueError:
+        parts = (0,)
+    return (path.parent.as_posix(), parts, path.stem)
+
+
 def main() -> int:
     errors = []
     documents = []
     if not DEFINITIONS.is_dir():
         print("no definitions directory; nothing to check")
         return 0
-    paths = sorted(DEFINITIONS.rglob("*.json"))
+    paths = sorted(DEFINITIONS.rglob("*.json"), key=version_key)
     for path in paths:
         document = check_definition(path, errors)
         if document is not None:

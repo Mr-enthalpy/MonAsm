@@ -412,13 +412,20 @@ fn encode_instruction(
 }
 
 /// Write one operand value into a form's slot, most significant placement first.
+///
+/// `placement.inverted` complements the chunk it carries (`ADR-0037`): EVEX and
+/// VEX name their extension bits `B̄`/`R̄`, so a set extension bit is written as
+/// zero. The complement is a constant, not a choice.
 fn write_field(bytes: &mut [u8], slot: &Slot, value: i128) {
     let total = slot.width_bits;
     let masked = value & mask(total);
     let mut remaining = total;
     for placement in &slot.placements {
         remaining -= placement.width;
-        let chunk = (masked >> remaining) & mask(placement.width);
+        let mut chunk = (masked >> remaining) & mask(placement.width);
+        if placement.inverted {
+            chunk ^= mask(placement.width);
+        }
         write_bits(bytes, placement.bit_offset, placement.width, chunk);
     }
 }
@@ -764,10 +771,12 @@ mod tests {
                 fmp_model::definition::Placement {
                     bit_offset: 12,
                     width: 4,
+                    inverted: false,
                 },
                 fmp_model::definition::Placement {
                     bit_offset: 0,
                     width: 8,
+                    inverted: false,
                 },
             ],
             width_bits: 12,
@@ -776,6 +785,42 @@ mod tests {
         // The high nibble goes to the high placement (byte 1, bits 4..8), the
         // low byte to the low placement.
         assert_eq!(bytes, [0xBC, 0xA0]);
+    }
+
+    #[test]
+    fn write_field_inverts_a_marked_placement() {
+        // `ADR-0037`: EVEX `B̄` carries the base's fourth bit complemented, so
+        // base 8 writes 0 at bit 13. A raw write would emit `P0 = f1` and
+        // encode `(%rax)` instead of `(%r8)` (`EXP-0039`).
+        let mut bytes = [0u8; 2];
+        let slot = Slot {
+            role: "base".to_string(),
+            kind: "x86.gpr64".to_string(),
+            target_type: "rm64".to_string(),
+            from: SlotFrom::RegNumber,
+            range: None,
+            modifiers: Vec::new(),
+            excluded: Vec::new(),
+            placements: vec![
+                fmp_model::definition::Placement {
+                    bit_offset: 13,
+                    width: 1,
+                    inverted: true,
+                },
+                fmp_model::definition::Placement {
+                    bit_offset: 0,
+                    width: 3,
+                    inverted: false,
+                },
+            ],
+            width_bits: 4,
+        };
+        write_field(&mut bytes, &slot, 8);
+        // Low three bits of 8 are 0 (bits 0..3), bit 3 is 1, written as 0 at 13.
+        assert_eq!(bytes, [0x00, 0x00]);
+        write_field(&mut bytes, &slot, 0);
+        // Base 0 writes 1 at 13 (the template's `f1` byte keeps bit 5 set).
+        assert_eq!(bytes, [0x00, 0x20]);
     }
 
     #[test]

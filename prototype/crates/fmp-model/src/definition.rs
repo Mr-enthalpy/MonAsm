@@ -80,6 +80,10 @@ pub struct Placement {
     /// Bit offset from the least significant bit of template byte 0.
     pub bit_offset: u32,
     pub width: u32,
+    /// `ADR-0037`: the chunk is written complemented. EVEX and VEX carry their
+    /// extension bits inverted (`B̄`/`R̄`), so the polarity is a property of the
+    /// placement, not something the materializer may decide.
+    pub inverted: bool,
 }
 
 impl Form {
@@ -138,7 +142,7 @@ const SLOT_FIELDS: &[&str] = &[
     "modifiers",
     "placements",
 ];
-const PLACEMENT_FIELDS: &[&str] = &["bit_offset", "width"];
+const PLACEMENT_FIELDS: &[&str] = &["bit_offset", "width", "invert"];
 
 /// Roles the contract's operand model allows (`01_contract.md` §8).
 const ROLES: &[&str] = &[
@@ -540,10 +544,15 @@ fn bind_placement(value: &json::Json, path: String) -> Result<Placement, Diagnos
     if width == 0 {
         return Err(load_error("placement.width", "must be at least 1"));
     }
+    let inverted = match obj.optional("invert") {
+        Some((value, path)) => bind::boolean(value, path).map_err(|fault| fault.definition())?,
+        None => false,
+    };
     Ok(Placement {
         bit_offset: bind::bounded_u32(offset, offset_path, u32::MAX, "u32")
             .map_err(|fault| fault.definition())?,
         width,
+        inverted,
     })
 }
 

@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0039/P14.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "d8d716fe3306ac484d18b71f2faa74695c2069204cdba1b876b6d599d063c231",
+  "output_sha256": "c03acc3809baafc002afcb8ce8e1c2604080b11f309fd554d199b1f625a9b940",
+  "size": 104,
+  "records": 0,
+  "notes": "Eight instructions put the base in r8-r15 on the new extension rows: legacy `movaps` gains a `41` REX byte (`4` + the base's fourth bit), and VEX grows from the two-byte `c5` form to the three-byte `c4 c1` form whose `B̄` is 0. Six EVEX instructions then reuse the four widened `0.9.0` rows, including the compressed `disp8*16` contents 1, 0xff and 0x7f, and the `8(%r8)` load/store that is not a multiple of 16 and therefore names a `disp32` row. `%r12` is absent on purpose: it still has no SSE row because it forces a SIB byte. `input_sha256` is P14.asm (383 bytes, the source above); `output_sha256` is the 104-byte .text."
+}
