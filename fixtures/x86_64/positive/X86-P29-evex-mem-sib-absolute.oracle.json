@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0054/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "2ae4358da56356291fb3f7359f4a803004c4db2d2ab3d811781df52fee1ab266",
+  "output_sha256": "35a811913bdaca94a123bd24954b144d3c81b2c881259d36608ce81b7a4a31ad",
+  "size": 66,
+  "records": 0,
+  "notes": "Six EVEX vmovaps instructions with a 32-bit absolute address, one per 0.25.0 row, eleven bytes each (66 bytes total). In every instruction ModRM is 04 (mod 00, r/m 100) and the SIB byte is the constant 25: scale 00, index 100 (\"no index\") and base 101 (\"no base, disp32\"). There is no base, index or scale operand, and the address is always four bytes, even for 0x7fff, which would fit a disp8. The vector register sits in the five-bit field at [43,3] plus the inverted R-bar/R-bar-prime bits at [12,1]/[15,1]: %xmm20 and %xmm21 are 62 e1, %ymm8 and %ymm9 are 62 71, %zmm30 and %zmm31 are 62 61. The addresses cover a positive value (4660), a negative one (-4096), 0x7fff, 4096, -1 and the signed end point -2147483648, whose four bytes are 00 00 00 80. input_sha256 is fixture.asm (the source above); output_sha256 is the 66-byte .text."
+}

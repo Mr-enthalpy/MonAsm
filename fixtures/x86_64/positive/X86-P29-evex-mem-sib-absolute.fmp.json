@@ -1,0 +1,242 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "x86",
+    "isa_variant": "x86-64",
+    "execution_mode": "64",
+    "enabled_extensions": [
+      "avx",
+      "avx512f",
+      "avx512vl"
+    ],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.x86",
+    "version": "0.25.0",
+    "digest": "sha256:b72c0b08d30e9bbfd0c5129e01e1cecf77abcde36e2928aab2f94bb80c06a51c"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [
+      ".text"
+    ],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": 66,
+      "fragments": [
+        {
+          "offset": 0,
+          "size": 11,
+          "kind": "instruction",
+          "instruction_id": "I0001"
+        },
+        {
+          "offset": 11,
+          "size": 11,
+          "kind": "instruction",
+          "instruction_id": "I0002"
+        },
+        {
+          "offset": 22,
+          "size": 11,
+          "kind": "instruction",
+          "instruction_id": "I0003"
+        },
+        {
+          "offset": 33,
+          "size": 11,
+          "kind": "instruction",
+          "instruction_id": "I0004"
+        },
+        {
+          "offset": 44,
+          "size": 11,
+          "kind": "instruction",
+          "instruction_id": "I0005"
+        },
+        {
+          "offset": 55,
+          "size": 11,
+          "kind": "instruction",
+          "instruction_id": "I0006"
+        }
+      ]
+    }
+  ],
+  "symbols": [],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "x86:vmovaps/xmm-abs32/evex",
+      "operands": [
+        {
+          "role": "dest",
+          "kind": "x86.xmm",
+          "target_type": "xmm",
+          "payload": {
+            "reg": 20
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp32",
+          "payload": {
+            "value": 4660
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 11
+    },
+    {
+      "instruction_id": "I0002",
+      "section_id": ".text",
+      "offset": 11,
+      "form_id": "x86:vmovaps/abs32-xmm/evex",
+      "operands": [
+        {
+          "role": "src",
+          "kind": "x86.xmm",
+          "target_type": "xmm",
+          "payload": {
+            "reg": 21
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp32",
+          "payload": {
+            "value": -4096
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 11
+    },
+    {
+      "instruction_id": "I0003",
+      "section_id": ".text",
+      "offset": 22,
+      "form_id": "x86:vmovaps/ymm-abs32/evex",
+      "operands": [
+        {
+          "role": "dest",
+          "kind": "x86.ymm",
+          "target_type": "ymm",
+          "payload": {
+            "reg": 8
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp32",
+          "payload": {
+            "value": 4096
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 11
+    },
+    {
+      "instruction_id": "I0004",
+      "section_id": ".text",
+      "offset": 33,
+      "form_id": "x86:vmovaps/abs32-ymm/evex",
+      "operands": [
+        {
+          "role": "src",
+          "kind": "x86.ymm",
+          "target_type": "ymm",
+          "payload": {
+            "reg": 9
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp32",
+          "payload": {
+            "value": 32767
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 11
+    },
+    {
+      "instruction_id": "I0005",
+      "section_id": ".text",
+      "offset": 44,
+      "form_id": "x86:vmovaps/zmm-abs32/evex",
+      "operands": [
+        {
+          "role": "dest",
+          "kind": "x86.zmm",
+          "target_type": "zmm",
+          "payload": {
+            "reg": 31
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp32",
+          "payload": {
+            "value": -1
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 11
+    },
+    {
+      "instruction_id": "I0006",
+      "section_id": ".text",
+      "offset": 55,
+      "form_id": "x86:vmovaps/abs32-zmm/evex",
+      "operands": [
+        {
+          "role": "src",
+          "kind": "x86.zmm",
+          "target_type": "zmm",
+          "payload": {
+            "reg": 30
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp32",
+          "payload": {
+            "value": -2147483648
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 11
+    }
+  ],
+  "fixups": []
+}

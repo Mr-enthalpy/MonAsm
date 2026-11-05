@@ -264,6 +264,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.22.0.json` | `monasm.isa.x86` | `sha256:61c7cd1c940a7b22838a2c3418ba54031a20c6b227203fb9b4a57875f1c36b58` |
 | `definitions/x86_64/0.23.0.json` | `monasm.isa.x86` | `sha256:507e55c84cc80cf8bd9be10a6c6e4f7cff4999084fb41b3138df60b68a283962` |
 | `definitions/x86_64/0.24.0.json` | `monasm.isa.x86` | `sha256:2521f2dcc9636c1e3a671bbfbf224dcaecb741014bf65b0660ae5cc1c8c4aca3` |
+| `definitions/x86_64/0.25.0.json` | `monasm.isa.x86` | `sha256:b72c0b08d30e9bbfd0c5129e01e1cecf77abcde36e2928aab2f94bb80c06a51c` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -286,7 +287,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.24.0`
+### 8.1 `x86-64` `0.1.0` … `0.25.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -521,6 +522,12 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:vmovaps/index-disp32-ymm/evex` | `62f17c2829040500000000` | src: `x86.ymm`/`ymm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; index: `x86.gpr64`/`sib_index` → `[14,1]` inverted, `[51,3]` (excl 4); imm: `x86.scale`/`scale2` → `[54,2]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | `EC-02`, `EC-09`, `EC-35`, `EC-37`, `EC-40`, `X86-P28` |
 | `x86:vmovaps/zmm-index-disp32/evex` | `62f17c4828040500000000` | dest: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; index: `x86.gpr64`/`sib_index` → `[14,1]` inverted, `[51,3]` (excl 4); imm: `x86.scale`/`scale2` → `[54,2]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | `EC-02`, `EC-09`, `EC-35`, `EC-37`, `EC-40`, `X86-P28` |
 | `x86:vmovaps/index-disp32-zmm/evex` | `62f17c4829040500000000` | src: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; index: `x86.gpr64`/`sib_index` → `[14,1]` inverted, `[51,3]` (excl 4); imm: `x86.scale`/`scale2` → `[54,2]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | `EC-02`, `EC-09`, `EC-35`, `EC-37`, `EC-40`, `X86-P28` |
+| `x86:vmovaps/xmm-abs32/evex` | `62f17c0828042500000000` | dest: `x86.xmm`/`xmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | `EC-02`, `EC-09`, `EC-35`, `EC-37`, `EC-40`, `X86-P29` |
+| `x86:vmovaps/abs32-xmm/evex` | `62f17c0829042500000000` | src: `x86.xmm`/`xmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | `EC-02`, `EC-09`, `EC-35`, `EC-37`, `EC-40`, `X86-P29` |
+| `x86:vmovaps/ymm-abs32/evex` | `62f17c2828042500000000` | dest: `x86.ymm`/`ymm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | `EC-02`, `EC-09`, `EC-35`, `EC-37`, `EC-40`, `X86-P29` |
+| `x86:vmovaps/abs32-ymm/evex` | `62f17c2829042500000000` | src: `x86.ymm`/`ymm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | `EC-02`, `EC-09`, `EC-35`, `EC-37`, `EC-40`, `X86-P29` |
+| `x86:vmovaps/zmm-abs32/evex` | `62f17c4828042500000000` | dest: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | `EC-02`, `EC-09`, `EC-35`, `EC-37`, `EC-40`, `X86-P29` |
+| `x86:vmovaps/abs32-zmm/evex` | `62f17c4829042500000000` | src: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; disp: `x86.imm`/`disp32` → `[56,32]` | 11 | `EC-02`, `EC-09`, `EC-35`, `EC-37`, `EC-40`, `X86-P29` |
 
 Placements are written `[bit_offset, width]`, with ` inverted` appended when the
 chunk is complemented. In the legacy SSE row
@@ -940,8 +947,8 @@ and the no-displacement rows exclude base `5`/`13` because `SIB.base = 101` at
 row, `62 f1 7c 08 28 44 05 00`. Naming a row against `0.22.0` is `E-FORM-001`
 (`N01ax`/`N01ay`), carrying the scale as `x86.imm` is `E-OPERAND-001` (`N02ab`),
 and a `disp` operand on the no-displacement row is `E-OPERAND-002` (`N02ac`).
-Still deferred on this axis: the no-base indexed shape, the other EVEX SSE
-memory mnemonics, EVEX masking, and the `0x67` prefix.
+Still deferred on this axis: the other EVEX SSE memory mnemonics, EVEX masking,
+and the `0x67` prefix.
 
 `0.24.0` takes that no-base shape (`ADR-0051`). Six rows drop the `base` slot
 and keep `ModRM` at `04`: with `mod = 00` and `SIB.base = 101` the encoding has
@@ -955,8 +962,23 @@ are unchanged, and the displacement sits at `[56,32]`. `(,%rax,4)` is
 as `x86.imm` is `E-OPERAND-001` (`N02ae`), index `4` is `E-RANGE-004`
 (`N16ac`), and `disp32` content `2147483648` is `E-RANGE-001` (`N03k`). Naming
 a row against `0.23.0` is `E-FORM-001` (`N01az`/`N01ba`). Still deferred on
-this axis: the absolute `SIB = 25` shape, the other EVEX SSE memory mnemonics,
-EVEX masking, and the `0x67` prefix.
+this axis: the other EVEX SSE memory mnemonics, EVEX masking, and the `0x67`
+prefix.
+
+`0.25.0` takes the last `SIB` combination (`ADR-0052`). Six rows put a 32-bit
+absolute address where the base and index used to be: `ModRM` stays `04`, the
+`SIB` byte is the constant `25` (scale `00`, index `100`, base `101`), and the
+template is `62 f1 7c <L'L> <28|29> 04 25 00 00 00 00`, eleven bytes in every
+row. The vector slot is the only field besides the address, which sits at
+`[56,32]`: `0x1234` is `62 f1 7c 08 28 04 25 34 12 00 00` and
+`-2147483648, %xmm21` is `62 e1 7c 08 29 2c 25 00 00 00 80`. The operand
+sequence is `dest`/`src`, `disp`: an `index` operand is `E-OPERAND-002`
+(`N02af`), the address carried as `disp8` is `E-OPERAND-001` (`N02ag`),
+`disp32` content `2147483648` is `E-RANGE-001` (`N03l`), and naming a row
+against `0.24.0` is `E-FORM-001` (`N01bb`/`N01bc`). Still deferred on this
+axis: a symbol in the address, the other EVEX SSE memory mnemonics, EVEX
+masking, the `0x67` prefix, and the same shape under the GPR and 8/16-bit
+`mov` opcodes.
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 
