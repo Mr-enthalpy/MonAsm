@@ -1,0 +1,230 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "x86",
+    "isa_variant": "x86-64",
+    "execution_mode": "64",
+    "enabled_extensions": ["avx", "avx512f", "avx512vl"],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.x86",
+    "version": "0.14.0",
+    "digest": "sha256:3126af72d83ec4ee8e0e34abfde924a73e7b41866fb2c3b8fc3152821d691a5b"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [".text"],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": 84,
+      "fragments": [
+        { "offset": 0, "size": 4, "kind": "instruction", "instruction_id": "I0001" },
+        { "offset": 4, "size": 4, "kind": "instruction", "instruction_id": "I0002" },
+        { "offset": 8, "size": 4, "kind": "instruction", "instruction_id": "I0003" },
+        { "offset": 12, "size": 4, "kind": "instruction", "instruction_id": "I0004" },
+        { "offset": 16, "size": 4, "kind": "instruction", "instruction_id": "I0005" },
+        { "offset": 20, "size": 5, "kind": "instruction", "instruction_id": "I0006" },
+        { "offset": 25, "size": 5, "kind": "instruction", "instruction_id": "I0007" },
+        { "offset": 30, "size": 6, "kind": "instruction", "instruction_id": "I0008" },
+        { "offset": 36, "size": 6, "kind": "instruction", "instruction_id": "I0009" },
+        { "offset": 42, "size": 6, "kind": "instruction", "instruction_id": "I0010" },
+        { "offset": 48, "size": 6, "kind": "instruction", "instruction_id": "I0011" },
+        { "offset": 54, "size": 6, "kind": "instruction", "instruction_id": "I0012" },
+        { "offset": 60, "size": 6, "kind": "instruction", "instruction_id": "I0013" },
+        { "offset": 66, "size": 6, "kind": "instruction", "instruction_id": "I0014" },
+        { "offset": 72, "size": 6, "kind": "instruction", "instruction_id": "I0015" },
+        { "offset": 78, "size": 6, "kind": "instruction", "instruction_id": "I0016" }
+      ]
+    }
+  ],
+  "symbols": [],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "x86:vmovaps/ymm-ymm/vex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 1 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0002",
+      "section_id": ".text",
+      "offset": 4,
+      "form_id": "x86:vmovaps/ymm-ymm/vex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 8 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 0 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0003",
+      "section_id": ".text",
+      "offset": 8,
+      "form_id": "x86:vmovaps/ymm-ymm/vex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 15 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 7 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0004",
+      "section_id": ".text",
+      "offset": 12,
+      "form_id": "x86:vmovaps/ymm-ymm-src-ext/vex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 8 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0005",
+      "section_id": ".text",
+      "offset": 16,
+      "form_id": "x86:vmovaps/ymm-ymm-src-ext/vex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 7 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 15 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0006",
+      "section_id": ".text",
+      "offset": 20,
+      "form_id": "x86:vmovaps/ymm-ymm-both-ext/vex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 8 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 8 }, "modifiers": [] }
+      ],
+      "expected_size": 5
+    },
+    {
+      "instruction_id": "I0007",
+      "section_id": ".text",
+      "offset": 25,
+      "form_id": "x86:vmovaps/ymm-ymm-both-ext/vex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 14 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 15 }, "modifiers": [] }
+      ],
+      "expected_size": 5
+    },
+    {
+      "instruction_id": "I0008",
+      "section_id": ".text",
+      "offset": 30,
+      "form_id": "x86:vmovaps/ymm-ymm/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 1 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0009",
+      "section_id": ".text",
+      "offset": 36,
+      "form_id": "x86:vmovaps/ymm-ymm/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 16 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0010",
+      "section_id": ".text",
+      "offset": 42,
+      "form_id": "x86:vmovaps/ymm-ymm/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 31 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 0 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0011",
+      "section_id": ".text",
+      "offset": 48,
+      "form_id": "x86:vmovaps/ymm-ymm/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 31 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.ymm", "target_type": "ymm", "payload": { "reg": 30 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0012",
+      "section_id": ".text",
+      "offset": 54,
+      "form_id": "x86:vmovaps/zmm-zmm/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 1 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0013",
+      "section_id": ".text",
+      "offset": 60,
+      "form_id": "x86:vmovaps/zmm-zmm/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 8 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0014",
+      "section_id": ".text",
+      "offset": 66,
+      "form_id": "x86:vmovaps/zmm-zmm/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 16 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0015",
+      "section_id": ".text",
+      "offset": 72,
+      "form_id": "x86:vmovaps/zmm-zmm/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 31 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 0 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    },
+    {
+      "instruction_id": "I0016",
+      "section_id": ".text",
+      "offset": 78,
+      "form_id": "x86:vmovaps/zmm-zmm/evex",
+      "operands": [
+        { "role": "dest", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 30 }, "modifiers": [] },
+        { "role": "src", "kind": "x86.zmm", "target_type": "zmm", "payload": { "reg": 31 }, "modifiers": [] }
+      ],
+      "expected_size": 6
+    }
+  ],
+  "fixups": []
+}

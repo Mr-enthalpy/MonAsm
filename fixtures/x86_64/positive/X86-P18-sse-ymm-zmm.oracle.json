@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0043/P18.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "d0569ae96453eaf03960133e234c052c2a02b3757f53b9040f656a7124408814",
+  "output_sha256": "41953bb371c2cbf0ef82dcef923d97463a7b8e8ce993f4505d7cec3aea0cd088",
+  "size": 84,
+  "records": 0,
+  "notes": "Sixteen register-direct instructions fix width in the prefix, not in an operand. The first seven are VEX.256 (`L = 1`, `P2 = 7c`/`fc`): low/low keeps two bytes and carries the destination's fourth bit in `R̄` (`%ymm0, %ymm8` is `c5 7c 28 c0`), a high source moves to opcode 29 (`%ymm8, %ymm0` is `c5 7c 29 c0`), and both-high grows the three-byte `C4` form (`c4 41 7c 28 c0`). Instructions 8-11 are EVEX.256 (`L'L = 10`, `P2 = 28`): low/low is `62 f1 7c 28 28 c1`, and `ymm16`/`ymm31` use the same `R̄'`/`X̄` fifth bit as `0.13.0`. Instructions 12-16 are EVEX.512 (`L'L = 11`, `P2 = 48`): the only byte that differs from the EVEX.256 twin is `P2` (`62 f1 7c 48 28 c1`), and `zmm16`-`zmm31` reach through the same five-bit fields. Every width keeps the instruction length of its family (4/4/5 for VEX, 6 for EVEX), so no byte is added for a wider register. `input_sha256` is P18.asm (371 bytes, the source above); `output_sha256` is the 84-byte .text."
+}

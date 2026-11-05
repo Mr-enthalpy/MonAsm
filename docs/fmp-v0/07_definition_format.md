@@ -253,6 +253,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.11.0.json` | `monasm.isa.x86` | `sha256:d9669be62267ecd90d69dc9f936bcb947948b8c1ec7c7ba0670eb63f32de0570` |
 | `definitions/x86_64/0.12.0.json` | `monasm.isa.x86` | `sha256:a74ae09e3f9d2596f2e99edde80d6a487e8596efc05d87e59d6409f82ebf35ae` |
 | `definitions/x86_64/0.13.0.json` | `monasm.isa.x86` | `sha256:79eabc2d19a7cf3cac84c857afd6a11b4f15063c7526f17f8782ace0b5ea3431` |
+| `definitions/x86_64/0.14.0.json` | `monasm.isa.x86` | `sha256:3126af72d83ec4ee8e0e34abfde924a73e7b41866fb2c3b8fc3152821d691a5b` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -275,7 +276,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.13.0`
+### 8.1 `x86-64` `0.1.0` … `0.14.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -353,6 +354,11 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:vmovaps/base-ext-xmm/vex` | `c4c1782900` | src: `x86.xmm`/`xmm` → `[15,1]` inverted, `[35,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[32,3]` (excl 12, 13) | 5 | `EC-02`, `EC-09`, `EC-27`, `EC-35`, `EC-40`, `X86-P16` — `mod = 00` from `0.12.0` |
 | `x86:vmovaps/xmm-base/evex` | `62f17c082800` | dest: `x86.xmm`/`xmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[40,3]` (excl 4, 5, 12, 13) | 6 | `EC-02`, `EC-09`, `EC-34`, `EC-35`, `EC-40`, `X86-P16`, `X86-P17` — `mod = 00` from `0.12.0`; `xmm` 5-bit from `0.13.0` |
 | `x86:vmovaps/base-xmm/evex` | `62f17c082900` | src: `x86.xmm`/`xmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; base: `x86.gpr64`/`rm64` → `[13,1]` inverted, `[40,3]` (excl 4, 5, 12, 13) | 6 | `EC-02`, `EC-09`, `EC-27`, `EC-34`, `EC-35`, `EC-40`, `X86-P16`, `X86-P17` — `mod = 00` from `0.12.0`; `xmm` 5-bit from `0.13.0` |
+| `x86:vmovaps/ymm-ymm/vex` | `c5fc28c0` | dest: `x86.ymm`/`ymm` → `[15,1]` inverted, `[27,3]`; src: `x86.ymm`/`ymm` → `[24,3]` | 4 | `EC-09`, `X86-P18` — `L = 1` from `0.14.0`; dest 4-bit, src 3-bit |
+| `x86:vmovaps/ymm-ymm-src-ext/vex` | `c57c29c0` | dest: `x86.ymm`/`ymm` → `[24,3]`; src: `x86.ymm`/`ymm` → `[15,1]` inverted, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7) | 4 | `EC-09`, `EC-40`, `X86-P18` — high source via opcode 29 |
+| `x86:vmovaps/ymm-ymm-both-ext/vex` | `c4417c28c0` | dest: `x86.ymm`/`ymm` → `[15,1]` inverted, `[35,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); src: `x86.ymm`/`ymm` → `[13,1]` inverted, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7) | 5 | `EC-09`, `EC-40`, `X86-P18` — three-byte `C4` when both are high |
+| `x86:vmovaps/ymm-ymm/evex` | `62f17c2828c0` | dest: `x86.ymm`/`ymm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; src: `x86.ymm`/`ymm` → `[14,1]` inverted, `[13,1]` inverted, `[40,3]` | 6 | `EC-06`, `EC-09`, `EC-40`, `X86-P18` — `L'L = 10` from `0.14.0` |
+| `x86:vmovaps/zmm-zmm/evex` | `62f17c4828c0` | dest: `x86.zmm`/`zmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; src: `x86.zmm`/`zmm` → `[14,1]` inverted, `[13,1]` inverted, `[40,3]` | 6 | `EC-06`, `EC-09`, `EC-40`, `X86-P18` — `L'L = 11` from `0.14.0`; no VEX or legacy `zmm` |
 
 Placements are written `[bit_offset, width]`, with ` inverted` appended when the
 chunk is complemented. In the legacy SSE row
@@ -590,8 +596,26 @@ so there it stays set and its meaning never has to be inferred. Legacy and VEX
 have no second extension bit at all, so their `xmm` slots stay at three and four
 bits: `xmm16` is `E-OPERAND-004` on a `0.13.0` VEX row (`N14o`) and on a
 `0.12.0` EVEX row (`N14m`), and `xmm32` is `E-OPERAND-004` at five bits
-(`N14n`). Still absent: `ymm`/`zmm`, EVEX masking and broadcast, `movapd`'s
-`0x66` form, and the memory shapes and prefixes the `0.12.0` paragraph lists.
+(`N14n`). EVEX masking and broadcast, `movapd`'s `0x66` form, `ymm`/`zmm` and
+the memory shapes and prefixes the `0.12.0` paragraph lists are still absent at
+this version.
+
+`0.14.0` adds the other two vector widths as form families (`ADR-0041`). The
+mnemonic does not change; the width is the `L` bit in VEX or the `L'L` field in
+EVEX, which the template pins, so an operand value never selects a width. Five
+register-direct rows are added: three VEX.256 windows, mirroring the `0.11.0`
+`xmm` windows with `L = 1` (`c5 fc 28 /r` low/low with the destination's fourth
+bit in `R̄`, `c5 7c 29 /r` for a high source with a low destination, and the
+three-byte `c4 41 7c 28 /r` when both are high), one EVEX.256 row
+(`62 f1 7c 28 28 /r`) and one EVEX.512 row (`62 f1 7c 48 28 /r`). The EVEX rows
+keep the `0.13.0` five-bit placements, so `ymm16`–`ymm31` and `zmm16`–`zmm31`
+are reachable; `x86.ymm` and `x86.zmm` are distinct kinds from `x86.xmm`,
+because the same register number names a different-width register and a plan
+that mixes them is `E-OPERAND-001`. Legacy `movaps` and VEX have no `zmm` form
+at all, and VEX `ymm` has only four bits, so `ymm16` is `E-OPERAND-004`
+(`N14p`) and `zmm32` is outside the five-bit field (`N14q`). Memory forms at
+these widths are a separate slice: they would add `disp8*32`/`disp8*64`
+compression (`EC-39`) and are absent here (`E-FORM-001`).
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 
