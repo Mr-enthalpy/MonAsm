@@ -53,8 +53,10 @@ fixed by the form, ADR-0029 makes the operand-size prefix and the high-byte
 register set form facts (five rows: two 16-bit directions, the high-byte row and
 the low-byte pair split by REX), and ADR-0030 makes the x86 encoding family a
 form fact (one `movaps` shape in `/legacy`, `/vex` and `/evex`, with the prefix
-as template and `xmm` registers 0–7 only).
-Twenty-four definition documents are frozen and oracle-verified; the materializer
+as template and `xmm` registers 0–7 only), and ADR-0033 makes a GPR operand four
+bits with the high bit placed in the form's `REX.R`/`REX.B` (the six 64-bit
+register-direct rows reach `r8`–`r15` from `0.6.0`).
+Twenty-five definition documents are frozen and oracle-verified; the materializer
 and its fixture gate are implemented.
 
 | Area | State |

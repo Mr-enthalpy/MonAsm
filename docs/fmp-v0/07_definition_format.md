@@ -236,6 +236,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.3.0.json` | `monasm.isa.x86` | `sha256:02500bf74d5c3db7816a30aca6c9c4d8fc7c5097306bc742f51284636c487c10` |
 | `definitions/x86_64/0.4.0.json` | `monasm.isa.x86` | `sha256:ee2141cbb17f338c5b4a9de0302076bb2416838c09f7c44e2ca097cb142a2682` |
 | `definitions/x86_64/0.5.0.json` | `monasm.isa.x86` | `sha256:24256f0c427447ee8db5506d7b395e3682dbb3b0317f0effa1ed3c4f75cc0aeb` |
+| `definitions/x86_64/0.6.0.json` | `monasm.isa.x86` | `sha256:79952b5dc726d18378651498ee35452645d08a4f7a66a133679bc86efa5839f5` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -258,19 +259,19 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.5.0`
+### 8.1 `x86-64` `0.1.0` … `0.6.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
-| `x86:mov/rm-r64/legacy` | `4889c0` | dest: `x86.gpr64`/`rm64` → `[16,3]`; src: `x86.gpr64`/`r64` → `[19,3]` | 3 | `EC-27` |
-| `x86:mov/r64-rm/legacy` | `488bc0` | dest: `x86.gpr64`/`r64` → `[19,3]`; src: `x86.gpr64`/`rm64` → `[16,3]` | 3 | `EC-27` |
-| `x86:add/rm64-imm8/legacy` | `4883c000` | dest: `x86.gpr64`/`rm64` → `[16,3]`; imm: `x86.imm`/`imm8` → `[24,8]` | 4 | `EC-01` |
-| `x86:add/rm64-imm32/legacy` | `4881c000000000` | dest: `x86.gpr64`/`rm64` → `[16,3]`; imm: `x86.imm`/`imm32` → `[24,32]` | 7 | `EC-01`, `EC-04` |
+| `x86:mov/rm-r64/legacy` | `4889c0` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]` | 3 | `EC-06`, `EC-27` — 4-bit slots from `0.6.0` |
+| `x86:mov/r64-rm/legacy` | `488bc0` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; src: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]` | 3 | `EC-06`, `EC-27` — 4-bit slots from `0.6.0` |
+| `x86:add/rm64-imm8/legacy` | `4883c000` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm8` → `[24,8]` | 4 | `EC-01`, `EC-06` — 4-bit dest from `0.6.0` |
+| `x86:add/rm64-imm32/legacy` | `4881c000000000` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm32` → `[24,32]` | 7 | `EC-01`, `EC-04`, `EC-06` — 4-bit dest from `0.6.0` |
 | `x86:add/rax-imm32/legacy` | `480500000000` | imm: `x86.imm`/`imm32` → `[16,32]` | 6 | `EC-04` |
 | `x86:jmp/rel8/legacy` | `eb00` | target: `x86.rel`/`rel8` → `[8,8]` | 2 | `EC-03` |
 | `x86:jmp/rel32/legacy` | `e900000000` | target: `x86.rel`/`rel32` → `[8,32]` | 5 | `EC-03` |
-| `x86:mov/r64-riprel32/legacy` | `488b0500000000` | dest: `x86.gpr64`/`r64` → `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `EC-34`, `X86-P6` — `0.2.0`+ |
-| `x86:mov/riprel32-r64/legacy` | `48890500000000` | src: `x86.gpr64`/`r64` → `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `EC-34`, `X86-P6` — `0.2.0`+ |
+| `x86:mov/r64-riprel32/legacy` | `488b0500000000` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `EC-06`, `EC-34`, `X86-P6` — 4-bit dest from `0.6.0` |
+| `x86:mov/riprel32-r64/legacy` | `48890500000000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `EC-06`, `EC-34`, `X86-P6` — 4-bit src from `0.6.0` |
 | `x86:mov/r64-base-disp8/legacy` | `488b4000` | dest: `x86.gpr64`/`r64` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
 | `x86:mov/r64-base-disp32/legacy` | `488b8000000000` | dest: `x86.gpr64`/`r64` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
 | `x86:mov/base-disp8-r64/legacy` | `48894000` | src: `x86.gpr64`/`r64` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[16,3]` (excl 4); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | `EC-02`, `EC-35`, `X86-P4` — `0.3.0`+ |
@@ -300,12 +301,12 @@ not owned by any operand; the memory rows fix `mod = 0b01`/`0b10` the same way.
 opcode (`REX.W 05 id`), which is exactly why `rax-imm32` and `rm64-imm32` are two
 `form_id`s and not two choices (`01_contract.md` §7).
 
-The register field of the four `0.1.0` `ModRM` rows is 3 bits wide, so `r8`–`r15` are not
-encodable: the template's `REX` byte is `0x48`, and no extension bit is declared
-for those registers. A plan that names `mov rax, r9` is rejected
-`E-OPERAND-004`; it is not emitted as `48 89 c8`, which decodes as
-`movq %rcx, %rax`. Adding `r8`–`r15` is a table change with its own digest, not an
-implicit widening.
+The register field of the six register-direct `0.1.0`–`0.5.0` rows is 3 bits wide,
+so `r8`–`r15` are not encodable there: the template's `REX` byte is `0x48`, and
+no extension bit is declared for those registers. A plan that names
+`mov rax, r9` against `0.5.0` is rejected `E-OPERAND-004`; it is not emitted as
+`48 89 c8`, which decodes as `movq %rcx, %rax`. `0.6.0` widens those slots to
+four bits (`ADR-0033`); a plan that names `0.5.0` keeps the 3-bit table.
 
 Every row is verified against `llvm-mc` 23.1.2 in `EXP-0004`: each template byte
 string is decoded, and each `ModRM` and immediate/branch field is exercised
@@ -357,6 +358,23 @@ not empty (`avx`, `avx512f`, `avx512vl`); the plan must declare the same set
 (`E-TARGET-001`), and the table is still not filtered per form. Memory operands,
 masking, `ymm`/`zmm`, the `0x66` form of `movapd` and the three-byte VEX
 `C4` form remain absent (`EXP-0032`).
+
+`0.6.0` widens the six register-direct 64-bit rows — `mov` in both directions,
+`add`'s two immediate rows, and the two `RIP`-relative rows — from 3-bit to 4-bit
+register slots. The fourth bit is not a new operand and not a new `form_id`: it
+is a placement into the `REX` byte the template already contains. `REX.B` (bit 0)
+extends `ModRM.r/m`, so a `dest`/`src`/`base` slot in that field becomes
+`[0,1], [16,3]`; `REX.R` (bit 2) extends `ModRM.reg`, so a slot in that field
+becomes `[2,1], [19,3]`. The first placement is the most significant bit, so
+`mov %r8, %r9` writes `r8`'s bit 3 into `REX.R`, its low three bits into
+`ModRM.reg`, `r9`'s bit 3 into `REX.B` and its low three bits into `ModRM.r/m`,
+giving `4d 89 c1` (`EXP-0035`). For a register below 8 the same placements write
+zero into the prefix bit, which is why the old rows' bytes do not change.
+`reg = 16` is `E-OPERAND-004` with `field_bits = 4`; `reg = 8` against `0.5.0`
+stays `E-OPERAND-004` with `field_bits = 3` (`N14c`/`N14d`). The 8-bit and 16-bit
+rows, the high-byte row, the base+disp rows (`SIB`/`mod` interaction) and the
+SSE/VEX/EVEX rows keep their narrower fields; each needs its own decision
+(`ADR-0033`). `REX.X` stays unused: no v0 row has an index operand.
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 

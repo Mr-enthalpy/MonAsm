@@ -97,3 +97,12 @@ their order, because diagnostics are sorted by `(path, code)`.
 is available: WSL has no distribution installed and no second machine was used.
 **Cross-platform determinism is `unverified`.** This record does not turn a
 same-host result into a cross-host claim.
+
+## 7. Re-run after `X86-P10`
+
+The same suite was re-run on 2026-11-05 after `0.6.0` and the `r8`–`r15`
+fixtures landed. The corpus is now **39 positive and 103 negative** fixtures
+(x86 10/34, AArch64 20/57, RV64 9/12). Result: all five tests still pass, with
+the same method (`EXP-R1` 39 × 100, `EXP-R2` 12 processes, `EXP-R4` 39 × 2,
+`EXP-R5` unchanged, `EXP-R6` 103 × 100). The counts in §1–§5 are the original
+run's; this section records the current corpus instead of rewriting them.

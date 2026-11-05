@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0035/P10.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "manual+disassembly",
+  "input_sha256": "22e504ad53b5b28c14637448d3dcb9937ec6defd2c1c8a8346ecee89ec409e0e",
+  "output_sha256": "134663b4a66f551f8681364e663208681b903fd590528f9fe023571495ea409d",
+  "size": 44,
+  "records": 0,
+  "notes": "The assembled part exercises the `89` direction, both `add` immediates and both RIP-relative directions with extended registers: `movq %r8,%r9` is 4d 89 c1 (REX.R and REX.B set by the two registers), `movq %r15,%rax` is 4c 89 f8 (REX.R only), `movq %r15,%r8` is 4d 89 f8, `addq $1,%r8` is 49 83 c0 01 (REX.B), `addq $0x7fffffff,%r15` is 49 81 c7 ff ff ff 7f (the imm32 row; the assembler would shorten -1 to imm8), `movq L1(%rip),%r10` is 4c 8b 15 07 00 00 00 and `movq %r11,L1(%rip)` is 4c 89 1d 00 00 00 00 (REX.R with a pcrel_end displacement to L1 at offset 40). The two `8B` register-direct rows are hand-derived from the placements and emitted with `.byte`, because llvm-mc always selects the `89` direction for a register-to-register move (EC-27): 4c 8b e0 is REX.W+R, 8B /r, ModRM e0 (reg=4+R=12, r/m=0) and 4d 8b f5 is REX.W+R+B, ModRM f5 (reg=6+R=14, r/m=5+B=13). `llvm-mc -disassemble` prints `movq %rax, %r12` and `movq %r13, %r14` for them.",
+  "disassembly": "movq\t%rax, %r12; movq\t%r13, %r14"
+}

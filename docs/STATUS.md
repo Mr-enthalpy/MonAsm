@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-05
-Phase: **3 in progress (x86, AArch64 and RV64 slices): twenty-four definition documents, the materializer and the fixture gate are in place; every AArch64 and RV64 coverage row and all nine v0 x86 rows are carried, so widening is coverage work with its own ADR per slice**
+Phase: **3 in progress (x86, AArch64 and RV64 slices): twenty-five definition documents, the materializer and the fixture gate are in place; every AArch64 and RV64 coverage row and all nine v0 x86 rows are carried, so widening is coverage work with its own ADR per slice**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -14,7 +14,7 @@ this file plus `AGENTS.md` alone.
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
-| 3 | Three-ISA vertical prototype | **in progress**: twenty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 9 positive and 30 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate |
+| 3 | Three-ISA vertical prototype | **in progress**: twenty-five definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 10 positive and 34 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate |
 | 4 | Invariants, negative tests, replay | **in progress**: `EXP-R1`/`R2`/`R4`/`R5`/`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs` (`EXP-0033`); `EXP-R3` is `unverified` because only one host exists |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
@@ -25,7 +25,7 @@ this file plus `AGENTS.md` alone.
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
 | G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: 27 of 36 rows are frozen; the 9 rows still `draft` are EC-05, EC-08, EC-10, EC-16, EC-18, EC-23, EC-24, EC-25 and EC-26, and none of them is needed by the three slices as they stand |
-| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 9 positive, 30 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 12 negative) |
+| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 10 positive, 34 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 12 negative) |
 
 ## Decisions
 
@@ -259,9 +259,15 @@ not cover is caught only by the weaker size check; it is now settled, and
    one `movaps` shape in three families (`/legacy`, `/vex`, `/evex`) with the
    prefix as template and the `ModRM` placements following it,
    `X86-P9-sse-vex-evex` matches `llvm-mc` (13 bytes, no record), and
-   `N01aa`/`N01ab`/`N02l`/`N06`/`N14b` pin the absent family, the `0.4.0`
-   boundary, the `zmm` operand, the extension-list mismatch and the `xmm8`
-   field end. No `X86-P*` row remains outside v0.
+   `N01aa`/`N01ab`/`N02l`/`N06`/`N14c`/`N14d` pin the absent family, the `0.5.0`
+   boundary, the `zmm` operand, the extension-list mismatch and the two ends of
+   the register field. `X86-P10` widens the six 64-bit register-direct rows in
+   `0.6.0` (`ADR-0033`): a `x86.gpr64` slot is four bits, its high bit is a
+   placement into `REX.R`/`REX.B`, `X86-P10-gpr-extended` matches `llvm-mc`
+   (44 bytes, no record), and `N14c`/`N14d` pin the 3-bit `0.5.0` boundary and
+   the 4-bit field end. Every directive §6.1 row is carried; the remaining
+   widening is memory bases and index (SIB), the 8/16-bit rows and the SSE
+   families.
 4. Contract debt is closed: `OD-05` (unknown fields/extensions) by ADR-0031,
    pinned by `N21a`/`N21b` and the definition unit test, and `OD-08` (canonical
    wire form) by ADR-0032, pinned by `EXP-R4`. The Level 1 artifact envelope
@@ -278,8 +284,10 @@ strict JSON reader and the plan/definition binders, `fmp-validate` for contract
 `0.2.0.json` (nine forms, digest `sha256:d9c088ca…`, the two RIP-relative
 rows), `0.3.0.json` (seventeen forms, digest `sha256:02500bf7…`, the eight
 base+displacement rows), `0.4.0.json` (twenty-two forms, digest
-`sha256:ee2141cb…`, the five prefix rows) and `0.5.0.json` (twenty-five forms,
-digest `sha256:24256f0c…`, the three encoding-family rows);
+`sha256:ee2141cb…`, the five prefix rows), `0.5.0.json` (twenty-five forms,
+digest `sha256:24256f0c…`, the three encoding-family rows) and `0.6.0.json`
+(twenty-five forms, digest `sha256:79952b5d…`, the six 64-bit register-direct
+rows widened from 3-bit to 4-bit register fields);
 `EXP-0004` (223 decoded byte strings across the seven `0.1.0` rows, plus the
 `OD-06` digest measurement); `EXP-0005` (9 positive fixtures against LLVM
 23.1.2, with the decode-verified caveat on five instructions); `EXP-0029` (the
@@ -288,7 +296,8 @@ the signed `disp32` ends and the record offset); `EXP-0030` (the base+disp
 fields, the `%rsp` SIB byte and the signed `disp8`/`disp32` ends); `EXP-0031`
 (the `0x66` width, the 8-bit register sets and the prefix order); `EXP-0032`
 (the three encoding families, the moving `ModRM` placement and the extension
-set); and 30 negative fixtures whose
+set); `EXP-0035` (the `r8`–`r15` placements, the `REX.R`/`REX.B` split and the
+version boundary); and 34 negative fixtures whose
 complete diagnostic sets — code, JSON Pointer, detail keys — are compared for
 exact equality. `E-OPERAND-004`/`N14` (an operand wider than its field) is one
 of them.

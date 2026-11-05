@@ -23,7 +23,7 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 | N11 | Plan implies implicit alignment or padding | Reject | E-LAYOUT-002 / E-LAYOUT-005 | all | `x86_64/negative/N11-fragment-gap.fmp.json` | x86 passing (`E-LAYOUT-002`; `E-LAYOUT-005` unreachable in v0, `04_errors.md` §2.3) |
 | N12 | Associated relocation pair is incomplete or inconsistent: no `hi`, more than one `hi`, no `lo`, a target mismatch, or a `pair_role` with no `pair_group` | Reject | E-FIXUP-007 | aarch64 (`adrp`+`lo12`), rv64 (`auipc`+`lo12`) | `aarch64/negative/N12a-pair-without-lo.fmp.json` | aarch64 passing (two `hi`, no `lo`); not applicable to x86 v0 (single-site `rel32`) |
 | N13 | `expected_digest` is present and the emitted bytes hash to a different value | Reject, never re-encode to match | E-BYTE-001 | x86, aarch64, rv64 | `x86_64/negative/N13-expected-digest-mismatch.fmp.json` | x86 passing |
-| N14 | Operand value does not fit the slot's encoded field: `r9` in a 3-bit `ModRM` field, or `x32` in a 5-bit AArch64 register field | Reject, never truncate to another register | E-OPERAND-004 | x86, aarch64 | `x86_64/negative/N14-register-wider-than-field.fmp.json`, `aarch64/negative/N14-register-wider-than-field.fmp.json` | x86 and aarch64 passing |
+| N14 | Operand value does not fit the slot's encoded field: `r9` in a 3-bit `ModRM` field, `x32` in a 5-bit AArch64 register field, `xmm8` in a 3-bit `xmm` field, `r8` against the 3-bit `0.5.0` table, or `r16` against the 4-bit `0.6.0` table | Reject, never truncate to another register | E-OPERAND-004 | x86, aarch64 | `x86_64/negative/N14-register-wider-than-field.fmp.json`, `x86_64/negative/N14b-xmm8-wider-than-field.fmp.json`, `x86_64/negative/N14c-extended-register-on-old-table.fmp.json`, `x86_64/negative/N14d-register-16-on-extended-table.fmp.json`, `aarch64/negative/N14-register-wider-than-field.fmp.json` | x86 and aarch64 passing (`N14b` is the `xmm8` field end on the `0.5.0` SSE/EVEX rows; `N14c` is the version boundary: `field_bits = 3` for a GPR on `0.5.0`; `N14d` is the field end: `field_bits = 4` on `0.6.0`) |
 | N15 | Operand payload is a composite memory operand (`{"mem": {"base": …, "disp": …}}`), not one of the four `fmp/0.1` shapes | Reject at read time, never split it into operands | E-OPERAND-003 | all | `rv64/negative/N15-composite-memory-payload.fmp.json` | rv64 passing |
 | N16 | Operand value is inside the slot's field range but excluded by the form (`c.addi` zero immediate, `c.addi` zero destination, the extended-register `imm3` values `5`–`7`, the 32-bit `imm6` values `32`–`63`, `%rsp` as a base on a non-SIB row) | Reject, never encode the HINT or the unallocated word the bytes would mean | E-RANGE-004 | x86, rv64, aarch64 | `rv64/negative/N16a-caddi-imm-zero.fmp.json`, `rv64/negative/N16b-caddi-rd-zero.fmp.json`, `x86_64/negative/N16f-rsp-on-non-sib-form.fmp.json`, `aarch64/negative/N16c-imm3-excluded.fmp.json`, `aarch64/negative/N16d-w-imm6-excluded.fmp.json`, `aarch64/negative/N16e-ext-imm3-excluded.fmp.json` | x86, rv64 and aarch64 passing (`N16f`: register 4 fits the 3-bit base field but would need a SIB byte, so it is rejected rather than widened) |
 | N17 | RV64 pair half is inconsistent: `N17a` a `pcrel_lo12` low half with a non-zero `addend`, `N17b` a `pcrel_hi` fixup with no `pair_role: lo`, `N17c` a `pcrel_hi` low half in a different section than its `hi` | Reject, never fold the addend in, fall back to `pcrel_begin`, or measure across sections | E-FIXUP-009 / E-FIXUP-007 | rv64 | `rv64/negative/N17a-lo12-addend-nonzero.fmp.json`, `rv64/negative/N17b-pcrel-hi-without-lo-role.fmp.json`, `rv64/negative/N17c-lo-in-other-section.fmp.json` | rv64 passing |
@@ -39,12 +39,15 @@ also confirm the materializer does **not** attempt a repair (W4: a plan whose
 immediate is edited must be rejected, not re-encoded around).
 
 N14 is the field-width failure, not the class failure. `r9` is a legal
-`x86.gpr64`, so `E-OPERAND-001` does not apply; the v0 `ModRM` field is 3 bits
-and the `REX` byte is pinned, so the value simply does not fit. `EXP-0004` §3
-measured what truncation would do: `48 89 c8` decodes as `movq %rcx, %rax`, a
-move of a different register. The AArch64 fixture is the same shape with a 5-bit
-field (`x32` would truncate to `x0`); an RV64 case would have the same shape, but
-no such fixture exists yet.
+`x86.gpr64`, so `E-OPERAND-001` does not apply; in `0.1.0`–`0.5.0` the `ModRM`
+field is 3 bits and the `REX` byte is pinned, so the value simply does not fit.
+`EXP-0004` §3 measured what truncation would do: `48 89 c8` decodes as
+`movq %rcx, %rax`, a move of a different register. `0.6.0` widens those slots to
+four bits and places the high bit in `REX.R`/`REX.B` (`ADR-0033`), so `N14c`
+pins the old boundary (`field_bits = 3`) and `N14d` the new field end
+(`field_bits = 4`: `r16` does not exist). The AArch64 fixture is the same shape
+with a 5-bit field (`x32` would truncate to `x0`); an RV64 case would have the
+same shape, but no such fixture exists yet.
 
 N18 is the A64-P2 pair: the operand is inside the *literal's* legal set but not
 inside the named form's field. `llvm-mc` accepts `#0x1000` and silently emits the
@@ -89,12 +92,12 @@ raw commands in `research/evidence/experiments/EXP-0001-xirasm-boundary-probes.m
 
 | ID | Experiment | Method | Observable | Status |
 |---|---|---|---|---|
-| EXP-R1 | Repeated execution | Materialize the same plan 100 times in one process; compare bytes, fixup records, fingerprints | Byte equality | **passing** — 38 positive fixtures × 100 runs, canonical artifact equal (`EXP-0033` §1) |
+| EXP-R1 | Repeated execution | Materialize the same plan 100 times in one process; compare bytes, fixup records, fingerprints | Byte equality | **passing** — 39 positive fixtures × 100 runs, canonical artifact equal (`EXP-0033` §1, re-run in §7) |
 | EXP-R2 | Cross-process | Run the CLI in N independent processes; compare hashes of artifacts | Hash equality | **passing** — 3 plans × 4 CLI processes, canonical artifact equal to the in-process result (`EXP-0033` §2) |
 | EXP-R3 | Different host environment | Run on a second OS/compiler/host where available; otherwise mark unverified | Hash equality or explicit `unverified` | **unverified** — one Windows host; WSL has no distribution, no second machine was used (`EXP-0033` §6) |
-| EXP-R4 | Serialization replay | Serialize → parse → materialize; compare with direct materialization | Byte equality | **passing** — 38 positives × canonical and pretty round trips (`EXP-0033` §3) |
+| EXP-R4 | Serialization replay | Serialize → parse → materialize; compare with direct materialization | Byte equality | **passing** — 39 positives × canonical and pretty round trips (`EXP-0033` §3, re-run in §7) |
 | EXP-R5 | Definition perturbation | Swap the definition for a modified one; expect E-DEF-001, not silent bytes | Error identity | **passing** — a changed template is `E-DEF-001` at `/definition_identity/digest`, a renamed version is `E-DEF-002`; neither emits bytes (`EXP-0033` §4) |
-| EXP-R6 | Negative determinism | Repeat an invalid plan; compare error identity (code+path+detail keys), ignoring `message` | Identity equality | **passing** — 99 negatives × 100 runs (`EXP-0033` §5) |
+| EXP-R6 | Negative determinism | Repeat an invalid plan; compare error identity (code+path+detail keys), ignoring `message` | Identity equality | **passing** — 103 negatives × 100 runs (`EXP-0033` §5, re-run in §7) |
 
 EXP-R3 must not be claimed unless actually executed. "Not tested on a second
 host" is the honest result.
@@ -105,7 +108,7 @@ host" is the honest result.
 |---|---|---|---|
 | AC-01 | Contract complete enough to guide implementation | `01_contract.md` with no `TBD` on fields used by the three slices | **clear for all three slices** (2026-11-05): OD-02, OD-04, OD-07, OD-09 and OD-12 are settled, `definitions/rv64/0.1.0.json`/`0.2.0.json` landed, and no field the three slices use is `TBD`; `symbol_order` and the Level 1 envelope stay `draft` because `OD-03` defers them and no slice needs them |
 | AC-02 | Key fields justified | Each frozen field cites a counterexample or source evidence | **clear for the fields the three slices use**: OD-02/04/09/13/14/15 cite measured counterexamples and the remaining `draft` fields (`symbol_order`, Level 1) are optional |
-| AC-03 | Three-ISA vertical slices | One closed loop per ISA: plan → validate → encode → fixup → oracle compare | **satisfied** (2026-11-05): x86 9 positive + 30 negative, AArch64 20 + 57, RV64 9 + 12, and `cargo test -p fmp-cli --test fixtures` compares every positive's bytes/record count with the oracle and every negative's complete diagnostic set |
+| AC-03 | Three-ISA vertical slices | One closed loop per ISA: plan → validate → encode → fixup → oracle compare | **satisfied** (2026-11-05): x86 10 positive + 34 negative, AArch64 20 + 57, RV64 9 + 12, and `cargo test -p fmp-cli --test fixtures` compares every positive's bytes/record count with the oracle and every negative's complete diagnostic set |
 | AC-04 | Encoding ambiguity proven absent | x86 `imm8`/`imm32`, `rel8`/`rel32`, `89`/`8B`, the `88`/`40 88`/`88h` register sets and the `legacy`/`vex`/`evex` families, plus RV64 `c.*` vs standard, are distinct `form_id`s; per-`EC` negative test per `02_encoding_choices.md`, "Validation obligation" | **satisfied for the frozen rows** (2026-11-05): each of the 27 frozen `EC` rows names a carrier that the fixtures reject when falsified (form variants through `N01`, operand classes through `N02`, excluded values through `N16`); the nine `draft` rows are outside the v0 surface and are listed in `02_encoding_choices.md`, "Open work" |
 | AC-05 | Fixups validated | x86 `rel32`; AArch64 `adrp`+`:lo12:`; RV64 `auipc`+`lo12` or B-type scatter | **satisfied** (2026-11-05): `X86-P8-local-and-external-branch` (`rel32` record), `X86-P6-rip-relative` (`R_X86_64_PC32`), `A64-P6-adrp-lo12-pair` (`adrp`+`lo12`), `RV-P8-pcrel-pair` (three records) and `RV-P8-pcrel-pair-resolved` (linked arithmetic) |
 | AC-06 | Strict rejection | All applicable N01–N13 with recorded codes | **satisfied for N01–N20 as applicable** (2026-11-05): every row has at least one fixture whose code, JSON Pointer and detail keys are compared exactly; N12 is not applicable to x86 v0 (single-site `rel32`), and N06 is exercised on x86 and rv64 |
@@ -133,6 +136,7 @@ Each vector needs **two independent sources**: our materializer, and an oracle
 | X86-P7 | Short vs near branch | `x86:jmp/rel8/legacy` and `x86:jmp/rel32/legacy` as explicit plans | llvm-mc | x86 passing (`EXP-0005`) |
 | X86-P8 | External branch fixup | `x86:jmp/rel32/legacy` to an undefined symbol with `emit_relocation`, record emitted. `call rel32` is not in the v0 surface (`OD-10`); its descriptor is identical, so the record shape is exercised without adding a form | llvm-mc + llvm-readobj | x86 passing (`EXP-0005`) |
 | X86-P9 | Explicit encoding family | SSE vs VEX vs EVEX for one operation: `x86:movaps/xmm-xmm/legacy`, `x86:vmovaps/xmm-xmm/vex` and `x86:vmovaps/xmm-xmm/evex` | llvm-mc | x86 passing (`EXP-0032`; `X86-P9-sse-vex-evex`) |
+| X86-P10 | The extended GPR file | `r8`–`r15` in a register-direct transfer: the six 64-bit rows of `0.6.0` carry a 4-bit register slot whose high bit is `REX.R`/`REX.B`, so `mov %r8,%r9` is `4d 89 c1` and `mov %rax,%rbx` keeps `48 89 c3` | llvm-mc + `llvm-mc -disassemble` | x86 passing (`EXP-0035`; `X86-P10-gpr-extended`) |
 
 Oracle note for X86-P7, measured 2026-11-04: llvm-mc does not accept a bare
 numeric branch target (`jmp 0x12`, `0x7f`, `0x80`, `0x1000`, `5` all emit
@@ -164,10 +168,10 @@ encoding-family rows (twenty-five forms, digest
 first x86 table whose `enabled_extensions` is not empty
 (`avx`, `avx512f`, `avx512vl`).
 
-X86-P1, P2, P3, P4, P5, P6, P7, P8 and P9 have fixtures under
-`fixtures/x86_64/positive/` and a recorded oracle in `EXP-0005`; the fixture gate
-compares their bytes with the oracle's, never with the materializer's own
-expectation.
+X86-P1, P2, P3, P4, P5, P6, P7, P8, P9 and P10 have fixtures under
+`fixtures/x86_64/positive/` and a recorded oracle (`EXP-0005`, `EXP-0035`); the
+fixture gate compares their bytes with the oracle's, never with the
+materializer's own expectation.
 
 `ADR-0008` settled the memory representation: one operand per encoded field
 (`base`, `disp`, `index`, `scale`), never a `{mem: …}` payload, because the
@@ -183,8 +187,13 @@ different question again and is closed by `ADR-0030`: `movaps` at `xmm` width is
 `0f 28 c1` with no prefix, `c5 f8 28 d3` in two-byte VEX and
 `62 f1 7c 08 28 e5` in EVEX.128, so the family is the `/legacy`, `/vex` or
 `/evex` component of the `form_id` and never an operand (`EC-09`, `EXP-0032`).
-All nine x86 rows P1–P9 now pass; `OD-10`'s VEX/EVEX deferral is lifted,
-and `EC-05`/`EC-10` and the rest of the extension surface stay out.
+All nine directive §6.1 rows P1–P9 now pass; `OD-10`'s VEX/EVEX deferral is
+lifted, and `EC-05`/`EC-10` and the rest of the extension surface stay out.
+P10 is widening rather than a directive row: `ADR-0033` makes a `x86.gpr64` slot
+four bits and places the high bit in `REX.R`/`REX.B`, so the six 64-bit
+register-direct rows reach `r8`–`r15` (`48 89 c3` for `mov rax, rbx`,
+`4d 89 c1` for `mov r8, r9`) from `0.6.0`, while `N14c`/`N14d` pin the two ends
+of the field (`EC-06`, `EXP-0035`).
 
 
 ### AArch64 (directive §6.2)
