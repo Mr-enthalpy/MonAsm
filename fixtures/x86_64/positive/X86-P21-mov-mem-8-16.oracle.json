@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0046/P21.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "5e6d3960782b88577f52cf127c267a2a5abd931bd3e6a1bb6b4f30ef5a853c45",
+  "output_sha256": "5a57e901c7492db29b5497981deb694c02a3f1415c5119bdb2b9846d1611394a",
+  "size": 122,
+  "records": 0,
+  "notes": "Twenty-six 8/16-bit mov memory instructions. Instructions 1-7 are the four word rows plus the disp8 ends: 127 and -128 stay one byte, -129 promotes to disp32. Instructions 8-12 are the REX-less low-byte set (al, cl) in both directions, including the disp32 promotions at 128 and -129. Instructions 13-19 are the high-byte set (ah, ch) at both displacement widths; the explicit 4-7 numbers are the ones a REX prefix would rename. Instructions 20-26 are the spl-dil set behind the template 40 byte, with bpl and dil so two different numbers of 4-7 are exercised in both directions. Every base is rax; the r8 and %rsp windows are deferred (ADR-0044) and measured in probes.txt. `input_sha256` is P21.asm (the source above); `output_sha256` is the 122-byte .text."
+}

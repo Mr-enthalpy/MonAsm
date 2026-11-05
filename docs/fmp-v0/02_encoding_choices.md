@@ -108,7 +108,7 @@ surface: a variant that is absent cannot be selected, repaired or approximated,
 and naming it is `E-FORM-001`. There is no feature flag and no partially
 implemented form.
 
-The x86-64 slice is one hundred and three forms covering fourteen frozen `EC` rows:
+The x86-64 slice is one hundred and nineteen forms covering fourteen frozen `EC` rows:
 
 | `form_id` | Bytes | Operand signature | Covers |
 |---|---|---|---|
@@ -215,6 +215,22 @@ The x86-64 slice is one hundred and three forms covering fourteen frozen `EC` ro
 | `x86:vmovaps/base-ymm/vex` | `C5 FC 29 /r`, `mod=00`, `r/m=base`, `L = 1`, `R̄` inverted | src `ymm` (0–15), base `rm64` (0–7, not `%rsp`/`%rbp`) | EC-02, EC-09, EC-27, EC-34, EC-35, X86-P20 |
 | `x86:vmovaps/ymm-base-ext/vex` | `C4 C1 7C 28 /r`, `mod=00`, `r/m=base`, `L = 1`, `R̄`/`B̄` inverted | dest `ymm` (0–15), base `rm64` (8–15, not `%r12`/`%r13`) | EC-02, EC-09, EC-35, EC-40, X86-P20 |
 | `x86:vmovaps/base-ext-ymm/vex` | `C4 C1 7C 29 /r`, `mod=00`, `r/m=base`, `L = 1`, `R̄`/`B̄` inverted | src `ymm` (0–15), base `rm64` (8–15, not `%r12`/`%r13`) | EC-02, EC-09, EC-27, EC-35, EC-40, X86-P20 |
+| `x86:mov/r16-base-disp8/legacy` | `66 8B /r`, `mod=01`, `r/m=base` | dest `r16`, base `rm64` (not `%rsp`), disp `disp8` | EC-02, EC-27, EC-36, X86-P21 |
+| `x86:mov/r16-base-disp32/legacy` | `66 8B /r`, `mod=10`, `r/m=base` | dest `r16`, base `rm64` (not `%rsp`), disp `disp32` | EC-02, EC-27, EC-36, X86-P21 |
+| `x86:mov/base-disp8-r16/legacy` | `66 89 /r`, `mod=01`, `r/m=base` | src `r16`, base `rm64` (not `%rsp`), disp `disp8` | EC-02, EC-27, EC-36, X86-P21 |
+| `x86:mov/base-disp32-r16/legacy` | `66 89 /r`, `mod=10`, `r/m=base` | src `r16`, base `rm64` (not `%rsp`), disp `disp32` | EC-02, EC-27, EC-36, X86-P21 |
+| `x86:mov/r8-base-disp8/legacy` | `8A /r`, `mod=01`, `r/m=base` | dest `r8` (0–3), base `rm64` (not `%rsp`), disp `disp8` | EC-02, EC-27, EC-28, EC-36, X86-P21 |
+| `x86:mov/r8-base-disp32/legacy` | `8A /r`, `mod=10`, `r/m=base` | dest `r8` (0–3), base `rm64` (not `%rsp`), disp `disp32` | EC-02, EC-27, EC-28, EC-36, X86-P21 |
+| `x86:mov/base-disp8-r8/legacy` | `88 /r`, `mod=01`, `r/m=base` | src `r8` (0–3), base `rm64` (not `%rsp`), disp `disp8` | EC-02, EC-27, EC-28, EC-36, X86-P21 |
+| `x86:mov/base-disp32-r8/legacy` | `88 /r`, `mod=10`, `r/m=base` | src `r8` (0–3), base `rm64` (not `%rsp`), disp `disp32` | EC-02, EC-27, EC-28, EC-36, X86-P21 |
+| `x86:mov/r8h-base-disp8/legacy` | `8A /r`, `mod=01`, `r/m=base` | dest `r8h` (4–7: `ah`/`ch`/`dh`/`bh`), base `rm64` (not `%rsp`), disp `disp8` | EC-02, EC-27, EC-28, EC-36, X86-P21 |
+| `x86:mov/r8h-base-disp32/legacy` | `8A /r`, `mod=10`, `r/m=base` | dest `r8h` (4–7), base `rm64` (not `%rsp`), disp `disp32` | EC-02, EC-27, EC-28, EC-36, X86-P21 |
+| `x86:mov/base-disp8-r8h/legacy` | `88 /r`, `mod=01`, `r/m=base` | src `r8h` (4–7), base `rm64` (not `%rsp`), disp `disp8` | EC-02, EC-27, EC-28, EC-36, X86-P21 |
+| `x86:mov/base-disp32-r8h/legacy` | `88 /r`, `mod=10`, `r/m=base` | src `r8h` (4–7), base `rm64` (not `%rsp`), disp `disp32` | EC-02, EC-27, EC-28, EC-36, X86-P21 |
+| `x86:mov/r8-base-disp8-rex/legacy` | `40 8A /r`, `mod=01`, `r/m=base` | dest `r8` (4–7: `spl`/`bpl`/`sil`/`dil`), base `rm64` (not `%rsp`), disp `disp8` | EC-02, EC-27, EC-28, EC-36, X86-P21 |
+| `x86:mov/r8-base-disp32-rex/legacy` | `40 8A /r`, `mod=10`, `r/m=base` | dest `r8` (4–7), base `rm64` (not `%rsp`), disp `disp32` | EC-02, EC-27, EC-28, EC-36, X86-P21 |
+| `x86:mov/base-disp8-r8-rex/legacy` | `40 88 /r`, `mod=01`, `r/m=base` | src `r8` (4–7: `spl`/`bpl`/`sil`/`dil`), base `rm64` (not `%rsp`), disp `disp8` | EC-02, EC-27, EC-28, EC-36, X86-P21 |
+| `x86:mov/base-disp32-r8-rex/legacy` | `40 88 /r`, `mod=10`, `r/m=base` | src `r8` (4–7), base `rm64` (not `%rsp`), disp `disp32` | EC-02, EC-27, EC-28, EC-36, X86-P21 |
 
 The variant names the operand signature as the ISA opcode table spells it, which
 is what makes the two `mov` forms and the two `add` immediate forms distinct
@@ -635,6 +651,23 @@ plain signed byte and needs no `disp8xN` name (`EC-02`, `EC-35`). A `zmm`
 operand is `E-OPERAND-001` (`N02q`), `ymm16` is `E-OPERAND-004` (`N14s`),
 `%rbp`/`%r12` are `E-RANGE-004` (`N16r`, `N16s`), and content `128` is
 `E-RANGE-001` (`N03f`, `EXP-0045`).
+
+`0.17.0` takes the same prefix and register-set facts into `mov` memory at 8 and
+16 bits (`ADR-0044`). Four word rows (`66 8B /r` load, `66 89 /r` store) carry
+a `r16` in `ModRM.reg` and a `disp8` or `disp32`; twelve byte rows split by
+register set: `8A`/`88` for numbers 0–3, the same opcodes for `r8h` numbers 4–7
+(`ah`–`bh`), and `40 8A`/`40 88` for numbers 4–7 behind a REX byte
+(`spl`–`dil`). The `66` byte is part of the row template and precedes any REX
+byte, so the displacement fields sit at 24 on the word and `40`-byte rows and
+at 16 on the REX-less byte rows; no operand value chooses a width (`EC-36`).
+The byte sets stay disjoint (`EC-28`), and every base remains the three-bit
+window 0–7 minus `%rsp`, because a `SIB` byte or a `REX.B` would change the
+length of a row whose template is fixed (`EC-02`, `EC-38`). `x86.gpr32` on a
+word row is `E-OPERAND-001` (`N02r`), `x86.gpr8h` on a `-rex` row is
+`E-OPERAND-001` (`N02s`), number 4 on the REX-less low row is `E-RANGE-004`
+(`N16t`), `%rsp` is `E-RANGE-004` (`N16u`), content `128` on a `disp8` slot is
+`E-RANGE-001` (`N03g`), base `8` is `E-OPERAND-004` (`N14t`), and the rows are
+absent from `0.16.0` (`N01an`).
 
 The RV64 slice is eight forms across two documents, generated from the pinned UDB
 nodes (ADR-0007, ADR-0009). Seven base-`I` forms are in `0.1.0`; `c.addi` joins

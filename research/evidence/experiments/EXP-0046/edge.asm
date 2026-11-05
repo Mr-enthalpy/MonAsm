@@ -1,0 +1,7 @@
+	movw %ax, 8(%rbp)
+	movb %ah, 8(%rbp)
+	movb %al, 8(%rbp)
+	movb %spl, 8(%rsp)
+	movw %r8w, 8(%rax)
+	movw %ax, 8(%r15)
+	movb %r15b, 8(%rax)
