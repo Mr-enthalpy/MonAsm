@@ -1,0 +1,886 @@
+{
+  "definition_format": "fmp-def/0.1",
+  "namespace": "monasm.isa.x86",
+  "version": "0.8.0",
+  "target_identity": {
+    "isa_family": "x86",
+    "isa_variant": "x86-64",
+    "execution_mode": "64",
+    "enabled_extensions": ["avx", "avx512f", "avx512vl"],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "forms": [
+    {
+      "form_id": "x86:mov/rm-r64/legacy",
+      "template": "4889c0",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 0, "width": 1 }, { "bit_offset": 16, "width": 3 }]
+        },
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/r64-rm/legacy",
+      "template": "488bc0",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 0, "width": 1 }, { "bit_offset": 16, "width": 3 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:add/rm64-imm8/legacy",
+      "template": "4883c000",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 0, "width": 1 }, { "bit_offset": 16, "width": 3 }]
+        },
+        {
+          "role": "imm",
+          "kind": "x86.imm",
+          "target_type": "imm8",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 8, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 24, "width": 8 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:add/rm64-imm32/legacy",
+      "template": "4881c000000000",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 0, "width": 1 }, { "bit_offset": 16, "width": 3 }]
+        },
+        {
+          "role": "imm",
+          "kind": "x86.imm",
+          "target_type": "imm32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 24, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:add/rax-imm32/legacy",
+      "template": "480500000000",
+      "slots": [
+        {
+          "role": "imm",
+          "kind": "x86.imm",
+          "target_type": "imm32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 16, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:jmp/rel8/legacy",
+      "template": "eb00",
+      "slots": [
+        {
+          "role": "target",
+          "kind": "x86.rel",
+          "target_type": "rel8",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 8, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 8, "width": 8 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:jmp/rel32/legacy",
+      "template": "e900000000",
+      "slots": [
+        {
+          "role": "target",
+          "kind": "x86.rel",
+          "target_type": "rel32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 8, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/r64-riprel32/legacy",
+      "template": "488b0500000000",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "target",
+          "kind": "x86.rel",
+          "target_type": "riprel32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 24, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/riprel32-r64/legacy",
+      "template": "48890500000000",
+      "slots": [
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "target",
+          "kind": "x86.rel",
+          "target_type": "riprel32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 24, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/r64-base-disp8/legacy",
+      "template": "488b4000",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "base",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "excluded": [4, 12],
+          "modifiers": [],
+          "placements": [{ "bit_offset": 0, "width": 1 }, { "bit_offset": 16, "width": 3 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 8, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 24, "width": 8 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/r64-base-disp32/legacy",
+      "template": "488b8000000000",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "base",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "excluded": [4, 12],
+          "modifiers": [],
+          "placements": [{ "bit_offset": 0, "width": 1 }, { "bit_offset": 16, "width": 3 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 24, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/r64-rsp-disp8/legacy",
+      "template": "488b442400",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 8, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 32, "width": 8 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/r64-r12-disp8/legacy",
+      "template": "498b442400",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 8, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 32, "width": 8 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/r64-rsp-disp32/legacy",
+      "template": "488b842400000000",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 32, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/r64-r12-disp32/legacy",
+      "template": "498b842400000000",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 32, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/base-disp8-r64/legacy",
+      "template": "48894000",
+      "slots": [
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "base",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "excluded": [4, 12],
+          "modifiers": [],
+          "placements": [{ "bit_offset": 0, "width": 1 }, { "bit_offset": 16, "width": 3 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 8, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 24, "width": 8 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/base-disp32-r64/legacy",
+      "template": "48898000000000",
+      "slots": [
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "base",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "excluded": [4, 12],
+          "modifiers": [],
+          "placements": [{ "bit_offset": 0, "width": 1 }, { "bit_offset": 16, "width": 3 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 24, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/rsp-disp8-r64/legacy",
+      "template": "4889442400",
+      "slots": [
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 8, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 32, "width": 8 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/r12-disp8-r64/legacy",
+      "template": "4989442400",
+      "slots": [
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 8, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 32, "width": 8 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/rsp-disp32-r64/legacy",
+      "template": "4889842400000000",
+      "slots": [
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 32, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/r12-disp32-r64/legacy",
+      "template": "4989842400000000",
+      "slots": [
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 32, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/rm16-r16/legacy",
+      "template": "6689c0",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr16",
+          "target_type": "rm16",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 16, "width": 3 }]
+        },
+        {
+          "role": "src",
+          "kind": "x86.gpr16",
+          "target_type": "r16",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 19, "width": 3 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/r16-rm16/legacy",
+      "template": "668bc0",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr16",
+          "target_type": "r16",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "src",
+          "kind": "x86.gpr16",
+          "target_type": "rm16",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 16, "width": 3 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/rm8h-r8h/legacy",
+      "template": "88e4",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr8h",
+          "target_type": "rm8h",
+          "from": "reg_number",
+          "excluded": [0, 1, 2, 3],
+          "modifiers": [],
+          "placements": [{ "bit_offset": 8, "width": 3 }]
+        },
+        {
+          "role": "src",
+          "kind": "x86.gpr8h",
+          "target_type": "r8h",
+          "from": "reg_number",
+          "excluded": [0, 1, 2, 3],
+          "modifiers": [],
+          "placements": [{ "bit_offset": 11, "width": 3 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/rm8-r8/legacy",
+      "template": "88c0",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr8",
+          "target_type": "rm8",
+          "from": "reg_number",
+          "excluded": [4, 5, 6, 7],
+          "modifiers": [],
+          "placements": [{ "bit_offset": 8, "width": 3 }]
+        },
+        {
+          "role": "src",
+          "kind": "x86.gpr8",
+          "target_type": "r8",
+          "from": "reg_number",
+          "excluded": [4, 5, 6, 7],
+          "modifiers": [],
+          "placements": [{ "bit_offset": 11, "width": 3 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/rm8-r8-rex/legacy",
+      "template": "4088e0",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr8",
+          "target_type": "rm8",
+          "from": "reg_number",
+          "excluded": [0, 1, 2, 3],
+          "modifiers": [],
+          "placements": [{ "bit_offset": 16, "width": 3 }]
+        },
+        {
+          "role": "src",
+          "kind": "x86.gpr8",
+          "target_type": "r8",
+          "from": "reg_number",
+          "excluded": [0, 1, 2, 3],
+          "modifiers": [],
+          "placements": [{ "bit_offset": 19, "width": 3 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:movaps/xmm-xmm/legacy",
+      "template": "0f28c0",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.xmm",
+          "target_type": "xmm",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "src",
+          "kind": "x86.xmm",
+          "target_type": "xmm",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 16, "width": 3 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:vmovaps/xmm-xmm/vex",
+      "template": "c5f828c0",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.xmm",
+          "target_type": "xmm",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 27, "width": 3 }]
+        },
+        {
+          "role": "src",
+          "kind": "x86.xmm",
+          "target_type": "xmm",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 24, "width": 3 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:vmovaps/xmm-xmm/evex",
+      "template": "62f17c0828c0",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.xmm",
+          "target_type": "xmm",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 43, "width": 3 }]
+        },
+        {
+          "role": "src",
+          "kind": "x86.xmm",
+          "target_type": "xmm",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 40, "width": 3 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/r64-base-index-disp8/legacy",
+      "template": "488b440000",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "base",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 0, "width": 1 }, { "bit_offset": 24, "width": 3 }]
+        },
+        {
+          "role": "index",
+          "kind": "x86.gpr64",
+          "target_type": "sib_index",
+          "from": "reg_number",
+          "excluded": [4],
+          "modifiers": [],
+          "placements": [{ "bit_offset": 1, "width": 1 }, { "bit_offset": 27, "width": 3 }]
+        },
+        {
+          "role": "imm",
+          "kind": "x86.scale",
+          "target_type": "scale2",
+          "from": "operand_value",
+          "range": { "signed": false, "bits": 2, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 30, "width": 2 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 8, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 32, "width": 8 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/r64-base-index-disp32/legacy",
+      "template": "488b840000000000",
+      "slots": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "base",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 0, "width": 1 }, { "bit_offset": 24, "width": 3 }]
+        },
+        {
+          "role": "index",
+          "kind": "x86.gpr64",
+          "target_type": "sib_index",
+          "from": "reg_number",
+          "excluded": [4],
+          "modifiers": [],
+          "placements": [{ "bit_offset": 1, "width": 1 }, { "bit_offset": 27, "width": 3 }]
+        },
+        {
+          "role": "imm",
+          "kind": "x86.scale",
+          "target_type": "scale2",
+          "from": "operand_value",
+          "range": { "signed": false, "bits": 2, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 30, "width": 2 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 32, "width": 32 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/base-index-disp8-r64/legacy",
+      "template": "4889440000",
+      "slots": [
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "base",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 0, "width": 1 }, { "bit_offset": 24, "width": 3 }]
+        },
+        {
+          "role": "index",
+          "kind": "x86.gpr64",
+          "target_type": "sib_index",
+          "from": "reg_number",
+          "excluded": [4],
+          "modifiers": [],
+          "placements": [{ "bit_offset": 1, "width": 1 }, { "bit_offset": 27, "width": 3 }]
+        },
+        {
+          "role": "imm",
+          "kind": "x86.scale",
+          "target_type": "scale2",
+          "from": "operand_value",
+          "range": { "signed": false, "bits": 2, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 30, "width": 2 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 8, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 32, "width": 8 }]
+        }
+      ]
+    },
+    {
+      "form_id": "x86:mov/base-index-disp32-r64/legacy",
+      "template": "4889840000000000",
+      "slots": [
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 2, "width": 1 }, { "bit_offset": 19, "width": 3 }]
+        },
+        {
+          "role": "base",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "from": "reg_number",
+          "modifiers": [],
+          "placements": [{ "bit_offset": 0, "width": 1 }, { "bit_offset": 24, "width": 3 }]
+        },
+        {
+          "role": "index",
+          "kind": "x86.gpr64",
+          "target_type": "sib_index",
+          "from": "reg_number",
+          "excluded": [4],
+          "modifiers": [],
+          "placements": [{ "bit_offset": 1, "width": 1 }, { "bit_offset": 27, "width": 3 }]
+        },
+        {
+          "role": "imm",
+          "kind": "x86.scale",
+          "target_type": "scale2",
+          "from": "operand_value",
+          "range": { "signed": false, "bits": 2, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 30, "width": 2 }]
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp32",
+          "from": "operand_value",
+          "range": { "signed": true, "bits": 32, "align_bits": 0 },
+          "modifiers": [],
+          "placements": [{ "bit_offset": 32, "width": 32 }]
+        }
+      ]
+    }
+  ]
+}

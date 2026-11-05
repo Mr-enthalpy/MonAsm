@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0037/P12.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "fe1400f60b0a844e958322782cc8192dc8561bdf86bcda0c32a33504232ec9a1",
+  "output_sha256": "6a9da912ac091b0d6966eb550782cdad456f933603bcc5dc43153919a9a00d87",
+  "size": 71,
+  "records": 0,
+  "notes": "Thirteen `mov` instructions, every one of them a SIB byte: base + index*scale + disp. The four scale contents are exercised over one base/index pair: `movq 8(%rax,%rcx,1)` is 48 8b 54 08 08 (SIB 08), (…,2) is 48 8b 54 48 08 (SIB 48), (…,4) is 48 8b 54 88 08 (SIB 88) and (…,8) is 48 8b 54 c8 08 (SIB c8), so the scale field is the top two bits of the SIB byte. REX.X is the index's bit 3: `movq 8(%r8,%r9,2), %r10` is 4f 8b 54 48 08 (three extension bits at once), `movq 8(%rax,%r12,4), %rdx` is 4a 8b 54 a0 08 (X=1 with SIB.index=100, i.e. r12), and `movq 8(%r13,%r12,8), %rdx` is 4b 8b 54 e5 08 (X=1 and B=1). `movq 8(%r12,%r13,8), %r15` is 4f 8b 7c ec 08 (r/m=100 and SIB.base=100 with B=1, i.e. r12 as the base). The disp32 rows are 4f 8b 9c 70 80 00 00 00 (load, r11/r8/r14*2/128) and 4f 89 bc ec 80 00 00 00 (store, r15/r12/r13*8/128). `movq 8(%rsp,%rcx,1), %rdx` is 48 8b 54 0c 08: rsp is an ordinary SIB base here. `movq 8(%rax,%rbp,1), %rdx` is 48 8b 54 28 08: index 5 is rbp, only index 4 is special. Every displacement fits the width of the form the plan names (8 for disp8, 128 for disp32), so llvm-mc's own mod choice coincides with the named form."
+}

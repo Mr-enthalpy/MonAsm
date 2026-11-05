@@ -238,6 +238,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.5.0.json` | `monasm.isa.x86` | `sha256:24256f0c427447ee8db5506d7b395e3682dbb3b0317f0effa1ed3c4f75cc0aeb` |
 | `definitions/x86_64/0.6.0.json` | `monasm.isa.x86` | `sha256:79952b5dc726d18378651498ee35452645d08a4f7a66a133679bc86efa5839f5` |
 | `definitions/x86_64/0.7.0.json` | `monasm.isa.x86` | `sha256:8c40c948a3a103b7d0668a4539f5cc8bc95e3cdba12b62c0c6a00bbc2ee92f1c` |
+| `definitions/x86_64/0.8.0.json` | `monasm.isa.x86` | `sha256:e55f694ae29e90854c8352aba60202cbd060d6333aff2a69b2e54978910155f5` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -260,7 +261,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.7.0`
+### 8.1 `x86-64` `0.1.0` … `0.8.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -285,6 +286,10 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:mov/r12-disp8-r64/legacy` | `4989442400` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-06`, `EC-35`, `X86-P11` — `0.7.0`+ |
 | `x86:mov/rsp-disp32-r64/legacy` | `4889842400000000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-06`, `EC-35`, `X86-P4` — 4-bit src from `0.7.0` |
 | `x86:mov/r12-disp32-r64/legacy` | `4989842400000000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-06`, `EC-35`, `X86-P11` — `0.7.0`+ |
+| `x86:mov/r64-base-index-disp8/legacy` | `488b440000` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]`; index: `x86.gpr64`/`sib_index` → `[1,1]`, `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-35`, `EC-37`, `X86-P12` — `0.8.0`+ |
+| `x86:mov/r64-base-index-disp32/legacy` | `488b840000000000` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]`; index: `x86.gpr64`/`sib_index` → `[1,1]`, `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-35`, `EC-37`, `X86-P12` — `0.8.0`+ |
+| `x86:mov/base-index-disp8-r64/legacy` | `4889440000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]`; index: `x86.gpr64`/`sib_index` → `[1,1]`, `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-35`, `EC-37`, `X86-P12` — `0.8.0`+ |
+| `x86:mov/base-index-disp32-r64/legacy` | `4889840000000000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]`; index: `x86.gpr64`/`sib_index` → `[1,1]`, `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-35`, `EC-37`, `X86-P12` — `0.8.0`+ |
 | `x86:mov/rm16-r16/legacy` | `6689c0` | dest: `x86.gpr16`/`rm16` → `[16,3]`; src: `x86.gpr16`/`r16` → `[19,3]` | 3 | `EC-36`, `X86-P5` — `0.4.0`+ |
 | `x86:mov/r16-rm16/legacy` | `668bc0` | dest: `x86.gpr16`/`r16` → `[19,3]`; src: `x86.gpr16`/`rm16` → `[16,3]` | 3 | `EC-36`, `X86-P5` — `0.4.0`+ |
 | `x86:mov/rm8h-r8h/legacy` | `88e4` | dest: `x86.gpr8h`/`rm8h` → `[8,3]` (excl 0, 1, 2, 3); src: `x86.gpr8h`/`r8h` → `[11,3]` (excl 0, 1, 2, 3) | 2 | `EC-36`, `X86-P5` — `0.4.0`+ |
@@ -343,8 +348,8 @@ register operand. `r8`–`r11`, `r13`–`r15` need only `REX.B` at `[0,1]`, so t
 use the general rows, which now exclude both SIB-forcing values: `4` (`%rsp`) and
 `12` (`%r12`). `%r12` has the same low three bits as `%rsp`, so it is four
 fixed-base rows of its own with `REX = 0x49` instead of `0x48`; the `%rsp` rows
-are unchanged. `REX.X` is still unexercised: it extends a `SIB` index, and no row
-has an index operand.
+are unchanged. `REX.X` stays unexercised in `0.7.0`: it extends a `SIB` index,
+and no row before `0.8.0` has an index operand.
 
 `0.4.0` adds the five prefix rows: two 16-bit directions with `0x66` as
 template byte 0, the high-byte row, and the low-byte pair split by REX. The
@@ -391,7 +396,33 @@ zero into the prefix bit, which is why the old rows' bytes do not change.
 stays `E-OPERAND-004` with `field_bits = 3` (`N14c`/`N14d`). The 8-bit and 16-bit
 rows, the high-byte row, the base+disp rows (`SIB`/`mod` interaction) and the
 SSE/VEX/EVEX rows keep their narrower fields; each needs its own decision
-(`ADR-0033`). `REX.X` stays unused: no v0 row has an index operand.
+(`ADR-0033`). `REX.X` stays unused by these rows: no v0 row before `0.8.0` has an
+index operand.
+
+`0.8.0` adds the index/scale shape (`ADR-0035`): four rows whose template fixes
+`r/m = 100` and therefore the `SIB` byte's presence, so an index/form choice is
+never read from an operand value. The `SIB` fields are operands: `base` is
+`[0,1]`/`[24,3]` (`REX.B` + `SIB.base`), `index` is `[1,1]`/`[27,3]` (`REX.X` +
+`SIB.index`), and the scale is the two-bit field content at `[30,2]` (0 = ×1,
+1 = ×2, 2 = ×4, 3 = ×8), carried as `role: imm`, `kind: x86.scale`,
+`target_type: scale2`, because the contract's `role` set is closed and the
+field's position is already fixed by the `SIB` byte plus the `target_type` guard;
+the multiplier is not the operand value. `disp` stays per row (`[32,8]` /
+`[32,32]`).
+
+The two new slots are not symmetric. `base` excludes nothing: `r/m = 100` has
+already announced the `SIB` byte, so `4` (`%rsp`) and `12` (`%r12`) are ordinary
+bases here, unlike the rows above. `index` excludes `4`: `SIB.index = 100` with
+`REX.X = 0` means "no index" and the register silently disappears (measured:
+`48 8b 54 20 08` decodes as `movq 8(%rax,%riz), %rdx`), while `12` stays legal
+because `REX.X = 1` makes `SIB.index = 100` mean `%r12` (`4b 8b 54 e5 08` is
+`movq 8(%r13,%r12,8), %rdx`). `%rsp` cannot be an index at all: `llvm-mc` rejects
+`8(%rax,%rsp,1)` as an invalid base+index expression. A scale operand outside
+`0…3` is `E-RANGE-001` (`N03c` passes the multiplier `8`, whose content is `3`)
+rather than a truncation or a third bit that would spill into `disp`
+(`EC-37`, `EXP-0037`). `mod = 00` (a SIB row with no displacement), a
+base-only `SIB` row (`index = 4` as a value), the `0x67` address-size prefix and
+the 8/16-bit and SSE memory rows remain absent.
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 
