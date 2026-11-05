@@ -14,7 +14,7 @@ this file plus `AGENTS.md` alone.
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
-| 3 | Three-ISA vertical prototype | **in progress**: twenty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 9 positive and 30 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 11 negative, all passing the two-source gate |
+| 3 | Three-ISA vertical prototype | **in progress**: twenty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 9 positive and 30 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate |
 | 4 | Invariants, negative tests, replay | not started |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
@@ -25,7 +25,7 @@ this file plus `AGENTS.md` alone.
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
 | G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: 27 of 36 rows are frozen; the 9 rows still `draft` are EC-05, EC-08, EC-10, EC-16, EC-18, EC-23, EC-24, EC-25 and EC-26, and none of them is needed by the three slices as they stand |
-| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 9 positive, 30 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 11 negative) |
+| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 9 positive, 30 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 12 negative) |
 
 ## Decisions
 
@@ -413,11 +413,12 @@ The nine positive fixtures exercise `add`, both `addi` endpoints, the B-type
 scatter forward and backward, the J-type scatter forward and backward, the
 `auipc` field, `ld`/`sd` at both signed imm12 endpoints, and `c.addi` (four
 immediates, with the 4-byte `addi` on the same immediate beside it), plus the
-`pcrel_hi`/`pcrel_lo12` pair. The eleven negatives pin `E-FORM-001` (including
+`pcrel_hi`/`pcrel_lo12` pair. The twelve negatives pin `E-FORM-001` (including
 `N01c`, the same form named against `0.1.0`), `E-OPERAND-001`, `E-RANGE-001`,
 `E-RANGE-002`, `E-RANGE-004` (`N16a`/`N16b`, the excluded zeroes),
-`E-FIXUP-009`/`E-FIXUP-007` (`N17a`/`N17b`/`N17c`, the pair half), and (read time)
-`E-OPERAND-003`. `RV-P8-pcrel-pair` is the first pair fixture whose oracle is the
+`E-FIXUP-009`/`E-FIXUP-007` (`N17a`/`N17b`/`N17c`, the pair half),
+`E-TARGET-001` (`N06`, a plan that declares `rv64i` against a table that also
+declares `rv64c`), and (read time) `E-OPERAND-003`. `RV-P8-pcrel-pair` is the first pair fixture whose oracle is the
 object file's relocation records rather than linked bytes: one `auipc`, one `addi`
 and one `sd`, all `emit_relocation`, so one `hi` and two `lo` members produce
 three records, and the bytes are three templates with zero immediates while
