@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0051/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "a9648531cbb111729a721108e7919b09f4a39a42fc1468276dbeb24ffb8a3fa0",
+  "output_sha256": "1423b8a9bd8b20a60e428aad0fa397432bf1a6a139c4320daee33c222203197c",
+  "size": 84,
+  "records": 0,
+  "notes": "Twelve fixed-base mod=00 SIB instructions, one per 0.22.0 row. Instructions 1-4 are the xmm rows and run xmm0-xmm3; 5-8 are the ymm rows and run ymm8-ymm11; 9-12 are the zmm rows and run zmm16-zmm19. Within each four the order is load rsp, load r12, store rsp, store r12. Every row is seven bytes: `62 P0 7c P2 28/29 04 24`, where ModRM 04 is mod=00/reg=0/rm=100 and SIB 24 is scale 00, index 100, base 100, with no displacement at all. %r12 costs no extra prefix byte because the base's fourth bit is already the inverted B-bar in P0 (62 f1 -> 62 d1). The vector register sits in the five-bit EVEX field at [43,3] plus the inverted R-bar/R-bar-prime bits at [12,1]/[15,1]; high registers only clear those bits (62 f1 -> 62 71 for ymm8 over %rsp, and 62 d1 -> 62 c1 for zmm17 over %r12). llvm-mc canonicalizes 0(%rsp) to (%rsp), so the no-displacement shape is the only encoding of a zero offset. input_sha256 is fixture.asm (the source above); output_sha256 is the 84-byte .text."
+}

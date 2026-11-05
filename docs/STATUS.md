@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-06
-Phase: **3 in progress (x86, AArch64 and RV64 slices): forty definition documents, the materializer and the fixture gate are in place; every AArch64 and RV64 coverage row and all nine v0 x86 rows are carried, so widening is coverage work with its own ADR per slice**
+Phase: **3 in progress (x86, AArch64 and RV64 slices): forty-one definition documents, the materializer and the fixture gate are in place; every AArch64 and RV64 coverage row and all nine v0 x86 rows are carried, so widening is coverage work with its own ADR per slice**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -14,7 +14,7 @@ this file plus `AGENTS.md` alone.
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
-| 3 | Three-ISA vertical prototype | **in progress**: forty definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 25 positive and 112 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate |
+| 3 | Three-ISA vertical prototype | **in progress**: forty-one definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 26 positive and 118 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate |
 | 4 | Invariants, negative tests, replay | **in progress**: `EXP-R1`/`R2`/`R4`/`R5`/`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs` (`EXP-0033`); `EXP-R3` is `unverified` because only one host exists |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
@@ -25,7 +25,7 @@ this file plus `AGENTS.md` alone.
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
 | G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: 31 of 40 rows are frozen; the 9 rows still `draft` are EC-05, EC-08, EC-10, EC-16, EC-18, EC-23, EC-24, EC-25 and EC-26, and none of them is needed by the three slices as they stand |
-| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 25 positive, 112 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 12 negative) |
+| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 26 positive, 118 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 12 negative) |
 
 ## Decisions
 
@@ -79,6 +79,7 @@ this file plus `AGENTS.md` alone.
 | ADR-0046 | The 8/16-bit memory bases reach `%rsp` and `%r12` through fixed-base `SIB` rows: `0.19.0` appends twenty-eight rows — word, REX-less low byte, high byte and `40`-prefixed byte, each load/store × `disp8`/`disp32`, at `%rsp` and `%r12` except the high-byte family, which gets `%rsp` only because `movb %ah, 8(%r12)` has no encoding (the `REX.B` byte that names `%r12` renames `ah` to `spl`). `%rsp` sets `r/m = 100` and spends a `SIB` byte (`24`), `%r12` spends `REX.B` on top, so the base leaves the operand list and enters the template: the row carries only the register and the displacement, the shape `0.3.0`/`0.7.0` gave `movq`, and no operand value changes a length (`INV-04`). The prefixes are template bytes, so `ModRM.reg`/`disp` move one byte later than on the `-base-disp*` rows (`[19,3]`/`[32,…]` on the word `%rsp` rows, `[27,3]`/`[40,…]` on the word `%r12` rows, `[11,3]`/`[24,…]` on the REX-less byte `%rsp` rows, and `[19,3]`/`[32,…]` on every row whose template carries a `REX` byte); the register windows stay 0–3 for the low rows, 4–7 for the `40` rows and 4–7 for the high-byte rows. Naming a row against `0.18.0` and the absent high-byte `%r12` row are `E-FORM-001` (`N01ap`/`N01aq`), a `gpr16` on a byte row is `E-OPERAND-001` (`N02u`), content `128` is `E-RANGE-001` (`N03h`), register `8` is `E-OPERAND-004` (`N14v`), and number `0` on a `40` row is `E-RANGE-004` (`N16y`); no `EC` row is added, `EC-35` and `EC-38` are revised in place, and there is no schema or Rust change | accepted 2026-11-06 |
 | ADR-0047 | The SSE `movaps`/`vmovaps` memory rows reach `%rsp` and `%r12` through fixed-base `SIB` rows: `0.20.0` appends sixteen rows — legacy and VEX, load/store × `disp8`/`disp32` × both bases — with the base in the template and the row carrying only the register and the displacement. `%rsp` sets `r/m = 100` and spends the `SIB` byte `24`; legacy `%r12` adds `REX.B` (`41`), and VEX `%r12` forces the three-byte prefix (`c4 c1 78`) because the two-byte form cannot carry `B = 1`, so no operand value changes a length (`INV-04`). The prefixes are template bytes, so `ModRM.reg`/`disp` move one byte later: `[19,3]`/`[32,…]` on legacy `%rsp`, `[27,3]`/`[40,…]` on legacy `%r12` and VEX `%rsp`, `[35,3]`/`[48,…]` on VEX `%r12`. The register windows are inherited rather than widened: the legacy field stays three bits (`xmm8` is `E-OPERAND-004`, `N14w`) and the VEX slot keeps its inverted `R` bit, so it already reaches `xmm8`–`xmm15` at no length cost. Naming a row against `0.19.0` and the absent `mod = 00` shape are `E-FORM-001` (`N01ar`/`N01as`), a `gpr64` operand is `E-OPERAND-001` (`N02v`), a third `base` operand is `E-OPERAND-002` (`N02w`), and content `128` is `E-RANGE-001` (`N03i`); no `EC` row is added, `EC-35` and `EC-38` are revised in place, and there is no schema or Rust change | accepted 2026-11-06 |
 | ADR-0048 | The EVEX `vmovaps` memory rows reach `%rsp` and `%r12` through fixed-base `SIB` rows: `0.21.0` appends twenty-four rows — three widths (`xmm`/`ymm`/`zmm`) × load/store × `disp8*N`/`disp32` × both bases — with the base in the template and the row carrying only the register and the displacement. `%rsp` sets `r/m = 100` and spends the `SIB` byte `24`; `%r12` spends the same byte and no prefix byte, because its fourth bit is already the inverted `B̄` in `P0` (`62 f1 ...` vs `62 d1 ...`), so the two bases are the same length and no operand value changes a length (`INV-04`). The prefix does not grow, so the vector slot stays `[43,3]` with its inverted `R̄`/`R̄'` bits and only the displacement moves, from `[48,…]` to `[56,…]`; the five-bit slot already reaches `xmm31` at no length cost. `disp8*N` content is still the same `disp / N` (`16`/`32`/`64` are content `1`), and `8(%rsp)` promotes to `disp32` rather than truncating. Naming a row against `0.20.0` and the absent `mod = 00` shape are `E-FORM-001` (`N01at`/`N01au`), a `gpr64` operand is two `E-OPERAND-001` (`N02x`), a third `base` operand is `E-OPERAND-002` (`N02y`), content `128` is `E-RANGE-001` (`N03j`), and register `32` is `E-OPERAND-004` (`N14x`); no `EC` row is added, `EC-35` and `EC-38` are revised in place, and there is no schema or Rust change | accepted 2026-11-06 |
+| ADR-0049 | The EVEX `vmovaps` no-displacement rows take `%rsp` and `%r12` as `SIB` bases: `0.22.0` appends twelve rows — three widths × load/store × both bases — at `mod = 00`, where `r/m = 100` moves the base into the `SIB` byte and leaves no displacement slot, so each row is seven bytes and carries only the vector register. `%rsp` is `62 f1 7c 08 28 04 24`, `%r12` is `62 d1 7c 08 28 04 24`; the two bases still differ only in the inverted `B̄` in `P0`, so a base never changes the length (`INV-04`). The prefix does not grow, so the vector slot stays `[43,3]` with its inverted `R̄`/`R̄'` bits; there is no `disp` slot, so a displacement operand is `E-OPERAND-002` rather than a silently ignored offset, and `llvm-mc` canonicalizes `0(%rsp)` to `(%rsp)`, so the shape is the only encoding of a zero offset. `%rbp`/`%r13` cannot use it (`mod = 00`, `r/m = 101` is RIP-relative) and keep `62 … 45 00` on the `-base` row. Naming a row against `0.21.0` and the absent `%rbp` shape are `E-FORM-001` (`N01av`/`N01aw`), a `gpr64` operand is two `E-OPERAND-001` (`N02z`), an extra `disp` operand is `E-OPERAND-002` (`N02aa`), register `32` is `E-OPERAND-004` (`N14y`), and `%rsp` on the general `xmm-base` row is `E-RANGE-004` (`N16z`); no `EC` row is added, `EC-02`/`EC-35`/`EC-38` are revised in place, and there is no schema or Rust change | accepted 2026-11-06 |
 
 ## Settled decisions (contract level)
 
@@ -427,7 +428,20 @@ not cover is caught only by the weaker size check; it is now settled, and
    (228 bytes, no record), and `N01at`/`N01au`/`N02x`/`N02y`/`N03j`/`N14x`
    pin the version boundary, the absent `mod = 00` shape, the operand
    class, the extra `base` operand, the content field end and the
-   five-bit register field.
+   five-bit register field. `X86-P26` closes the `mod = 00` half of that
+   axis: `0.22.0` (`ADR-0049`) appends twelve fixed-base rows —
+   `xmm`/`ymm`/`zmm` × load/store × `%rsp`/`%r12`. `r/m = 100` moves the
+   base into the `SIB` byte and `mod = 00` drops the displacement slot, so
+   `(%rsp)` is `62 f1 7c 08 28 04 24` and `(%r12)` is
+   `62 d1 7c 08 28 04 24`: seven bytes, still differing only in `P0`.
+   `%rbp`/`%r13` cannot use the shape (`mod = 00`, `r/m = 101` is
+   RIP-relative) and keep `62 … 45 00` on the `-base` row, and `llvm-mc`
+   canonicalizes `0(%rsp)` to `(%rsp)`, so the row is the only encoding of
+   a zero offset. `X86-P26-evex-mem-sib-nodisp` matches `llvm-mc`
+   (84 bytes, no record), and `N01av`/`N01aw`/`N02z`/`N02aa`/`N14y`/`N16z`
+   pin the version boundary, the absent `%rbp` shape, the operand class,
+   the extra `disp` operand, the five-bit register field and `%rsp` on the
+   general row.
 4. Contract debt is closed: `OD-05` (unknown fields/extensions) by ADR-0031,
    pinned by `N21a`/`N21b` and the definition unit test, and `OD-08` (canonical
    wire form) by ADR-0032, pinned by `EXP-R4`. The Level 1 artifact envelope
@@ -474,7 +488,9 @@ fixed-base `SIB` rows, again with no new `EC` fact) and `0.20.0.json` (one
 hundred and seventy-one forms, digest `sha256:b8bd1ed3…`, the sixteen SSE
 fixed-base `SIB` rows, again with no new `EC` fact) and `0.21.0.json` (one
 hundred and ninety-five forms, digest `sha256:30af3fec…`, the twenty-four
-EVEX fixed-base `SIB` rows, again with no new `EC` fact);
+EVEX fixed-base `SIB` rows, again with no new `EC` fact) and `0.22.0.json` (two
+hundred and seven forms, digest `sha256:61c7cd1c…`, the twelve EVEX
+no-displacement fixed-base `SIB` rows, again with no new `EC` fact);
 `EXP-0004` (223 decoded byte strings across the seven `0.1.0` rows, plus the
 `OD-06` digest measurement); `EXP-0005` (9 positive fixtures against LLVM
 23.1.2, with the decode-verified caveat on five instructions); `EXP-0029` (the
@@ -510,7 +526,9 @@ and displacement, the high-byte `%r12` refusal and the unchanged register
 windows); `EXP-0049` (the SSE `SIB` bases, the moving `ModRM` and displacement,
 the inherited register windows and the VEX `R̄` window);
 `EXP-0050` (the EVEX `SIB` bases, the unchanged vector slot, the
-`disp8*N` content and the five-bit window); and 112 negative fixtures whose
+`disp8*N` content and the five-bit window); `EXP-0051` (the `mod = 00` `SIB`
+bases, the missing displacement slot, the one-encoding zero offset and the
+`%rbp`/`%r13` refusal); and 118 negative fixtures whose
 complete diagnostic sets — code, JSON Pointer, detail keys — are compared for
 exact equality. `E-OPERAND-004`/`N14` (an operand wider than its field) is one
 of them.
