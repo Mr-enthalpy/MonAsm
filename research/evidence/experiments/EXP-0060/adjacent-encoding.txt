@@ -1,0 +1,16 @@
+	movb	(%rbp), %al                     # encoding: [0x8a,0x45,0x00]
+	movb	(%r13), %al                     # encoding: [0x41,0x8a,0x45,0x00]
+	movb	(%rsp), %al                     # encoding: [0x8a,0x04,0x24]
+	movb	(%r12), %al                     # encoding: [0x41,0x8a,0x04,0x24]
+	movb	(%rsp), %ah                     # encoding: [0x8a,0x24,0x24]
+	movb	(%rbp), %spl                    # encoding: [0x40,0x8a,0x65,0x00]
+	movb	(%r13), %r8b                    # encoding: [0x45,0x8a,0x45,0x00]
+	movb	(%rbp), %al                     # encoding: [0x8a,0x45,0x00]
+	movl	(%rax), %eax                    # encoding: [0x8b,0x00]
+	movw	(%rax), %ax                     # encoding: [0x66,0x8b,0x00]
+	movq	(%rax), %rax                    # encoding: [0x48,0x8b,0x00]
+	movb	(%rax), %r16b                   # encoding: [0xd5,0x40,0x8a,0x00]
+	movb	(%rax), %al                     # encoding: [0x8a,0x00]
+C:\Users\hanni\Projects\MonAsm\research\evidence\experiments\EXP-0060\adjacent.asm:6:1: error: can't encode 'ah' in an instruction requiring EVEX/REX2/REX prefix
+movb (%r13), %ah
+^

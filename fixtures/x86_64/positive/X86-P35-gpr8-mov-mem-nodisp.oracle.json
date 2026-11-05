@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0060/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "20819bb11421ddae4295a3700bde4a87a7000f06f25de77b22ecee41ee326f47",
+  "output_sha256": "5ad8a6f622515dcd5d66d21017bb595825f56c5381c0eed0803685ff2c34796e",
+  "size": 20,
+  "records": 0,
+  "notes": "One byte-width mov per 0.31.0 row, eight instructions, 20 bytes: load and store in the four register windows at mod = 00, where the row is opcode plus ModRM and nothing else. The low and high windows have no REX byte (8a 00, 88 09, 8a 22, 88 3b, two bytes each); the REX = 40 window relabels 4-7 (40 8a 3e, 40 88 37) and the REX.R window reaches r8b-r15b (45 8a 00, 45 88 39), both three bytes. The base is ModRM.r/m at [8,3] for the three-bit rows and REX.B at [0,1] plus [16,3] for the four-bit rows. The base set here is %rax, %rcx, %rdx, %rbx, %rsi, %rdi, %r8, %r9; %rsp/%r12 would need a SIB byte and %rbp/%r13 collide with r/m = 101 (llvm-mc writes %rbp as 8a 45 00, mod = 01). The disp8/disp32 twins (8a 40 00, 8a 80 00 00 00 00) stay separate rows, and movabsb (A0/A2) is a fourth shape. input_sha256 is fixture.asm (the source above); output_sha256 is the 20-byte .text."
+}

@@ -1,0 +1,14 @@
+movb (%rbp), %al
+movb (%r13), %al
+movb (%rsp), %al
+movb (%r12), %al
+movb (%rsp), %ah
+movb (%r13), %ah
+movb (%rbp), %spl
+movb (%r13), %r8b
+movb 0(%rbp), %al
+movl (%rax), %eax
+movw (%rax), %ax
+movq (%rax), %rax
+movb (%rax), %r16b
+movb (%rax), %al

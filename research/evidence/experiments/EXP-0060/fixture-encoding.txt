@@ -1,0 +1,8 @@
+	movb	(%rax), %al                     # encoding: [0x8a,0x00]
+	movb	%cl, (%rcx)                     # encoding: [0x88,0x09]
+	movb	(%rdx), %ah                     # encoding: [0x8a,0x22]
+	movb	%bh, (%rbx)                     # encoding: [0x88,0x3b]
+	movb	(%rsi), %dil                    # encoding: [0x40,0x8a,0x3e]
+	movb	%sil, (%rdi)                    # encoding: [0x40,0x88,0x37]
+	movb	(%r8), %r8b                     # encoding: [0x45,0x8a,0x00]
+	movb	%r15b, (%r9)                    # encoding: [0x45,0x88,0x39]
