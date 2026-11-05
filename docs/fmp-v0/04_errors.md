@@ -39,7 +39,7 @@ Rules:
 | E-PLAN-006 | Required field absent from a strict object | `field`, `object` | — |
 | E-TARGET-001 | Unsupported or mismatched `isa_family`, `isa_variant`, or `enabled_extensions` | `found` | — |
 | E-TARGET-002 | Invalid or missing `execution_mode` for the family | `found`, `required` | — |
-| E-TARGET-003 | Form requires an extension that is not enabled | `extension`, `form_id` | N06 |
+| E-TARGET-003 | Form requires an extension that is not enabled | `extension`, `form_id` | — |
 | E-TARGET-004 | Unsupported `byte_order` or `address_width` | `found` | — |
 | E-DEF-001 | The definition cannot be loaded (unknown `definition_format`, duplicate form, bad template or placement), or `definition_identity.digest` does not match the loaded definition | `declared`, `actual`, `reason` | N10 |
 | E-DEF-002 | Namespace or version not available in this materializer | `namespace`, `version` | EXP-R5 |
@@ -266,8 +266,10 @@ silent omission would make a later slice look like it had always been covered.
 - `E-TARGET-003` — a definition has no per-form extension requirement
   (`07_definition_format.md` §2), so there is no `form_id` to name. Each table
   declares one `enabled_extensions` set, and a mismatch with the plan is
-  `E-TARGET-001`. The code becomes reachable when a table gains a form that an
-  extension gates (`N06`).
+  `E-TARGET-001`; `0.5.0` is the first x86 table with an extension-gated form
+  (`EVEX.128` needs AVX-512VL), and `N06` exercises `E-TARGET-001`, not this
+  code. `E-TARGET-003` becomes reachable only if the format gains a per-form
+  extension field, not merely from a table that declares extensions.
 - `E-LAYOUT-005` — no plan field requests alignment: fragments carry no alignment
   attribute, and a `fill` fragment is the only padding. A plan that wants padding
   and omits the fragment produces a gap, which is `E-LAYOUT-002`. The code

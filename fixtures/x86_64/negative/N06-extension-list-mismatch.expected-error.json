@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-TARGET-001", "path": "/target_identity/enabled_extensions", "detail_keys": ["found"] }
+  ]
+}

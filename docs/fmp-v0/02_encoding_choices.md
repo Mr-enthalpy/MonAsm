@@ -68,7 +68,7 @@ not be moved to `frozen` on the strength of an argument alone.
 | EC-06 | x86-64 | REX presence and W/R/X/B bits; high-byte registers (`AH`) are illegal with any REX | Legality and one prefix byte | `operand type` (register class → REX bits) + definition rule | A plan naming `AH` with a 64-bit operand cannot be encoded; the encoder must reject, not silently switch registers. The high-byte half now ships in `0.4.0`: `x86.gpr8h` is its own kind, a REX template cannot carry it, and a REX-less `x86.gpr8` slot excludes 4–7 (`E-DEF-001`) (`ADR-0029`, `EXP-0031`); the `W`/`R`/`X`/`B` half still waits for `r8`–`r15` and the extension families. | frozen |
 | EC-07 | x86-64 | Operand-size prefix `0x66` vs a distinct 16/32/64-bit form | One prefix byte, different semantics | `form variant` (`r16-*`) | `add ax, bx` requires `66`; omitting it changes the operand width. | frozen |
 | EC-08 | x86-64 | Address-size prefix `0x67` in 64-bit mode | One prefix byte and truncation semantics | `operand modifier` (`addr_size`) | 32-bit addressing in 64-bit mode truncates the effective address. | draft |
-| EC-09 | x86-64 | Legacy SSE vs VEX vs EVEX for the same operation | Prefix family, 2–4 bytes, register reach | `encoding family` (`legacy` / `vex` / `evex`) | `vaddps xmm0,xmm1,xmm2` fits 2-byte VEX but is also expressible in EVEX. | draft (deferred, `X86-P9`) |
+| EC-09 | x86-64 | Legacy SSE vs VEX vs EVEX for the same operation | Prefix family, 3–6 byte encodings, register reach | `form variant` (`/legacy` / `/vex` / `/evex`) | `llvm-mc` 23.1.2: `movaps %xmm1,%xmm0` is `0f 28 c1`, `vmovaps %xmm3,%xmm2` is `c5 f8 28 d3`, and `62 f1 7c 08 28 e5` decodes as `vmovaps %xmm5,%xmm4`. Same operation, same operands, three lengths; VEX and EVEX are both legal at `xmm` width, and `llvm-mc` always picks VEX for the mnemonic, so an unfamilied row would let two implementers emit different bytes (`INV-02`). A plan that names a family the table lacks is `E-FORM-001` (`N01aa`, `N01ab`), a `zmm` operand on the `xmm` row is `E-OPERAND-001` (`N02l`), and the extension set the EVEX row needs is checked by `E-TARGET-001` (`N06`) (`ADR-0030`, `EXP-0032`). | frozen |
 | EC-10 | x86-64 | `LOCK` / `REP` / segment prefix presence | One or more prefix bytes | `operand modifier` (`lock` / `rep` / `segment`) | `lock add [rax], ebx` vs plain `add` differ only by `F0`, with different semantics. | draft |
 | EC-11 | AArch64 | 32-bit (`w`) vs 64-bit (`x`) variant | Different `sf` bit, different semantics | `form variant` (`w32-…` / `x64-…`) + `operand type` guard (`aarch64.gpr32`/`w32` vs `aarch64.gpr64`/`x64`) | `add w0,w1,w2` is `0x0b020020` and `add x0,x1,x2` is `0x8b020020`: bit 31 alone, and the operand values are identical, so no operand field could carry the choice. The width is which MRS node the row came from (`ADD_32_addsub_shift` vs `ADD_64_addsub_shift`, `sf` at 31+1), and the register class is a second, independent guard: the nodes spell `<Wd>`/`<Wn>`/`<Wm>` and `llvm-mc` rejects `add w0, w1, x2`; an `x64` operand on a `w` row is `E-OPERAND-001` (`N02c`, `EXP-0021` §2). | frozen |
 | EC-12 | AArch64 | `add/sub` immediate: imm12 vs imm12 shifted by 12 | Different `sh` bit and range | `form variant` (`imm12` / `imm12-scaled`) | `add x0,x1,#1` and `add x0,x1,#1,lsl #12` are both legal spellings of different values. The `sub` rows in `0.8.0` carry the same pair: `sub x0, x1, #4096` is encodable only as `-lsl12` (`imm12 = 1`), `llvm-mc` picks that form without a diagnostic, and naming `-lsl0` is `E-RANGE-001` (`N18d`, `EXP-0019` §2). | frozen |
@@ -104,7 +104,7 @@ surface: a variant that is absent cannot be selected, repaired or approximated,
 and naming it is `E-FORM-001`. There is no feature flag and no partially
 implemented form.
 
-The x86-64 slice is twenty-two forms covering eight frozen `EC` rows:
+The x86-64 slice is twenty-five forms covering nine frozen `EC` rows:
 
 | `form_id` | Bytes | Operand signature | Covers |
 |---|---|---|---|
@@ -130,6 +130,9 @@ The x86-64 slice is twenty-two forms covering eight frozen `EC` rows:
 | `x86:mov/rm8h-r8h/legacy` | `88 /r` | dest `rm8h`, src `r8h` (numbers 4–7: `ah`/`ch`/`dh`/`bh`) | EC-36, X86-P5 |
 | `x86:mov/rm8-r8/legacy` | `88 /r` | dest `rm8`, src `r8` (numbers 0–3: `al`/`cl`/`dl`/`bl`) | EC-36, X86-P5 |
 | `x86:mov/rm8-r8-rex/legacy` | `REX 88 /r` | dest `rm8`, src `r8` (numbers 4–7: `spl`/`bpl`/`sil`/`dil`) | EC-36, X86-P5 |
+| `x86:movaps/xmm-xmm/legacy` | `0F 28 /r` | dest `xmm`, src `xmm` | EC-09, X86-P9 |
+| `x86:vmovaps/xmm-xmm/vex` | `C5 F8 28 /r` | dest `xmm`, src `xmm` | EC-09, X86-P9 |
+| `x86:vmovaps/xmm-xmm/evex` | `62 F1 7C 08 28 /r` | dest `xmm`, src `xmm` | EC-09, X86-P9 |
 
 The variant names the operand signature as the ISA opcode table spells it, which
 is what makes the two `mov` forms and the two `add` immediate forms distinct
@@ -496,8 +499,10 @@ the `x` index rows stay `x64`, which is why an `x64` destination is
 `E-OPERAND-001` (`N02h`). A modifier carrying `lsl #2` is still `E-OPERAND-003`
 (`N19c`): the scale is the `S` bit, and a modifier never writes one.
 
-`EC-05`, `EC-09` and `EC-10` are out of v0. `X86-P9` (explicit encoding family)
-stays deferred, so `vex`/`evex` never appear in a v0 `form_id`.
+`EC-05` and `EC-10` are out of v0. `EC-09` is frozen by `0.5.0`: the three
+`movaps` rows carry the family in the `form_id` (`/legacy`, `/vex`, `/evex`), so
+`vex`/`evex` appear only in that table and a family the table lacks is still
+`E-FORM-001` (`ADR-0030`).
 
 The RV64 slice is eight forms across two documents, generated from the pinned UDB
 nodes (ADR-0007, ADR-0009). Seven base-`I` forms are in `0.1.0`; `c.addi` joins
@@ -653,7 +658,7 @@ Test obligation per `EC` row:
 
 The v0 `EC` set is decided (OD-10). What remains is per-row evidence:
 
-- `EC-05`, `EC-08`, `EC-09`, `EC-10`, `EC-16`, `EC-18`, `EC-23`, `EC-24`,
+- `EC-05`, `EC-08`, `EC-10`, `EC-16`, `EC-18`, `EC-23`, `EC-24`,
   `EC-25`, `EC-26` are `draft` and need an observed counterexample before they can
   be frozen. None of them is required by the x86 slice. `EC-08`, `EC-10` and
   `EC-26` name `operand modifier` as the carrier for `addr_size`, `lock`/`rep` and

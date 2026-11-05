@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj P9.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "manual+disassembly",
+  "input_sha256": "20511b368d774490def64d52e7b81c2cfa7f8199e3386691b6cb85842f2cf327",
+  "output_sha256": "2afcdc1f68f1d0b6c1bd58495a20f8d94d61bac3c294bd58beb4184e6ed13714",
+  "size": 13,
+  "records": 0,
+  "notes": "One operation, `movaps` at `xmm` width, in three encoding families. The assembled part is `movaps %xmm1,%xmm0` -> `0f 28 c1` (no prefix) and `vmovaps %xmm3,%xmm2` -> `c5 f8 28 d3` (two-byte VEX); the appended `62 f1 7c 08 28 e5` is the EVEX.128 encoding of `vmovaps %xmm5,%xmm4`, which llvm-mc will not select from a mnemonic but decodes to the same instruction. The three byte strings differ only in the prefix family and the ModRM position, so the family is a form fact.",
+  "disassembly": "vmovaps\t%xmm5, %xmm4"
+}

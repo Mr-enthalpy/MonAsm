@@ -1,7 +1,7 @@
 # EXP-0005 — x86-64 positive fixtures, measured with LLVM
 
-- Date: 2026-11-04 (extended 2026-11-05 with `X86-P6`, `X86-P4` and `X86-P5`)
-- Subject: `fixtures/x86_64/positive/` — the eight bytes-emitting vectors
+- Date: 2026-11-04 (extended 2026-11-05 with `X86-P6`, `X86-P4`, `X86-P5` and `X86-P9`)
+- Subject: `fixtures/x86_64/positive/` — the nine bytes-emitting vectors
 - Toolchain: LLVM 23.1.2 (`llvm-mc`, `llvm-objcopy`, `llvm-readobj`), Python 3.8
 - Basis: **experiment** for every byte below
 - Reproduce: `python fixture_oracle.py` (rewrites), or
@@ -32,6 +32,7 @@ LLVM agree, not that a function agrees with itself.
 | `X86-P5-prefixes` | two `movw` rows; high bytes both ways; `movb %al,%cl`; `movb %spl,%bpl`; `movb %ah,%ah`; decode-verified `66 8b c3` | `6689d8 6689f7 88e5 88ec 88c1 4088e5 88e4 668bc3` | 20 | `llvm-mc` + `manual+disassembly` |
 | `X86-P6-rip-relative` | `movq 16(%rip),%rax`; local load/store against `L1` at `0x20`; `movq ext(%rip),%rbx` | `488b0510000000 488b0d12000000` + 2×`00` + `48891509000000` + 9×`00` + `aabbccdd 488b1d00000000` | 43 | `llvm-mc` + `llvm-readobj` |
 | `X86-P8-local-and-external-branch` | `jmp L1` (resolved); `jmp ext` (recorded) | `e9cb000000` + 200×`00` + `4889d8 4883c001 e900000000` | 217 | `llvm-mc` + `llvm-readobj` |
+| `X86-P9-sse-vex-evex` | `movaps %xmm1,%xmm0`; `vmovaps %xmm3,%xmm2`; decode-verified EVEX.128 `vmovaps %xmm5,%xmm4` | `0f28c1 c5f828d3 62f17c0828e5` | 13 | `manual+disassembly` |
 
 `EXP-0004` decoded every row of the definition table, including the forms LLVM
 will not assemble from a mnemonic. This experiment adds the end-to-end plan
@@ -39,7 +40,7 @@ path: the plan names a form, the table places the fields, and the bytes match.
 
 ## 3. Cases LLVM cannot emit from assembly text
 
-Four instructions in the fixtures are not produced by `llvm-mc` from a
+Five instructions in the fixtures are not produced by `llvm-mc` from a
 mnemonic. They are **decode-verified**, not assembled, and the oracle record says
 so:
 
@@ -64,6 +65,12 @@ so:
   measured `66 89 d8` and is verified by `llvm-mc -disassemble`, which prints
   `movw %bx, %ax`. It keeps the direction pair explicit, as `X86-P1` does at 64
   bits.
+- `X86-P9`'s third instruction (`62 f1 7c 08 28 e5`, EVEX.128). `llvm-mc` always
+  emits the two-byte VEX `c5 f8 28 e5` for `vmovaps %xmm5, %xmm4`, because EVEX
+  at 128 bits needs AVX-512VL and no mask. The EVEX bytes are verified by
+  `llvm-mc -disassemble`, which prints `vmovaps %xmm5, %xmm4`; the fixture keeps
+  all three families as distinct `form_id`s rather than relying on the
+  assembler's preference.
 
 ## 4. Branch notes
 
@@ -86,7 +93,7 @@ so:
 
 | File | Meaning |
 |---|---|
-| `P1.asm` … `P8.asm` | The assembled source, one per fixture (`P4.asm` is `X86-P4`) |
+| `P1.asm` … `P9.asm` | The assembled source, one per fixture (`P4.asm` is `X86-P4`) |
 | `fixture_oracle.py` | Regenerates `*.expected.bin` and `*.oracle.json`; `--check` verifies |
 | `../fixtures/x86_64/positive/*.fmp.json` | The plans |
 | `../fixtures/x86_64/positive/*.expected.bin` | Oracle bytes |

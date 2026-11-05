@@ -14,6 +14,7 @@ Vectors: `X86-P1` … `X86-P9` in `docs/fmp-v0/06_validation_matrix.md`.
 | X86-P6 | `X86-P6-rip-relative` | `EXP-0005` + `EXP-0029`, record count from `llvm-readobj` |
 | X86-P4 | `X86-P4-base-disp` | `EXP-0005` + `EXP-0030` (`manual+disassembly` for the small-value `disp32`) |
 | X86-P5 | `X86-P5-prefixes` | `EXP-0005` + `EXP-0031` (`manual+disassembly` for the 16-bit `8B` half) |
+| X86-P9 | `X86-P9-sse-vex-evex` | `EXP-0005` + `EXP-0032` (`manual+disassembly` for the EVEX.128 row) |
 
 `X86-P6` ships in `definitions/x86_64/0.2.0.json` as two forms with
 `mod = 00`, `r/m = 101` and `disp32` as the last field (`ADR-0027`). `X86-P4`
@@ -21,29 +22,34 @@ ships in `0.3.0` as eight forms, load/store × `disp8`/`disp32` ×
 base-in-`r/m`/`%rsp`-fixed (`ADR-0028`). `X86-P5` ships in `0.4.0` as five
 forms: two 16-bit directions whose template starts with `0x66`, the high-byte
 row, and the low-byte pair split by a REX prefix (`ADR-0029`).
-`X86-P9` is deferred with the extension families (`OD-10`).
+`X86-P9` ships in `0.5.0` as three `movaps` rows at `xmm` width, one per
+encoding family: `/legacy` (`0f 28 /r`), two-byte `/vex` (`c5 f8 28 /r`) and
+EVEX.128 `/evex` (`62 f1 7c 08 28 /r`), with the prefix as template and the
+`ModRM` slots moving with it (`ADR-0030`).
 
 ## Negative fixtures present
 
 | Vector | Fixture | Code |
 |---|---|---|
-| N01 | `negative/N01-absent-form`, `negative/N01x-absent-riprel-form`, `negative/N01y-absent-basedisp-form`, `negative/N01z-absent-16bit-form` | `E-FORM-001` |
-| N02 | `negative/N02-operand-kind-mismatch`, `negative/N02j-base-on-riprel-form`, `negative/N02k-high-byte-operand-on-rex-form` | `E-OPERAND-001`, `E-OPERAND-002` |
+| N01 | `negative/N01-absent-form`, `negative/N01x-absent-riprel-form`, `negative/N01y-absent-basedisp-form`, `negative/N01z-absent-16bit-form`, `negative/N01aa-absent-unfamilied-vmovaps-form`, `negative/N01ab-vex-form-absent-in-0.4.0` | `E-FORM-001` |
+| N02 | `negative/N02-operand-kind-mismatch`, `negative/N02j-base-on-riprel-form`, `negative/N02k-high-byte-operand-on-rex-form`, `negative/N02l-zmm-operand-on-xmm-evex-form` | `E-OPERAND-001`, `E-OPERAND-002` |
 | N03 | `negative/N03-imm8-out-of-range`, `negative/N03-disp8-out-of-range` | `E-RANGE-001` |
 | N04 | `negative/N04a-rel8-out-of-range`, `N04b-rel32-absolute-out-of-range`, `N04e-riprel32-literal-out-of-range` | `E-RANGE-002`, `E-FIXUP-003` |
 | N05 | `negative/N05-expected-size-mismatch` | `E-SIZE-001` |
+| N06 | `negative/N06-extension-list-mismatch` | `E-TARGET-001` |
 | N07 | `negative/N07-fixup-partial-field`, `negative/N07b-riprel-operand-fixup-mismatch` | `E-FIXUP-001` |
 | N08 | `negative/N08-undeclared-symbol`, `N08b-resolve-undefined-symbol`, `N08c-absolute-pcrel-without-base` | `E-SYMBOL-001`, `E-FIXUP-002` |
 | N09 | `negative/N09-overlapping-fragments` | `E-LAYOUT-001` |
 | N10 | `negative/N10-definition-digest-mismatch` | `E-DEF-001` |
 | N11 | `negative/N11-fragment-gap` | `E-LAYOUT-002` |
 | N13 | `negative/N13-expected-digest-mismatch` | `E-BYTE-001` |
-| N14 | `negative/N14-register-wider-than-field` | `E-OPERAND-004` |
+| N14 | `negative/N14-register-wider-than-field`, `negative/N14b-xmm8-wider-than-field` | `E-OPERAND-004` |
 | N16 | `negative/N16f-rsp-on-non-sib-form`, `negative/N16g-low-byte-number-four-without-rex` | `E-RANGE-004` |
 
-`N06` (extension-gated form) and `N12` (relocation pair) have no x86 case in
-v0: the slice has no extension-gated form and only single-site `rel32` fixups.
-Both are recorded as not applicable in `06_validation_matrix.md`, not silently
-skipped.
+`N06` (extension-list mismatch) now has an x86 case: `0.5.0` declares
+`avx`/`avx512f`/`avx512vl` for its EVEX.128 row, and a plan that omits them is
+`E-TARGET-001`. `N12` (relocation pair) still has no x86 case in v0: the slice
+has only single-site `rel32` fixups. It is recorded as not applicable in
+`06_validation_matrix.md`, not silently skipped.
 
 See `../README.md` for naming and oracle rules.

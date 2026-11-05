@@ -15,7 +15,7 @@ naming: `fixtures/<isa>/negative/N0X-<slug>.fmp.json`.
 | N03 | Immediate exceeds the field's range | Reject | E-RANGE-001 | x86, aarch64, rv64 | `x86_64/negative/N03-imm8-out-of-range.fmp.json`, `x86_64/negative/N03-disp8-out-of-range.fmp.json`, `aarch64/negative/N03-imm12-out-of-range.fmp.json`, `aarch64/negative/N03-cond-out-of-range.fmp.json`, `aarch64/negative/N03-imm6-out-of-range.fmp.json`, `aarch64/negative/N03-imm3-out-of-range.fmp.json`, `aarch64/negative/N03-imm12-disp-out-of-range.fmp.json`, `aarch64/negative/N03-imm9-disp-out-of-range.fmp.json`, `aarch64/negative/N03-str-imm9-post-disp-out-of-range.fmp.json`, `aarch64/negative/N03-stur-imm9-disp-out-of-range.fmp.json`, `aarch64/negative/N03-movk-imm16-out-of-range.fmp.json` | x86 and aarch64 passing (`N03-disp8` is `disp8 = 128`, one past the measured `[-128, 127]`, on a `disp8` form: it is not re-formed as `disp32`) |
 | N04 | Control-transfer or literal displacement exceeds the form's range | Reject, never expand or re-form | E-RANGE-002 / E-FIXUP-003 | x86, aarch64, rv64 | `x86_64/negative/N04a-rel8-out-of-range.fmp.json`, `N04b-rel32-absolute-out-of-range.fmp.json`, `x86_64/negative/N04e-riprel32-literal-out-of-range.fmp.json`, `aarch64/negative/N04c-bcond-imm19-out-of-range.fmp.json`, `aarch64/negative/N04d-loadlit-imm19-out-of-range.fmp.json` | x86 and aarch64 passing (`N04e` is `disp32 = 2147483648`, one past the measured `[-2147483648, 2147483647]`) |
 | N05 | `expected_size` disagrees with the encoded length | Reject | E-SIZE-001 / E-LAYOUT-003 | x86, aarch64, rv64 | `x86_64/negative/N05-expected-size-mismatch.fmp.json` | x86 passing |
-| N06 | Form requires a disabled target extension | Reject | E-TARGET-003 | rv64 (C), x86 (AVX), aarch64 (optional feature) | none | not applicable to x86 v0 (no extension-gated form); see `04_errors.md` §2.3 |
+| N06 | The plan's target identity does not match the definition it names, including an `enabled_extensions` set that omits what the definition's forms need | Reject | E-TARGET-001 / E-TARGET-003 | rv64 (C), x86 (AVX-512), aarch64 (optional feature) | `x86_64/negative/N06-extension-list-mismatch.fmp.json` | x86 passing (`E-TARGET-001`: `0.5.0` declares `avx`/`avx512f`/`avx512vl` for its EVEX row and a plan that omits them is rejected); `E-TARGET-003` stays unreachable because no row carries its own requirement (`04_errors.md` §2.3) |
 | N07 | Fixup kind is incompatible with the field | Reject | E-FIXUP-001 | x86, aarch64, rv64 | `x86_64/negative/N07-fixup-partial-field.fmp.json`, `x86_64/negative/N07b-riprel-operand-fixup-mismatch.fmp.json` | x86 passing (`N07b`: the operand names `S1`, the fixup targets `S2`) |
 | N08 | Reference names a `symbol_id` absent from `symbols[]`; or `resolve_in_place` is asked to patch a symbol that exists but has no address | Reject the identity error in every mode; reject only the mode that needs an address | E-SYMBOL-001 / E-FIXUP-002 | x86, aarch64, rv64 | `x86_64/negative/N08-undeclared-symbol.fmp.json`, `N08b-resolve-undefined-symbol.fmp.json`, `N08c-absolute-pcrel-without-base.fmp.json` | x86 passing |
 | N09 | Two layout fragments overlap | Reject | E-LAYOUT-001 | all (layout is ISA-independent) | `x86_64/negative/N09-overlapping-fragments.fmp.json` | x86 passing |
@@ -105,7 +105,7 @@ host" is the honest result.
 | AC-01 | Contract complete enough to guide implementation | `01_contract.md` with no `TBD` on fields used by the three slices | **clear for the x86 and AArch64 slices**: OD-02, OD-04, OD-07 and OD-09 settled; the fields those tables use have frozen rows in `01_contract.md`, `03_fixup_model.md` and `07_definition_format.md`. The RV64 surface has no table yet (`OD-12` settles its source, ADR-0007), so AC-01 stays open until `definitions/rv64/` lands |
 | AC-02 | Key fields justified | Each frozen field cites a counterexample or source evidence | in progress — every field the x86 slice uses now cites one (OD-02/04/09); the remaining `draft` fields are optional or Level 1 |
 | AC-03 | Three-ISA vertical slices | One closed loop per ISA: plan → validate → encode → fixup → oracle compare | planned |
-| AC-04 | Encoding ambiguity proven absent | x86 `imm8`/`imm32`, `rel8`/`rel32`, `89`/`8B`, the `88`/`40 88`/`88h` register sets and RV64 `c.*` vs standard are distinct `form_id`s; per-`EC` negative test per `02_encoding_choices.md`, "Validation obligation" | planned |
+| AC-04 | Encoding ambiguity proven absent | x86 `imm8`/`imm32`, `rel8`/`rel32`, `89`/`8B`, the `88`/`40 88`/`88h` register sets and the `legacy`/`vex`/`evex` families, plus RV64 `c.*` vs standard, are distinct `form_id`s; per-`EC` negative test per `02_encoding_choices.md`, "Validation obligation" | planned |
 | AC-05 | Fixups validated | x86 `rel32`; AArch64 `adrp`+`:lo12:`; RV64 `auipc`+`lo12` or B-type scatter | planned — the mode decision is settled (OD-02: two modes, one effect each), so the fixtures can be written |
 | AC-06 | Strict rejection | All applicable N01–N13 with recorded codes | planned |
 | AC-07 | Deterministic replay | EXP-R1, EXP-R2, EXP-R4, EXP-R5 | planned |
@@ -131,7 +131,7 @@ Each vector needs **two independent sources**: our materializer, and an oracle
 | X86-P6 | RIP-relative reference | `mov rax, [rip+disp32]`: `x86:mov/r64-riprel32/legacy` and the store direction, with a `pcrel_end` fixup | llvm-mc + llvm-readobj | x86 passing (`EXP-0029`; `X86-P6-rip-relative`) |
 | X86-P7 | Short vs near branch | `x86:jmp/rel8/legacy` and `x86:jmp/rel32/legacy` as explicit plans | llvm-mc | x86 passing (`EXP-0005`) |
 | X86-P8 | External branch fixup | `x86:jmp/rel32/legacy` to an undefined symbol with `emit_relocation`, record emitted. `call rel32` is not in the v0 surface (`OD-10`); its descriptor is identical, so the record shape is exercised without adding a form | llvm-mc + llvm-readobj | x86 passing (`EXP-0005`) |
-| X86-P9 | Explicit encoding family | SSE vs VEX vs EVEX for one operation | llvm-mc | deferred (OD-10) |
+| X86-P9 | Explicit encoding family | SSE vs VEX vs EVEX for one operation: `x86:movaps/xmm-xmm/legacy`, `x86:vmovaps/xmm-xmm/vex` and `x86:vmovaps/xmm-xmm/evex` | llvm-mc | x86 passing (`EXP-0032`; `X86-P9-sse-vex-evex`) |
 
 Oracle note for X86-P7, measured 2026-11-04: llvm-mc does not accept a bare
 numeric branch target (`jmp 0x12`, `0x7f`, `0x80`, `0x1000`, `5` all emit
@@ -140,7 +140,7 @@ numeric branch target (`jmp 0x12`, `0x7f`, `0x80`, `0x1000`, `5` all emit
 the displacement, not the resolved target, so the vector is compared as bytes and
 the target is computed from the plan.
 
-Definition anchor for X86-P1–P8, measured 2026-11-04 and 2026-11-05: the seven
+Definition anchor for X86-P1–P9, measured 2026-11-04 and 2026-11-05: the seven
 `0.1.0` forms live in `definitions/x86_64/0.1.0.json` (digest
 `sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad`), and
 `EXP-0004` decodes 223 plan-derived byte strings with `llvm-mc` to confirm every
@@ -156,8 +156,14 @@ base+displacement rows (seventeen forms, digest
 prefix rows (twenty-two forms, digest
 `sha256:ee2141cbb17f338c5b4a9de0302076bb2416838c09f7c44e2ca097cb142a2682`);
 `EXP-0031` measures their bytes and the fixture below.
+`definitions/x86_64/0.5.0.json` repeats those twenty-two and adds the three
+encoding-family rows (twenty-five forms, digest
+`sha256:24256f0c427447ee8db5506d7b395e3682dbb3b0317f0effa1ed3c4f75cc0aeb`);
+`EXP-0032` measures the three families and the fixture below, and `0.5.0` is the
+first x86 table whose `enabled_extensions` is not empty
+(`avx`, `avx512f`, `avx512vl`).
 
-X86-P1, P2, P3, P4, P5, P6, P7 and P8 have fixtures under
+X86-P1, P2, P3, P4, P5, P6, P7, P8 and P9 have fixtures under
 `fixtures/x86_64/positive/` and a recorded oracle in `EXP-0005`; the fixture gate
 compares their bytes with the oracle's, never with the materializer's own
 expectation.
@@ -171,8 +177,13 @@ and `ADR-0028` closed P4 and P6: `movq 8(%rcx), %rax` is `48 8b 41 08`
 is RIP-relative), and `%rsp` is a fixed-base SIB form. P5 is a different
 question and is closed by `ADR-0029`: `0x66` selects the 16-bit width as
 template byte 0, and the 8-bit rows are split by prefix because `88 e5` is
-`ah`/`ch` while `40 88 e5` is `spl`/`bpl` (`EC-36`, `EXP-0031`). Only `X86-P9`
-(the extension encoding families) stays outside v0 (`OD-10`).
+`ah`/`ch` while `40 88 e5` is `spl`/`bpl` (`EC-36`, `EXP-0031`). P9 is a
+different question again and is closed by `ADR-0030`: `movaps` at `xmm` width is
+`0f 28 c1` with no prefix, `c5 f8 28 d3` in two-byte VEX and
+`62 f1 7c 08 28 e5` in EVEX.128, so the family is the `/legacy`, `/vex` or
+`/evex` component of the `form_id` and never an operand (`EC-09`, `EXP-0032`).
+All nine x86 rows P1–P9 now pass; `OD-10`'s VEX/EVEX deferral is lifted,
+and `EC-05`/`EC-10` and the rest of the extension surface stay out.
 
 
 ### AArch64 (directive §6.2)

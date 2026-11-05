@@ -18,6 +18,10 @@ explicitly:
   verified by disassembly.
 - `X86-P5`'s `8B /r` 16-bit half: `llvm-mc` always picks `89 /r` for
   `movw %bx, %ax`, for the same reason as P1.
+- `X86-P9`'s EVEX row: `llvm-mc` never selects an EVEX encoding for
+  `vmovaps %xmm5, %xmm4` (it prints `c5 f8 28 e5`), because EVEX at 128 bits
+  needs AVX-512VL and no mask. The `62 f1 7c 08 28 e5` bytes are verified by
+  `llvm-mc -disassemble`, which prints the same instruction.
 - `X86-P8`'s external branch: the assembled bytes are `e9 00 00 00 00` plus one
   `R_X86_64_PLT32 ext -4` relocation. The record's `records` count is 1; the
   materializer's `pcrel_end` with `addend = 0` is the same value
@@ -124,6 +128,22 @@ CASES = [
             "keeps number 4 as a high byte on both sides. The appended 66 8b c3 is the `8B` "
             "direction at 16 bits, which llvm-mc will not select from a mnemonic, so it is "
             "verified by `llvm-mc -disassemble`, which prints `movw %bx, %ax`."
+        ),
+    },
+    {
+        "stem": "X86-P9-sse-vex-evex",
+        "asm": "P9.asm",
+        "suffix": bytes.fromhex("62f17c0828e5"),
+        "records": 0,
+        "kind": "manual+disassembly",
+        "notes": (
+            "One operation, `movaps` at `xmm` width, in three encoding families. The "
+            "assembled part is `movaps %xmm1,%xmm0` -> `0f 28 c1` (no prefix) and "
+            "`vmovaps %xmm3,%xmm2` -> `c5 f8 28 d3` (two-byte VEX); the appended "
+            "`62 f1 7c 08 28 e5` is the EVEX.128 encoding of `vmovaps %xmm5,%xmm4`, which "
+            "llvm-mc will not select from a mnemonic but decodes to the same instruction. "
+            "The three byte strings differ only in the prefix family and the ModRM "
+            "position, so the family is a form fact."
         ),
     },
     {

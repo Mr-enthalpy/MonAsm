@@ -52,6 +52,13 @@ carries no extension requirement of its own: the table declares one
 `enabled_extensions` set for the whole document. The table is never filtered per
 plan: a definition covers exactly one target.
 
+A table whose forms need an extension above the baseline declares it in
+`enabled_extensions`: `0.5.0` lists `avx`, `avx512f` and `avx512vl` because its
+EVEX row is `EVEX.128`, which AVX-512VL enables. This is still one set for the
+whole table — no row carries a requirement of its own, so `E-TARGET-003` stays
+unreachable (`04_errors.md` §2.3) and the plan/definition equality check is
+`E-TARGET-001`.
+
 There is **no digest field inside the definition**. The digest is computed over
 the document and compared with `definition_identity.digest` (`E-DEF-001`); a
 field that contained its own hash would have to exclude itself from its own
@@ -68,7 +75,8 @@ input, which is the kind of special case that drifts.
 Rules:
 
 - `form_id` MUST follow `01_contract.md` §7. For `x86` it MUST end in
-  `/legacy`, `/vex` or `/evex`; v0 contains only `/legacy`.
+  `/legacy`, `/vex` or `/evex`; v0 carries `/legacy` in `0.1.0`–`0.4.0` and adds
+  `/vex` and `/evex` in `0.5.0`.
 - `size` is **not** a field: it is `len(template) / 2`. A redundant size field
   can disagree with the template, and the disagreement has no correct resolution.
 - Two rows MUST NOT share a `form_id` (`E-DEF-001` at load; the plan's failure
@@ -227,6 +235,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.2.0.json` | `monasm.isa.x86` | `sha256:d9c088cacb9d20dcf8b801cbdb978996ed31d2e70b631897a905d179207991ac` |
 | `definitions/x86_64/0.3.0.json` | `monasm.isa.x86` | `sha256:02500bf74d5c3db7816a30aca6c9c4d8fc7c5097306bc742f51284636c487c10` |
 | `definitions/x86_64/0.4.0.json` | `monasm.isa.x86` | `sha256:ee2141cbb17f338c5b4a9de0302076bb2416838c09f7c44e2ca097cb142a2682` |
+| `definitions/x86_64/0.5.0.json` | `monasm.isa.x86` | `sha256:24256f0c427447ee8db5506d7b395e3682dbb3b0317f0effa1ed3c4f75cc0aeb` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -249,7 +258,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.4.0`
+### 8.1 `x86-64` `0.1.0` … `0.5.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -275,18 +284,23 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:mov/rm8h-r8h/legacy` | `88e4` | dest: `x86.gpr8h`/`rm8h` → `[8,3]` (excl 0, 1, 2, 3); src: `x86.gpr8h`/`r8h` → `[11,3]` (excl 0, 1, 2, 3) | 2 | `EC-36`, `X86-P5` — `0.4.0`+ |
 | `x86:mov/rm8-r8/legacy` | `88c0` | dest: `x86.gpr8`/`rm8` → `[8,3]` (excl 4, 5, 6, 7); src: `x86.gpr8`/`r8` → `[11,3]` (excl 4, 5, 6, 7) | 2 | `EC-36`, `X86-P5` — `0.4.0`+ |
 | `x86:mov/rm8-r8-rex/legacy` | `4088e0` | dest: `x86.gpr8`/`rm8` → `[16,3]` (excl 0, 1, 2, 3); src: `x86.gpr8`/`r8` → `[19,3]` (excl 0, 1, 2, 3) | 3 | `EC-36`, `X86-P5` — `0.4.0`+ |
+| `x86:movaps/xmm-xmm/legacy` | `0f28c0` | dest: `x86.xmm`/`xmm` → `[19,3]`; src: `x86.xmm`/`xmm` → `[16,3]` | 3 | `EC-09`, `X86-P9` — `0.5.0`+ |
+| `x86:vmovaps/xmm-xmm/vex` | `c5f828c0` | dest: `x86.xmm`/`xmm` → `[27,3]`; src: `x86.xmm`/`xmm` → `[24,3]` | 4 | `EC-09`, `X86-P9` — `0.5.0`+ |
+| `x86:vmovaps/xmm-xmm/evex` | `62f17c0828c0` | dest: `x86.xmm`/`xmm` → `[43,3]`; src: `x86.xmm`/`xmm` → `[40,3]` | 6 | `EC-09`, `X86-P9` — `0.5.0`+ |
 
-Placements are written `[bit_offset, width]`. `[16,3]` is the low three bits of
-byte 2, which is `ModRM.rm`; `[19,3]` is `ModRM.reg`; `[24,8]` is byte 3. In the
-register-to-register rows the two `ModRM` bits above them (`bits 6–7` of byte 2)
-are `mod = 0b11`, part of the template and not owned by any operand; the
-memory rows fix `mod = 0b01`/`0b10` the same way.
+Placements are written `[bit_offset, width]`. In the legacy SSE row
+`[16,3]` is the low three bits of byte 2, which is `ModRM.rm`, and `[19,3]`
+is `ModRM.reg`; the VEX and EVEX rows are the same two fields at `[24,3]`/
+`[27,3]` and `[40,3]`/`[43,3]`, because the prefix length moves `ModRM`.
+`[24,8]` is byte 3. In the register-to-register rows the two `ModRM` bits
+above them (`bits 6–7` of `ModRM`) are `mod = 0b11`, part of the template and
+not owned by any operand; the memory rows fix `mod = 0b01`/`0b10` the same way.
 
 `x86:add/rax-imm32/legacy` has no `dest` slot: the register is fixed by the
 opcode (`REX.W 05 id`), which is exactly why `rax-imm32` and `rm64-imm32` are two
 `form_id`s and not two choices (`01_contract.md` §7).
 
-The register field of the four `ModRM` rows is 3 bits wide, so `r8`–`r15` are not
+The register field of the four `0.1.0` `ModRM` rows is 3 bits wide, so `r8`–`r15` are not
 encodable: the template's `REX` byte is `0x48`, and no extension bit is declared
 for those registers. A plan that names `mov rax, r9` is rejected
 `E-OPERAND-004`; it is not emitted as `48 89 c8`, which decodes as
@@ -326,6 +340,23 @@ disjoint: `0–3` are the REX-less low bytes, `4–7` in `gpr8h` are
 `ah`/`ch`/`dh`/`bh`, and `4–7` in a REX row are `spl`/`bpl`/`sil`/`dil`
 (`ADR-0029`, `EC-36`). The `8A` direction, memory operands at these widths,
 `0x67`, and `r8`–`r15` remain absent.
+
+`0.5.0` adds the three encoding-family rows for one operation, `movaps` at
+`xmm` width: `0F 28 /r` with no prefix, `C5 F8 28 /r` (two-byte VEX), and
+`62 F1 7C 08 28 /r` (EVEX). The `ModRM` byte is the last byte in each, so the
+`dest` and `src` slots move with the prefix length: `[19,3]`/`[16,3]`,
+`[27,3]`/`[24,3]`, `[43,3]`/`[40,3]`. `x86.xmm` is one kind for all three
+because the register set does not change with the family; the family is the
+`/legacy`, `/vex` or `/evex` component of the `form_id`, never an operand
+(`EC-09`, `ADR-0030`). The VEX `vvvv` field and the EVEX `R/X/B/R'`/`vvvv`/`V'`
+extension bits are fixed `1` in the templates, so these rows reach `xmm0`–`xmm7`
+only: `xmm8`–`xmm15` need a REX/VEX/EVEX extension bit and are rejected with
+`E-OPERAND-004`. The three rows are the only forms that need an extension above
+the x86-64 baseline, so `0.5.0` is the first x86 table whose `enabled_extensions` is
+not empty (`avx`, `avx512f`, `avx512vl`); the plan must declare the same set
+(`E-TARGET-001`), and the table is still not filtered per form. Memory operands,
+masking, `ymm`/`zmm`, the `0x66` form of `movapd` and the three-byte VEX
+`C4` form remain absent (`EXP-0032`).
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 
@@ -935,5 +966,6 @@ without a plan error: the input is the definition.
   `imm12` rows are the same statement: the operand is the field and the
   access-size multiplier belongs to the ISA field, so a byte offset would need
   the format change ADR-0013 declined.
-- `X86-P9` (explicit encoding family) stays deferred; no `/vex` or `/evex` row
-  exists, so naming one is `E-FORM-001`.
+- `EC-09` is frozen by `0.5.0`: the family is the `/legacy`, `/vex` or `/evex`
+  component of the `form_id`, and the three rows share one operation and one
+  operand shape. A family the table does not carry is still `E-FORM-001`.
