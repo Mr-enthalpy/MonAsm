@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0065/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "f252615fe6e7b1dfbe1908390831546f5c1e2e20c86ea916f0ce3fe621f2b4dc",
+  "output_sha256": "36adfe8e333c0ccbecc546667cd022d13c0e8d48ce55dee6c73e7d34187be346",
+  "size": 60,
+  "records": 0,
+  "notes": "All eight 0.36.0 rows, twice each, sixteen instructions and 60 bytes: the %rsp low rows are three bytes (8b 04 24 / 89 04 24), every %r12 row and every -ext row is four (41/44/45 ...). The base is template content -- ModRM = 04 and SIB = 24 -- because %rsp and %r12 share the low three bits 100 and the REX.B byte is the only bit that tells them apart; each row fixes its base and the register windows are disjoint (the -ext rows exclude 0-7). %rbp/%r13 stay on the zero-displacement shape (r/m = 101 at mod = 00 is RIP-relative). input_sha256 is fixture.asm (the source above); output_sha256 is the 60-byte .text."
+}
