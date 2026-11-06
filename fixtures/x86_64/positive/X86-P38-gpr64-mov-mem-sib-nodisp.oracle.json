@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0063/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "86d27dad9d68b0abc219f2d6eaf745506352b24f67dc59937fad7b1e06ef04ee",
+  "output_sha256": "d87ed6ef0fbbfe983b202faff0c435271cab591b2bab1d6e375e9df073c0d9fd",
+  "size": 32,
+  "records": 0,
+  "notes": "All four 0.34.0 rows, twice each, eight instructions and 32 bytes: both directions over %rsp and %r12, each with %rax (REX.R = 0) and %r8 (REX.R = 1). REX.W is a template constant and REX.B is too -- 48 under %rsp, 49 under %r12 -- so the four REX bytes are 48/4c/49/4d and REX.R at [2,1] is the only bit the operand owns. ModRM = 04 (mod = 00, r/m = 100 announces the SIB) and SIB = 24 (scale = 00, index = 100 meaning none, base = 100) are template bytes. The base is not an operand, so a base or disp operand is E-OPERAND-002 and the rows for %rbp/%r13 stay the RIP-relative or disp8 shapes. input_sha256 is fixture.asm (the source above); output_sha256 is the 32-byte .text."
+}

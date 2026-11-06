@@ -1,0 +1,11 @@
+movq (%rbp), %rax
+movq (%r13), %rax
+movq 8(%rsp), %rax
+movq 8(%r12), %rax
+movq (%rsp), %r16
+movl (%rsp), %eax
+movw (%rsp), %ax
+movb (%rsp), %al
+movq (%rax), %rax
+movq (%rsp), %r15
+movq (%r12), %r15
