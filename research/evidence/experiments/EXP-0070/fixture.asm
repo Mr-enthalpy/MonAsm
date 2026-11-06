@@ -1,0 +1,12 @@
+movw (%rax), %ax
+movw (%rdi), %ax
+movw (%r8), %ax
+movw (%r15), %ax
+movw %ax, (%rax)
+movw %ax, (%rdi)
+movw %ax, (%r8)
+movw %ax, (%r15)
+movw (%rsp), %ax
+movw %ax, (%rsp)
+movw (%r12), %ax
+movw %ax, (%r12)

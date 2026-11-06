@@ -1,0 +1,10 @@
+movw (%rbp), %ax
+movw (%r13), %ax
+movw (%rsp), %r8w
+movw (%r12), %r8w
+movw 0(%rax), %ax
+movl (%rax), %eax
+movq (%rax), %rax
+movb (%rax), %al
+movw (%rsp,%rax), %ax
+movw (%rsp,%rax,4), %ax
