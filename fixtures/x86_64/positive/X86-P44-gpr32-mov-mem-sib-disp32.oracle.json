@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0069/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "9f0e62d964222c508af5690b08ec5717d351926cddc0107a2f87e5b672097347",
+  "output_sha256": "de51cff2cc2a4b6035b821b62d41fe76f3ebaac46ec9beba0947d6154b9ee3fc",
+  "size": 124,
+  "records": 0,
+  "notes": "All eight 0.40.0 rows, twice each at displacements 200 and 100000, sixteen instructions and 124 bytes: the unprefixed %rsp rows are seven bytes (8b 84 24 c8 00 00 00 / 89 84 24 c8 00 00 00), and the REX.B (%r12) and REX.R rows are eight (41/44/45 ...). This is the mod = 10 SIB shape: ModRM = 84, SIB = 24, and the signed disp32 at [24,32] or [32,32] behind a REX byte. The base is fixed in the template, so %rsp and %r12 differ only in REX.B. input_sha256 is fixture.asm (the source above); output_sha256 is the 124-byte .text."
+}

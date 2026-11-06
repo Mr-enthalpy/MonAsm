@@ -1,0 +1,13 @@
+movl -2147483648(%rsp), %eax
+movl 2147483647(%rsp), %eax
+movl 128(%rsp), %eax
+movl 8(%rsp), %eax
+movl (%rsp), %eax
+movl (%r12), %eax
+movl 200(%rbp), %eax
+movl 200(%r13), %eax
+movl 200(%rsp), %r16d
+movq 200(%rsp), %rax
+movw 200(%rsp), %ax
+movl 200(%rsp,%rax), %eax
+movl 200(%rsp,%rax,4), %eax
