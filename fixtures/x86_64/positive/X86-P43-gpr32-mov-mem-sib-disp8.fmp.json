@@ -1,0 +1,572 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "x86",
+    "isa_variant": "x86-64",
+    "execution_mode": "64",
+    "enabled_extensions": [
+      "avx",
+      "avx512f",
+      "avx512vl"
+    ],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.x86",
+    "version": "0.39.0",
+    "digest": "sha256:08e2fb7afee30bc6bf63f3bd795f88f6dfb4ae100a41e72f2f6491b113a3b1a0"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [
+      ".text"
+    ],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": 76,
+      "fragments": [
+        {
+          "offset": 0,
+          "size": 4,
+          "kind": "instruction",
+          "instruction_id": "I0001"
+        },
+        {
+          "offset": 4,
+          "size": 4,
+          "kind": "instruction",
+          "instruction_id": "I0002"
+        },
+        {
+          "offset": 8,
+          "size": 5,
+          "kind": "instruction",
+          "instruction_id": "I0003"
+        },
+        {
+          "offset": 13,
+          "size": 5,
+          "kind": "instruction",
+          "instruction_id": "I0004"
+        },
+        {
+          "offset": 18,
+          "size": 4,
+          "kind": "instruction",
+          "instruction_id": "I0005"
+        },
+        {
+          "offset": 22,
+          "size": 4,
+          "kind": "instruction",
+          "instruction_id": "I0006"
+        },
+        {
+          "offset": 26,
+          "size": 5,
+          "kind": "instruction",
+          "instruction_id": "I0007"
+        },
+        {
+          "offset": 31,
+          "size": 5,
+          "kind": "instruction",
+          "instruction_id": "I0008"
+        },
+        {
+          "offset": 36,
+          "size": 5,
+          "kind": "instruction",
+          "instruction_id": "I0009"
+        },
+        {
+          "offset": 41,
+          "size": 5,
+          "kind": "instruction",
+          "instruction_id": "I0010"
+        },
+        {
+          "offset": 46,
+          "size": 5,
+          "kind": "instruction",
+          "instruction_id": "I0011"
+        },
+        {
+          "offset": 51,
+          "size": 5,
+          "kind": "instruction",
+          "instruction_id": "I0012"
+        },
+        {
+          "offset": 56,
+          "size": 5,
+          "kind": "instruction",
+          "instruction_id": "I0013"
+        },
+        {
+          "offset": 61,
+          "size": 5,
+          "kind": "instruction",
+          "instruction_id": "I0014"
+        },
+        {
+          "offset": 66,
+          "size": 5,
+          "kind": "instruction",
+          "instruction_id": "I0015"
+        },
+        {
+          "offset": 71,
+          "size": 5,
+          "kind": "instruction",
+          "instruction_id": "I0016"
+        }
+      ]
+    }
+  ],
+  "symbols": [],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "x86:mov/r32-rsp-disp8/legacy",
+      "operands": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 0
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 8
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0002",
+      "section_id": ".text",
+      "offset": 4,
+      "form_id": "x86:mov/r32-rsp-disp8/legacy",
+      "operands": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 7
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 100
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0003",
+      "section_id": ".text",
+      "offset": 8,
+      "form_id": "x86:mov/r32-ext-rsp-disp8/legacy",
+      "operands": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 8
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 8
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 5
+    },
+    {
+      "instruction_id": "I0004",
+      "section_id": ".text",
+      "offset": 13,
+      "form_id": "x86:mov/r32-ext-rsp-disp8/legacy",
+      "operands": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 15
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 100
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 5
+    },
+    {
+      "instruction_id": "I0005",
+      "section_id": ".text",
+      "offset": 18,
+      "form_id": "x86:mov/rsp-disp8-r32/legacy",
+      "operands": [
+        {
+          "role": "src",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 0
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 8
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0006",
+      "section_id": ".text",
+      "offset": 22,
+      "form_id": "x86:mov/rsp-disp8-r32/legacy",
+      "operands": [
+        {
+          "role": "src",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 7
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 100
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0007",
+      "section_id": ".text",
+      "offset": 26,
+      "form_id": "x86:mov/rsp-disp8-r32-ext/legacy",
+      "operands": [
+        {
+          "role": "src",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 8
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 8
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 5
+    },
+    {
+      "instruction_id": "I0008",
+      "section_id": ".text",
+      "offset": 31,
+      "form_id": "x86:mov/rsp-disp8-r32-ext/legacy",
+      "operands": [
+        {
+          "role": "src",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 15
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 100
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 5
+    },
+    {
+      "instruction_id": "I0009",
+      "section_id": ".text",
+      "offset": 36,
+      "form_id": "x86:mov/r32-r12-disp8/legacy",
+      "operands": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 0
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 8
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 5
+    },
+    {
+      "instruction_id": "I0010",
+      "section_id": ".text",
+      "offset": 41,
+      "form_id": "x86:mov/r32-r12-disp8/legacy",
+      "operands": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 7
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 100
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 5
+    },
+    {
+      "instruction_id": "I0011",
+      "section_id": ".text",
+      "offset": 46,
+      "form_id": "x86:mov/r32-ext-r12-disp8/legacy",
+      "operands": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 8
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 8
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 5
+    },
+    {
+      "instruction_id": "I0012",
+      "section_id": ".text",
+      "offset": 51,
+      "form_id": "x86:mov/r32-ext-r12-disp8/legacy",
+      "operands": [
+        {
+          "role": "dest",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 15
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 100
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 5
+    },
+    {
+      "instruction_id": "I0013",
+      "section_id": ".text",
+      "offset": 56,
+      "form_id": "x86:mov/r12-disp8-r32/legacy",
+      "operands": [
+        {
+          "role": "src",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 0
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 8
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 5
+    },
+    {
+      "instruction_id": "I0014",
+      "section_id": ".text",
+      "offset": 61,
+      "form_id": "x86:mov/r12-disp8-r32/legacy",
+      "operands": [
+        {
+          "role": "src",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 7
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 100
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 5
+    },
+    {
+      "instruction_id": "I0015",
+      "section_id": ".text",
+      "offset": 66,
+      "form_id": "x86:mov/r12-disp8-r32-ext/legacy",
+      "operands": [
+        {
+          "role": "src",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 8
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 8
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 5
+    },
+    {
+      "instruction_id": "I0016",
+      "section_id": ".text",
+      "offset": 71,
+      "form_id": "x86:mov/r12-disp8-r32-ext/legacy",
+      "operands": [
+        {
+          "role": "src",
+          "kind": "x86.gpr32",
+          "target_type": "r32",
+          "payload": {
+            "reg": 15
+          },
+          "modifiers": []
+        },
+        {
+          "role": "disp",
+          "kind": "x86.imm",
+          "target_type": "disp8",
+          "payload": {
+            "value": 100
+          },
+          "modifiers": []
+        }
+      ],
+      "expected_size": 5
+    }
+  ],
+  "fixups": []
+}
