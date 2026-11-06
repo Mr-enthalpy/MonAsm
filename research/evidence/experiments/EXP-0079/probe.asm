@@ -1,0 +1,15 @@
+movl 8(%rax,%rcx,1), %r8d
+movl %r8d, 8(%rax,%rcx,1)
+movl 200(%rax,%rcx,1), %r8d
+movl %r8d, 200(%rax,%rcx,1)
+movl 8(%r8,%rcx,1), %eax
+movl %eax, 8(%r8,%rcx,1)
+movl 200(%r8,%rcx,1), %eax
+movl %eax, 200(%r8,%rcx,1)
+movl 8(%rax,%r9,1), %eax
+movl %eax, 8(%rax,%r9,1)
+movl 200(%rax,%r9,1), %eax
+movl %eax, 200(%rax,%r9,1)
+movl 8(%r12,%rcx,1), %eax
+movl %eax, 8(%rax,%r12,1)
+movl 8(%rsp,%rcx,1), %r8d

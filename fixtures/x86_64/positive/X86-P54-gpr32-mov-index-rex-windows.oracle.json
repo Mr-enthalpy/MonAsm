@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0079/probe.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "6e15ae95cec1673e538c2b3721bd29c58085ea1fd046a8fd3d53bc6d2dc145d9",
+  "output_sha256": "fcb2ccc6befba68d9be798a9dc73afb8e25f8ae059beb70b04917bb2b42c2e26",
+  "size": 93,
+  "records": 0,
+  "notes": "The twelve 0.50.0 rows: the REX.R, REX.B and REX.X windows on the 32-bit indexed mov, both directions at disp8 and disp32. Each row fixes one extension bit, so ModRM is byte 2 (register [19,3]), SIB is byte 3 (base [24,3], index [27,3], scale [30,2]) and the displacement follows at [32,8] or [32,32]. The disp8 rows are five bytes (44/41/42 8b/89 44 08 08) and the disp32 rows are eight. Three extra instructions cover %r12 as a base (41 8b 44 0c 08), %r12 as an index (42 89 44 20 08) and %rsp as a base (44 8b 44 0c 08). input_sha256 is probe.asm; output_sha256 is the 93-byte .text."
+}
