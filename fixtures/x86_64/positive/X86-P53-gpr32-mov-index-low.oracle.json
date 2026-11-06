@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0078/probe.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "a9443fe6c106a9e021203d7f420c6481d0f98dd077456e021faa21afd86aeae9",
+  "output_sha256": "595b6d7550ed40f4e7c3cc0fc62ce33adf3ca44091164f7d46ff96607a9b138f",
+  "size": 63,
+  "records": 0,
+  "notes": "The four 0.49.0 rows: 32-bit mov with a SIB index, both directions at disp8 and disp32. There is no prefix byte, so ModRM is byte 1 (register [11,3]) and SIB is byte 2 (scale [22,2], index [19,3], base [16,3]); the displacement follows at [24,8] or [24,32]. The disp8 rows are four bytes (8b 44 08 08, 8b 7c b7 08, 89 44 08 08, 89 7c b7 08) with %rsp and %rbp as SIB bases (8b 44 0c 08, 8b 44 35 08), and the disp32 rows are seven. input_sha256 is probe.asm; output_sha256 is the 63-byte .text."
+}
