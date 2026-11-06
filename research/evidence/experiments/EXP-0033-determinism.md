@@ -133,10 +133,11 @@ after `0.25.0` and `X86-P29`, and a twenty-first time on 2026-11-06 after
 `0.41.0` and `X86-P45`, and a thirty-seventh time on 2026-11-07 after
 `0.42.0` and `X86-P46`, and a thirty-eighth time on 2026-11-07 after
 `0.43.0` and `X86-P47`, and a thirty-ninth time on 2026-11-07 after
-`0.44.0` and `X86-P48`.
+`0.44.0` and `X86-P48`, and a fortieth time on 2026-11-07 after
+`0.45.0` and `X86-P49`.
 The corpus is now
-**77 positive and 357 negative** fixtures (x86 48/288, AArch64 20/57, RV64 9/12).
-Result: all five tests still pass, with the same method (`EXP-R1` 77 × 100,
-`EXP-R2` 12 processes, `EXP-R4` 77 × 2, `EXP-R5` unchanged, `EXP-R6` 357
+**78 positive and 365 negative** fixtures (x86 49/296, AArch64 20/57, RV64 9/12).
+Result: all five tests still pass, with the same method (`EXP-R1` 78 × 100,
+`EXP-R2` 12 processes, `EXP-R4` 78 × 2, `EXP-R5` unchanged, `EXP-R6` 365
 × 100). The counts in §1–§5 are the original run's; this section records
 the current corpus instead of rewriting them.

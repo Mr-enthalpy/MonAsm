@@ -1,0 +1,13 @@
+{
+  "errors": [
+    {
+      "code": "E-FORM-001",
+      "path": "/instructions/0/form_id",
+      "detail_keys": [
+        "form_id",
+        "namespace",
+        "version"
+      ]
+    }
+  ]
+}
