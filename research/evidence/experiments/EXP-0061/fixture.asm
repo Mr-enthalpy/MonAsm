@@ -1,0 +1,14 @@
+movb (%rsp), %al
+movb (%r12), %cl
+movb (%rsp), %ah
+movb (%rsp), %dil
+movb (%r12), %sil
+movb (%rsp), %r8b
+movb (%r12), %r15b
+movb %al, (%rsp)
+movb %cl, (%r12)
+movb %bh, (%rsp)
+movb %dil, (%rsp)
+movb %sil, (%r12)
+movb %r8b, (%rsp)
+movb %r15b, (%r12)

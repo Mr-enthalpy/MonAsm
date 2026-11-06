@@ -190,6 +190,10 @@ is `40 8a 3e` and `%r15b, (%r9)` is `45 88 39` (three). `%rbp` and `%r13`
 stay on their `disp8 = 0` rows (`8a 45 00`) because `r/m = 101` at
 `mod = 00` is RIP-relative, and `%rsp`/`%r12` still need the `SIB` byte.
 The address is still signed 32-bit content (`-128` is `80 ff ff ff`).
+ADR-0059 takes those two bases onto the shape: `(%rsp), %al` is `8a 04 24`
+and `(%r12), %al` is `41 8a 04 24` (three bytes, or four behind a `REX` byte
+whose `B` bit alone picks the base), with `SIB = 24` fixed in the template;
+the high-byte window has only the `%rsp` half, because `REX.B` renames `%ah`.
 ADR-0057 carries that fourth window into the memory rows, where one `REX`
 byte holds both extension bits: `8(%rax), %r8b` is `44 8a 40 08` and
 `8(%r8), %r8b` is `45 8a 40 08` (four bytes each, `REX.R` at `[2,1]` and
@@ -198,17 +202,17 @@ byte holds both extension bits: `8(%rax), %r8b` is `44 8a 40 08` and
 read two ways. Both directions appear in all three base windows at disp8
 and disp32, and the high-byte window cannot join (`8(%r8), %ah` is
 rejected; `8(%rax), %ah` is `8a 60 08`).
-Fifty definition documents are frozen and oracle-verified; the materializer
+Fifty-one definition documents are frozen and oracle-verified; the materializer
 and its fixture gate are implemented.
 
 | Area | State |
 |---|---|
 | Contract (`docs/fmp-v0/01_contract.md`) | draft, fields marked `TBD` where unproven |
 | Schema (`schema/fmp-v0.schema.json`) | draft, examples validate |
-| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), `0.2.0` (9 forms), `0.3.0` (17 forms), `0.4.0` (22 forms), `0.5.0` (25 forms), `0.6.0` (25 forms), `0.7.0` (29 forms), `0.8.0` (33 forms), `0.9.0` (45 forms), `0.10.0` (53 forms), `0.11.0` (62 forms), `0.12.0` (74 forms), `0.13.0` (74 forms), `0.14.0` (79 forms), `0.15.0` (91 forms), `0.16.0` (103 forms), `0.17.0` (119 forms), `0.18.0` (127 forms), `0.19.0` (155 forms), `0.20.0` (171 forms), `0.21.0` (195 forms) and `0.22.0` (207 forms) and `0.23.0` (225 forms) and `0.24.0` (231 forms) and `0.25.0` (237 forms) and `0.26.0` (239 forms) and `0.27.0` (243 forms) and `0.28.0` (247 forms) and `0.29.0` (255 forms) and `0.30.0` (267 forms) and `0.31.0` (275 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms), `0.8.0` (32 forms), `0.9.0` (44 forms), `0.10.0` (68 forms), `0.11.0` (92 forms), `0.12.0` (132 forms), `0.13.0` (135 forms), `0.14.0` (136 forms), `0.15.0` (152 forms), `0.16.0` (168 forms) and `0.17.0` (176 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
+| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), `0.2.0` (9 forms), `0.3.0` (17 forms), `0.4.0` (22 forms), `0.5.0` (25 forms), `0.6.0` (25 forms), `0.7.0` (29 forms), `0.8.0` (33 forms), `0.9.0` (45 forms), `0.10.0` (53 forms), `0.11.0` (62 forms), `0.12.0` (74 forms), `0.13.0` (74 forms), `0.14.0` (79 forms), `0.15.0` (91 forms), `0.16.0` (103 forms), `0.17.0` (119 forms), `0.18.0` (127 forms), `0.19.0` (155 forms), `0.20.0` (171 forms), `0.21.0` (195 forms) and `0.22.0` (207 forms) and `0.23.0` (225 forms) and `0.24.0` (231 forms) and `0.25.0` (237 forms) and `0.26.0` (239 forms) and `0.27.0` (243 forms) and `0.28.0` (247 forms) and `0.29.0` (255 forms) and `0.30.0` (267 forms) and `0.31.0` (275 forms) and `0.32.0` (289 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms), `0.8.0` (32 forms), `0.9.0` (44 forms), `0.10.0` (68 forms), `0.11.0` (92 forms), `0.12.0` (132 forms), `0.13.0` (135 forms), `0.14.0` (136 forms), `0.15.0` (152 forms), `0.16.0` (168 forms) and `0.17.0` (176 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
 | Prototype (`prototype/`) | workspace compiled; all three slices materialize from the plan |
 | Oracles (`tools/oracle/`) | planned; `llvm-mc` (± `ld.lld`) drives the experiments |
-| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0060 |
+| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0061 |
 
 Read `docs/STATUS.md` for the current phase, gate status, and next action.
 

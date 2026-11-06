@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0061/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "98f60bd151d02f2c8f46db1c4bf74a4be7d9d0fd05a759bf86a81e33b750ce8c",
+  "output_sha256": "4b76ef10702c9a543f6cb7df2ff08e48aa56b1cb8bef7c981d23167a94868151",
+  "size": 52,
+  "records": 0,
+  "notes": "One byte-width mov per 0.32.0 SIB row, fourteen instructions, 52 bytes: load and store over %rsp and %r12 in the four register windows, except %r12 with the high-byte window, which has no encoding because REX.B renames %ah. The two REX-less %rsp rows are three bytes (8a 04 24, 8a 24 24, 88 04 24, 88 24 24); every other row is four, with REX = 40/41/44/45. SIB = 24 is scale = 00, index = 100 (no index) and base = 100; REX.B distinguishes %rsp from %r12, and both are fixed in the template, so the base is not an operand (a plan that supplies one is E-OPERAND-002). The disp8/disp32 twins (8a 44 24 00, 8a 84 24 00 00 00 00) stay separate rows. input_sha256 is fixture.asm (the source above); output_sha256 is the 52-byte .text."
+}
