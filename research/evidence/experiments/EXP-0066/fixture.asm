@@ -1,0 +1,12 @@
+movl 8(%rax), %eax
+movl 8(%rsi), %edi
+movl %eax, 8(%rax)
+movl %edi, 8(%rsi)
+movl 8(%rax), %r8d
+movl 8(%r9), %r15d
+movl %r8d, 8(%rax)
+movl %r15d, 8(%r9)
+movl 8(%r8), %eax
+movl 8(%r15), %edi
+movl %eax, 8(%r8)
+movl %edi, 8(%r15)
