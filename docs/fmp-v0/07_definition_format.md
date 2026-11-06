@@ -274,6 +274,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.32.0.json` | `monasm.isa.x86` | `sha256:bad81d6655d9e612fa353814fa40ba9910ba3830ac954df2169365abd02563ac` |
 | `definitions/x86_64/0.33.0.json` | `monasm.isa.x86` | `sha256:b6659c62116dab7bf79f6c9704844d0fd9a1ad27ac8780e2071a93cf28dd6d8e` |
 | `definitions/x86_64/0.34.0.json` | `monasm.isa.x86` | `sha256:03368b63e89e40d4cc0c58f7b394110e6dcc2e69bd801d469fa8adc505ad117f` |
+| `definitions/x86_64/0.35.0.json` | `monasm.isa.x86` | `sha256:d4fd01ad8f795ea595f77dc928ded8188a0e98e7b1c5e098c458bea46616780d` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -296,7 +297,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.34.0`
+### 8.1 `x86-64` `0.1.0` … `0.35.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -595,6 +596,12 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:mov/rsp-r64/legacy` | `48890424` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]` | 4 | `EC-02`, `EC-06`, `EC-35`, `X86-P38` |
 | `x86:mov/r64-r12/legacy` | `498b0424` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]` | 4 | `EC-02`, `EC-06`, `EC-35`, `X86-P38` |
 | `x86:mov/r12-r64/legacy` | `49890424` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]` | 4 | `EC-02`, `EC-06`, `EC-35`, `X86-P38` |
+| `x86:mov/r32-base/legacy` | `8b00` | dest: `x86.gpr32`/`r32` → `[11,3]`; base: `x86.gpr64`/`rm64` → `[8,3]` (excl 4, 5) | 2 | `EC-02`, `EC-27`, `EC-28`, `EC-34`, `EC-35`, `EC-38`, `X86-P39` |
+| `x86:mov/base-r32/legacy` | `8900` | src: `x86.gpr32`/`r32` → `[11,3]`; base: `x86.gpr64`/`rm64` → `[8,3]` (excl 4, 5) | 2 | `EC-02`, `EC-27`, `EC-28`, `EC-34`, `EC-35`, `EC-38`, `X86-P39` |
+| `x86:mov/r32-ext-base/legacy` | `448b00` | dest: `x86.gpr32`/`r32` → `[2,1]`, `[19,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]` (excl 4, 5, 12, 13) | 3 | `EC-02`, `EC-06`, `EC-27`, `EC-28`, `EC-34`, `EC-35`, `EC-38`, `X86-P39` |
+| `x86:mov/base-r32-ext/legacy` | `448900` | src: `x86.gpr32`/`r32` → `[2,1]`, `[19,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]` (excl 4, 5, 12, 13) | 3 | `EC-02`, `EC-06`, `EC-27`, `EC-28`, `EC-34`, `EC-35`, `EC-38`, `X86-P39` |
+| `x86:mov/r32-base-ext/legacy` | `418b00` | dest: `x86.gpr32`/`r32` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12, 13) | 3 | `EC-02`, `EC-06`, `EC-27`, `EC-28`, `EC-34`, `EC-35`, `EC-38`, `X86-P39` |
+| `x86:mov/base-ext-r32/legacy` | `418900` | src: `x86.gpr32`/`r32` → `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7, 12, 13) | 3 | `EC-02`, `EC-06`, `EC-27`, `EC-28`, `EC-34`, `EC-35`, `EC-38`, `X86-P39` |
 
 Placements are written `[bit_offset, width]`, with ` inverted` appended when the
 chunk is complemented. In the legacy SSE row
@@ -1205,7 +1212,24 @@ operand is `E-OPERAND-002` (`N02bb`/`N02bc`), register `16` is
 `E-OPERAND-004` (`N14ai`), and naming a row against `0.33.0` is
 `E-FORM-001` (`N01bv`/`N01bw`). Still deferred in this family: `REX.X`
 with an index and scale, the `0x67` prefix, a symbol in the displacement,
-`moffs`, the APX `d5` window, and the same shape at 32 and 16 bits.
+`moffs`, the APX `d5` window, and the same shape at 16 bits.
+
+`0.35.0` gives the 32-bit family its first base rows (`ADR-0062`):
+`movl (%rax), %eax` is `8b 00` and `movl %eax, (%rax)` is `89 00`, two
+bytes with `mod = 00` and no displacement, but the legacy row has no
+`REX` byte, so a high register or a high base changes the length. The
+reach is three disjoint rows per direction: the low row keeps the 3-bit
+`ModRM` fields, `movl (%rax), %r8d` is `44 8b 00` (`REX.R`), and
+`movl (%r8), %eax` is `41 8b 00` (`REX.B`), so `movl (%r9), %r15d` is
+`45 8b 39` and a `(register, base)` pair names exactly one row. The base
+excludes `%rsp`/`%r12` (they need the `SIB` byte) and `%rbp`/`%r13`
+(`r/m = 101` at `mod = 00` is RIP-relative). A `disp` operand is
+`E-OPERAND-002` (`N02bd`), the 3-bit and 4-bit ends are `E-OPERAND-004`
+(`N14ak`/`N14aj`), the excluded bases and windows are `E-RANGE-004`
+(`N16as`/`N16at`/`N16au`/`N16av`), and naming a row against `0.34.0` is
+`E-FORM-001` (`N01bx`/`N01by`). Still deferred in this family: the
+`%rsp`/`%r12` `SIB` bases, the `disp8`/`disp32` base shapes, the `0x67`
+prefix, a symbol in an address, and the APX `d5` window.
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 

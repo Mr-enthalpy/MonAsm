@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0064/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "088c1b4e7e7c8e395aab01fd4f538f4ec36e55fd1f898f68fa5b23d51d2d0fd2",
+  "output_sha256": "e29e5845843ce667da6d3e5c236062ee8d54e46445124335a40ce455e6cbb835",
+  "size": 32,
+  "records": 0,
+  "notes": "All six 0.35.0 rows, twice each, twelve instructions and 32 bytes: the low/low row is two bytes (8b 00 / 89 00), the REX.R and REX.B rows are three (44/41/45 ...). The reach is the form because the 32-bit legacy row has no REX byte in its template; the windows are disjoint, so each (register, base) pair names one row. ModRM = 00 (mod = 00, reg = 000, r/m = 000) in the low row; REX.R at [2,1] and REX.B at [0,1] carry the fourth bits. The base excludes %rsp/%r12 (SIB) and %rbp/%r13 (r/m = 101 at mod = 00 is RIP-relative). input_sha256 is fixture.asm (the source above); output_sha256 is the 32-byte .text."
+}

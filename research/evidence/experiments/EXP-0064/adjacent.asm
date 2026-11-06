@@ -1,0 +1,12 @@
+movl (%rbp), %eax
+movl (%r13), %eax
+movl (%rsp), %eax
+movl (%r12), %eax
+movl (%rip), %eax
+movl 0(%rax), %eax
+movl 8(%rax), %eax
+movq (%rax), %rax
+movw (%rax), %ax
+movb (%rax), %al
+movl (%rax), %r16d
+movl %eax, 8(%r8)
