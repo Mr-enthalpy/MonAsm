@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0075/probe.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "e6d5037a6edee765b59e609d5f2f2fd39040aecce73c08c98b7674eb6024a424",
+  "output_sha256": "cf3b734c17dd61226541ab6e92281e679abf5a4ff3a5950616035212ccc2f29e",
+  "size": 78,
+  "records": 0,
+  "notes": "All four 0.46.0 rows: load and store at disp8 and disp32, with scale 1 and 4, low registers (%ax/%di), low bases (%rax/%rdi) and the SIB-announced %rsp/%rbp bases, twelve instructions and 78 bytes. The disp8 rows are five bytes (66 8b 44 08 08 with ModRM 44 and SIB 08, 66 8b 7c b7 08 with ModRM 7c and SIB b7, 66 8b 44 0c 08 for the %rsp base and 66 8b 44 0d 08 for %rbp), and the disp32 rows are eight (the same ModRM/SIB bytes followed by the signed disp32 at [32,32]). input_sha256 is probe.asm (the source above); output_sha256 is the 78-byte .text."
+}

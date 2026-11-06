@@ -1,0 +1,10 @@
+movw 8(%rax,%rsp,1), %ax
+movw 8(%rax,%rcx,1), %r8w
+movw 8(%r8,%rcx,1), %ax
+movw 8(%rax,%r9,1), %ax
+movw 8(%r8,%r9,1), %ax
+movw 8(%rax), %ax
+movw 127(%rax,%rcx,1), %ax
+movw -128(%rax,%rcx,1), %ax
+movw 8(%rax,%rcx,1), %r16w
+movw 200(%r8,%rcx,1), %ax
