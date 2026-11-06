@@ -1,0 +1,11 @@
+movw (%rbp), %r8w
+movw (%r13), %r8w
+movw (%rax), %r16w
+movw 8(%rax), %r8w
+movw 200(%rax), %r8w
+movw 8(%rsp), %r8w
+movl (%rax), %r8d
+movq (%rax), %r8
+movb (%rax), %r8b
+movw (%rsp,%rax), %r8w
+movw (%rsp,%rax,4), %r8w
