@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0073/probe.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "9e2fca709419c2cf033030e75fc593e4f09e655a9254d00c121a90e47e5da842",
+  "output_sha256": "657d9c5955267f67507861be7b9764085e82b4e7d4fab6e84c41be894f323680",
+  "size": 118,
+  "records": 0,
+  "notes": "All eight 0.44.0 rows: the four plain-base rows twice (at the %r8w and %r15w ends of the register window) and the four fixed %rsp/%r12 rows once at %r8w plus the two %r12 rows again at %r15w, fourteen instructions and 118 bytes. This is the mod = 10 shape with 0x66 before REX: the plain rows are eight bytes (66 44 8b 80 c8 00 00 00 with REX.R only, 66 45 8b 80 c8 00 00 00 with REX.RB), the %rsp rows are 66 44 8b 84 24 c8 00 00 00 and the %r12 rows are 66 45 8b 84 24 c8 00 00 00 (nine bytes, SIB = 24 plus the signed disp32 at [40,32]). input_sha256 is probe.asm (the source above); output_sha256 is the 118-byte .text."
+}
