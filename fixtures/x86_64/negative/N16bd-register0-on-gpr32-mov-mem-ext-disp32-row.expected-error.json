@@ -1,0 +1,13 @@
+{
+  "errors": [
+    {
+      "code": "E-RANGE-004",
+      "path": "/instructions/0/operands/0/payload/reg",
+      "detail_keys": [
+        "excluded",
+        "target_type",
+        "value"
+      ]
+    }
+  ]
+}
