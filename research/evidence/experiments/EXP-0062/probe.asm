@@ -1,0 +1,10 @@
+movq (%rax), %rax
+movq (%r8), %r8
+movq (%r9), %r15
+movq (%rdi), %rsi
+movq (%rsi), %rdi
+movq %rax, (%rax)
+movq %r8, (%r8)
+movq %r15, (%r9)
+movq %rsi, (%rdi)
+movq %rdi, (%rsi)

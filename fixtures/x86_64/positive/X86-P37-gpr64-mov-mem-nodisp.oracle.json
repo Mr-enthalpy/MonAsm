@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0062/fixture.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "b937c57bc88d23e8ec707a9d114dc1249f481976dcc78143511114269e32decd",
+  "output_sha256": "8c1624a4d2865f2c02865636082e1bae9a7c8923c0f71f7e43996ef980dcbc26",
+  "size": 18,
+  "records": 0,
+  "notes": "One 64-bit mov per 0.33.0 row, six instructions, 18 bytes: both directions over %rax (48 8b 00 / 48 89 00), over %r8 with both extension bits set (4d 8b 00 / 4d 89 00), and over %r9 with %r15 at the top of both four-bit fields (4d 8b 39 / 4d 89 39). REX.W is a template constant (48); REX.R carries the register's fourth bit at [2,1] and REX.B the base's at [0,1]. The base slot excludes %rsp/%r12 (SIB byte) and %rbp/%r13 (RIP-relative at r/m = 101), so a plan that names one of them is E-RANGE-004 and the rows for those four bases are separate forms. There is no disp slot, so a displacement operand is E-OPERAND-002. input_sha256 is fixture.asm (the source above); output_sha256 is the 18-byte .text."
+}

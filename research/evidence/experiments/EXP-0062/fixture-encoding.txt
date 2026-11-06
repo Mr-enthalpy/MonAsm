@@ -1,0 +1,6 @@
+	movq	(%rax), %rax                    # encoding: [0x48,0x8b,0x00]
+	movq	(%r8), %r8                      # encoding: [0x4d,0x8b,0x00]
+	movq	(%r9), %r15                     # encoding: [0x4d,0x8b,0x39]
+	movq	%rax, (%rax)                    # encoding: [0x48,0x89,0x00]
+	movq	%r8, (%r8)                      # encoding: [0x4d,0x89,0x00]
+	movq	%r15, (%r9)                     # encoding: [0x4d,0x89,0x39]

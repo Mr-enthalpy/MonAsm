@@ -1,0 +1,13 @@
+movq (%rsp), %rax
+movq (%r12), %rax
+movq (%rbp), %rax
+movq (%r13), %rax
+movq 8(%rax), %rax
+movq 0x1234, %rax
+movq (%rax), %r16
+movl (%rax), %eax
+movw (%rax), %ax
+movb (%rax), %al
+movq %rax, (%rsp)
+movq %rax, (%r12)
+movq 0(%rax), %rax
