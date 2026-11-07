@@ -1,9 +1,11 @@
-//! Determinism experiments `EXP-R1`, `EXP-R2`, `EXP-R4`, `EXP-R5` and `EXP-R6`
-//! (`06_validation_matrix.md` §2).
+//! Determinism experiments `EXP-R1`, `EXP-R2`, `EXP-R3`, `EXP-R4`, `EXP-R5`
+//! and `EXP-R6` (`06_validation_matrix.md` §2).
 //!
-//! What this file does *not* claim: `EXP-R3` (a second host, OS or compiler) is
-//! not run here. The evidence record says so explicitly instead of turning
-//! "same host" into "cross-platform".
+//! `EXP-R3` is the cross-host half: the test below pins the canonical artifact
+//! digest of one plan per ISA to the value recorded on the primary Windows
+//! host. The same constants must hold on every host, which is what
+//! `.github/workflows/determinism.yml` checks on Linux and macOS; the evidence
+//! record names the run instead of turning "same host" into "cross-platform".
 //!
 //! The comparisons are on the artifact's canonical JSON, not on a formatted
 //! printout, so a change in diagnostic prose cannot mask a byte difference and a
@@ -141,6 +143,47 @@ fn exp_r2_cross_process_agrees_with_in_process() {
             );
         }
     }
+}
+
+/// `EXP-R3`: one fixed plan per ISA has the same canonical artifact digest on
+/// every host. The constants are the values recorded on the primary Windows
+/// host (`EXP-0033` §6); a second host must reproduce them exactly.
+#[test]
+fn exp_r3_artifact_digests_match_the_recorded_values() {
+    let registry = registry();
+    let cases = [
+        (
+            "x86_64",
+            "X86-P9-sse-vex-evex.fmp.json",
+            "sha256:da97dcaad805b973984a92d2ffb933a82a407b1a4cc9a1aa87bfc8a9c715c660",
+        ),
+        (
+            "aarch64",
+            "A64-P14-cmp-cmn-family.fmp.json",
+            "sha256:638e769fb8fe17ab3ed6d2259d1eab3f503ca9b25ca2133745076e7f64bf5a65",
+        ),
+        (
+            "rv64",
+            "RV-P8-pcrel-pair.fmp.json",
+            "sha256:19bae975204dbe62ff46cf11a2fd70114356ff9656687c8fefc1aa459d032f7c",
+        ),
+    ];
+
+    let mut mismatches = Vec::new();
+    for (isa, fixture, expected) in cases {
+        let path = example("positive", isa, fixture);
+        let bytes = outcome(&path, &registry).expect("positive fixture must materialize");
+        let document = json::parse(&bytes).expect("canonical artifact is JSON");
+        let digest = canonical::canonical_digest(&document);
+        if digest != expected {
+            mismatches.push(format!("{isa}/{fixture}: {digest}"));
+        }
+    }
+    assert!(
+        mismatches.is_empty(),
+        "artifact digests differ from the recorded values:\n{}",
+        mismatches.join("\n")
+    );
 }
 
 /// `EXP-R4`: serializing and re-reading the plan does not change the artifact,
