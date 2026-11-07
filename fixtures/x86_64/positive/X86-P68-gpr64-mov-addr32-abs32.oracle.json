@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0093/probe.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "870a0ae3d24964dd11212ca506cefe0df1072f5a6bd39ae8397e20c98db3ebcf",
+  "output_sha256": "ceff0da3eb4fb5bca203ba0685073e7b2669a3a21992561b4b5f1f2ce97689b3",
+  "size": 90,
+  "records": 0,
+  "notes": "The two 0.64.0 rows: the absolute SIB = 25 shape behind 0x67 at the 64-bit value width. REX.W is mandatory, so both rows are nine bytes (67 at byte 0, REX 48/4c at byte 1, opcode at byte 2, ModRM 04 at byte 3, SIB 25 at byte 4, disp32 at [40,32]); the value is [10,1]+[27,3] and covers 0-15. SIB = 25 is template content, so there is no base, index or scale role and no REX.B/REX.X bit. The displacement is four bytes at every value, including zero (67 48 8b 04 25 00 00 00 00); the signed ends are 67 48 8b 04 25 00 00 00 80 and 67 48 8b 04 25 ff ff ff 7f. %r15 moves ModRM.reg to 3c (67 4c 8b 3c 25 34 12 00 00) and %r8 sets REX.R (67 4c 8b 04 25 34 12 00 00). input_sha256 is probe.asm; output_sha256 is the 90-byte .text."
+}
