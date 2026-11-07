@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0085/probe.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "fe4978b67d2bb09a39ca2565127810ce031f4cc5125ebb0bbc3ba30e07620869",
+  "output_sha256": "e8860e37deb5a930b0aae3885caf3fd1e9c7529a8a7866f7e15ea92a48ae29c3",
+  "size": 78,
+  "records": 0,
+  "notes": "The four 0.56.0 rows: the 0x67 REX.W movq on the 32-bit indexed address shape, both directions at disp8 and disp32. 0x67 is byte 0, REX = 48 byte 1, the opcode byte 2, ModRM byte 3 (value register [10,1]+[27,3]) and SIB byte 4 (base [8,1]+[32,3], index [9,1]+[35,3], scale [38,2]), with the displacement at [40,8] or [40,32]. REX.W is template content; R/X/B come from the operands, so REX = 4f is the same row as 48. The base and index are 32-bit address registers (%eax-%r15d) while the value is %rax-%r15. The eight extra instructions cover REX.RBX with %r8 (67 4f 8b 44 08 08), %r12 on all three operands (67 4f 8b 64 24 08), %r13 (67 4f 8b 6c 2d 08), %ebp as a base (67 48 8b 44 0d 08), %r12d as an index (67 4a 8b 44 20 08), %r12d as a base (67 49 8b 44 0c 08), the x8 scale (67 48 8b 44 c8 08) and a %r15/%r15d/%ebp store (67 4d 89 7c 2f 08). input_sha256 is probe.asm; output_sha256 is the 78-byte .text."
+}

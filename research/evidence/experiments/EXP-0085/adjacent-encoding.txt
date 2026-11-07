@@ -1,0 +1,13 @@
+	movq	8(%rax,%rcx), %rax              # encoding: [0x48,0x8b,0x44,0x08,0x08]
+	movq	8(%r8,%r9), %r8                 # encoding: [0x4f,0x8b,0x44,0x08,0x08]
+	movl	8(%eax,%ecx), %eax              # encoding: [0x67,0x8b,0x44,0x08,0x08]
+	movq	8(%esp,%ecx), %rax              # encoding: [0x67,0x48,0x8b,0x44,0x0c,0x08]
+	movq	8(%eax,%ecx), %r8               # encoding: [0x67,0x4c,0x8b,0x44,0x08,0x08]
+	movq	8(%eax,%r9d), %rax              # encoding: [0x67,0x4a,0x8b,0x44,0x08,0x08]
+	movq	8(%r8d,%ecx), %rax              # encoding: [0x67,0x49,0x8b,0x44,0x08,0x08]
+C:\Users\hanni\Projects\MonAsm\research\evidence\experiments\EXP-0085\adjacent.asm:1:8: error: invalid base+index expression
+movq 8(%eax,%esp,1), %rax
+       ^
+C:\Users\hanni\Projects\MonAsm\research\evidence\experiments\EXP-0085\adjacent.asm:9:22: error: invalid operand for instruction
+movq 8(%eax,%ecx,1), %eax
+                     ^~~~
