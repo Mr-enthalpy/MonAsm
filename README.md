@@ -397,7 +397,9 @@ value) so every row is `verified`. Phase 5 froze the contract set for the v0
 scope (`ADR-0095`), published `docs/fmp-v0/08_final_recommendation.md` and closed
 the last acceptance criterion, `AC-10`, with the Phase 6 roadmap M1–M5. Phase 6
 is underway: M1 (error-coverage gate) landed `N24a`–`N24h`, so every reachable
-error code now has an end-to-end fixture; M2 is next.
+error code now has an end-to-end fixture; M2 (oracle rerun harness) landed
+`tools/oracle/rerun.py`, which re-derives 66 of the 100 positive fixtures
+byte-identically and reports the other 34 as skipped with a reason. M3 is next.
 
 | Area | State |
 |---|---|

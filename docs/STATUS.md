@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-08
-Phase: **6 in progress**: Phase 4 is complete (all eight invariants `verified`; `EXP-R3` passes on three CI hosts; `N22` closes INV-04 and `N23a` closes INV-06). Phase 5 froze the contract set for the v0 scope (`ADR-0095`), published `08_final_recommendation.md` (§A–§H plus Q1–Q10) and closed `AC-10` with the Phase 6 roadmap M1–M5. Phase 6 M1 (error-coverage gate) is complete with `N24a`–`N24h`; M2 is next
+Phase: **6 in progress**: Phase 4 is complete (all eight invariants `verified`; `EXP-R3` passes on three CI hosts; `N22` closes INV-04 and `N23a` closes INV-06). Phase 5 froze the contract set for the v0 scope (`ADR-0095`), published `08_final_recommendation.md` (§A–§H plus Q1–Q10) and closed `AC-10` with the Phase 6 roadmap M1–M5. Phase 6 M1 (error-coverage gate) is complete with `N24a`–`N24h`, and M2 (oracle rerun harness) is complete with `tools/oracle/rerun.py`; M3 is next
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -17,7 +17,7 @@ this file plus `AGENTS.md` alone.
 | 3 | Three-ISA vertical prototype | **complete** (2026-11-08): eighty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 71 positive and 476 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate; exit criteria below |
 | 4 | Invariants, negative tests, replay | **complete** (2026-11-08): `EXP-R1`–`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs`; `EXP-R3` also passes on Ubuntu 24.04 (`x86_64`), macOS 26.7.2 (`aarch64`) and Windows Server 2025 with the pinned 1.96.0 toolchain (`EXP-0033` §6, run 42402997326); the invariant-to-test map in `01_contract.md` §2 is filled and every row is `verified` (`N22` closes `E-LAYOUT-004`/`006`/`007`, `N23a` closes the expression-shaped-value gap in INV-06) |
 | 5 | Convergence, route evaluation, roadmap | **complete** (2026-11-08): `08_final_recommendation.md` §A–§H and Q1–Q10; `ADR-0095` moves the contract set to `frozen for the v0 scope`; `AC-10` satisfied; Phase 6 order fixed as M1 error-coverage gate → M2 oracle rerun harness → M3 Level 1 object writer → M4 planner boundary → M5 coverage widening |
-| 6 | Implementation roadmap (M1–M5) | **in progress**: M1 error-coverage gate **complete** (2026-11-08) with `N24a`–`N24h`, CI run `42407621760` green on Ubuntu, macOS and Windows; M2 oracle rerun harness next; M3–M5 pending |
+| 6 | Implementation roadmap (M1–M5) | **in progress**: M1 error-coverage gate **complete** (2026-11-08) with `N24a`–`N24h`, CI run `42407621760` green on Ubuntu, macOS and Windows; M2 oracle rerun harness **complete** (`tools/oracle/rerun.py`: 66/100 re-derived, 29 `input-not-stored`, 5 `manual-derivation`); M3 Level 1 object writer next; M4–M5 pending |
 
 ## Gates
 
@@ -252,13 +252,17 @@ not cover is caught only by the weaker size check; it is now settled, and
 
 ## Next action
 
-Phases 3, 4 and 5 are complete, and Phase 6 **M1 is complete**: `N24a`–`N24h`
-add the eight end-to-end negative fixtures for the codes that had none, and
-`04_errors.md` §2.4 now records 37 of the 43 active codes as fixture-covered.
-The next action is **M2, the oracle rerun harness**: one command that re-derives
-every `*.expected.bin` from `llvm-mc` (or records a manual derivation) and diffs,
-so each `*.oracle.json` hash is reproducible. After M2 the order is fixed:
-M3 Level 1 object writer, M4 planner boundary/API, M5 coverage widening
+Phases 3, 4 and 5 are complete, and Phase 6 **M1 and M2 are complete**. M1 added
+`N24a`–`N24h`, so `04_errors.md` §2.4 records 37 of the 43 active codes as
+fixture-covered. M2 added `tools/oracle/rerun.py`: it resolves each assembler
+input by `input_sha256` and re-runs the recorded command, so `66/100` positives
+reproduce byte-identically, `29` are `input-not-stored` (all 20 AArch64 and 9
+RV64 inputs were never committed) and `5` are `manual-derivation`
+(`tools/oracle/README.md` §"State"). The next action is **M3, the Level 1 object
+writer**: `artifact: sections` plus `include_symbol_table`, sections, symbols and
+relocation records from the plan, no relaxation and no container format; the
+exit gate is that new fixtures validate and the Level 0 byte image is unchanged.
+After M3 the order is fixed: M4 planner boundary/API, M5 coverage widening
 (`08_final_recommendation.md` §H). The numbered list below is the widening
 backlog retained for M5 and later; each item still needs its own ADR before a
 table changes.

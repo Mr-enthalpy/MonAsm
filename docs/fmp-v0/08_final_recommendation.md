@@ -467,7 +467,7 @@ The order is fixed: close the evidence gate before adding surface.
 | Step | Module | Scope | Exit gate |
 |---|---|---|---|
 | M1 | Error-coverage gate | Add end-to-end fixtures for the eight reachable uncovered codes; keep the two JSON-layer-only codes as unit tests | **closed 2026-11-08**: `N24a`–`N24h` land, `04_errors.md` §2.4 has no "reachable, no fixture" group, and `cargo test -p fmp-cli --test fixtures` is green |
-| M2 | Oracle rerun harness | One command that re-derives every `*.expected.bin` from `llvm-mc` (or records a manual derivation) and diffs | Corpus regenerates byte-identically; `*.oracle.json` hashes match |
+| M2 | Oracle rerun harness | One command that re-derives every `*.expected.bin` from `llvm-mc` (or records a manual derivation) and diffs | **closed 2026-11-08, coverage-qualified**: `tools/oracle/rerun.py` resolves each input by `input_sha256`, re-runs the recorded command and compares bytes; 66/100 reproduce (all x86-64 with stored input), 29 are `input-not-stored` (20 AArch64 + 9 RV64, never committed) and 5 are `manual-derivation`; `--strict` fails on any `SKIP` once the inputs are backfilled (`tools/oracle/README.md`) |
 | M3 | Level 1 object writer | `artifact: sections` + `include_symbol_table`; sections, symbols and relocation records from the plan, no relaxation and no container format (Level 2) | New fixtures validate; Level 0 bytes unchanged |
 | M4 | Planner boundary/API | Export the plan builder as a library boundary, with the same closed-object discipline | API tests reject illegal plans at the same codes |
 | M5 | Coverage widening | One ISA family per ADR, each with a rejection fixture for its absent variant | No implicit decision enters; new `EC` rows frozen |

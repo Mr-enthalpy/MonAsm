@@ -37,3 +37,52 @@ llvm-mc -triple=aarch64 -show-encoding
 # RV64
 llvm-mc -triple=riscv64 -show-encoding
 ```
+
+## Rerun harness (`rerun.py`)
+
+`python tools/oracle/rerun.py` re-derives the bytes for every positive fixture
+whose assembler input is still in the tree, and reports the ones that are not.
+
+**Input resolution is by content, not by name.** The harness hashes every
+`*.s`/`*.asm` under `research/evidence/experiments/` and matches the
+`input_sha256` in each `*.oracle.json`. A hash match proves the bytes are the
+ones the record was made from; a name match proves nothing. When several files
+share a hash (identical copies) the lexicographically first relative path wins,
+so the run is deterministic (`INV-05`).
+
+For a resolved record the harness copies the input into a temporary directory
+under the basename the recorded command names, runs that command verbatim, and
+compares the produced image with `*.expected.bin`, `output_sha256` and `size`.
+The `records` field (relocation count) is not re-checked; the byte image and the
+lookup hash are.
+
+| Status | Meaning |
+|---|---|
+| `PASS` | Resolved input, command succeeded, bytes and hashes agree |
+| `SKIP` | The record cannot be reproduced on this host; a reason is printed |
+| `FAIL` | A resolved record produced different bytes, or its command failed |
+
+Skip reasons are stable prefixes: `manual-derivation` (the expected bytes are
+not the assembler output), `input-not-stored` (no file in the evidence tree
+hashes to `input_sha256`), `toolchain-version` (installed `llvm-mc` differs from
+the pinned `version`), `tool-missing` (e.g. `ld.lld` absent).
+
+Exit codes: `0` when every resolved record passes, `1` on any `FAIL`, `2` when
+`llvm-mc`/`llvm-objcopy` is unavailable or a record cannot be parsed. `--strict`
+turns a `SKIP` into a failure; that is the gate to use once the missing inputs
+are backfilled. The summary always prints `<pass>/<total> re-derived,
+<skip> skipped`, so a partial run is never reported as a clean corpus.
+
+### State (2026-11-08, llvm-mc 23.1.2)
+
+`66/100 re-derived, 34 skipped, 0 failed`:
+
+- 66 x86-64 records reproduce byte-identically, including the `ld.lld` one.
+- 29 records are `input-not-stored` — all 20 AArch64 and all 9 RV64 records.
+  Their inputs were never committed and the recorded `input_sha256` matches no
+  file in the evidence tree, so the harness refuses to treat them as verified.
+- 5 x86-64 records are `manual-derivation`: the expected bytes include an
+  encoding `llvm-mc` will not select from a mnemonic (documented per record).
+
+A corrupted `expected.bin` fails the run (byte offset is printed) and exits `1`;
+this was checked by flipping one byte of `X86-P6` and restoring it.
