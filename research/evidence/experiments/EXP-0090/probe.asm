@@ -1,0 +1,13 @@
+movl 8(,%ecx,1), %eax
+movl %eax, 8(,%ecx,1)
+movl 8(,%ecx,1), %r8d
+movl %r8d, 8(,%ecx,1)
+movl 8(,%r9d,1), %eax
+movl %eax, 8(,%r9d,1)
+movl 8(,%r9d,1), %r8d
+movl %r8d, 8(,%r9d,1)
+movl 0(,%ecx,1), %eax
+movl -8(,%ecx,1), %eax
+movl 8(,%ecx,4), %eax
+movl 8(,%r12d,1), %eax
+movl 4660(,%r15d,8), %r15d
