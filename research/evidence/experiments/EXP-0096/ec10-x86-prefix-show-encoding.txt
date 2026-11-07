@@ -1,0 +1,6 @@
+
+	addl	(%rax), %ebx                    # encoding: [0x03,0x18]
+	lock		addl	(%rax), %ebx            # encoding: [0xf0,0x03,0x18]
+	movsb	%ds:(%rsi), %es:(%rdi)          # encoding: [0xa4]
+	rep		movsb	(%rsi), %es:(%rdi)      # encoding: [0xf3,0xa4]
+	movl	%fs:0, %eax                     # encoding: [0x64,0x8b,0x04,0x25,0x00,0x00,0x00,0x00]

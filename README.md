@@ -12,7 +12,7 @@ The materializer has no planning authority. That is the whole point.
 
 ## Status
 
-**Phase 3 in progress on x86-64, AArch64 and RV64.** Gate G0 (oracle toolchain) and
+**Phase 3 complete on x86-64, AArch64 and RV64.** Gate G0 (oracle toolchain) and
 G1 (encoder boundary audit) passed. The audit found that XirAsm's x86 path makes
 four independent encoding decisions the caller cannot address, that its RISC-V
 path is the only form-addressable entry point, and that AArch64 exists solely as a
@@ -366,6 +366,19 @@ ADR-0092 takes the `0x67 66` absolute sibling at the 16-bit width:
 `4660, %ax` is `67 66 8b 04 25 34 12 00 00` (nine bytes) and
 `4660, %r8w` is `67 66 44 8b 04 25 34 12 00 00` (ten), with the `REX`
 byte at position 2 and the same constant `SIB = 25`.
+ADR-0093 lets an absolute 32-bit content field carry a symbol: the operand keeps
+`payload: {}`, one fixup covers exactly the field's bits with
+`pc_reference_rule = none`, and `emit_relocation` writes zero plus one
+`R_X86_64_32S` record, so `movl ext, %eax` is `8b 04 25 00 00 00 00` and the
+seven-byte row stays seven bytes. `resolve_in_place` writes `S + A` and needs the
+section base; with `.text` at `0x1000` and `L1` at offset 30 the field is
+`1e 10 00 00`.
+ADR-0094 keeps seven ambiguous families absent: `lock`/`rep`/segment prefixes,
+the AArch64 `mov` alias, `cbz`/`cbnz`/`tbz`/`tbnz`, RV64 `jal`/`c.j`/`jalr`,
+`fence` masks, `csrrw`/`csrrwi`, and `aq`/`rl`. Each has more than one
+legitimate encoding, so the choice is a carrier the plan names — a form for a
+prefix, suffix or instruction change, an operand type for the `fence` masks — and
+naming one is `E-FORM-001` because v0 ships no such row.
 ADR-0057 carries that fourth window into the memory rows, where one `REX`
 byte holds both extension bits: `8(%rax), %r8b` is `44 8a 40 08` and
 `8(%r8), %r8b` is `45 8a 40 08` (four bytes each, `REX.R` at `[2,1]` and
@@ -384,7 +397,7 @@ and its fixture gate are implemented.
 | Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), `0.2.0` (9 forms), `0.3.0` (17 forms), `0.4.0` (22 forms), `0.5.0` (25 forms), `0.6.0` (25 forms), `0.7.0` (29 forms), `0.8.0` (33 forms), `0.9.0` (45 forms), `0.10.0` (53 forms), `0.11.0` (62 forms), `0.12.0` (74 forms), `0.13.0` (74 forms), `0.14.0` (79 forms), `0.15.0` (91 forms), `0.16.0` (103 forms), `0.17.0` (119 forms), `0.18.0` (127 forms), `0.19.0` (155 forms), `0.20.0` (171 forms), `0.21.0` (195 forms) and `0.22.0` (207 forms) and `0.23.0` (225 forms) and `0.24.0` (231 forms) and `0.25.0` (237 forms) and `0.26.0` (239 forms) and `0.27.0` (243 forms) and `0.28.0` (247 forms) and `0.29.0` (255 forms) and `0.30.0` (267 forms) and `0.31.0` (275 forms) and `0.32.0` (289 forms) and `0.33.0` (291 forms) and `0.34.0` (295 forms) and `0.35.0` (301 forms) and `0.36.0` (309 forms) and `0.37.0` (315 forms) and `0.38.0` (321 forms) and `0.39.0` (329 forms) and `0.40.0` (337 forms) and `0.41.0` (345 forms) and `0.42.0` (353 forms) and `0.43.0` (361 forms) and `0.44.0` (369 forms) and `0.45.0` (373 forms) and `0.46.0` (377 forms) and `0.47.0` (385 forms) and `0.48.0` (389 forms) and `0.49.0` (393 forms) and `0.50.0` (405 forms) and `0.51.0` (409 forms) and `0.52.0` (413 forms) and `0.53.0` (417 forms) and `0.54.0` (429 forms) and `0.55.0` (445 forms) and `0.56.0` (449 forms) and `0.57.0` (453 forms) and `0.58.0` (465 forms) and `0.59.0` (481 forms) and `0.60.0` (489 forms) and `0.61.0` (497 forms) and `0.62.0` (499 forms) and `0.63.0` (503 forms) and `0.64.0` (505 forms) and `0.65.0` (509 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms), `0.8.0` (32 forms), `0.9.0` (44 forms), `0.10.0` (68 forms), `0.11.0` (92 forms), `0.12.0` (132 forms), `0.13.0` (135 forms), `0.14.0` (136 forms), `0.15.0` (152 forms), `0.16.0` (168 forms) and `0.17.0` (176 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
 | Prototype (`prototype/`) | workspace compiled; all three slices materialize from the plan |
 | Oracles (`tools/oracle/`) | planned; `llvm-mc` (± `ld.lld`) drives the experiments |
-| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0094 |
+| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0096 |
 
 Read `docs/STATUS.md` for the current phase, gate status, and next action.
 

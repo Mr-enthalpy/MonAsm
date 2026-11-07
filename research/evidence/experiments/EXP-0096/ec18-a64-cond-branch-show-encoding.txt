@@ -1,0 +1,16 @@
+
+.Ltmp0:
+	b.eq	.Ltmp0                          // encoding: [0bAAA00000,A,A,0x54]
+                                        //   fixup A - offset: 0, value: .Ltmp0, kind: fixup_aarch64_pcrel_branch19
+.Ltmp1:
+	cbz	x0, .Ltmp1                      // encoding: [0bAAA00000,A,A,0xb4]
+                                        //   fixup A - offset: 0, value: .Ltmp1, kind: fixup_aarch64_pcrel_branch19
+.Ltmp2:
+	cbnz	w0, .Ltmp2                      // encoding: [0bAAA00000,A,A,0x35]
+                                        //   fixup A - offset: 0, value: .Ltmp2, kind: fixup_aarch64_pcrel_branch19
+.Ltmp3:
+	tbz	w0, #0, .Ltmp3                  // encoding: [0bAAA00000,A,0b00000AAA,0x36]
+                                        //   fixup A - offset: 0, value: .Ltmp3, kind: fixup_aarch64_pcrel_branch14
+.Ltmp4:
+	tbnz	x0, #63, .Ltmp4                 // encoding: [0bAAA00000,A,0b11111AAA,0xb7]
+                                        //   fixup A - offset: 0, value: .Ltmp4, kind: fixup_aarch64_pcrel_branch14

@@ -1,7 +1,7 @@
 # Status
 
-Updated: 2026-11-06
-Phase: **3 in progress (x86, AArch64 and RV64 slices): fifty definition documents, the materializer and the fixture gate are in place; every AArch64 and RV64 coverage row and all nine v0 x86 rows are carried, so widening is coverage work with its own ADR per slice**
+Updated: 2026-11-08
+Phase: **3 complete (x86, AArch64 and RV64 slices): eighty-four definition documents, the materializer and the fixture gate are in place; every directive §6.1/§6.2/§6.3 item is carried, all 40 `EC` rows are frozen, and every coverage row in the three ISAs passes its two-source gate, so further work is Phase 4 or coverage with its own ADR per slice**
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -14,7 +14,7 @@ this file plus `AGENTS.md` alone.
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
-| 3 | Three-ISA vertical prototype | **in progress**: eighty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 69 positive and 454 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate |
+| 3 | Three-ISA vertical prototype | **complete** (2026-11-08): eighty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 71 positive and 461 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate; exit criteria below |
 | 4 | Invariants, negative tests, replay | **in progress**: `EXP-R1`/`R2`/`R4`/`R5`/`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs` (`EXP-0033`); `EXP-R3` is `unverified` because only one host exists |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
@@ -24,8 +24,36 @@ this file plus `AGENTS.md` alone.
 |---|---|---|
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
-| G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: 33 of 40 rows are frozen; the 7 rows still `draft` are EC-10, EC-16, EC-18, EC-23, EC-24, EC-25 and EC-26, and none of them is needed by the three slices as they stand |
+| G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **passed** 2026-11-08: 40 of 40 rows are frozen. The last seven (`EC-10`, `EC-16`, `EC-18`, `EC-23`, `EC-24`, `EC-25`, `EC-26`) are absent-in-v0 decisions with measured counterexamples in `EXP-0096` and decided carriers in `ADR-0094` |
 | G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 71 positive, 461 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 12 negative) |
+
+### Phase 3 exit criteria
+
+Phase 3 closes on the gate set and the directive's three experiment matrices, not
+on a slice count:
+
+- **Gate G3** — each ISA carries at least three positive and two negative
+  vectors whose bytes and diagnostics match a recorded oracle
+  (`06_validation_matrix.md` §5). x86 has 71/461, AArch64 20/57 and RV64 9/12.
+- **Directive §6.1** (x86-64) — all nine items are carried by the positive rows
+  in `06_validation_matrix.md` §4: register transfer, immediate arithmetic, two
+  legal encodings of one operation, displacement widths, prefix rules,
+  RIP-relative addressing, short and near branches, external-call fixups, and
+  the `legacy`/`vex`/`evex` family choice.
+- **Directive §6.2** (AArch64) — all eight items: register arithmetic,
+  immediate arithmetic, load/store addressing kinds, conditional branch,
+  unconditional branch or call, `adrp`+`:lo12:`, a shifted or scaled immediate
+  field, and a target-specific modifier.
+- **Directive §6.3** (RV64) — all eight items: integer arithmetic, I-type
+  immediate, load/store, conditional branch, `jal`, scattered fields, RVC vs
+  standard as separate forms, and the `auipc`+`lo12` pair.
+- **Gate G2** — all 40 `EC` rows are frozen and each cites a measured
+  counterexample and a decided carrier (`ADR-0094`). `EXP-0096` records the
+  seven families v0 keeps absent with no fixture; the rejection path is
+  `E-FORM-001`, already pinned by the `N01` family.
+- **Determinism** — `EXP-R1`, `EXP-R2`, `EXP-R4`, `EXP-R5` and `EXP-R6` pass on
+  this host (`EXP-0033`); `EXP-R3` stays `unverified` because no second host
+  exists, and Phase 3 does not claim it.
 
 ## Decisions
 
@@ -124,6 +152,7 @@ this file plus `AGENTS.md` alone.
 | ADR-0091 | The absolute `SIB = 25` shape behind `0x67` reaches the 64-bit value width: `0.64.0` appends two rows, one per direction, because `REX.W` is mandatory and `R` is a free bit of the same byte. `addr32 movq 4660, %rax` is `67 48 8b 04 25 34 12 00 00` (nine bytes; `0x67` at byte 0, `REX.W` at byte 1, opcode at byte 2, `ModRM = 04` at byte 3, `SIB = 25` at byte 4, `disp32` at `[40,32]`) with the value at `[10,1]`+`[27,3]` covering `0`-`15`; there is no bare geometry and no exclusion. `SIB = 25` is `scale = 00`/`index = 100`/`base = 101`, so the address carries no register: no `base`, `index` or `scale` slot and no `REX.B`/`REX.X` bit. The displacement is four bytes at every value, including zero (`67 48 8b 04 25 00 00 00 00`), and `2147483648` is `E-RANGE-001` (`N03zq`); a supplied base and a missing displacement are `E-OPERAND-002` (`N02cn`/`N02co`), a 32-bit operand is `E-OPERAND-001` twice (`N02cp`), value `16` is `E-OPERAND-004` (`N14cd`), and naming a row against `0.63.0` is `E-FORM-001` (`N01ed`/`N01ee`). `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37` and `EC-38` are revised in place; no `EC` row is added or renumbered, and no schema or Rust change | accepted 2026-11-08 |
 | ADR-0092 | The absolute `SIB = 25` shape gains the `0x67 66` prefix pair at the 16-bit value width: `0.65.0` appends four rows (bare and `REX.R` x two directions). `addr32 movw 4660, %ax` is `67 66 8b 04 25 34 12 00 00` (nine bytes; `0x67` at byte 0, `0x66` at byte 1, opcode at byte 2, `ModRM = 04` at byte 3, `SIB = 25` at byte 4, `disp32` at `[40,32]`) with the value at `[27,3]`; the `REX` row puts `REX` at byte 2, the value at `[18,1]`+`[35,3]` (excluding `0`-`7`) and the displacement at `[48,32]`. `SIB = 25` is `scale = 00`/`index = 100`/`base = 101`, so the address carries no register: no `base`, `index` or `scale` slot and no `REX.B`/`REX.X` bit. The displacement is four bytes at every value, including zero (`67 66 8b 04 25 00 00 00 00`), and `2147483648` is `E-RANGE-001` (`N03zr`); a supplied base and a missing displacement are `E-OPERAND-002` (`N02cq`/`N02cr`), a 32-bit operand is `E-OPERAND-001` twice (`N02cs`), the bare three-bit field rejects `8` (`N14cf`), the extended four-bit one rejects `16` (`N14ce`), value `0` on the `-ext` row is `E-RANGE-004` (`N16dg`), and naming a row against `0.64.0` is `E-FORM-001` (`N01ef`/`N01eg`). `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37` and `EC-38` are revised in place; no `EC` row is added or renumbered, and no schema or Rust change | accepted 2026-11-08 |
 | ADR-0093 | An absolute 32-bit content field can carry a symbol: the operand keeps `payload: {}` and one fixup over exactly the slot's bits carries `pc_reference_rule = none`, `value_transform = identity`, the addend and `range_constraint {signed: true, bits: 32, align_bits: 0}`. Nine measured windows: the eight `disp32` slots of the absolute `mov` rows are 7/7/8/8/9/7/7/11 bytes at `[24,32]`, `[24,32]`, `[32,32]`, `[32,32]`, `[40,32]`, `[24,32]`, `[24,32]`, `[56,32]`, and `addq $ext, %rax` puts the same symbol in the `imm32` slot at `[24,32]`. `emit_relocation` writes zero and emits one `R_X86_64_32S`-style record (nine records at `0x3`/`0xA`/`0x12`/`0x1A`/`0x23`/`0x2A`/`0x31`/`0x3C`/`0x43`) and cannot range-check the value; `resolve_in_place` writes `S + A` and needs the target's section `base_address`, because a `none` rule cannot cancel the site, so the unbound plan is `E-FIXUP-002` (`N08d`). With `.text` at `0x1000` and `L1` at offset 30 the five resolved displacements are `0x101e`/`0x1022`/`0x101e`/`0x1020`/`0x101e`. `payload: {symbol_id}` on `disp` and `payload: {}` with no covering fixup are `E-OPERAND-003` (`N15b`/`N15c`), a value plus a covering fixup is `E-FIXUP-006` (`N07c`), a partial window is two `E-FIXUP-001` (`N07d`), the 64-bit `[32,32]` window on a 7-byte row is `E-FIXUP-005` plus `E-FIXUP-001` (`N07e`), and `0x1000` in the 8-bit `add` immediate is `E-FIXUP-003` (`N04f`). `0.65.0` stays canonical (509 forms, digest `sha256:9f5bc421…`); `EC-02`, `EC-05`, `EC-34` and `EC-39` are revised in place, and no definition, schema or Rust change is needed | accepted 2026-11-08 |
+| ADR-0094 | Seven ambiguous families stay absent in v0: `EC-10` (x86 prefix presence), `EC-16` (AArch64 `mov` alias), `EC-18` (AArch64 conditional transfer), `EC-23` (RV64 jump and call), `EC-24` (RV64 `fence` masks), `EC-25` (RV64 CSR immediate) and `EC-26` (RV64 `aq`/`rl`) are frozen with a decided carrier but no row. `EXP-0096` measures the two or more legitimate encodings in each family: `lock addl (%rax), %ebx` is `f0 03 18` against `03 18`; `mov x0, #1` is `20 00 80 d2` (`MOVZ`) against `00 00 80 92` (`MOVN`) for `#-1`; `jal x0` is `01 a0` (`c.j`) under `.option rvc` against `6f 00 00 00` under `.option norvc`; `fence rw, rw` is `0f 00 30 03` against `0f 00 f0 0f` for `iorw, iorw`; `csrrw` is `f3 10 01 30` (`funct3 = 001`) against `f3 50 01 30` (`funct3 = 101`) for `csrrwi`; `.aq` sets bit 26 and `.rl` bit 25. A decision whose output is a byte, a length or a fixed semantic bit is a `form variant`; `EC-24` is `operand type` because its output is the `imm12` field value. No definition, schema, Rust or fixture change: `0.65.0` stays canonical (509 forms, `sha256:9f5bc421…`) and the corpus stays 100 positive / 530 negative. The rejection path for all seven is `E-FORM-001`, already pinned by `N01` | accepted 2026-11-08 |
 
 ## Settled decisions (contract level)
 
@@ -221,6 +250,14 @@ not cover is caught only by the weaker size check; it is now settled, and
 `EXP-0004` §4 measures both halves.
 
 ## Next action
+
+Phase 3 is complete (exit criteria above). Phase 4 is next: move `EXP-R3` from
+`unverified` to verified on a second host, and keep the invariant-to-test map in
+`01_contract.md` current. The numbered list below is the widening backlog
+retained for a later phase; no item is part of the Phase 3 close-out, and each
+still needs its own ADR before a table changes.
+
+### Widening backlog
 
 1. Decide the next format question, one ADR each, before widening any table.
    The AArch64 `-lsl12` half of `A64-P2` is closed without a format change:

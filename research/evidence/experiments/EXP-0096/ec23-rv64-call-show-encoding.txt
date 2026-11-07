@@ -1,0 +1,19 @@
+
+	.option	rvc
+.Ltmp0:
+	jal	.Ltmp0                          # encoding: [0xef,0bAAAA0000,A,A]
+                                        #   fixup A - offset: 0, value: .Ltmp0, kind: fixup_riscv_jal
+.Ltmp1:
+	j	.Ltmp1                          # encoding: [0bAAAAAA01,0b101AAAAA]
+                                        #   fixup A - offset: 0, value: .Ltmp1, kind: fixup_riscv_rvc_jump
+.Ltmp2:
+	j	.Ltmp2                          # encoding: [0bAAAAAA01,0b101AAAAA]
+                                        #   fixup A - offset: 0, value: .Ltmp2, kind: fixup_riscv_rvc_jump
+.Ltmp3:
+	jalr	ra                              # encoding: [0x82,0x90]
+	.option	norvc
+.Ltmp4:
+	j	.Ltmp4                          # encoding: [0x6f,0bAAAA0000,A,A]
+                                        #   fixup A - offset: 0, value: .Ltmp4, kind: fixup_riscv_jal
+.Ltmp5:
+	jalr	ra                              # encoding: [0xe7,0x80,0x00,0x00]

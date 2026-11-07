@@ -1,0 +1,4 @@
+
+	fence	rw, rw                          # encoding: [0x0f,0x00,0x30,0x03]
+	fence                                   # encoding: [0x0f,0x00,0xf0,0x0f]
+	fence	r, w                            # encoding: [0x0f,0x00,0x10,0x02]
