@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0087/probe.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "6cb55296b64d9feb165ea29494c81f0ae12a798cfceb98ff85105689b31fdb97",
+  "output_sha256": "9c31d3fb894e21378df7f4abc8bda1ce4a9c9717b2b2281231d4dd2832cb608f",
+  "size": 130,
+  "records": 0,
+  "notes": "The twelve 0.58.0 rows: the 0x67 0x66 movw behind the address-size prefix takes the three single-REX windows (R value, B base, X index), both directions at disp8 and disp32. 0x67 is byte 0, 0x66 byte 1, REX byte 2, the opcode byte 3, ModRM byte 4 (value register [35,3]) and SIB byte 5 (base [40,3], index [43,3], scale [46,2]), with the displacement at [48,8] or [48,32]. The fixed bit is R at [18,1], B at [16,1] or X at [17,1]; its slot excludes 0-7. The base and index are 32-bit address registers (%r8d-%r15d) while the value is %r8w-%r15w. The four extra instructions cover %r15w with %ebp as a base (67 66 44 8b 7c 0d 08), %r15d as a base (67 66 41 8b 54 2f 08), %r15d as an index (67 66 42 8b 54 38 08) and the x8 scale (67 66 44 8b 7c c8 08). input_sha256 is probe.asm; output_sha256 is the 130-byte .text."
+}
