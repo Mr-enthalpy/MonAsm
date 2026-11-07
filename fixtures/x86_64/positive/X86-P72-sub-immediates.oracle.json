@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0102/probe.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "31d8186bc3e847039e4629493cacaa6605f3d2dc0883296dabee39b98397c90c",
+  "output_sha256": "60352c7055d173fe2af1141aa18f3d53b05d6c5ebc36e5fda70aa69c55f3b722",
+  "size": 55,
+  "records": 0,
+  "notes": "The three 0.66.0 sub rows: REX.W 83 /5 ib (48 83 e8 01 / 48 83 e8 80 / 49 83 e8 01), REX.W 81 /5 id (48 81 eb 2c 01 00 00 / 49 81 ef ff ff ff 7f / 48 81 ea 00 00 00 80) and REX.W 2d id (48 2d 2c 01 00 00 / 48 2d ff ff ff 7f / 48 2d 00 00 00 80). llvm-mc picks the accumulator for subq $300, %rax, which is EC-04's counterexample; subq $1, %r8 shows the dest slot's REX.B bit (49, not 48). input_sha256 is probe.asm; output_sha256 is the 55-byte .text."
+}

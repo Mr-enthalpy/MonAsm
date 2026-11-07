@@ -1,7 +1,7 @@
 # Definition Format
 
 Status: **frozen for the v0 scope** (`ADR-0095`): the format and the shipped
-tables (`x86-64` `0.1.0` … `0.65.0`, `aarch64` `0.1.0` … `0.18.0`, `rv64`
+tables (`x86-64` `0.1.0` … `0.66.0`, `aarch64` `0.1.0` … `0.18.0`, `rv64`
 `0.1.0`/`0.2.0`). The format is intended for the other targets, whose tables wait
 on source data, not on an open decision (`OD-07` is settled by ADR-0005 and
 pinned by ADR-0006). This document defines the artifact a pinned
@@ -307,6 +307,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.63.0.json` | `monasm.isa.x86` | `sha256:72c7e8f2fcf4c73ad816d7de274d9b46edec7d9ef99b4834c27140d83d6c91e8` |
 | `definitions/x86_64/0.64.0.json` | `monasm.isa.x86` | `sha256:fc98a834b7840d3f2383b05a5d2950966a81187234a080f24f7ad85ab6c07a4f` |
 | `definitions/x86_64/0.65.0.json` | `monasm.isa.x86` | `sha256:9f5bc421a67688426dea259a7f5a9c4c5eb0746db0dd1c5b473a30ba3612b42a` |
+| `definitions/x86_64/0.66.0.json` | `monasm.isa.x86` | `sha256:63b3b3a153aa0b5508f2055496efa1c56ac74e56b03d56f56f5c522b6d2e1904` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -332,7 +333,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.65.0`
+### 8.1 `x86-64` `0.1.0` … `0.66.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -845,6 +846,9 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:mov/addr32-abs32-r16/legacy` | `676689042500000000` | src: `x86.gpr16`/`r16` → `[27,3]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37`, `EC-38`, `X86-P69` |
 | `x86:mov/r16-ext-addr32-abs32/legacy` | `6766448b042500000000` | dest: `x86.gpr16`/`r16` → `[18,1]`, `[35,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); disp: `x86.imm`/`disp32` → `[48,32]` | 10 | `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37`, `EC-38`, `X86-P69` |
 | `x86:mov/addr32-abs32-r16-ext/legacy` | `67664489042500000000` | src: `x86.gpr16`/`r16` → `[18,1]`, `[35,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); disp: `x86.imm`/`disp32` → `[48,32]` | 10 | `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37`, `EC-38`, `X86-P69` |
+| `x86:sub/rm64-imm8/legacy` | `4883e800` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm8` → `[24,8]` | 4 | `EC-01`, `EC-06` — 4-bit dest from `0.6.0`, `0.66.0`+ |
+| `x86:sub/rm64-imm32/legacy` | `4881e800000000` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm32` → `[24,32]` | 7 | `EC-01`, `EC-04`, `EC-06` — 4-bit dest from `0.6.0`, `0.66.0`+ |
+| `x86:sub/rax-imm32/legacy` | `482d00000000` | imm: `x86.imm`/`imm32` → `[16,32]` | 6 | `EC-04`, `0.66.0`+ |
 
 Placements are written `[bit_offset, width]`, with ` inverted` appended when the
 chunk is complemented. In the legacy SSE row
@@ -2023,6 +2027,22 @@ the `-ext` row is `E-RANGE-004` (`N16dg`), and naming a row against
 `0x67 66` (the measurement and a manual derivation disagree about the
 offset width), the `0x67 66` RIP-relative row, a symbol in the
 displacement, APX `d5` and EVEX masking/broadcast.
+
+`0.66.0` adds the three `sub` immediate rows (`ADR-0101`): `subq $1, %rax`
+is `48 83 e8 01`, `subq $300, %rbx` is `48 81 eb 2c 01 00 00` and
+`subq $300, %rax` is `48 2d 2c 01 00 00`. The only bytes that differ from
+the `add` rows are `ModRM.reg` (`/5` instead of `/0`) and the accumulator
+opcode (`2d` instead of `05`), so both are template content and no plan
+field carries them. The destination slot keeps its four bits
+(`REX.B` `[0,1]` + `ModRM.r/m` `[16,3]`): `subq $1, %r8` is
+`49 83 e8 01`. `subq $300, %rax` also has the `48 81 e8 2c 01 00 00`
+encoding, and `llvm-mc` picks the accumulator, which is `EC-04`'s
+counterexample for `sub` too. `128` on the signed 8-bit immediate is
+`E-RANGE-001` (`N03zs`), a `r32` destination on `rm64-imm32` misses both
+the kind and the target type (`N02ct`), the register form (`29`/`2B`) is
+absent (`N01ej`) and a `0.66.0` row against `0.65.0` is `E-FORM-001`
+(`N01ek`). Still deferred: the register-register pair, the other widths, a
+symbol in the immediate, APX `d5` and EVEX masking/broadcast.
 
 ### 8.2 `aarch64` `0.1.0` … `0.18.0`
 
