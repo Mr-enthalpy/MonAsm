@@ -1,0 +1,16 @@
+	movl	8(%r8,%rcx), %eax               # encoding: [0x41,0x8b,0x44,0x08,0x08]
+	movl	8(%rax,%r9), %eax               # encoding: [0x42,0x8b,0x44,0x08,0x08]
+	movl	8(%r8d,%r9d), %r8d              # encoding: [0x67,0x47,0x8b,0x44,0x08,0x08]
+	movl	8(%eax,%ecx), %r8d              # encoding: [0x67,0x44,0x8b,0x44,0x08,0x08]
+	movl	8(%eax,%r9d), %r8d              # encoding: [0x67,0x46,0x8b,0x44,0x08,0x08]
+	movq	8(%r8d,%r9d), %rax              # encoding: [0x67,0x4b,0x8b,0x44,0x08,0x08]
+	movq	8(%eax,%ecx), %rax              # encoding: [0x67,0x48,0x8b,0x44,0x08,0x08]
+	movl	8(%r13d,%r13d), %r13d           # encoding: [0x67,0x47,0x8b,0x6c,0x2d,0x08]
+	movl	8(%edx,%ebx,2), %r8d            # encoding: [0x67,0x44,0x8b,0x44,0x5a,0x08]
+	movl	8(%r8d,%ecx), %r8d              # encoding: [0x67,0x45,0x8b,0x44,0x08,0x08]
+C:\Users\hanni\Projects\MonAsm\research\evidence\experiments\EXP-0083\adjacent.asm:1:8: error: invalid base+index expression
+movl 8(%eax,%esp,1), %eax
+       ^
+C:\Users\hanni\Projects\MonAsm\research\evidence\experiments\EXP-0083\adjacent.asm:2:8: error: invalid base+index expression
+movl 8(%r8d,%esp,1), %eax
+       ^

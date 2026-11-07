@@ -1,0 +1,12 @@
+movl 8(%eax,%esp,1), %eax
+movl 8(%r8d,%esp,1), %eax
+movl 8(%r8,%rcx,1), %eax
+movl 8(%rax,%r9,1), %eax
+movl 8(%r8d,%r9d,1), %r8d
+movl 8(%eax,%ecx,1), %r8d
+movl 8(%eax,%r9d,1), %r8d
+movq 8(%r8d,%r9d,1), %rax
+movq 8(%eax,%ecx,1), %rax
+movl 8(%r13d,%r13d,1), %r13d
+movl 8(%edx,%ebx,2), %r8d
+movl 8(%r8d,%ecx,1), %r8d

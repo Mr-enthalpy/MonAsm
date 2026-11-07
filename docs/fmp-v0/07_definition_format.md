@@ -293,6 +293,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.51.0.json` | `monasm.isa.x86` | `sha256:e73395dffc494d13d0b142cbba0e4c55a40d19bcd68a6b793025156bbcb41bc5` |
 | `definitions/x86_64/0.52.0.json` | `monasm.isa.x86` | `sha256:4587b149e1119681ffefe011862343d8bccd0f52dbe7d278a0afb05517f7f7ae` |
 | `definitions/x86_64/0.53.0.json` | `monasm.isa.x86` | `sha256:9c4c913f51e0e74710f416cd03d1547e6d4af4f2b678c1f1c4ae46f5722ff52b` |
+| `definitions/x86_64/0.54.0.json` | `monasm.isa.x86` | `sha256:4513f6a9b15293f96bb79e46dbd477ea7cc051e3fb33a9a9ce3792e8ac6fa8cd` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -315,7 +316,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.53.0`
+### 8.1 `x86-64` `0.1.0` … `0.54.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -736,6 +737,18 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:mov/addr32-base-index-disp8-r32/legacy` | `6789440000` | src: `x86.gpr32`/`r32` → `[19,3]`; base: `x86.gpr32`/`rm32` → `[24,3]`; index: `x86.gpr32`/`sib_index32` → `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-02`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P57` |
 | `x86:mov/r32-addr32-base-index-disp32/legacy` | `678b840000000000` | dest: `x86.gpr32`/`r32` → `[19,3]`; base: `x86.gpr32`/`rm32` → `[24,3]`; index: `x86.gpr32`/`sib_index32` → `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P57` |
 | `x86:mov/addr32-base-index-disp32-r32/legacy` | `6789840000000000` | src: `x86.gpr32`/`r32` → `[19,3]`; base: `x86.gpr32`/`rm32` → `[24,3]`; index: `x86.gpr32`/`sib_index32` → `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P57` |
+| `x86:mov/r32-ext-addr32-base-index-disp8/legacy` | `67448b440000` | dest: `x86.gpr32`/`r32` → `[10,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr32`/`rm32` → `[32,3]`; index: `x86.gpr32`/`sib_index32` → `[35,3]` (excl 4); imm: `x86.scale`/`scale2` → `[38,2]`; disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `EC-02`, `EC-06`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P58` |
+| `x86:mov/addr32-base-index-disp8-r32-ext/legacy` | `674489440000` | src: `x86.gpr32`/`r32` → `[10,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr32`/`rm32` → `[32,3]`; index: `x86.gpr32`/`sib_index32` → `[35,3]` (excl 4); imm: `x86.scale`/`scale2` → `[38,2]`; disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `EC-02`, `EC-06`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P58` |
+| `x86:mov/r32-ext-addr32-base-index-disp32/legacy` | `67448b840000000000` | dest: `x86.gpr32`/`r32` → `[10,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr32`/`rm32` → `[32,3]`; index: `x86.gpr32`/`sib_index32` → `[35,3]` (excl 4); imm: `x86.scale`/`scale2` → `[38,2]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-02`, `EC-06`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P58` |
+| `x86:mov/addr32-base-index-disp32-r32-ext/legacy` | `674489840000000000` | src: `x86.gpr32`/`r32` → `[10,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr32`/`rm32` → `[32,3]`; index: `x86.gpr32`/`sib_index32` → `[35,3]` (excl 4); imm: `x86.scale`/`scale2` → `[38,2]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-02`, `EC-06`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P58` |
+| `x86:mov/r32-addr32-base-ext-index-disp8/legacy` | `67418b440000` | dest: `x86.gpr32`/`r32` → `[27,3]`; base: `x86.gpr32`/`rm32` → `[8,1]`, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); index: `x86.gpr32`/`sib_index32` → `[35,3]` (excl 4); imm: `x86.scale`/`scale2` → `[38,2]`; disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `EC-02`, `EC-06`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P58` |
+| `x86:mov/addr32-base-ext-index-disp8-r32/legacy` | `674189440000` | src: `x86.gpr32`/`r32` → `[27,3]`; base: `x86.gpr32`/`rm32` → `[8,1]`, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); index: `x86.gpr32`/`sib_index32` → `[35,3]` (excl 4); imm: `x86.scale`/`scale2` → `[38,2]`; disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `EC-02`, `EC-06`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P58` |
+| `x86:mov/r32-addr32-base-ext-index-disp32/legacy` | `67418b840000000000` | dest: `x86.gpr32`/`r32` → `[27,3]`; base: `x86.gpr32`/`rm32` → `[8,1]`, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); index: `x86.gpr32`/`sib_index32` → `[35,3]` (excl 4); imm: `x86.scale`/`scale2` → `[38,2]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-02`, `EC-06`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P58` |
+| `x86:mov/addr32-base-ext-index-disp32-r32/legacy` | `674189840000000000` | src: `x86.gpr32`/`r32` → `[27,3]`; base: `x86.gpr32`/`rm32` → `[8,1]`, `[32,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); index: `x86.gpr32`/`sib_index32` → `[35,3]` (excl 4); imm: `x86.scale`/`scale2` → `[38,2]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-02`, `EC-06`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P58` |
+| `x86:mov/r32-addr32-base-index-ext-disp8/legacy` | `67428b440000` | dest: `x86.gpr32`/`r32` → `[27,3]`; base: `x86.gpr32`/`rm32` → `[32,3]`; index: `x86.gpr32`/`sib_index32` → `[9,1]`, `[35,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); imm: `x86.scale`/`scale2` → `[38,2]`; disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `EC-02`, `EC-06`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P58` |
+| `x86:mov/addr32-base-index-ext-disp8-r32/legacy` | `674289440000` | src: `x86.gpr32`/`r32` → `[27,3]`; base: `x86.gpr32`/`rm32` → `[32,3]`; index: `x86.gpr32`/`sib_index32` → `[9,1]`, `[35,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); imm: `x86.scale`/`scale2` → `[38,2]`; disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `EC-02`, `EC-06`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P58` |
+| `x86:mov/r32-addr32-base-index-ext-disp32/legacy` | `67428b840000000000` | dest: `x86.gpr32`/`r32` → `[27,3]`; base: `x86.gpr32`/`rm32` → `[32,3]`; index: `x86.gpr32`/`sib_index32` → `[9,1]`, `[35,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); imm: `x86.scale`/`scale2` → `[38,2]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-02`, `EC-06`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P58` |
+| `x86:mov/addr32-base-index-ext-disp32-r32/legacy` | `674289840000000000` | src: `x86.gpr32`/`r32` → `[27,3]`; base: `x86.gpr32`/`rm32` → `[32,3]`; index: `x86.gpr32`/`sib_index32` → `[9,1]`, `[35,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); imm: `x86.scale`/`scale2` → `[38,2]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-02`, `EC-06`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P58` |
 
 Placements are written `[bit_offset, width]`, with ` inverted` appended when the
 chunk is complemented. In the legacy SSE row
@@ -1672,6 +1685,23 @@ windows are the deferred forms (`67 47 8b 44 08 08`, `67 44 8b 44 08 08`). A
 missing index is `E-OPERAND-002` (`N02bw`), scale `4` is `E-RANGE-001`
 (`N03zf`), index `4` is `E-RANGE-004` (`N16cl`), and naming a row against
 `0.52.0` is `E-FORM-001` (`N01dh`/`N01di`).
+
+`0.54.0` puts one `REX` byte after the `0x67` byte (`ADR-0081`):
+`movl 8(%eax,%ecx,1), %r8d` is `67 44 8b 44 08 08` (six bytes) and
+`movl 200(%eax,%ecx,1), %r8d` is `67 44 8b 84 08 c8 00 00 00` (nine). `0x67`
+stays byte 0 and `REX` byte 1, so the opcode is byte 2, `ModRM` byte 3 and
+`SIB` byte 4: register `[27,3]` (with `REX.R` at `[10,1]`), base `[32,3]` (with
+`REX.B` at `[8,1]`), index `[35,3]` (with `REX.X` at `[9,1]`), scale `[38,2]`
+and displacement `[40,8]`/`[40,32]`. Each extended slot excludes `0`–`7`, so a
+low value on it is `E-RANGE-004` (`N16cm`/`N16cn`/`N16co`), while the operands a
+row keeps low stay three bits (`E-OPERAND-004`, `N14bn`/`N14bo`). `%r12d` is
+legal as a base (`67 41 8b 44 0c 08`) and as an index (`67 42 8b 44 20 08`),
+`%esp` as an index stays rejected, and `%ebp` is a legal base on the `REX.R` row
+(`67 44 8b 44 0d 08`). A missing index is `E-OPERAND-002` (`N02by`), scale `4`
+is `E-RANGE-001` (`N03zg`), and naming a row against `0.53.0` is `E-FORM-001`
+(`N01dj`/`N01dk`). Still deferred: the two-bit `addr32` windows (`67 43`,
+`67 45`, `67 46`, `67 47`), a symbol in a displacement, the no-base indexed
+shape, the `moffs` form, the APX `d5` window and EVEX masking/broadcast.
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 
