@@ -2,9 +2,9 @@
 
 - Status: accepted
 - Date: 2026-11-08
-- Settles: the design half of `08_final_recommendation.md` §H M4 (planner
-  boundary/API); the M4 exit gate still requires the implementation and its
-  parity tests
+- Settles: `08_final_recommendation.md` §H M4 (planner boundary/API); the
+  design and its parity gate are implemented in `prototype/crates/fmp-plan` and
+  `prototype/crates/fmp-cli/tests/planner_api.rs`
 - Supersedes: none
 - Superseded by: none
 - Revises: the M4 row of `08_final_recommendation.md` §H and the `AC-10` row of
@@ -100,16 +100,17 @@ Two facts measured before deciding:
    negatives, 641 documents — so the parity gate is 101/101 and 540/540 with no
    exception list. The six `read`-phase negatives never produce a `Plan` and are
    covered by the structural-exclusion check instead.
-7. **The M4 exit gate is six tests** in
+7. **The M4 exit gate is six test groups, implemented as ten tests** in
    `prototype/crates/fmp-cli/tests/planner_api.rs`: positive parity over all
-   101 positives (bytes, record count, recorded Level 1 envelope), negative
-   parity over all 540 `materialize`-phase negatives (code, path, detail keys),
-   from-scratch authoring for at least one positive per ISA plus `X86-P71`, a
-   closed-key-set check on a maximal document, a structural-exclusion check for
-   the six `read`-phase negatives, and a determinism check (two builds, one
-   canonical byte string). The test lives in `fmp-cli` because that crate
-   already loads the registry and the fixture tree; `fmp-plan` stays free of
-   both.
+   101 positives (bytes, record count, recorded Level 1 envelope, fingerprint),
+   negative parity over all 540 `materialize`-phase negatives (code, path,
+   detail keys), from-scratch authoring for one positive per ISA plus `X86-P71`,
+   closed key sets, optional-member and enum-spelling round trips, a fixed-point
+   re-emission check, a structural-exclusion check for the six `read`-phase
+   negatives, a determinism check (two builds, one canonical byte string) and
+   typed `Unrepresentable` failures. The test lives in `fmp-cli` because that
+   crate already loads the registry and the fixture tree; `fmp-plan` stays free
+   of both.
 8. **The `symbol.size` mismatch is recorded, not repaired here.** The schema's
    symbol object allows `size`; `01_contract.md` §9 does not define it; and
    `fmp-model` accepts but does not bind it (`SYMBOL_FIELDS` includes both `type`

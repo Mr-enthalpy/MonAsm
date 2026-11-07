@@ -13,3 +13,6 @@ path = "src/main.rs"
 fmp-model = { path = "../fmp-model" }
 fmp-validate = { path = "../fmp-validate" }
 fmp-materialize = { path = "../fmp-materialize" }
+
+[dev-dependencies]
+fmp-plan = { path = "../fmp-plan" }

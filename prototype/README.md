@@ -12,7 +12,7 @@ implemented.
 | `fmp-validate` | Static checks for steps 2–7 of `01_contract.md` §13: target, output gate, layout, symbols, instructions, operands and fixups |
 | `fmp-materialize` | Digest check, `fmp_validate::check`, emission and fingerprint (`materialize`) |
 | `fmp-cli` | The `fmp materialize <plan.json> --definitions <dir>` binary and the fixture/determinism tests |
-| `fmp-plan` | **Designed, not yet implemented** (`ADR-0097`, `docs/fmp-v0/09_planner_api.md`): a total, closed plan builder that depends only on `fmp-model` and has no validator |
+| `fmp-plan` | Planner-side plan builder (`ADR-0097`, `docs/fmp-v0/09_planner_api.md`): a total, closed writer that depends only on `fmp-model` and has no validator |
 
 The materializer path is:
 
@@ -30,9 +30,10 @@ binary outside a test target.
   at Level 1, the recorded section/symbol envelope); every negative reproduces
   exactly the registered diagnostic set.
 - `fmp-cli/tests/determinism.rs` — `EXP-R1`–`EXP-R6` replay and identity.
-- `fmp-cli/tests/planner_api.rs` — **designed** M4 parity gate: 101 positive and
-  540 `materialize`-phase negative fixtures rebuilt through `fmp-plan`, plus
-  from-scratch, closed-key, structural-exclusion and determinism cases.
+- `fmp-cli/tests/planner_api.rs` — M4 parity gate: 101 positive and 540
+  `materialize`-phase negative fixtures rebuilt through `fmp-plan`, plus
+  from-scratch, closed-key, optional-member, enum-spelling, structural-exclusion,
+  fixed-point and determinism cases.
 
 ## Constraints for every crate
 

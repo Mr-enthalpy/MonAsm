@@ -4,6 +4,7 @@ members = [
     "crates/fmp-model",
     "crates/fmp-validate",
     "crates/fmp-materialize",
+    "crates/fmp-plan",
     "crates/fmp-cli",
 ]
 

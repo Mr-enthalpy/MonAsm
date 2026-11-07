@@ -180,15 +180,21 @@ The M4 exit gate is `08_final_recommendation.md` §H: *API tests reject illegal
 plans at the same codes*. The tests are integration tests in
 `prototype/crates/fmp-cli/tests/planner_api.rs`, because that crate already
 loads the registry and the fixture tree. `fmp-plan` stays free of the encoder.
+**Status: implemented**; `cargo test -p fmp-cli --test planner_api` runs ten
+tests, all green.
 
 | Test | Corpus | Assertion |
 |---|---|---|
-| Positive parity | all 101 positives | `from_model` -> `build_canonical` -> `read` -> `materialize` gives the same bytes, the same record count and, where recorded, the same Level 1 section/symbol envelope |
+| Positive parity | all 101 positives | `from_model` -> `build_canonical` -> `read` -> `materialize` gives the same bytes, the same record count and, where recorded, the same Level 1 section/symbol envelope; the plan fingerprint is unchanged |
 | Negative parity | all 540 `materialize`-phase negatives | the same code, JSON Pointer and detail-key set as the fixture's `expected-error.json` |
-| From scratch | at least one positive per ISA, plus `X86-P71` | the document built only from constructors materializes to the oracle bytes; this proves the API is usable without `from_model` |
-| Closed sets | one maximal document | each emitted object's key set equals the contract's closed set; no unknown key and no missing required key |
+| From scratch | one positive per ISA (`X86-P1`, `A64-P2`, `RV-P1`), plus `X86-P71` | the document built only from constructors materializes to the oracle bytes; this proves the API is usable without `from_model` |
+| Closed sets | `x86_p71`, a maximal document, and a full-enum document | each emitted object's key set equals the contract's closed set; no unknown key and no missing required key |
+| Optional members | one document that sets every optional member | `provenance`, `symbol_order`, `base_address`, `expected_digest`, `transform_shift`, `pair_group`, `pair_role` and the empty payload are written under the reader's names and read back unchanged |
+| Enum spellings | every closed enum member | the reader returns the same variant, so a renamed member becomes `Unknown(..)` and fails |
+| Fixed point | `X86-P71` re-emitted | `from_model` -> `build` is byte-identical to the first build |
 | Structural exclusion | the six `read`-phase negatives | they are unrepresentable by type (`N15` composite payload, `N21a`/`N21b` unknown field, `N23a` expression-shaped value, `N24a` unsupported version, `N24b` missing nested field); the existing fixture gate still rejects them on the document path |
 | Determinism | two builds of one document | identical canonical bytes; the builder has no state, map order or environment input |
+| Typed failure | an unknown artifact, `section_relative`, and a non-default `fixup_record_order` | `from_model` returns `Unrepresentable` with the exact path and value; it never panics or invents a variant |
 
 The negative parity test is the load-bearing one. It does not re-implement a
 rule: it rebuilds the same plan through the builder and lets the unchanged
@@ -198,7 +204,9 @@ document path cannot provide on its own.
 
 `from_model` is a convenience for that test, not the claim. The from-scratch
 test keeps the claim honest: the API can author a plan with no bound model in
-hand.
+hand. The optional-member and enum-spelling tests cover the values the corpus
+does not exercise (`data`, `rodata`, `undefined`, `weak`, `hi20`, `lo12_s`,
+`provenance`), so a spelling that no fixture happens to use is still checked.
 
 ## 8. Non-goals and recorded defects
 
