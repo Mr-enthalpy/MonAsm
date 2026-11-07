@@ -1,0 +1,10 @@
+movl 8(%r8,%r9,1), %r8d
+movl %r8d, 8(%r8,%r9,1)
+movl 200(%r8,%r9,1), %r8d
+movl %r8d, 200(%r8,%r9,1)
+movl 8(%r12,%r12,1), %r8d
+movl 8(%r15,%r15,8), %r15d
+movl 8(%r8,%r12,1), %r8d
+movl 8(%r12,%r9,1), %r8d
+movl 8(%r8,%r9,8), %r8d
+movl %r15d, 8(%r10,%r11,2)
