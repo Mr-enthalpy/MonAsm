@@ -1,8 +1,9 @@
 # Fixup Model
 
-Status: **draft**. This document defines how a planned patch is expressed and
-executed. It is deliberately more general than "write a 32-bit value at an
-offset".
+Status: **frozen for the v0 scope** (`ADR-0095`); `section_relative` remains
+`inference`/`unverified` and is out of v0 scope. This document defines how a
+planned patch is expressed and executed. It is deliberately more general than
+"write a 32-bit value at an offset".
 
 ## 1. Separated concepts
 

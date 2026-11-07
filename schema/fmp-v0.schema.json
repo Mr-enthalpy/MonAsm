@@ -2,8 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://monasm.dev/schema/fmp-v0.schema.json",
   "title": "Frozen Machine Plan v0",
-  "description": "Draft schema. Fields annotated x-status=draft are not frozen. See docs/fmp-v0/01_contract.md.",
-  "x-status": "draft",
+  "description": "Frozen for the v0 scope. Fields annotated x-status=draft are out of v0 scope. See docs/fmp-v0/01_contract.md.",
+  "x-status": "frozen-for-v0-scope",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -71,7 +71,7 @@
           "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
         },
         "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-        "source_ref": { "type": "string" }
+        "source_ref": { "type": "string", "x-status": "draft" }
       }
     },
     "output_contract": {
@@ -94,7 +94,8 @@
         "symbol_order": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
-          "uniqueItems": true
+          "uniqueItems": true,
+          "x-status": "draft"
         },
         "fixup_record_order": { "const": "section_id,offset,fixup_id" },
         "include_symbol_table": { "type": "boolean" },
@@ -196,7 +197,7 @@
         },
         "expected_size": { "type": "integer", "minimum": 0 },
         "expected_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-        "source_trace": { "$ref": "#/$defs/source_trace" }
+        "source_trace": { "$ref": "#/$defs/source_trace", "x-status": "draft" }
       }
     },
     "operand": {
@@ -248,7 +249,7 @@
         "binding": { "enum": ["local", "global", "weak"] },
         "section_id": { "type": "string", "minLength": 1 },
         "offset": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
-        "type": { "enum": ["func", "object", "notype"] },
+        "type": { "enum": ["func", "object", "notype"], "x-status": "draft" },
         "size": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 }
       },
       "allOf": [

@@ -4,15 +4,15 @@
     "isa_family": "riscv",
     "isa_variant": "rv64",
     "execution_mode": "n/a",
-    "enabled_extensions": ["rv64c", "rv64i"],
+    "enabled_extensions": ["rv64i", "rv64c"],
     "feature_constraints": [],
     "byte_order": "little",
     "address_width": 64
   },
   "definition_identity": {
     "namespace": "monasm.isa.riscv",
-    "version": "0.1.0",
-    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    "version": "0.2.0",
+    "digest": "sha256:8329a38faa964f9c69207a48e3bfb45c13fb0ddbaeb829ddcc0dbd1cffa8de10"
   },
   "output_contract": {
     "artifact": "bytes",
@@ -38,10 +38,10 @@
       "instruction_id": "I0001",
       "section_id": ".text",
       "offset": 0,
-      "form_id": "riscv:c.addi/rd-eq-rs1",
+      "form_id": "riscv:c.addi/rd-imm6",
       "operands": [
-        { "role": "dest", "kind": "riscv.xreg", "target_type": "creg_x8_x15", "payload": { "reg": 10 }, "modifiers": [] },
-        { "role": "imm", "kind": "riscv.imm", "target_type": "imm6_nonzero", "payload": { "value": 5 }, "modifiers": [] }
+        { "role": "dest", "kind": "riscv.xreg", "target_type": "xreg", "payload": { "reg": 10 }, "modifiers": [] },
+        { "role": "imm", "kind": "riscv.imm", "target_type": "imm6", "payload": { "value": 1 }, "modifiers": [] }
       ],
       "expected_size": 2
     }
@@ -49,6 +49,6 @@
   "fixups": [],
   "provenance": {
     "materializer_version": "0.1.0-draft",
-    "notes": "Illustrative only: compressed form is explicit in form_id, never selected by the encoder."
+    "notes": "Illustrative only: the compressed form is named by form_id, never selected by the encoder. Shape mirrors RV-P7-caddi."
   }
 }

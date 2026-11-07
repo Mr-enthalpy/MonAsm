@@ -50,6 +50,6 @@
   "fixups": [],
   "provenance": {
     "materializer_version": "0.1.0-draft",
-    "notes": "Illustrative only. Digest is a placeholder; no bytes are claimed."
+    "notes": "Illustrative only. The digest is the pinned x86-64 0.1.0 digest from 07_definition_format.md §8.1; bytes are not claimed."
   }
 }

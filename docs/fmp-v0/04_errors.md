@@ -1,6 +1,7 @@
 # Error Model
 
-Status: **draft**. Error identity is part of the contract; error prose is not.
+Status: **frozen for the v0 scope** (`ADR-0095`). Error identity is part of the
+contract; error prose is not.
 
 ## 1. Envelope
 
@@ -33,11 +34,11 @@ Rules:
 |---|---|---|---|
 | E-PLAN-001 | Unknown or unsupported `format_version` | `found`, `supported` | — |
 | E-PLAN-002 | Value has the wrong type or literal form (a non-integer number, a malformed hex byte string), or lies outside the declared domain for its path | `path_type`, `found_kind` | N23a |
-| E-PLAN-003 | Unknown field in a strict object | `field`, `object` | — |
-| E-PLAN-004 | Document is not parseable, or has duplicate keys | `reason` | — |
-| E-PLAN-005 | Canonical-form violation that changes bytes (e.g. float, BOM, CRLF-dependent content) | `reason` | EXP-R4 |
+| E-PLAN-003 | Unknown field in a strict object | `field`, `object` | N21a, N21b |
+| E-PLAN-004 | Document is not parseable, or has duplicate keys | `reason` | unit `rejects_duplicate_keys` |
+| E-PLAN-005 | Canonical-form violation that changes bytes (e.g. float, BOM, CRLF-dependent content) | `reason` | unit `rejects_a_byte_order_mark` |
 | E-PLAN-006 | Required field absent from a strict object | `field`, `object` | — |
-| E-TARGET-001 | Unsupported or mismatched `isa_family`, `isa_variant`, or `enabled_extensions` | `found` | — |
+| E-TARGET-001 | Unsupported or mismatched `isa_family`, `isa_variant`, or `enabled_extensions` | `found` | N06 |
 | E-TARGET-002 | Invalid or missing `execution_mode` for the family | `found`, `required` | — |
 | E-TARGET-003 | Form requires an extension that is not enabled | `extension`, `form_id` | — |
 | E-TARGET-004 | Unsupported `byte_order` or `address_width` | `found` | — |
@@ -56,7 +57,7 @@ Rules:
 | E-LAYOUT-002 | Fragment gap, or fragment sum != `declared_size` | `declared`, `covered` | N11 |
 | E-LAYOUT-003 | Instruction offset/size does not match its fragment | `instruction_id`, `fragment` | N05 |
 | E-LAYOUT-004 | List order violates the contract's declared order | `list`, `index` | N22a, N22f |
-| E-LAYOUT-005 | Layout requires the materializer to compute padding or alignment | `section_id`, `offset`, `required_align` | N11 |
+| E-LAYOUT-005 | Layout requires the materializer to compute padding or alignment | `section_id`, `offset`, `required_align` | — (unreachable, §2.3) |
 | E-LAYOUT-006 | Duplicate `section_id`, or `section_order` is not a permutation of `sections[]` | `section_id`, `problem` | N22b, N22c |
 | E-LAYOUT-007 | Duplicate `instruction_id`, or two instructions at the same `(section_id, offset)` | `instruction_id`, `section_id`, `offset` | N22d, N22e |
 | E-SYMBOL-001 | A reference names a `symbol_id` that `symbols[]` does not declare | `symbol_id`, `mode` | N08 |
@@ -73,7 +74,7 @@ Rules:
 | E-SIZE-001 | Encoded length != `expected_size` | `instruction_id`, `expected`, `actual` | N05 |
 | E-BYTE-001 | Emitted bytes do not match `expected_digest` | `instruction_id`, `declared`, `actual` | N13 |
 | E-VERSION-001 | Materializer cannot honor a declared plan feature | `feature`, `format_version` | — |
-| E-INTERNAL-001 | Internal invariant violated (bug); never used for user input | `invariant` | — |
+| E-INTERNAL-001 | Internal invariant violated (bug); never used for user input | `invariant` | — (not user-reachable) |
 
 `E-PLAN-002`'s two detail keys describe one fault from two sides: `path_type` is
 what the path requires (`integer`, `u64`, `i64`, `address`), and `found_kind` is
@@ -259,9 +260,9 @@ reused for a different condition.
 
 ### 2.3 Codes with no `fmp/0.1` trigger
 
-Two codes are declared and implemented but no plan can reach them yet. They stay
-in the registry because the condition they name is real in the model, and a
-silent omission would make a later slice look like it had always been covered.
+Two user-input codes are declared and implemented but no plan can reach them yet.
+They stay in the registry because the condition they name is real in the model, and
+a silent omission would make a later slice look like it had always been covered.
 
 - `E-TARGET-003` — a definition has no per-form extension requirement
   (`07_definition_format.md` §2), so there is no `form_id` to name. Each table
@@ -274,6 +275,29 @@ silent omission would make a later slice look like it had always been covered.
   attribute, and a `fill` fragment is the only padding. A plan that wants padding
   and omits the fragment produces a gap, which is `E-LAYOUT-002`. The code
   becomes reachable if a fragment ever gains `align_to`.
+- `E-INTERNAL-001` — not a user-input code. It is raised only when the
+  materializer's own invariant is violated (a bug), so no plan can trigger it by
+  construction; §4 uses it as the review marker for an error that leaks a pointer,
+  timestamp, host name, or address.
+
+### 2.4 Coverage gate before widening (M1)
+
+The registry is the declared surface; a code is *covered* only when a test
+asserts its exact code, JSON Pointer and detail-key set (`fixtures/README.md`).
+Measured against the current corpus, 43 codes are active, 29 are covered by a
+fixture, and the remaining 14 split as follows. This is the Phase 6 M1 work list;
+it is recorded here so a widening slice cannot claim coverage it does not have.
+
+| Group | Codes | Current evidence | M1 action |
+|---|---|---|---|
+| Reachable, no fixture | `E-PLAN-001`, `E-PLAN-006`, `E-TARGET-002`, `E-TARGET-004`, `E-SYMBOL-002`, `E-SYMBOL-003`, `E-FIXUP-008`, `E-VERSION-001` | behaviour exists in the validator; no end-to-end fixture | add one negative fixture per code |
+| JSON layer, unit only | `E-PLAN-004`, `E-PLAN-005` | `rejects_duplicate_keys`, `rejects_a_byte_order_mark` | keep as unit tests; no fixture can reach the plan layer |
+| Non-plan conditions | `E-DEF-002` | `exp_r5_definition_perturbation_is_loud` | keep the replay test |
+| Structurally unreachable | `E-TARGET-003`, `E-LAYOUT-005` | §2.3 | leave unreachable; revisit only if the format gains the trigger |
+| Not user-input | `E-INTERNAL-001` | §2.3 | leave as the bug marker |
+
+`E-PLAN-002` is covered twice: `N23a` (expression-shaped scalar) and the JSON unit
+tests `rejects_floats_and_exponents` / `rejects_a_negative_zero_fraction`.
 
 ## 3. Rules
 

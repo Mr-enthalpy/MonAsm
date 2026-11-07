@@ -1,7 +1,8 @@
-# FMP v0 Contract (draft)
+# FMP v0 Contract (frozen for v0 scope)
 
-Status: **draft**. Fields marked `TBD` are not frozen; they lack a counterexample
-or source evidence. Nothing in this document overrides
+Status: **frozen for the v0 scope** (`ADR-0095`). Fields marked `TBD` or
+`draft` are not frozen; they lack a counterexample or source evidence and are
+recorded as out of v0 scope. Nothing in this document overrides
 `00_directive.md`, and every deviation must be recorded as an ADR.
 
 Conformance keywords: **MUST**, **MUST NOT**, **SHOULD**, **MAY** are used in the
@@ -293,9 +294,10 @@ Rules:
 `form_id` is resolved against a **pinned definition artifact**. The contract fixes
 only what the plan names — `definition_identity` = `namespace` + `version` +
 `digest` — and delegates the artifact itself to `07_definition_format.md`, which
-fixes its shape, its load-time checks, its digest coverage and the v0 tables
-(`definitions/x86_64/0.1.0.json`, `definitions/aarch64/0.1.0.json`,
-`definitions/rv64/0.1.0.json`).
+fixes its shape, its load-time checks, its digest coverage and the shipped v0
+tables: `definitions/x86_64/0.1.0.json` … `0.65.0.json`,
+`definitions/aarch64/0.1.0.json` … `0.17.0.json`, and
+`definitions/rv64/0.1.0.json`/`0.2.0.json`.
 
 - A definition that fails a load-time check is `E-DEF-001`; the process stops
   before any plan is read from it.
@@ -310,10 +312,13 @@ fixes its shape, its load-time checks, its digest coverage and the v0 tables
 - It is a **check**, never an input. The materializer MUST encode from
   `form_id + operands`, then compare, then reject (`E-BYTE-001`). It MUST NOT
   derive emitted bytes from the digest.
-- The plan MUST carry a hash. Raw expected bytes are forbidden: bytes can be
-  emitted and a hash cannot, so a hash cannot silently become the source of
-  truth. Variant C (byte template + patch fields) was rejected for exactly this
-  reason, and it also loses the operand and form that legality depends on.
+- `expected_digest` is optional per instruction. When a plan must detect a
+  same-length encoder defect it MUST carry the digest; a plan that does not carry
+  one relies on `expected_size` alone and cannot detect that class of defect. Raw
+  expected bytes are forbidden: bytes can be emitted and a hash cannot, so a hash
+  cannot silently become the source of truth. Variant C (byte template + patch
+  fields) was rejected for exactly this reason, and it also loses the operand and
+  form that legality depends on.
 - `expected_size` is checked first; a length fault is `E-SIZE-001` and the
   digest is never consulted.
 - When any `expected_digest` is present, `provenance.generated_by` MUST name its

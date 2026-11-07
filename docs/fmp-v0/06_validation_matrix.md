@@ -1,7 +1,8 @@
 # Validation Matrix
 
-Status: **draft**. Fixtures and results are filled in Phases 3–4. This file is
-the canonical registry for `N*`, `EXP-R*`, and `AC-*`.
+Status: **frozen for the v0 scope** (`ADR-0095`). The fixtures and results are
+complete for the v0 scope. This file is the canonical registry for `N*`,
+`EXP-R*`, and `AC-*`.
 
 ## 1. Negative tests (`N*`)
 
@@ -140,7 +141,7 @@ second, third and fourth hosts.
 | AC-07 | Deterministic replay | EXP-R1, EXP-R2, EXP-R3, EXP-R4, EXP-R5 | **satisfied** (2026-11-08): `EXP-R1`/`R2`/`R4`/`R5` pass, `R6` covers negative identity, and `EXP-R3` passes on three CI hosts (Ubuntu 24.04 `x86_64`, macOS 26.7.2 `aarch64`, Windows Server 2025) with the pinned 1.96.0 toolchain (`EXP-0033` §6) |
 | AC-08 | Reuse boundary backed by source evidence | `90_boundary_audit.md` with revision, file, symbol, line range | **done** for XirAsm; LLVM internals deferred (see audit §8) |
 | AC-09 | Unresolved problems stated | `05_open_decisions.md` with blocking impact, no "later" hand-waving | **satisfied** (2026-11-05): every `OD-*` row is accepted, including OD-05 (ADR-0031) and OD-08 (ADR-0032); the only deferred item is the Level 1 envelope, which OD-03 records as out of scope |
-| AC-10 | Executable next step | Final report §H: modules, order, gates, blockers | planned |
+| AC-10 | Executable next step | Final report §H: modules, order, gates, blockers | **satisfied** (2026-11-08): `08_final_recommendation.md` §H names M1–M5 in order (error-coverage gate → oracle rerun harness → Level 1 writer → planner API → coverage widening), with the test gate and the risk table; M1's work list is `04_errors.md` §2.4 |
 
 ## 4. Positive vectors
 

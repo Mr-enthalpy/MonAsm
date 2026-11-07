@@ -1,7 +1,7 @@
 # Encoding Decisions and Their Carriers
 
-Status: **draft** (registry rows are frozen individually). This is the operational
-form of INV-02, under ADR-0004.
+Status: **frozen for the v0 scope** (`ADR-0095`); all 40 registry rows are
+frozen. This is the operational form of INV-02, under ADR-0004.
 
 ## The rule
 
@@ -109,7 +109,7 @@ surface: a variant that is absent cannot be selected, repaired or approximated,
 and naming it is `E-FORM-001`. There is no feature flag and no partially
 implemented form.
 
-The x86-64 slice is four hundred and thirteen forms covering fifteen frozen `EC` rows:
+The x86-64 slice is five hundred and nine forms covering fifteen frozen `EC` rows:
 
 | `form_id` | Bytes | Operand signature | Covers |
 |---|---|---|---|

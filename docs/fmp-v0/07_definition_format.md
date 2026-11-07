@@ -1,11 +1,13 @@
 # Definition Format
 
-Status: **frozen for `x86-64` `0.1.0` and `aarch64` `0.1.0`**; the same format
-is intended for the other targets, whose tables wait on source data, not on an
-open decision (`OD-07` is settled by ADR-0005 and pinned by ADR-0006). This
-document defines the artifact a pinned `definition_identity` names. It is the
-operational form of `OD-10`: the table *is* the feature surface, and a `form_id`
-the table does not contain is `E-FORM-001`.
+Status: **frozen for the v0 scope** (`ADR-0095`): the format and the shipped
+tables (`x86-64` `0.1.0` … `0.65.0`, `aarch64` `0.1.0` … `0.17.0`, `rv64`
+`0.1.0`/`0.2.0`). The format is intended for the other targets, whose tables wait
+on source data, not on an open decision (`OD-07` is settled by ADR-0005 and
+pinned by ADR-0006). This document defines the artifact a pinned
+`definition_identity` names. It is the operational form of `OD-10`: the table
+*is* the feature surface, and a `form_id` the table does not contain is
+`E-FORM-001`.
 
 A definition is **data**. It is not a library, a plugin, or a table of callbacks
 (`INV-06`). The materializer reads it, checks it, and encodes from it.

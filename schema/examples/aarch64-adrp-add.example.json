@@ -11,8 +11,8 @@
   },
   "definition_identity": {
     "namespace": "monasm.isa.aarch64",
-    "version": "0.1.0",
-    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    "version": "0.17.0",
+    "digest": "sha256:de2c53e1871f5c24f6af73082dcc402729786d2e6e2495f84e3ed553adb4e4ed"
   },
   "output_contract": {
     "artifact": "sections",
@@ -26,25 +26,27 @@
       "section_id": ".text",
       "section_kind": "code",
       "image_backed": true,
-      "declared_size": 8,
+      "base_address": 0,
+      "declared_size": 16,
       "fragments": [
         { "offset": 0, "size": 4, "kind": "instruction", "instruction_id": "I0001" },
-        { "offset": 4, "size": 4, "kind": "instruction", "instruction_id": "I0002" }
+        { "offset": 4, "size": 4, "kind": "instruction", "instruction_id": "I0002" },
+        { "offset": 8, "size": 8, "kind": "fill", "fill_byte": 0 }
       ]
     }
   ],
   "symbols": [
-    { "symbol_id": "S1", "name": "ext_data", "kind": "external", "binding": "global" }
+    { "symbol_id": "S1", "name": "blob", "kind": "defined", "binding": "local", "section_id": ".text", "offset": 8 }
   ],
   "instructions": [
     {
       "instruction_id": "I0001",
       "section_id": ".text",
       "offset": 0,
-      "form_id": "aarch64:adrp/x64",
+      "form_id": "aarch64:adrp/x64-imm21",
       "operands": [
-        { "role": "dest", "kind": "aarch64.xreg", "target_type": "xreg", "payload": { "reg": 0 }, "modifiers": [] },
-        { "role": "target", "kind": "aarch64.symbol", "target_type": "symbol", "payload": { "symbol_id": "S1" }, "modifiers": [] }
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "target", "kind": "aarch64.rel", "target_type": "imm21", "payload": { "symbol_id": "S1" }, "modifiers": [] }
       ],
       "expected_size": 4
     },
@@ -52,11 +54,11 @@
       "instruction_id": "I0002",
       "section_id": ".text",
       "offset": 4,
-      "form_id": "aarch64:add/x64-imm12-lo12",
+      "form_id": "aarch64:add/x64-imm12-lsl0",
       "operands": [
-        { "role": "dest", "kind": "aarch64.xreg", "target_type": "xreg", "payload": { "reg": 0 }, "modifiers": [] },
-        { "role": "src", "kind": "aarch64.xreg", "target_type": "xreg", "payload": { "reg": 0 }, "modifiers": [] },
-        { "role": "imm", "kind": "aarch64.lo12", "target_type": "lo12", "payload": { "symbol_id": "S1" }, "modifiers": [] }
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "src", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "imm", "kind": "aarch64.imm", "target_type": "imm12", "payload": {}, "modifiers": [] }
       ],
       "expected_size": 4
     }
@@ -67,15 +69,15 @@
       "section_id": ".text",
       "offset": 0,
       "field_descriptor": [
-        { "lsb": 29, "width": 2 },
-        { "lsb": 5, "width": 19 }
+        { "lsb": 5, "width": 19 },
+        { "lsb": 29, "width": 2 }
       ],
       "target": { "kind": "symbol", "symbol_id": "S1" },
       "addend": 0,
       "pc_reference_rule": "pcrel_page",
       "value_transform": "page",
-      "range_constraint": { "signed": true, "bits": 21, "align_bits": 12 },
-      "resolution_mode": "emit_relocation",
+      "range_constraint": { "signed": true, "bits": 21, "align_bits": 0 },
+      "resolution_mode": "resolve_in_place",
       "pair_group": "G1",
       "pair_role": "hi"
     },
@@ -91,13 +93,13 @@
       "pc_reference_rule": "none",
       "value_transform": "lo12_i",
       "range_constraint": { "signed": false, "bits": 12, "align_bits": 0 },
-      "resolution_mode": "emit_relocation",
+      "resolution_mode": "resolve_in_place",
       "pair_group": "G1",
       "pair_role": "lo"
     }
   ],
   "provenance": {
     "materializer_version": "0.1.0-draft",
-    "notes": "Illustrative pair shape only. Bit positions shown for discussion; digest is a placeholder."
+    "notes": "Level 1 illustration only (artifact: sections, include_symbol_table: true). fmp/0.1 ships Level 0, so this plan is rejected E-VERSION-001 before materialization. Shape mirrors A64-P6-adrp-lo12-pair."
   }
 }

@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-08
-Phase: **4 complete**: Phase 3 is complete (eighty-four definition documents, the materializer and the fixture gate; all 40 `EC` rows frozen; every directive §6.1/§6.2/§6.3 item carried). `EXP-R3` passes on three CI hosts, the invariant-to-test map in `01_contract.md` is filled, and every row is `verified`: `N22` closes INV-04 and `N23a` closes INV-06 with an expression-shaped scalar rejected at read time
+Phase: **5 complete**: Phase 4 is complete (all eight invariants `verified`; `EXP-R3` passes on three CI hosts; `N22` closes INV-04 and `N23a` closes INV-06). Phase 5 froze the contract set for the v0 scope (`ADR-0095`), published `08_final_recommendation.md` (§A–§H plus Q1–Q10) and closed `AC-10` with the Phase 6 roadmap M1–M5
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -16,7 +16,7 @@ this file plus `AGENTS.md` alone.
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
 | 3 | Three-ISA vertical prototype | **complete** (2026-11-08): eighty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 71 positive and 468 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate; exit criteria below |
 | 4 | Invariants, negative tests, replay | **complete** (2026-11-08): `EXP-R1`–`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs`; `EXP-R3` also passes on Ubuntu 24.04 (`x86_64`), macOS 26.7.2 (`aarch64`) and Windows Server 2025 with the pinned 1.96.0 toolchain (`EXP-0033` §6, run 42402997326); the invariant-to-test map in `01_contract.md` §2 is filled and every row is `verified` (`N22` closes `E-LAYOUT-004`/`006`/`007`, `N23a` closes the expression-shaped-value gap in INV-06) |
-| 5 | Convergence, route evaluation, roadmap | not started |
+| 5 | Convergence, route evaluation, roadmap | **complete** (2026-11-08): `08_final_recommendation.md` §A–§H and Q1–Q10; `ADR-0095` moves the contract set to `frozen for the v0 scope`; `AC-10` satisfied; Phase 6 order fixed as M1 error-coverage gate → M2 oracle rerun harness → M3 Level 1 object writer → M4 planner boundary → M5 coverage widening |
 
 ## Gates
 
@@ -251,14 +251,16 @@ not cover is caught only by the weaker size check; it is now settled, and
 
 ## Next action
 
-Phase 3 and Phase 4 are complete. `EXP-R3` passes on the three CI hosts
-(`EXP-0033` §6), the invariant-to-test map in `01_contract.md` §2 is filled with
-every row `verified`, `N22` pins the ordering and uniqueness rules of INV-04
-(`E-LAYOUT-004`/`006`/`007`), and `N23a` pins INV-06 by rejecting an
-expression-shaped scalar at read time. The next action is a Phase 5 decision, not
-more Phase 4 work: choose the first convergence/roadmap question and open it as
-an ADR. The numbered list below is the widening backlog retained for a later
-phase; no item is part of the Phase 3 close-out, and each still needs its own ADR
+Phases 3, 4 and 5 are complete. Phase 5 published
+`08_final_recommendation.md` (§A–§H plus Q1–Q10) and `ADR-0095` moved the contract
+set to `frozen for the v0 scope`; `AC-10` is satisfied. The next action is **M1,
+the error-coverage gate**: add one end-to-end negative fixture for each of the
+eight reachable uncovered codes listed in `04_errors.md` §2.4
+(`E-PLAN-001`, `E-PLAN-006`, `E-TARGET-002`, `E-TARGET-004`, `E-SYMBOL-002`,
+`E-SYMBOL-003`, `E-FIXUP-008`, `E-VERSION-001`). After M1, the order is fixed:
+M2 oracle rerun harness, M3 Level 1 object writer, M4 planner boundary/API, M5
+coverage widening (`08_final_recommendation.md` §H). The numbered list below is
+the widening backlog retained for M5 and later; each item still needs its own ADR
 before a table changes.
 
 ### Widening backlog

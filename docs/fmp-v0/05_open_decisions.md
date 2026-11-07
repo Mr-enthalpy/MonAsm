@@ -1,8 +1,8 @@
 # Open Decisions
 
-Status: **draft**. Each entry states the question, the candidate answers, the
-evidence that would settle it, and the acceptance criterion it blocks. Nothing
-here is decided until it says `accepted`.
+Status: **frozen for the v0 scope** (`ADR-0095`); every `OD-*` row is
+`accepted`. Each entry states the question, the candidate answers, the evidence
+that settled it, and the acceptance criterion it blocked.
 
 | ID | Question | Options | Evidence needed | Blocks | Status |
 |---|---|---|---|---|---|
