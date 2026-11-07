@@ -14,7 +14,7 @@ this file plus `AGENTS.md` alone.
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
-| 3 | Three-ISA vertical prototype | **in progress**: eighty-one definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 66 positive and 431 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate |
+| 3 | Three-ISA vertical prototype | **in progress**: eighty-two definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 67 positive and 438 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate |
 | 4 | Invariants, negative tests, replay | **in progress**: `EXP-R1`/`R2`/`R4`/`R5`/`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs` (`EXP-0033`); `EXP-R3` is `unverified` because only one host exists |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
@@ -25,7 +25,7 @@ this file plus `AGENTS.md` alone.
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
 | G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **in progress**: 33 of 40 rows are frozen; the 7 rows still `draft` are EC-10, EC-16, EC-18, EC-23, EC-24, EC-25 and EC-26, and none of them is needed by the three slices as they stand |
-| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 66 positive, 431 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 12 negative) |
+| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 67 positive, 438 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 12 negative) |
 
 ## Decisions
 
@@ -120,6 +120,7 @@ this file plus `AGENTS.md` alone.
 | ADR-0087 | The `0x67 66` rows take the no-base indexed shape: `0.60.0` appends eight rows (four `REX` windows × two directions, `disp32` only) where `mod = 00` and `SIB.base = 101` free the base slot, so `movw 8(,%ecx,1), %ax` is `67 66 8b 04 0d 08 00 00 00` (nine bytes; `0x67` at byte 0, `0x66` at byte 1, opcode at byte 2, `ModRM = 04` at byte 3, `SIB = 0d` at byte 4, `disp32` at `[40,32]`) and `movw 8(,%r9d,1), %r8w` is `67 66 46 8b 04 0d 08 00 00 00` (ten, `REX = 46` at byte 2 and every later field eight bits higher: value `[35,3]`, index `[43,3]`, scale `[46,2]`, displacement `[48,32]`). There is no `base` role and no `REX.B` bit; the displacement is four bytes at every value, including zero (`67 66 8b 04 0d 00 00 00 00`). `SIB.base = 101` carries the no-base meaning, so index `4` with `REX.X = 1` names `%r12d` (`67 66 42 8b 04 25 08 00 00 00`) while the bare row rejects `4` (`E-RANGE-004`, `N16da`) and the `RX` row rejects `0` (`N16db`); a missing index and a supplied base are both `E-OPERAND-002` (`N02cg`/`N02ch`), scale `4` is `E-RANGE-001` (`N03zm`), a value past its four-bit field is `E-OPERAND-004` (`N14bx`), and naming a row against `0.59.0` is `E-FORM-001` (`N01dv`/`N01dw`). The `REX.W` siblings stay deferred: `llvm-mc` never emits the redundant `0x66` before `REX.W` (`data16` emits a standalone byte), so there is no asm→obj oracle. `EC-02`, `EC-06`, `EC-08`, `EC-37` and `EC-38` are revised in place; no `EC` row is added or renumbered, and no schema or Rust change | accepted 2026-11-08 |
 | ADR-0088 | The no-base indexed shape reaches the 32-bit value width: `0.61.0` appends eight rows (four `REX` windows × two directions, `disp32` only) where the absent `0x66` removes one geometry, so `movl 8(,%ecx,1), %eax` is `67 8b 04 0d 08 00 00 00` (eight bytes; `0x67` at byte 0, opcode at byte 1, `ModRM = 04` at byte 2, `SIB = 0d` at byte 3, value `[19,3]`, index `[27,3]`, scale `[30,2]`, `disp32` at `[32,32]`) and `movl 8(,%r9d,1), %r8d` is `67 46 8b 04 0d 08 00 00 00` (nine, `REX = 46` at byte 1 with `R` at `[10,1]` and `X` at `[9,1]`, so every later field is eight bits higher: `[27,3]`/`[35,3]`/`[38,2]`/`[40,32]`). There is no `base` role and no `REX.B` bit; the displacement is four bytes at every value, including zero (`67 8b 04 0d 00 00 00 00`). `SIB.base = 101` carries the no-base meaning, so index `4` with `REX.X = 1` names `%r12d` (`67 42 8b 04 25 08 00 00 00`) while the bare row rejects `4` (`E-RANGE-004`, `N16dc`) and the `RX` row rejects `0` (`N16dd`); a missing index and a supplied base are both `E-OPERAND-002` (`N02ci`/`N02cj`), scale `4` is `E-RANGE-001` (`N03zn`), a value past its four-bit field is `E-OPERAND-004` (`N14by`), and naming a row against `0.60.0` is `E-FORM-001` (`N01dx`/`N01dy`). The `REX.W` `movq` shape (`67 48`/`67 4c`/`67 4a`/`67 4e`) stays deferred: `REX.W` is mandatory there and `R`/`X` are free bits inside it. `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37` and `EC-38` are revised in place; no `EC` row is added or renumbered, and no schema or Rust change | accepted 2026-11-08 |
 | ADR-0089 | The no-base indexed shape reaches the 64-bit value width: `0.62.0` appends two rows, one per direction, because `REX.W` is mandatory and the `REX` byte therefore always exists. `movq 8(,%ecx,1), %rax` is `67 48 8b 04 0d 08 00 00 00` (nine bytes; `0x67` at byte 0, `REX` at byte 1, opcode at byte 2, `ModRM = 04` at byte 3, `SIB = 0d` at byte 4) with the value at `[10,1]`+`[27,3]`, the index at `[9,1]`+`[35,3]`, the scale at `[38,2]` and `disp32` at `[40,32]`. `R` and `X` are free bits of that one byte, so `0x48`/`0x4c`/`0x4a`/`0x4e` are the same form and one row per direction covers all sixteen value registers and indexes. There is no `base` role and no `REX.B` bit; the displacement is four bytes at every value, including zero (`67 48 8b 04 0d 00 00 00 00`). `SIB.base = 101` carries the no-base meaning, so `%r12d` is legal through `REX.X = 1` (`67 4a 8b 04 25 08 00 00 00`) while index `4` with `REX.X = 0` is `E-RANGE-004` (`N16de`); a missing index and a supplied base are both `E-OPERAND-002` (`N02ck`/`N02cl`), scale `4` is `E-RANGE-001` (`N03zo`), a value or index past its four-bit field is `E-OPERAND-004` (`N14bz`/`N14ca`), and naming a row against `0.61.0` is `E-FORM-001` (`N01dz`/`N01ea`). `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37` and `EC-38` are revised in place; no `EC` row is added or renumbered, and no schema or Rust change | accepted 2026-11-08 |
+| ADR-0090 | The absolute `SIB = 25` shape gains the `0x67` prefix at the 32-bit value width: `0.63.0` appends four rows (bare and `REX.R` x two directions). `addr32 movl 4660, %eax` is `67 8b 04 25 34 12 00 00` (eight bytes; `0x67` at byte 0, opcode at byte 1, `ModRM = 04` at byte 2, `SIB = 25` at byte 3, `disp32` at `[32,32]`) with the value at `[19,3]`; the `REX` row puts `REX` at byte 1, the value at `[10,1]`+`[27,3]` (excluding `0`-`7`) and the displacement at `[40,32]`. `SIB = 25` is `scale = 00`/`index = 100`/`base = 101`, so the address carries no register: there is no `base`, `index` or `scale` slot and no `REX.B`/`REX.X` bit, and a supplied base is `E-OPERAND-002` (`N02cm`). The displacement is four bytes at every value, including zero (`67 8b 04 25 00 00 00 00`), and `2147483648` is `E-RANGE-001` (`N03zp`); the bare three-bit value field rejects `8` (`N14cc`), the extended four-bit one rejects `16` (`N14cb`), value `0` on the `-ext` row is `E-RANGE-004` (`N16df`), and naming a row against `0.62.0` is `E-FORM-001` (`N01eb`/`N01ec`). `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37` and `EC-38` are revised in place; no `EC` row is added or renumbered, and no schema or Rust change | accepted 2026-11-08 |
 
 ## Settled decisions (contract level)
 
@@ -1032,6 +1033,17 @@ not cover is caught only by the weaker size check; it is now settled, and
    `N01dz`/`N01ea`/`N02ck`/`N02cl`/`N03zo`/`N14bz`/`N14ca`/`N16de` pin
    both version boundaries, the missing index, the supplied base, the
    scale end, both four-bit field ends and the index constant.
+   `X86-P67` takes the absolute `SIB = 25` shape behind `0x67`
+   (`ADR-0090`): `addr32 movl 4660, %eax` is
+   `67 8b 04 25 34 12 00 00` (eight bytes) with no address register at
+   all, because `SIB = 25` is the `scale = 00`/`index = 100`/`base = 101`
+   constant. The `REX.R` rows are nine bytes (`67 44 8b 04 25 …`), so
+   `0.63.0` appends four rows.
+   `X86-P67-gpr32-mov-addr32-abs32` matches `llvm-mc` (84 bytes, ten
+   instructions, no record), and
+   `N01eb`/`N01ec`/`N02cm`/`N03zp`/`N14cb`/`N14cc`/`N16df` pin both
+   version boundaries, the supplied base, the signed displacement end,
+   both value-field ends and the extended window floor.
 4. Contract debt is closed: `OD-05` (unknown fields/extensions) by ADR-0031,
    pinned by `N21a`/`N21b` and the definition unit test, and `OD-08` (canonical
    wire form) by ADR-0032, pinned by `EXP-R4`. The Level 1 artifact envelope
@@ -1196,7 +1208,11 @@ shifted fields revise `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37` and
 `0.62.0.json` (four hundred and ninety-nine forms, digest `sha256:bbcd8062…`,
 the two `0x67` no-base indexed 64-bit rows whose mandatory `REX.W` and
 free `R`/`X` bits revise `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37` and
-`EC-38` in place);
+`EC-38` in place and
+`0.63.0.json` (five hundred and three forms, digest `sha256:72c7e8f2…`,
+the four `0x67` absolute `SIB = 25` rows whose constant `SIB`, shifted
+`REX.R` geometry and absent address roles revise `EC-02`, `EC-06`,
+`EC-07`, `EC-08`, `EC-37` and `EC-38` in place);
 `EXP-0004` (223 decoded byte strings across the seven `0.1.0` rows, plus the
 `OD-06` digest measurement); `EXP-0005` (9 positive fixtures against LLVM
 23.1.2, with the decode-verified caveat on five instructions); `EXP-0029` (the
@@ -1391,8 +1407,14 @@ displacement, one geometry with `R`/`X` as free bits (`48`/`4c`/`4a`/`4e`),
 index `4` under `REX.X` as `%r12d`, the x4 and x8 scales, the base+index,
 `movw` and `movl` siblings, the 64-bit-addressing and absolute neighbours,
 `%esp` as an index and a 32-bit value register);
+`EXP-0092` (the eight- and nine-byte `0x67` absolute `SIB = 25` rows, the
+constant `SIB` byte, the `[32,32]`/`[40,32]` geometry split behind
+`REX.R`, the mandatory four-byte displacement and its signed ends,
+`%r15d` as the value, the absolute row without `0x67`, the 64-bit and
+16-bit siblings, the indexed and base+index neighbours, the two `moffs`
+forms, the `0x67` RIP-relative row and two rejected spellings);
 and
-500
+507
 negative fixtures whose
 complete diagnostic sets — code, JSON Pointer, detail keys — are compared for
 exact equality. `E-OPERAND-004`/`N14` (an operand wider than its field) is one
