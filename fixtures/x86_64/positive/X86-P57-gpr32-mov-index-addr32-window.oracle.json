@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0082/probe.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "206a660a1b1acbccdafc5578ff400fc9abbd3be7397f1e08b3fa1b3066dc9df2",
+  "output_sha256": "1aa6ee42b4f922df655eb5d2258f4ed887b3b3f42c7caf294533889f8dc7c96f",
+  "size": 56,
+  "records": 0,
+  "notes": "The four 0.53.0 rows: the 0x67 address-size prefix on the 32-bit indexed mov, both directions at disp8 and disp32. 0x67 is byte 0 and the opcode moves to byte 1, so ModRM is byte 2 (register [19,3]) and SIB is byte 3 (base [24,3], index [27,3], scale [30,2]), with the displacement at [32,8] or [32,32]. The base and index are 32-bit address registers. The disp8 rows are five bytes (67 8b/89 44 08 08) and the disp32 rows are eight. Six extra instructions cover %esp as a base (67 8b 44 0c 08), %ebp as a base (67 8b 44 0d 08), %edi/%esi at x4 (67 8b 7c b7 08), the x8 scale (67 8b 44 c8 08), a negative displacement (67 8b 44 08 f8) and %edx/%ebx at x2 (67 8b 44 5a 08). input_sha256 is probe.asm; output_sha256 is the 56-byte .text."
+}

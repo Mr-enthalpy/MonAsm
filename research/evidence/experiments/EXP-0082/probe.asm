@@ -1,0 +1,10 @@
+movl 8(%eax,%ecx,1), %eax
+movl %eax, 8(%eax,%ecx,1)
+movl 200(%eax,%ecx,1), %eax
+movl %eax, 200(%eax,%ecx,1)
+movl 8(%esp,%ecx,1), %eax
+movl 8(%ebp,%ecx,1), %eax
+movl 8(%edi,%esi,4), %edi
+movl 8(%eax,%ecx,8), %eax
+movl -8(%eax,%ecx,1), %eax
+movl 8(%edx,%ebx,2), %eax

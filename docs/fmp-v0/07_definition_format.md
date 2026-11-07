@@ -292,6 +292,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.50.0.json` | `monasm.isa.x86` | `sha256:6f38e272ef1464b5067053c7a10d744adee19699fbe4ecbc0928fb3c8f7da75a` |
 | `definitions/x86_64/0.51.0.json` | `monasm.isa.x86` | `sha256:e73395dffc494d13d0b142cbba0e4c55a40d19bcd68a6b793025156bbcb41bc5` |
 | `definitions/x86_64/0.52.0.json` | `monasm.isa.x86` | `sha256:4587b149e1119681ffefe011862343d8bccd0f52dbe7d278a0afb05517f7f7ae` |
+| `definitions/x86_64/0.53.0.json` | `monasm.isa.x86` | `sha256:9c4c913f51e0e74710f416cd03d1547e6d4af4f2b678c1f1c4ae46f5722ff52b` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -314,7 +315,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.52.0`
+### 8.1 `x86-64` `0.1.0` … `0.53.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -731,6 +732,10 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:mov/base-ext-index-ext-disp8-r32-ext/legacy` | `4789440000` | src: `x86.gpr32`/`r32` → `[2,1]`, `[19,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); index: `x86.gpr64`/`sib_index` → `[1,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-02`, `EC-06`, `EC-27`, `EC-37`, `EC-38`, `X86-P56` |
 | `x86:mov/r32-ext-base-ext-index-ext-disp32/legacy` | `478b840000000000` | dest: `x86.gpr32`/`r32` → `[2,1]`, `[19,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); index: `x86.gpr64`/`sib_index` → `[1,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-06`, `EC-27`, `EC-37`, `EC-38`, `X86-P56` |
 | `x86:mov/base-ext-index-ext-disp32-r32-ext/legacy` | `4789840000000000` | src: `x86.gpr32`/`r32` → `[2,1]`, `[19,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); base: `x86.gpr64`/`rm64` → `[0,1]`, `[24,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); index: `x86.gpr64`/`sib_index` → `[1,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-06`, `EC-27`, `EC-37`, `EC-38`, `X86-P56` |
+| `x86:mov/r32-addr32-base-index-disp8/legacy` | `678b440000` | dest: `x86.gpr32`/`r32` → `[19,3]`; base: `x86.gpr32`/`rm32` → `[24,3]`; index: `x86.gpr32`/`sib_index32` → `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-02`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P57` |
+| `x86:mov/addr32-base-index-disp8-r32/legacy` | `6789440000` | src: `x86.gpr32`/`r32` → `[19,3]`; base: `x86.gpr32`/`rm32` → `[24,3]`; index: `x86.gpr32`/`sib_index32` → `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-02`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P57` |
+| `x86:mov/r32-addr32-base-index-disp32/legacy` | `678b840000000000` | dest: `x86.gpr32`/`r32` → `[19,3]`; base: `x86.gpr32`/`rm32` → `[24,3]`; index: `x86.gpr32`/`sib_index32` → `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P57` |
+| `x86:mov/addr32-base-index-disp32-r32/legacy` | `6789840000000000` | src: `x86.gpr32`/`r32` → `[19,3]`; base: `x86.gpr32`/`rm32` → `[24,3]`; index: `x86.gpr32`/`sib_index32` → `[27,3]` (excl 4); imm: `x86.scale`/`scale2` → `[30,2]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | `EC-02`, `EC-08`, `EC-27`, `EC-37`, `EC-38`, `X86-P57` |
 
 Placements are written `[bit_offset, width]`, with ` inverted` appended when the
 chunk is complemented. In the legacy SSE row
@@ -1648,9 +1653,25 @@ index, so a low value on any of the three is `E-RANGE-004`
 `47 89 64 24 08`), `%r15`/`%r15` with `%r15d` at x8 is `47 8b 7c ff 08`, and
 `%rsp` as an index stays rejected. A missing index is `E-OPERAND-002`
 (`N02bv`), scale `4` is `E-RANGE-001` (`N03ze`), and naming a row against
-`0.51.0` is `E-FORM-001` (`N01df`/`N01dg`). Still deferred: the `0x67` prefix,
-a symbol in a displacement, the no-base indexed shape, the APX `d5` window,
-and EVEX masking/broadcast on these rows.
+`0.51.0` is `E-FORM-001` (`N01df`/`N01dg`). Still deferred: the `0x67`+`REX`
+windows, a symbol in a displacement, the no-base indexed shape, the APX `d5`
+window, and EVEX masking/broadcast on these rows.
+
+`0.53.0` puts the address-size prefix in front of that shape (`ADR-0080`):
+`0x67` is template byte 0 and the opcode moves to byte 1, so `ModRM` is byte 2
+and `SIB` byte 3 exactly as in the `0.51.0` geometry. `movl 8(%eax,%ecx,1),
+%eax` is `67 8b 44 08 08` (five bytes) and `movl 200(%eax,%ecx,1), %eax` is
+`67 8b 84 08 c8 00 00 00` (eight). The register is still `x86.gpr32`/`r32` at
+`[19,3]`, but the base and index are 32-bit address registers: `x86.gpr32`/
+`rm32` at `[24,3]` and `x86.gpr32`/`sib_index32` at `[27,3]` (index `4`
+excluded), with the scale at `[30,2]` and the displacement at
+`[32,8]`/`[32,32]`. `%esp` is a legal base (`67 8b 44 0c 08`) and `%ebp` is a
+legal index (`67 8b 44 28 08`), while `%esp` as an index is rejected. All three
+address slots are three bits, so `8`–`15` is `E-OPERAND-004`; the `0x67`+`REX`
+windows are the deferred forms (`67 47 8b 44 08 08`, `67 44 8b 44 08 08`). A
+missing index is `E-OPERAND-002` (`N02bw`), scale `4` is `E-RANGE-001`
+(`N03zf`), index `4` is `E-RANGE-004` (`N16cl`), and naming a row against
+`0.52.0` is `E-FORM-001` (`N01dh`/`N01di`).
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 
