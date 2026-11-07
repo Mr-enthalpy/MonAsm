@@ -1,0 +1,11 @@
+	movw	8(%eax,%ecx), %ax               # encoding: [0x67,0x66,0x8b,0x44,0x08,0x08]
+	movl	8(,%r9d), %eax                  # encoding: [0x67,0x42,0x8b,0x04,0x0d,0x08,0x00,0x00,0x00]
+	movw	8(,%rcx), %ax                   # encoding: [0x66,0x8b,0x04,0x0d,0x08,0x00,0x00,0x00]
+	movw	4660, %ax                       # encoding: [0x66,0x8b,0x04,0x25,0x34,0x12,0x00,0x00]
+	movq	8(,%r9), %rax                   # encoding: [0x4a,0x8b,0x04,0x0d,0x08,0x00,0x00,0x00]
+C:\Users\hanni\Projects\MonAsm\research\evidence\experiments\EXP-0089\adjacent.asm:6:8: error: invalid base+index expression
+movw 8(,%esp,1), %ax
+       ^
+C:\Users\hanni\Projects\MonAsm\research\evidence\experiments\EXP-0089\adjacent.asm:7:18: error: invalid operand for instruction
+movw 8(,%r9d,1), %eax
+                 ^~~~

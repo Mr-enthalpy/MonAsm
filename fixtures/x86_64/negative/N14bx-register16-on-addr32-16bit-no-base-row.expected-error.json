@@ -1,0 +1,13 @@
+{
+  "errors": [
+    {
+      "code": "E-OPERAND-004",
+      "path": "/instructions/0/operands/0/payload/reg",
+      "detail_keys": [
+        "field_bits",
+        "target_type",
+        "value"
+      ]
+    }
+  ]
+}

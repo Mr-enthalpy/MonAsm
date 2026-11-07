@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0089/probe.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "411d20729c21d72baf94443a5c2d75ced5dbae2718e8ff0e0ffd64dd76cb6641",
+  "output_sha256": "d1c9a143fb638c0a66cdb92745312417be3696024461818af6cffd29bb879152",
+  "size": 125,
+  "records": 0,
+  "notes": "The eight 0.60.0 rows: the 0x67 0x66 movw no-base indexed shape (ModRM 04, SIB.base 101, disp32 mandatory) across the four REX windows (none, 44 value, 42 index, 46 both), both directions, plus six corners: zero displacement, -8, the x4 scale (SIB 8d), %r12d as the index under REX.X (67 66 42 8b 04 25 08 00 00 00) and 4660(,%r15d,8), %r15w (67 66 46 8b 3c fd 34 12 00 00). 0x67 is byte 0, 0x66 byte 1, REX byte 2 when present, the opcode byte 3, ModRM 04 byte 4 and SIB at byte 5 with index [43,3] and scale [46,2]; the displacement is signed at [48,32] and the value at [35,3]. There is no base slot, so no REX.B bit exists. input_sha256 is probe.asm; output_sha256 is the 125-byte .text."
+}

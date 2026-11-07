@@ -1,0 +1,13 @@
+movw 8(,%ecx,1), %ax
+movw %ax, 8(,%ecx,1)
+movw 8(,%ecx,1), %r8w
+movw %r8w, 8(,%ecx,1)
+movw 8(,%r9d,1), %ax
+movw %ax, 8(,%r9d,1)
+movw 8(,%r9d,1), %r8w
+movw %r8w, 8(,%r9d,1)
+movw 0(,%ecx,1), %ax
+movw -8(,%ecx,1), %ax
+movw 8(,%ecx,4), %ax
+movw 8(,%r12d,1), %ax
+movw 4660(,%r15d,8), %r15w
