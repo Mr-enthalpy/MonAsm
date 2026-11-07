@@ -334,8 +334,12 @@ ADR-0085 adds the three single-`REX` windows on that pair: the `REX` byte sits
 at position 2, so `8(%eax,%ecx,1), %r8w` is `67 66 44 8b 44 08 08` and
 `200(%eax,%ecx,1), %r8w` is `67 66 44 8b 84 08 c8 00 00 00` (ten bytes). `R`
 widens the value, `B` the base (`67 66 41 8b 44 08 08`) and `X` the index
-(`67 66 42 8b 44 08 08`), while the address registers stay 32-bit; the two-bit
-windows (`%r12w` with `%r12d` is `67 66 45 8b 64 0c 08`) stay deferred.
+(`67 66 42 8b 44 08 08`), while the address registers stay 32-bit.
+ADR-0086 adds the four two-`REX`-bit windows on the same pair: `RB` (`0x45`)
+widens the value and the base (`8(%r8d,%ecx,1), %r8w` is `67 66 45 8b 44 08
+08`), `RX` (`0x46`) the value and the index, `BX` (`0x43`) the base and the
+index and `RBX` (`0x47`) all three, with `200(%r8d,%ecx,1), %r8w` ten bytes
+(`67 66 45 8b 84 08 c8 00 00 00`); index `4` with `REX.X = 1` names `%r12d`.
 ADR-0057 carries that fourth window into the memory rows, where one `REX`
 byte holds both extension bits: `8(%rax), %r8b` is `44 8a 40 08` and
 `8(%r8), %r8b` is `45 8a 40 08` (four bytes each, `REX.R` at `[2,1]` and
@@ -344,17 +348,17 @@ byte holds both extension bits: `8(%rax), %r8b` is `44 8a 40 08` and
 read two ways. Both directions appear in all three base windows at disp8
 and disp32, and the high-byte window cannot join (`8(%r8), %ah` is
 rejected; `8(%rax), %ah` is `8a 60 08`).
-Seventy-seven definition documents are frozen and oracle-verified; the materializer
+Seventy-eight definition documents are frozen and oracle-verified; the materializer
 and its fixture gate are implemented.
 
 | Area | State |
 |---|---|
 | Contract (`docs/fmp-v0/01_contract.md`) | draft, fields marked `TBD` where unproven |
 | Schema (`schema/fmp-v0.schema.json`) | draft, examples validate |
-| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), `0.2.0` (9 forms), `0.3.0` (17 forms), `0.4.0` (22 forms), `0.5.0` (25 forms), `0.6.0` (25 forms), `0.7.0` (29 forms), `0.8.0` (33 forms), `0.9.0` (45 forms), `0.10.0` (53 forms), `0.11.0` (62 forms), `0.12.0` (74 forms), `0.13.0` (74 forms), `0.14.0` (79 forms), `0.15.0` (91 forms), `0.16.0` (103 forms), `0.17.0` (119 forms), `0.18.0` (127 forms), `0.19.0` (155 forms), `0.20.0` (171 forms), `0.21.0` (195 forms) and `0.22.0` (207 forms) and `0.23.0` (225 forms) and `0.24.0` (231 forms) and `0.25.0` (237 forms) and `0.26.0` (239 forms) and `0.27.0` (243 forms) and `0.28.0` (247 forms) and `0.29.0` (255 forms) and `0.30.0` (267 forms) and `0.31.0` (275 forms) and `0.32.0` (289 forms) and `0.33.0` (291 forms) and `0.34.0` (295 forms) and `0.35.0` (301 forms) and `0.36.0` (309 forms) and `0.37.0` (315 forms) and `0.38.0` (321 forms) and `0.39.0` (329 forms) and `0.40.0` (337 forms) and `0.41.0` (345 forms) and `0.42.0` (353 forms) and `0.43.0` (361 forms) and `0.44.0` (369 forms) and `0.45.0` (373 forms) and `0.46.0` (377 forms) and `0.47.0` (385 forms) and `0.48.0` (389 forms) and `0.49.0` (393 forms) and `0.50.0` (405 forms) and `0.51.0` (409 forms) and `0.52.0` (413 forms) and `0.53.0` (417 forms) and `0.54.0` (429 forms) and `0.55.0` (445 forms) and `0.56.0` (449 forms) and `0.57.0` (453 forms) and `0.58.0` (465 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms), `0.8.0` (32 forms), `0.9.0` (44 forms), `0.10.0` (68 forms), `0.11.0` (92 forms), `0.12.0` (132 forms), `0.13.0` (135 forms), `0.14.0` (136 forms), `0.15.0` (152 forms), `0.16.0` (168 forms) and `0.17.0` (176 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
+| Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), `0.2.0` (9 forms), `0.3.0` (17 forms), `0.4.0` (22 forms), `0.5.0` (25 forms), `0.6.0` (25 forms), `0.7.0` (29 forms), `0.8.0` (33 forms), `0.9.0` (45 forms), `0.10.0` (53 forms), `0.11.0` (62 forms), `0.12.0` (74 forms), `0.13.0` (74 forms), `0.14.0` (79 forms), `0.15.0` (91 forms), `0.16.0` (103 forms), `0.17.0` (119 forms), `0.18.0` (127 forms), `0.19.0` (155 forms), `0.20.0` (171 forms), `0.21.0` (195 forms) and `0.22.0` (207 forms) and `0.23.0` (225 forms) and `0.24.0` (231 forms) and `0.25.0` (237 forms) and `0.26.0` (239 forms) and `0.27.0` (243 forms) and `0.28.0` (247 forms) and `0.29.0` (255 forms) and `0.30.0` (267 forms) and `0.31.0` (275 forms) and `0.32.0` (289 forms) and `0.33.0` (291 forms) and `0.34.0` (295 forms) and `0.35.0` (301 forms) and `0.36.0` (309 forms) and `0.37.0` (315 forms) and `0.38.0` (321 forms) and `0.39.0` (329 forms) and `0.40.0` (337 forms) and `0.41.0` (345 forms) and `0.42.0` (353 forms) and `0.43.0` (361 forms) and `0.44.0` (369 forms) and `0.45.0` (373 forms) and `0.46.0` (377 forms) and `0.47.0` (385 forms) and `0.48.0` (389 forms) and `0.49.0` (393 forms) and `0.50.0` (405 forms) and `0.51.0` (409 forms) and `0.52.0` (413 forms) and `0.53.0` (417 forms) and `0.54.0` (429 forms) and `0.55.0` (445 forms) and `0.56.0` (449 forms) and `0.57.0` (453 forms) and `0.58.0` (465 forms) and `0.59.0` (481 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms), `0.8.0` (32 forms), `0.9.0` (44 forms), `0.10.0` (68 forms), `0.11.0` (92 forms), `0.12.0` (132 forms), `0.13.0` (135 forms), `0.14.0` (136 forms), `0.15.0` (152 forms), `0.16.0` (168 forms) and `0.17.0` (176 forms), rv64 `0.1.0` (7 forms) and `0.2.0` (8 forms) frozen, digests pinned |
 | Prototype (`prototype/`) | workspace compiled; all three slices materialize from the plan |
 | Oracles (`tools/oracle/`) | planned; `llvm-mc` (± `ld.lld`) drives the experiments |
-| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0087 |
+| Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0088 |
 
 Read `docs/STATUS.md` for the current phase, gate status, and next action.
 

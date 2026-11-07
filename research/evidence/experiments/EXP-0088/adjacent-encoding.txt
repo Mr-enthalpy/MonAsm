@@ -1,0 +1,14 @@
+	movw	8(%eax,%ecx), %ax               # encoding: [0x67,0x66,0x8b,0x44,0x08,0x08]
+	movw	8(%eax,%ecx), %r8w              # encoding: [0x67,0x66,0x44,0x8b,0x44,0x08,0x08]
+	movw	8(%r8d,%ecx), %ax               # encoding: [0x67,0x66,0x41,0x8b,0x44,0x08,0x08]
+	movw	8(%eax,%r9d), %ax               # encoding: [0x67,0x66,0x42,0x8b,0x44,0x08,0x08]
+	movl	8(%r8d,%r9d), %r8d              # encoding: [0x67,0x47,0x8b,0x44,0x08,0x08]
+	movw	8(%rax,%rcx), %ax               # encoding: [0x66,0x8b,0x44,0x08,0x08]
+	movw	8(%r12d,%r12d), %r12w           # encoding: [0x67,0x66,0x47,0x8b,0x64,0x24,0x08]
+	movw	8(%esp,%ecx), %ax               # encoding: [0x67,0x66,0x8b,0x44,0x0c,0x08]
+C:\Users\hanni\Projects\MonAsm\research\evidence\experiments\EXP-0088\adjacent.asm:9:8: error: invalid base+index expression
+movw 8(%eax,%esp,1), %ax
+       ^
+C:\Users\hanni\Projects\MonAsm\research\evidence\experiments\EXP-0088\adjacent.asm:10:22: error: invalid operand for instruction
+movw 8(%r8d,%r9d,1), %eax
+                     ^~~~
