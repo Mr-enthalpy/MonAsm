@@ -17,7 +17,7 @@ this file plus `AGENTS.md` alone.
 | 3 | Three-ISA vertical prototype | **complete** (2026-11-08): eighty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 71 positive and 476 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate; exit criteria below |
 | 4 | Invariants, negative tests, replay | **complete** (2026-11-08): `EXP-R1`–`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs`; `EXP-R3` also passes on Ubuntu 24.04 (`x86_64`), macOS 26.7.2 (`aarch64`) and Windows Server 2025 with the pinned 1.96.0 toolchain (`EXP-0033` §6, run 42402997326); the invariant-to-test map in `01_contract.md` §2 is filled and every row is `verified` (`N22` closes `E-LAYOUT-004`/`006`/`007`, `N23a` closes the expression-shaped-value gap in INV-06) |
 | 5 | Convergence, route evaluation, roadmap | **complete** (2026-11-08): `08_final_recommendation.md` §A–§H and Q1–Q10; `ADR-0095` moves the contract set to `frozen for the v0 scope`; `AC-10` satisfied; Phase 6 order fixed as M1 error-coverage gate → M2 oracle rerun harness → M3 Level 1 object writer → M4 planner boundary → M5 coverage widening |
-| 6 | Implementation roadmap (M1–M5) | **in progress**: M1 error-coverage gate **complete** (2026-11-08) with `N24a`–`N24h`; M2 oracle rerun harness next; M3–M5 pending |
+| 6 | Implementation roadmap (M1–M5) | **in progress**: M1 error-coverage gate **complete** (2026-11-08) with `N24a`–`N24h`, CI run `42407621760` green on Ubuntu, macOS and Windows; M2 oracle rerun harness next; M3–M5 pending |
 
 ## Gates
 
