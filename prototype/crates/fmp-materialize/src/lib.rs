@@ -25,37 +25,109 @@ use fmp_model::plan::{
 /// The version recorded in the artifact envelope. Audit only.
 pub const MATERIALIZER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// The materialized result: `01_contract.md` §11.1.
+/// The materialized result: `01_contract.md` §11.1 and §11.2.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Artifact {
+    /// The Level 0 image: image-backed sections concatenated in `section_order`.
     pub bytes: Vec<u8>,
+    /// `0` or `1`; Level 1 is `artifact: sections`.
+    pub level: u8,
+    /// One entry per `section_order` id, in that order (Level 1 payload).
+    pub sections: Vec<SectionImage>,
+    /// `Some` only when `include_symbol_table` asked for a table.
+    pub symbols: Option<Vec<SymbolEntry>>,
     /// Records in `fixup_record_order`, one per `emit_relocation` fixup.
     pub fixups: Vec<Record>,
     pub fingerprint: String,
 }
 
+/// One laid-out section in the Level 1 artifact (`01_contract.md` §11.2).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SectionImage {
+    pub section_id: String,
+    pub section_kind: String,
+    pub image_backed: bool,
+    pub base_address: Option<u64>,
+    /// The plan's `declared_size`; for an image-backed section this equals
+    /// `bytes.len()` (validation enforces exact fragment coverage).
+    pub size: u64,
+    pub bytes: Vec<u8>,
+}
+
+/// One declared symbol in the Level 1 artifact; no symbol is synthesized.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SymbolEntry {
+    pub symbol_id: String,
+    pub name: String,
+    pub kind: String,
+    pub binding: String,
+    pub section_id: Option<String>,
+    pub offset: Option<u64>,
+}
+
 impl Artifact {
     pub fn bytes_hex(&self) -> String {
-        let mut out = String::with_capacity(self.bytes.len() * 2);
-        for byte in &self.bytes {
-            out.push(nibble(byte >> 4));
-            out.push(nibble(byte & 0x0F));
-        }
-        out
+        hex(&self.bytes)
     }
 
-    /// The artifact envelope as a JSON value, in the order §11.1 lists.
+    /// The artifact envelope as a JSON value. Level 0 follows §11.1 exactly;
+    /// Level 1 follows §11.2 and never reuses the Level 0 field order.
     pub fn to_json(&self) -> Json {
-        let mut fixups = Vec::with_capacity(self.fixups.len());
-        for record in &self.fixups {
-            fixups.push(record.to_json());
+        if self.level == 0 {
+            return self.level_zero_json();
         }
+        let mut sections = Vec::with_capacity(self.sections.len());
+        for section in &self.sections {
+            let mut fields = vec![
+                (
+                    "section_id".to_string(),
+                    Json::Str(section.section_id.clone()),
+                ),
+                (
+                    "section_kind".to_string(),
+                    Json::Str(section.section_kind.clone()),
+                ),
+                ("image_backed".to_string(), Json::Bool(section.image_backed)),
+            ];
+            if let Some(address) = section.base_address {
+                fields.push(("base_address".to_string(), Json::Int(address as i128)));
+            }
+            fields.push(("size".to_string(), Json::Int(section.size as i128)));
+            fields.push(("bytes_hex".to_string(), Json::Str(hex(&section.bytes))));
+            sections.push(Json::Object(fields));
+        }
+
+        let mut entries = vec![
+            ("format_version".to_string(), text(codes::FORMAT_VERSION)),
+            ("level".to_string(), Json::Int(1)),
+            ("sections".to_string(), Json::Array(sections)),
+        ];
+        if let Some(symbols) = &self.symbols {
+            let mut list = Vec::with_capacity(symbols.len());
+            for symbol in symbols {
+                list.push(symbol.to_json());
+            }
+            entries.push(("symbols".to_string(), Json::Array(list)));
+        }
+        entries.push(("fixups".to_string(), self.fixups_json()));
+        entries.push((
+            "fingerprint".to_string(),
+            Json::Str(self.fingerprint.clone()),
+        ));
+        entries.push((
+            "materializer_version".to_string(),
+            Json::Str(MATERIALIZER_VERSION.to_string()),
+        ));
+        Json::Object(entries)
+    }
+
+    fn level_zero_json(&self) -> Json {
         Json::Object(vec![
             ("format_version".to_string(), text(codes::FORMAT_VERSION)),
             ("level".to_string(), Json::Int(0)),
             ("bytes_hex".to_string(), Json::Str(self.bytes_hex())),
             ("size".to_string(), Json::Int(self.bytes.len() as i128)),
-            ("fixups".to_string(), Json::Array(fixups)),
+            ("fixups".to_string(), self.fixups_json()),
             (
                 "fingerprint".to_string(),
                 Json::Str(self.fingerprint.clone()),
@@ -66,6 +138,41 @@ impl Artifact {
             ),
         ])
     }
+
+    fn fixups_json(&self) -> Json {
+        let mut fixups = Vec::with_capacity(self.fixups.len());
+        for record in &self.fixups {
+            fixups.push(record.to_json());
+        }
+        Json::Array(fixups)
+    }
+}
+
+impl SymbolEntry {
+    fn to_json(&self) -> Json {
+        let mut fields = vec![
+            ("symbol_id".to_string(), Json::Str(self.symbol_id.clone())),
+            ("name".to_string(), Json::Str(self.name.clone())),
+            ("kind".to_string(), Json::Str(self.kind.clone())),
+            ("binding".to_string(), Json::Str(self.binding.clone())),
+        ];
+        if let Some(section_id) = &self.section_id {
+            fields.push(("section_id".to_string(), Json::Str(section_id.clone())));
+        }
+        if let Some(offset) = self.offset {
+            fields.push(("offset".to_string(), Json::Int(offset as i128)));
+        }
+        Json::Object(fields)
+    }
+}
+
+fn hex(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        out.push(nibble(byte >> 4));
+        out.push(nibble(byte & 0x0F));
+    }
+    out
 }
 
 /// One RELA-shaped fixup record (`03_fixup_model.md` §8).
@@ -263,7 +370,7 @@ pub fn materialize(plan: &Plan, definition: &Definition) -> Result<Artifact, Vec
 
 fn emit(plan: &Plan, definition: &Definition) -> Result<Artifact, Vec<Diagnostic>> {
     let mut errors = Vec::new();
-    let mut image: Vec<u8> = Vec::new();
+    let mut sections: Vec<SectionImage> = Vec::new();
     let mut records: Vec<Record> = Vec::new();
 
     for section_id in &plan.output.section_order {
@@ -278,45 +385,52 @@ fn emit(plan: &Plan, definition: &Definition) -> Result<Artifact, Vec<Diagnostic
                 continue;
             }
         };
-        if !section.image_backed {
-            // No file bytes; `declared_size` is virtual.
-            continue;
-        }
-        let base = image.len() as u64;
-        image.resize(base as usize + section.declared_size as usize, 0);
-        for fragment in &section.fragments {
-            let at = (base + fragment.offset) as usize;
-            match &fragment.body {
-                FragmentBody::Fill(byte) => {
-                    for offset in 0..fragment.size as usize {
-                        image[at + offset] = *byte;
+        let mut bytes: Vec<u8> = Vec::new();
+        if section.image_backed {
+            bytes.resize(section.declared_size as usize, 0);
+            for fragment in &section.fragments {
+                let at = fragment.offset as usize;
+                match &fragment.body {
+                    FragmentBody::Fill(byte) => {
+                        for offset in 0..fragment.size as usize {
+                            bytes[at + offset] = *byte;
+                        }
                     }
-                }
-                FragmentBody::Data(hex) => {
-                    let bytes = decode_hex(hex);
-                    image[at..at + bytes.len()].copy_from_slice(&bytes);
-                }
-                FragmentBody::Instruction(instruction_id) => {
-                    let instruction = match plan
-                        .instructions
-                        .iter()
-                        .find(|instruction| &instruction.instruction_id == instruction_id)
-                    {
-                        Some(instruction) => instruction,
-                        None => {
-                            errors.push(internal("fragment names an unvalidated instruction"));
-                            continue;
+                    FragmentBody::Data(hex) => {
+                        let payload = decode_hex(hex);
+                        bytes[at..at + payload.len()].copy_from_slice(&payload);
+                    }
+                    FragmentBody::Instruction(instruction_id) => {
+                        let instruction = match plan
+                            .instructions
+                            .iter()
+                            .find(|instruction| &instruction.instruction_id == instruction_id)
+                        {
+                            Some(instruction) => instruction,
+                            None => {
+                                errors.push(internal("fragment names an unvalidated instruction"));
+                                continue;
+                            }
+                        };
+                        match encode_instruction(plan, definition, section, instruction) {
+                            Ok(encoded) => {
+                                bytes[at..at + encoded.len()].copy_from_slice(&encoded);
+                            }
+                            Err(found) => errors.extend(found),
                         }
-                    };
-                    match encode_instruction(plan, definition, section, instruction) {
-                        Ok(bytes) => {
-                            image[at..at + bytes.len()].copy_from_slice(&bytes);
-                        }
-                        Err(found) => errors.extend(found),
                     }
                 }
             }
         }
+        // A non-image-backed section keeps its virtual size and has no bytes.
+        sections.push(SectionImage {
+            section_id: section.section_id.clone(),
+            section_kind: section_kind_name(&section.section_kind).to_string(),
+            image_backed: section.image_backed,
+            base_address: section.base_address,
+            size: section.declared_size,
+            bytes,
+        });
     }
 
     // Records are collected from the plan, not from the fragment walk, so the
@@ -327,16 +441,103 @@ fn emit(plan: &Plan, definition: &Definition) -> Result<Artifact, Vec<Diagnostic
         }
     }
 
+    let symbols = if plan.output.include_symbol_table {
+        let mut entries = Vec::with_capacity(plan.symbols.len());
+        if let Some(order) = &plan.output.symbol_order {
+            // §12: the declared order is the emitted order; the validator has
+            // already required `symbols[]` to match it exactly.
+            for symbol_id in order {
+                match plan
+                    .symbols
+                    .iter()
+                    .find(|symbol| &symbol.symbol_id == symbol_id)
+                {
+                    Some(symbol) => entries.push(SymbolEntry::of(symbol)),
+                    None => errors.push(internal("symbol_order names an unvalidated symbol")),
+                }
+            }
+        } else {
+            let mut ordered: Vec<&fmp_model::plan::Symbol> = plan.symbols.iter().collect();
+            ordered.sort_by(|left, right| left.symbol_id.cmp(&right.symbol_id));
+            for symbol in ordered {
+                entries.push(SymbolEntry::of(symbol));
+            }
+        }
+        Some(entries)
+    } else {
+        None
+    };
+
     if !errors.is_empty() {
         diagnostic::sort(&mut errors);
         return Err(errors);
     }
 
+    // The Level 0 image is exactly the image-backed section bytes in
+    // `section_order`, so a Level 1 plan is still checked by the oracle bytes.
+    let image: Vec<u8> = sections
+        .iter()
+        .flat_map(|section| section.bytes.iter().copied())
+        .collect();
+    let level = match plan.output.artifact {
+        fmp_model::plan::Artifact::Bytes => 0,
+        fmp_model::plan::Artifact::Sections => 1,
+        fmp_model::plan::Artifact::Unknown(_) => {
+            return Err(vec![internal(
+                "an unvalidated artifact value reached emission",
+            )])
+        }
+    };
+
     Ok(Artifact {
         bytes: image,
+        level,
+        sections,
+        symbols,
         fixups: records,
         fingerprint: fingerprint(plan, definition),
     })
+}
+
+impl SymbolEntry {
+    fn of(symbol: &fmp_model::plan::Symbol) -> Self {
+        SymbolEntry {
+            symbol_id: symbol.symbol_id.clone(),
+            name: symbol.name.clone(),
+            kind: symbol_kind_name(&symbol.kind).to_string(),
+            binding: binding_name(&symbol.binding).to_string(),
+            section_id: symbol.section_id.clone(),
+            offset: symbol.offset,
+        }
+    }
+}
+
+fn section_kind_name(kind: &fmp_model::plan::SectionKind) -> &str {
+    match kind {
+        fmp_model::plan::SectionKind::Code => "code",
+        fmp_model::plan::SectionKind::Data => "data",
+        fmp_model::plan::SectionKind::Rodata => "rodata",
+        fmp_model::plan::SectionKind::Bss => "bss",
+        fmp_model::plan::SectionKind::Unknown(name) => name,
+    }
+}
+
+fn symbol_kind_name(kind: &fmp_model::plan::SymbolKind) -> &str {
+    match kind {
+        fmp_model::plan::SymbolKind::Defined => "defined",
+        fmp_model::plan::SymbolKind::Undefined => "undefined",
+        fmp_model::plan::SymbolKind::External => "external",
+        fmp_model::plan::SymbolKind::Unknown(name) => name,
+    }
+}
+
+fn binding_name(binding: &fmp_model::plan::Binding) -> &str {
+    match binding {
+        fmp_model::plan::Binding::Local => "local",
+        fmp_model::plan::Binding::Global => "global",
+        fmp_model::plan::Binding::Weak => "weak",
+        fmp_model::plan::Binding::Unknown(name) => name,
+    }
 }
 
 fn encode_instruction(
@@ -847,5 +1048,112 @@ mod tests {
         }
         let second_plan = fmp_model::plan::bind(&document).unwrap();
         assert_eq!(first, fingerprint(&second_plan, &definition));
+    }
+
+    fn level_one_plan() -> Plan {
+        fmp_model::plan::read(
+            include_str!(
+                "../../../../fixtures/x86_64/positive/X86-P71-level-one-sections.fmp.json"
+            )
+            .as_bytes(),
+        )
+        .unwrap()
+    }
+
+    fn definition_for(relative: &str) -> Definition {
+        let path = format!(
+            "{}/../../../definitions/{}",
+            env!("CARGO_MANIFEST_DIR"),
+            relative
+        );
+        fmp_model::definition::read(&std::fs::read(path).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn level_one_splits_sections_and_keeps_the_level_zero_image() {
+        let plan = level_one_plan();
+        let definition = definition_for("x86_64/0.2.0.json");
+        let artifact = materialize(&plan, &definition).unwrap();
+
+        assert_eq!(artifact.level, 1);
+        assert_eq!(artifact.sections.len(), 2);
+        assert_eq!(artifact.sections[0].section_id, ".text");
+        assert_eq!(artifact.sections[0].size, 43);
+        assert_eq!(artifact.sections[0].bytes, artifact.bytes);
+        assert_eq!(artifact.sections[1].section_id, ".bss");
+        assert_eq!(artifact.sections[1].size, 8);
+        assert!(!artifact.sections[1].image_backed);
+        assert!(artifact.sections[1].bytes.is_empty());
+    }
+
+    #[test]
+    fn level_one_symbols_follow_symbol_order() {
+        let plan = level_one_plan();
+        let definition = definition_for("x86_64/0.2.0.json");
+        let artifact = materialize(&plan, &definition).unwrap();
+        let symbols = artifact
+            .symbols
+            .as_ref()
+            .expect("include_symbol_table is true");
+        let ids: Vec<&str> = symbols
+            .iter()
+            .map(|symbol| symbol.symbol_id.as_str())
+            .collect();
+        // The plan declares `symbol_order` as ext, S2, S1; `symbol_id` order
+        // would be S1, S2, ext, so this pins the declared order.
+        assert_eq!(ids, ["ext", "S2", "S1"]);
+        assert_eq!(symbols[2].name, "L1");
+        assert_eq!(symbols[2].section_id.as_deref(), Some(".text"));
+        assert_eq!(symbols[2].offset, Some(32));
+    }
+
+    #[test]
+    fn level_one_without_symbol_table_omits_symbols() {
+        let plan = level_one_plan();
+        let mut document = plan.document.clone();
+        if let Json::Object(entries) = &mut document {
+            for (key, value) in entries {
+                if key == "output_contract" {
+                    if let Json::Object(fields) = value {
+                        for (name, field) in fields {
+                            if name == "include_symbol_table" {
+                                *field = Json::Bool(false);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let plan = fmp_model::plan::bind(&document).unwrap();
+        let definition = definition_for("x86_64/0.2.0.json");
+        let artifact = materialize(&plan, &definition).unwrap();
+        assert!(artifact.symbols.is_none());
+        assert!(artifact.to_json().get("symbols").is_none());
+    }
+
+    #[test]
+    fn level_zero_envelope_keeps_its_fields_and_order() {
+        let plan = fmp_model::plan::read(plan_source().as_bytes()).unwrap();
+        let definition = fmp_model::definition::read(&definition_bytes()).unwrap();
+        let artifact = materialize(&plan, &definition).unwrap();
+        let envelope = artifact.to_json();
+        let keys: Vec<&str> = match &envelope {
+            Json::Object(entries) => entries.iter().map(|(key, _)| key.as_str()).collect(),
+            _ => panic!("an artifact envelope is an object"),
+        };
+        assert_eq!(
+            keys,
+            [
+                "format_version",
+                "level",
+                "bytes_hex",
+                "size",
+                "fixups",
+                "fingerprint",
+                "materializer_version",
+            ]
+        );
+        assert!(envelope.get("sections").is_none());
+        assert!(envelope.get("symbols").is_none());
     }
 }

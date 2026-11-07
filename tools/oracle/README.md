@@ -75,9 +75,9 @@ are backfilled. The summary always prints `<pass>/<total> re-derived,
 
 ### State (2026-11-08, llvm-mc 23.1.2)
 
-`66/100 re-derived, 34 skipped, 0 failed`:
+`67/101 re-derived, 34 skipped, 0 failed`:
 
-- 66 x86-64 records reproduce byte-identically, including the `ld.lld` one.
+- 67 x86-64 records reproduce byte-identically, including the `ld.lld` one.
 - 29 records are `input-not-stored` — all 20 AArch64 and all 9 RV64 records.
   Their inputs were never committed and the recorded `input_sha256` matches no
   file in the evidence tree, so the harness refuses to treat them as verified.

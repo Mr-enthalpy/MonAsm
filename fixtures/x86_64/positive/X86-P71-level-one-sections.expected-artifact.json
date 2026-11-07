@@ -1,0 +1,71 @@
+{
+  "format_version": "fmp/0.1",
+  "level": 1,
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "size": 43,
+      "bytes_hex": "488b0510000000488b0d12000000000048891509000000000000000000000000aabbccdd488b1d00000000"
+    },
+    {
+      "section_id": ".bss",
+      "section_kind": "bss",
+      "image_backed": false,
+      "size": 8,
+      "bytes_hex": ""
+    }
+  ],
+  "symbols": [
+    {
+      "symbol_id": "ext",
+      "name": "ext",
+      "kind": "external",
+      "binding": "global"
+    },
+    {
+      "symbol_id": "S2",
+      "name": "S2",
+      "kind": "defined",
+      "binding": "local",
+      "section_id": ".bss",
+      "offset": 0
+    },
+    {
+      "symbol_id": "S1",
+      "name": "L1",
+      "kind": "defined",
+      "binding": "local",
+      "section_id": ".text",
+      "offset": 32
+    }
+  ],
+  "fixups": [
+    {
+      "fixup_id": "F0003",
+      "section_id": ".text",
+      "offset": 36,
+      "field_descriptor": [
+        {
+          "lsb": 24,
+          "width": 32
+        }
+      ],
+      "target": {
+        "kind": "symbol",
+        "symbol_id": "ext"
+      },
+      "addend": 0,
+      "pc_reference_rule": "pcrel_end",
+      "value_transform": "identity",
+      "range_constraint": {
+        "signed": true,
+        "bits": 32,
+        "align_bits": 0
+      }
+    }
+  ],
+  "fingerprint": "sha256:da6de0241fa379c3dd38fbcdf29a6fa01340fbd3b9fe95dfa3270be42a4e2788",
+  "materializer_version": "0.0.0"
+}

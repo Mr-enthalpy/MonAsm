@@ -1,0 +1,14 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0100/level1-sections.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "f2d6f9a264047df36ef843d205794de2c5ff5eec1c8377706e85303c2a70c2ad",
+  "output_sha256": "1e70735cff06ee7a57c34709753ea715ac9098f5c4d8bcb650804eb8c04709bf",
+  "size": 43,
+  "records": 1,
+  "notes": "The .text half is the X86-P6 body: `movq 16(%rip), %rax`, `movq L1(%rip), %rcx`, two fill bytes, `movq %rdx, L1(%rip)`, nine fill bytes, L1 at 0x20 with `aa bb cc dd`, and `movq ext(%rip), %rbx`. The file adds `.bss` with `S2` at offset 0 and `.zero 8`; it emits no file bytes, so llvm-objcopy writes the same 43-byte .text. input_sha256 is level1-sections.asm; output_sha256 is the 43-byte .text.",
+  "disassembly": "llvm-objdump -d reads `movq 0x10(%rip), %rax`, `movq 0x12(%rip), %rcx` (target L1 at 0x20), and `movq %rdx, 0x9(%rip)` (also L1). The `.space` bytes are not instructions.",
+  "relocation_check": "llvm-readobj --relocations reports one `R_X86_64_PC32 ext 0xFFFFFFFFFFFFFFFC` record at 0x27.",
+  "symbol_check": "llvm-readobj --symbols reports `L1` local, section .text, value 0x20; `S2` local, section .bss, value 0x0; `ext` global, undefined. llvm-readobj --sections reports `.text` size 43 and `.bss` SHT_NOBITS size 8."
+}

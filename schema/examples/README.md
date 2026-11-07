@@ -18,9 +18,10 @@ Rules for examples:
 - If the schema changes, examples are updated in the same commit.
 - Use real form ids, operand kinds and definition digests. A placeholder digest
   teaches the wrong thing and hides a real lookup failure.
-- `fmp/0.1` ships **Level 0 only**. The AArch64 example is deliberately Level 1
-  and is therefore rejected `E-VERSION-001` before materialization; it exists to
-  show the deferred object-file shape, not a runnable v0 plan.
+- `fmp/0.1` accepts **Level 0** and **Level 1**. The AArch64 example is Level 1
+  (`artifact: sections` + the declared symbol table, `ADR-0096`); it shows the
+  section/symbol envelope, while the materializer tests it through fixtures, not
+  through this illustrative file.
 - The RV64 example is Level 0 and is the only compressed-form example. It shows
   that the `c.*` mnemonic is named by `form_id`, never selected from the
   uncompressed spelling.

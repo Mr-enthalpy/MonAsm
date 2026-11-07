@@ -31,26 +31,31 @@ The one-sentence definition this report must defend is `00_directive.md` §18:
 
 ### A.1 Recommended FMP v0 boundary
 
-FMP v0 is frozen at **Level 0**: one canonical plan object, validated and
+FMP v0 ships **Level 0** by default: one canonical plan object, validated and
 executed against a pinned definition, producing bytes plus normalized fixup
-records. The boundary is:
+records. **Level 1** (the same plan projected as laid-out sections, an optional
+declared symbol table and the same records) is implemented as an opt-in through
+`artifact: sections` (`ADR-0096`, `01_contract.md` §11.2). Neither level writes a
+container file. The boundary is:
 
 - **In scope.** `format_version = "fmp/0.1"`; `target_identity`;
   `definition_identity` (`namespace` + `version` + `digest`);
-  `output_contract` with `artifact = "bytes"`; `sections` with fragments;
-  `symbols`; `instructions` naming an exact `form_id` with typed operands;
-  `fixups` with field descriptors, targets, PC rules, transforms, ranges and
-  pairing. The full field set and its counterexamples are `01_contract.md` §3–§12.
-- **Out of scope, rejected, not silently accepted.** Level 1 object output
-  (`artifact: sections`, `include_symbol_table: true`), `emit_fixups: false`, a
+  `output_contract` with `artifact = "bytes"` (Level 0) or `"sections"`
+  (Level 1); `sections` with fragments; `symbols`; `instructions` naming an
+  exact `form_id` with typed operands; `fixups` with field descriptors, targets,
+  PC rules, transforms, ranges and pairing. The full field set and its
+  counterexamples are `01_contract.md` §3–§12.
+- **Out of scope, rejected, not silently accepted.** `emit_fixups: false`, a
   non-default `fixup_record_order`, non-empty `feature_constraints`, and
-  `section_relative` fixup targets. The first four are `E-VERSION-001`; the last
+  `section_relative` fixup targets. The first three are `E-VERSION-001`; the last
   is `inference`/`unverified` and no v0 fixture exercises it
-  (`03_fixup_model.md` §2.1).
-- **Not frozen, explicitly optional.** Four plan fields stay `draft`:
-  `source_ref`, `source_trace`, `symbol.type`, `symbol_order`
-  (`01_contract.md` §7, §9, §11). They either never affect output or exist only
-  for the deferred Level 1 tables, so they do not carry a v0 counterexample. Per
+  (`03_fixup_model.md` §2.1). A Level 0 plan that asks for a symbol table is also
+  `E-VERSION-001` (`N24i`); Level 2 containers are out of `fmp/0.1`.
+- **Not frozen, explicitly optional.** Three plan fields stay `draft`:
+  `source_ref`, `source_trace`, `symbol.type` (`01_contract.md` §7, §9). They
+  never affect output, so they do not carry a v0 counterexample. `symbol_order`
+  is now `frozen`: Level 1 makes the emitted table order observable, and
+  `X86-P71` pins the declared order against `symbol_id` order (`ADR-0096`). Per
   `AGENTS.md` rule 2 a field without a counterexample is never marked `frozen`.
 
 The contract-set status therefore moves from `draft` to **"frozen for the v0
@@ -70,8 +75,8 @@ change the decision; §F records the evidence.
 
 | Evidence | Source | What it proves |
 |---|---|---|
-| Three ISA vertical loops close byte-exactly | `06_validation_matrix.md` §4; `fixtures/` | 100 positive plans reproduce independently derived bytes; x86 71, AArch64 20, RV64 9 |
-| Strict rejection is exercised, not asserted | `06_validation_matrix.md` §1; `04_errors.md` §2 | 545 negative plans, each pinned to a code, JSON Pointer and detail-key set |
+| Three ISA vertical loops close byte-exactly | `06_validation_matrix.md` §4; `fixtures/` | 101 positive plans reproduce independently derived bytes; x86 72, AArch64 20, RV64 9 |
+| Strict rejection is exercised, not asserted | `06_validation_matrix.md` §1; `04_errors.md` §2 | 546 negative plans, each pinned to a code, JSON Pointer and detail-key set |
 | Determinism replays on three hosts | `EXP-0033` §6; CI runs on Ubuntu, macOS, Windows | Identical artifacts and diagnostics across hosts and processes |
 | Every invariant has an executable test | `01_contract.md` §2 | INV-01 through INV-08 are `verified` |
 | Encoding ambiguity has counterexamples | `02_encoding_choices.md`; `EXP-0096` | 40 `EC` rows frozen; the seven absent families are rejected `E-FORM-001` |
@@ -84,19 +89,21 @@ Only one item blocked overall completion, and Phase 5 closes it:
 **AC-10** (`06_validation_matrix.md` §3) required an executable next step. §H now
 supplies the module list, order, gates, and risks.
 
-No correctness blocker remains for the v0 scope. The remaining items are
-deliberate deferrals, recorded here so they cannot be mistaken for coverage:
+No correctness blocker remains for the v0 scope. The remaining items are recorded
+here so they cannot be mistaken for coverage:
 
-1. **Level 1 object output** is designed but not implemented (`01_contract.md`
-   §11, OD-03). One AArch64 schema example illustrates the shape and is rejected
-   `E-VERSION-001` at Level 0; it is not a materializable v0 plan.
+1. **Level 1 object output** is implemented as of 2026-11-08 (`01_contract.md`
+   §11.2, `ADR-0096`): `artifact: sections` splits the same image into sections
+   and optionally emits the declared symbol table. Level 2 containers and
+   symbol synthesis remain out of `fmp/0.1`.
 2. **`section_relative` fixups** are named by the contract but unexercised
    (`03_fixup_model.md` §2.1).
 3. **Eight reachable error codes had no fixture when this report was written.**
-   M1 closed that gap on 2026-11-08 with `N24a`–`N24h`; `04_errors.md` §2.4 now
-   records 37 of the 43 active codes as fixture-covered, and the six remaining
-   are the JSON-layer, non-plan, structurally unreachable and internal groups
-   listed there.
+   M1 closed that gap on 2026-11-08 with `N24a`–`N24h`; M3 repointed `N24h` to
+   `emit_fixups: false` and added `N24i` for the Level 0 symbol-table gate.
+   `04_errors.md` §2.4 now records 37 of the 43 active codes as fixture-covered,
+   and the six remaining are the JSON-layer, non-plan, structurally unreachable
+   and internal groups listed there.
 4. **LLVM internals remain unverified** (`90_boundary_audit.md` §8). LLVM was used
    only as an oracle; no LLVM source path was traced, so no LLVM-internal claim is
    made.
@@ -238,10 +245,12 @@ codes; the retired and unreachable sets are stated explicitly in `04_errors.md`
 
 ### C.8 What is not frozen
 
-`source_ref`, `source_trace`, `symbol.type`, `symbol_order` remain `draft`
-(`01_contract.md` §7, §9, §11). `section_relative` remains `unverified`
-(`03_fixup_model.md` §2.1). Level 1 output is designed but deferred. These are
-recorded as out of v0 scope, not as frozen facts.
+`source_ref`, `source_trace`, `symbol.type` remain `draft`
+(`01_contract.md` §7, §9). `section_relative` remains `unverified`
+(`03_fixup_model.md` §2.1). `symbol_order` is frozen because Level 1 emits the
+table in that order (`ADR-0096`). Level 1 itself is implemented; Level 2
+containers and synthetic symbols remain out of v0 scope. These are recorded as
+out of v0 scope, not as frozen facts.
 
 ---
 
@@ -253,11 +262,11 @@ recorded as out of v0 scope, not as frozen facts.
   table has **509 forms** (measured from
   `definitions/x86_64/0.65.0.json`). Fifteen `EC` rows are carried by this slice
   (`02_encoding_choices.md` §"v0 surface").
-- **Fixtures.** 71 positive plans and 476 negative plans. The positive set covers
+- **Fixtures.** 72 positive plans and 477 negative plans. The positive set covers
   `mov`/`add` in both directions, `imm8`/`imm32`, `rel8`/`rel32`, register
   extension through `REX`, base/index/scale, absolute and RIP-relative
-  addressing, SSE/VEX/EVEX register and memory shapes, and the byte-register
-  high/low split.
+  addressing, SSE/VEX/EVEX register and memory shapes, the byte-register
+  high/low split, and the Level 1 section/symbol envelope (`X86-P71`).
 - **Key counterexamples.** `mov r64, r64`/`mov r64, rm64` are two forms
   (`89`/`8B`), and a plan naming a coarse form is `E-FORM-001` (`N01`). The two
   legal encodings of `add` (`01`/`81`) are separate forms. `REX` byte
@@ -342,7 +351,7 @@ Each invariant has an executable test and a recorded result (`01_contract.md`
 with identical artifact digests. CI runs `42402997326`, `42403439382`,
 `42403938259`, `42404376743` are green on all three hosts.
 
-The negative side is not a gesture: 545 negative plans are compared by exact code,
+The negative side is not a gesture: 546 negative plans are compared by exact code,
 JSON Pointer, and detail-key set (`fixtures/README.md`; `fixtures.rs` requires
 equality, not containment). That is the executable form of "does not secretly
 plan": a plan that asks the materializer to choose gets a rejection, not a
@@ -418,7 +427,7 @@ trust; Route C places it in the plan, where a test can reject it.
 | Layout | sections, fragments, offsets, declared size; no padding/relax/reorder | `01_contract.md` §6; `N09`, `N11`, `N22` |
 | Symbols | id, name, kind, binding, section/offset | `01_contract.md` §9 |
 | Fixups | descriptor, target, addend, PC rule, transform, range, mode, pair | `03_fixup_model.md`; `AC-05` |
-| Output | Level 0 bytes + normalized fixup records + fingerprint | `01_contract.md` §11.1 |
+| Output | Level 0 bytes + normalized fixup records + fingerprint; opt-in Level 1 sections + declared symbols with the same records | `01_contract.md` §11.1–§11.2 |
 | Errors | 43 active codes, stable identity, sorted reporting | `04_errors.md` §1–§2 |
 | Determinism | replay across repetition, process, serialization, host, definition drift | `EXP-0033` |
 
@@ -426,8 +435,8 @@ trust; Route C places it in the plan, where a test can reject it.
 
 | Feature | Disposition | Evidence |
 |---|---|---|
-| Level 1 object output (`artifact: sections`) | designed, deferred; rejected at Level 0 | `E-VERSION-001`; `01_contract.md` §11 |
-| Symbol table (`include_symbol_table: true`) | deferred | `E-VERSION-001` |
+| Level 1 object output (`artifact: sections`) | supported (`ADR-0096`): section split in `section_order`; no container | `X86-P71`; `01_contract.md` §11.2 |
+| Symbol table (`include_symbol_table: true`) | supported at Level 1 only, in `symbol_order` or `symbol_id` order; no synthesized symbols | `X86-P71`; `N24i`; `01_contract.md` §11.2 |
 | `emit_fixups: false` | rejected | `E-VERSION-001` |
 | Non-default `fixup_record_order` | rejected | `E-VERSION-001` |
 | Non-empty `feature_constraints` | rejected | `E-VERSION-001` |
@@ -451,7 +460,7 @@ trust; Route C places it in the plan, where a test can reject it.
    adoption.
 3. **New `format_version`** for a new envelope; `fmp/0.1` never grows an `x_*`
    field (`OD-05`, `ADR-0031`).
-4. **Level 1 opt-in** through `artifact: sections`, already legal in the schema;
+4. **Level 1 opt-in** through `artifact: sections`, implemented in `ADR-0096`;
    it adds serialization, never changes Level 0 bytes.
 5. **New error code** must be declared in `04_errors.md` with a trigger, detail
    keys, and a negative test; retired codes stay documented as retired.
@@ -467,8 +476,8 @@ The order is fixed: close the evidence gate before adding surface.
 | Step | Module | Scope | Exit gate |
 |---|---|---|---|
 | M1 | Error-coverage gate | Add end-to-end fixtures for the eight reachable uncovered codes; keep the two JSON-layer-only codes as unit tests | **closed 2026-11-08**: `N24a`–`N24h` land, `04_errors.md` §2.4 has no "reachable, no fixture" group, and `cargo test -p fmp-cli --test fixtures` is green |
-| M2 | Oracle rerun harness | One command that re-derives every `*.expected.bin` from `llvm-mc` (or records a manual derivation) and diffs | **closed 2026-11-08, coverage-qualified**: `tools/oracle/rerun.py` resolves each input by `input_sha256`, re-runs the recorded command and compares bytes; 66/100 reproduce (all x86-64 with stored input), 29 are `input-not-stored` (20 AArch64 + 9 RV64, never committed) and 5 are `manual-derivation`; `--strict` fails on any `SKIP` once the inputs are backfilled (`tools/oracle/README.md`) |
-| M3 | Level 1 object writer | `artifact: sections` + `include_symbol_table`; sections, symbols and relocation records from the plan, no relaxation and no container format (Level 2) | New fixtures validate; Level 0 bytes unchanged |
+| M2 | Oracle rerun harness | One command that re-derives every `*.expected.bin` from `llvm-mc` (or records a manual derivation) and diffs | **closed 2026-11-08, coverage-qualified**: `tools/oracle/rerun.py` resolves each input by `input_sha256`, re-runs the recorded command and compares bytes; 67/101 reproduce (all x86-64 with stored input), 29 are `input-not-stored` (20 AArch64 + 9 RV64, never committed) and 5 are `manual-derivation`; `--strict` fails on any `SKIP` once the inputs are backfilled (`tools/oracle/README.md`) |
+| M3 | Level 1 object writer | `artifact: sections` + `include_symbol_table`; sections, symbols and relocation records from the plan, no relaxation and no container format (Level 2) | **closed 2026-11-08**: `X86-P71` and `EXP-0100` validate the §11.2 envelope; Level 0 bytes are unchanged (`.text` is the same 43-byte oracle image); `N24h`/`N24i` keep `E-VERSION-001` reachable |
 | M4 | Planner boundary/API | Export the plan builder as a library boundary, with the same closed-object discipline | API tests reject illegal plans at the same codes |
 | M5 | Coverage widening | One ISA family per ADR, each with a rejection fixture for its absent variant | No implicit decision enters; new `EC` rows frozen |
 
@@ -565,16 +574,18 @@ because it carries the target-specific pieces as data.
 ### Q8. How is "does not secretly plan" proven?
 
 By executable evidence, not a diagram: `form_id` exact lookup, no fallback paths,
-545 negative plans compared by exact diagnostic, replay tests across three hosts,
+546 negative plans compared by exact diagnostic, replay tests across three hosts,
 and a definition-drift test that is loud. A plan that asks for a decision gets a
 rejection; a byte that would require a choice cannot be produced.
 
 ### Q9. What is the minimal effective v0 boundary?
 
-Level 0: bytes plus normalized fixup records, three ISAs, one vertical slice each,
-strict rejection, deterministic replay. Everything else is deferred and listed in
-§G.2. The boundary is minimal because each excluded feature would add layout or
-selection authority without adding a contract question.
+Level 0 is the default: bytes plus normalized fixup records, three ISAs, one
+vertical slice each, strict rejection, deterministic replay. Level 1 is an opt-in
+projection of the same validated plan (`ADR-0096`), not a second encoder.
+Everything else is deferred and listed in §G.2. The boundary is minimal because
+each excluded feature would add layout or selection authority without adding a
+contract question.
 
 ### Q10. How do future extensions avoid breaking old plans?
 
@@ -602,3 +613,5 @@ shows what moved.
 | `schema/examples/README.md` | cited stale `OD-07`/`encoding_choices` | points at the current contract sections |
 | `README.md` | oracle "planned"; "examples validate" | states the oracle as implemented and the examples as illustrative |
 | `06_validation_matrix.md` | AC-10 `planned` | AC-10 `satisfied` by §H |
+| `01_contract.md` §11 | `symbol_order` and the Level 1 envelope were `draft`/undefined | `symbol_order` frozen with a counterexample; §11.2 defines the Level 1 artifact (`ADR-0096`) |
+| `04_errors.md` §2.4 | `N24h` still named the accepted `artifact: sections` | `N24h` repointed to `emit_fixups: false`; `N24i` added for the Level 0 symbol-table gate |

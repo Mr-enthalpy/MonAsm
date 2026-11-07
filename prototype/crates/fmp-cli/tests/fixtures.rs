@@ -135,6 +135,24 @@ fn positives_reproduce_the_oracle_bytes() {
             "{name}: record count differs from the oracle record"
         );
 
+        // A Level 1 fixture states the complete envelope, not only the bytes:
+        // section split, symbol table and the unchanged fixup records. The file
+        // is authored from the plan and `*.expected.bin`; comparing the parsed
+        // values also pins the documented field order (`Json` objects are
+        // ordered).
+        let artifact_path = case_file(dir, &name, "expected-artifact.json");
+        if artifact_path.is_file() {
+            let expected = std::fs::read(&artifact_path)
+                .unwrap_or_else(|error| panic!("{}: {error}", artifact_path.display()));
+            let expected = fmp_model::json::parse(&expected)
+                .unwrap_or_else(|error| panic!("{}: {}", artifact_path.display(), error.reason()));
+            assert_eq!(
+                artifact.to_json(),
+                expected,
+                "{name}: artifact envelope differs from the recorded Level 1 shape"
+            );
+        }
+
         // Every positive fixture that carries a digest must name its source
         // (contract §7), and the materializer must have accepted it.
         if plan

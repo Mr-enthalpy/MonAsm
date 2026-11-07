@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-VERSION-001", "path": "/output_contract/include_symbol_table", "detail_keys": ["feature", "format_version"] }
+  ]
+}

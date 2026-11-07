@@ -21,7 +21,7 @@ link to them instead of redefining.
 | **Canonical form** | The unique serialization of an FMP: sorted keys, no insignificant whitespace, integers only, LF, UTF-8. |
 | **Fingerprint** | SHA-256 over the canonical plan plus domain separation plus definition digest. |
 | **Oracle** | An independent authority used to check our bytes (llvm-mc, binutils, manual derivation). Never the same code path as the thing under test. |
-| **Level 0 / 1 / 2** | Bytes + fixup records / laid-out sections + symbols + relocations / complete object files. |
+| **Level 0 / 1 / 2** | Bytes + fixup records / laid-out sections + declared symbols + the same records (implemented, `ADR-0096`) / complete object files. |
 | **Route A / B / C** | XirAsm-lib-centered / LLVM MC-centered / self-owned kernel (see ADR-0001 and directive §13). |
 | **Disposable zone** | `tools/oracle/`, `research/external/`: deletable without breaking the product build. |
 | **`TBD`** | Not yet supported by evidence. Never treat as frozen. |

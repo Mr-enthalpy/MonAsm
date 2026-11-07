@@ -95,7 +95,7 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
           "uniqueItems": true,
-          "x-status": "draft"
+          "x-status": "frozen"
         },
         "fixup_record_order": { "const": "section_id,offset,fixup_id" },
         "include_symbol_table": { "type": "boolean" },

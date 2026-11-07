@@ -73,7 +73,7 @@ Rules:
 | E-FIXUP-009 | Fixup addend not allowed by its kind: an RV64 `pcrel_lo12` low half with a non-zero `addend` | `fixup_id`, `addend`, `value_transform` | N17a |
 | E-SIZE-001 | Encoded length != `expected_size` | `instruction_id`, `expected`, `actual` | N05 |
 | E-BYTE-001 | Emitted bytes do not match `expected_digest` | `instruction_id`, `declared`, `actual` | N13 |
-| E-VERSION-001 | Materializer cannot honor a declared plan feature | `feature`, `format_version` | N24h |
+| E-VERSION-001 | Materializer cannot honor a declared plan feature | `feature`, `format_version` | N24h, N24i |
 | E-INTERNAL-001 | Internal invariant violated (bug); never used for user input | `invariant` | — (not user-reachable) |
 
 `E-PLAN-002`'s two detail keys describe one fault from two sides: `path_type` is
@@ -286,21 +286,26 @@ The registry is the declared surface; a code is *covered* only when a test
 asserts its exact code, JSON Pointer and detail-key set (`fixtures/README.md`).
 M1 closed the reachable gap on 2026-11-08: 43 codes are active, 37 are covered by
 a fixture, and the six that are not cannot be reached by a well-formed plan or
-do not belong to the plan layer.
+do not belong to the plan layer. M3 did not add a code; it repointed `N24h` from
+the now-accepted Level 1 `artifact` to `emit_fixups: false` and added `N24i` for
+a Level 0 symbol-table request, so `E-VERSION-001` keeps two end-to-end
+negatives and the counts are unchanged.
 
 | Group | Codes | Evidence |
 |---|---|---|
-| Fixture-covered | 37 active codes | `fixtures/`; `N24a`–`N24h` are the M1 additions |
+| Fixture-covered | 37 active codes | `fixtures/`; `N24a`–`N24i` are the M1 additions plus the M3 split |
 | JSON layer, unit only | `E-PLAN-004`, `E-PLAN-005` | `rejects_duplicate_keys`, `rejects_a_byte_order_mark`; no plan-layer fixture can reach them |
 | Non-plan conditions | `E-DEF-002` | `exp_r5_definition_perturbation_is_loud` |
 | Structurally unreachable | `E-TARGET-003`, `E-LAYOUT-005` | §2.3; revisit only if the format gains the trigger |
 | Not user-input | `E-INTERNAL-001` | §2.3; the bug marker |
 
-The `N24` family holds the eight M1 fixtures: `N24a` (`E-PLAN-001`), `N24b`
-(`E-PLAN-006`), `N24c` (`E-TARGET-002`), `N24d` (`E-TARGET-004`), `N24e`
-(`E-SYMBOL-002`), `N24f` (`E-SYMBOL-003`), `N24g` (`E-FIXUP-008`) and `N24h`
-(`E-VERSION-001`). Each one is an otherwise valid plan with exactly the named
-fault, so the fixture asserts a single diagnostic rather than a cascade.
+The `N24` family holds the nine coverage fixtures: `N24a` (`E-PLAN-001`),
+`N24b` (`E-PLAN-006`), `N24c` (`E-TARGET-002`), `N24d` (`E-TARGET-004`), `N24e`
+(`E-SYMBOL-002`), `N24f` (`E-SYMBOL-003`), `N24g` (`E-FIXUP-008`), `N24h`
+(`E-VERSION-001` for `emit_fixups: false`) and `N24i` (`E-VERSION-001` for
+`include_symbol_table: true` at Level 0). Each one is an otherwise valid plan
+with exactly the named fault, so the fixture asserts a single diagnostic rather
+than a cascade.
 
 `E-PLAN-002` is covered twice: `N23a` (expression-shaped scalar) and the JSON unit
 tests `rejects_floats_and_exponents` / `rejects_a_negative_zero_fraction`.

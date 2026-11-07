@@ -15,11 +15,11 @@
     "digest": "sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad"
   },
   "output_contract": {
-    "artifact": "sections",
+    "artifact": "bytes",
     "section_order": [".text"],
     "fixup_record_order": "section_id,offset,fixup_id",
     "include_symbol_table": false,
-    "emit_fixups": true
+    "emit_fixups": false
   },
   "sections": [
     {

@@ -448,20 +448,22 @@ Two rules make a fixup unambiguous (OD-02):
 |---|---|---|---|---|---|
 | `artifact` | yes | `bytes` \| `sections` (Level 0/1) | Selects the output shape | Object-file output would require ordering policy (OD-03). | frozen |
 | `section_order` | yes | Explicit list of `section_id` | Emission order is observable in the image | Implicit map order differs between runs (INV-05). | frozen |
-| `symbol_order` | no | Explicit list of `symbol_id` | Only for Level 1 tables | Hash order changes table bytes across processes. | draft |
+| `symbol_order` | no | Explicit list of `symbol_id` | Pins the Level 1 `symbols[]` order | A plan whose symbols are declared `ext` then `S1` cannot request that table order; the emitter falls back to `symbol_id` order (`S1`, `ext`) or, worse, to map order, so two processes emit different tables for the same symbol set (INV-05). | frozen |
 | `fixup_record_order` | yes | `(section_id, offset, fixup_id)` | Record order is part of the output contract | Any other order makes byte comparison environment-dependent. | frozen |
-| `include_symbol_table` | yes | Boolean | Selects whether Level 1 emits `symbols[]` | One emitter writes `.symtab` and another omits it; both artifacts are "correct" and differ. It MUST be `false` at Level 0 and MUST NOT change instruction bytes. | frozen |
+| `include_symbol_table` | yes | Boolean | Selects whether Level 1 emits `symbols[]` | One emitter writes `.symtab` and another omits it; both artifacts are "correct" and differ. It MUST be `false` at Level 0; `true` at Level 0 is `E-VERSION-001`. It MUST NOT change instruction bytes. | frozen |
 | `emit_fixups` | yes | Boolean, MUST be `true` in `fmp/0.1` | Prevents "resolved by magic" behavior | A plan with external references could emit bytes with no records. `false` is rejected (`E-VERSION-001`), not honoured. | frozen |
 
-Output level (OD-03, measured in `EXP-0002` §6): v0 emits **Level 0** — bytes
-plus normalized fixup records. Level 1 (`artifact: sections` with
-`include_symbol_table: true`) is optional and deferred. No AC-05 shape needs a
-symbol table or a relocation table to be expressed: the Level 0 fixup record
-already carries the site, the bit range, the target, the addend, the PC rule, the
-transform, the range and the pair relation. Level 1 would add serialization, and
-for RV64 it would add a synthesized local symbol per `hi` site, because
-`R_RISCV_PCREL_LO12_I` names the `auipc`, not the target. `artifact: sections`
-stays legal in the schema so a later slice can opt in without a format bump.
+Output level (OD-03, measured in `EXP-0002` §6): Level 0 is mandatory and Level 1
+is implemented as of 2026-11-08 (`ADR-0096`). Level 2 (container files) stays out
+of `fmp/0.1`. No AC-05 shape needs a symbol table or a relocation table to be
+expressed: the Level 0 fixup record already carries the site, the bit range, the
+target, the addend, the PC rule, the transform, the range and the pair relation.
+Level 1 therefore adds serialization, not encoding information. It does not
+synthesize symbols in `fmp/0.1`; for RV64 the `auipc`-naming local label that
+`R_RISCV_PCREL_LO12_I` would need remains a later writer task, while the Level 0
+record keeps the pair relation explicit. `artifact: sections` and
+`include_symbol_table: true` are accepted at Level 1; `include_symbol_table: true`
+with `artifact: bytes` remains `E-VERSION-001`.
 
 ### 11.1 The Level 0 artifact
 
@@ -493,6 +495,88 @@ materializer produces one document:
 The envelope is deterministic: no timestamps, hostnames, absolute paths or tool
 versions other than the build's own constant. `E-BYTE-001` is checked before the
 envelope is assembled, so an artifact is either complete and correct or absent.
+
+### 11.2 The Level 1 artifact
+
+With `artifact: sections` and `emit_fixups: true`, the materializer produces one
+document (`ADR-0096`):
+
+```json
+{
+  "format_version": "fmp/0.1",
+  "level": 1,
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "size": 3,
+      "bytes_hex": "4889d8"
+    }
+  ],
+  "symbols": [
+    {
+      "symbol_id": "S1",
+      "name": "start",
+      "kind": "defined",
+      "binding": "global",
+      "section_id": ".text",
+      "offset": 0
+    }
+  ],
+  "fixups": [],
+  "fingerprint": "sha256:…",
+  "materializer_version": "0.0.0"
+}
+```
+
+`sections[]` has exactly one entry per `section_order` id, in that order. A
+non-image-backed section (for example `bss`) is listed with its virtual
+`declared_size` and `"bytes_hex": ""`, so the list never names an absent section
+and the virtual size is not lost.
+
+| Field | Required | Meaning |
+|---|---|---|
+| `format_version` | yes | The plan's `format_version`, echoed after the gate |
+| `level` | yes | `1` |
+| `sections` | yes | One entry per `section_order` id, in that order |
+| `symbols` | iff `include_symbol_table` | The plan's symbols, in `symbol_order` or by `symbol_id` |
+| `fixups` | yes | The §8 records, in `fixup_record_order`; identical to Level 0 |
+| `fingerprint` | yes | §12's fingerprint over the plan, the definition identity, and nothing else |
+| `materializer_version` | yes | Audit only; never part of the bytes or the fingerprint |
+
+Section entry fields:
+
+| Field | Required | Meaning | Counterexample if absent |
+|---|---|---|---|
+| `section_id` | yes | The plan's id, echoed | Two sections are concatenated into one byte string; the consumer cannot tell where the second starts. |
+| `section_kind` | yes | `code` \| `data` \| `rodata` \| `bss` | A consumer must infer from the plan, and cannot distinguish a data section from code. |
+| `image_backed` | yes | Whether the section has file bytes | A `bss` section would be read as zero-filled bytes and inflate the image (INV-04). |
+| `base_address` | only when the plan declares it | The plan's `base_address`, echoed; never defaulted | An absolute reference cannot be interpreted without the plan at hand, and a default of `0` would silently change it. |
+| `size` | yes | The plan's `declared_size` | A `bss` section has no bytes; without `size` its virtual extent disappears. For an image-backed section, `size` also lets a consumer verify `len(bytes_hex) / 2`. |
+| `bytes_hex` | yes | Lowercase hex, no separator; `""` when `image_backed` is `false` | The section image itself would be missing. |
+
+Symbol entry fields:
+
+| Field | Required | Meaning | Counterexample if absent |
+|---|---|---|---|
+| `symbol_id` | yes | The plan's id, echoed | A record cannot be matched to a fixup target, which names `symbol_id`. |
+| `name` | yes | The emitted name | The table carries no name a consumer can use. |
+| `kind` | yes | `defined` \| `undefined` \| `external` | An external symbol would be mistaken for an unresolved local and get a definition it must not have. |
+| `binding` | yes | `local` \| `global` \| `weak` | An emitter defaults to `global`, so a weak symbol silently becomes strong. |
+| `section_id`, `offset` | `defined` only | The location, echoed | A defined symbol without a location is unresolvable but looks complete; `E-SYMBOL-003` already rejects that plan. |
+
+`symbols[]` is absent, not empty, when `include_symbol_table` is `false`. The
+order is `symbol_order` when present, otherwise ascending `symbol_id`; both are
+already validated against the plan (`E-LAYOUT-004`), so the emitter never sorts,
+repairs or synthesizes a symbol. In particular, `fmp/0.1` does not synthesize the
+RV64 `pcrel_lo12` local label.
+
+The Level 1 payload carries no container: no ELF header, section flags, string
+table or relocation-type numbers. Those are Level 2 and stay out of `fmp/0.1`.
+The Level 0 image is the concatenation of the `bytes_hex` values of the
+image-backed sections in `section_order`, so the existing `*.expected.bin`
+oracle still checks a Level 1 plan's code bytes.
 
 ## 12. Canonicalization, ordering, fingerprint
 

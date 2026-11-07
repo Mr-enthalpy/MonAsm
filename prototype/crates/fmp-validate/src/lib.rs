@@ -147,24 +147,22 @@ fn check_target(model: &Model, errors: &mut Vec<Diagnostic>) {
 }
 
 // ---------------------------------------------------------------------------
-// Output contract gates (OD-03: v0 ships Level 0)
+// Output contract gates (ADR-0096: Level 0 and Level 1)
 // ---------------------------------------------------------------------------
 
 fn check_output(model: &Model, errors: &mut Vec<Diagnostic>) {
     let output = &model.plan.output;
-    if output.artifact != Artifact::Bytes {
-        let feature = match &output.artifact {
-            Artifact::Sections => "artifact:sections".to_string(),
-            Artifact::Unknown(name) => format!("artifact:{name}"),
-            Artifact::Bytes => unreachable!(),
-        };
+    if let Artifact::Unknown(name) = &output.artifact {
         errors.push(
             Diagnostic::new(codes::E_VERSION_001, output.path.clone() + "/artifact")
-                .with("feature", feature)
+                .with("feature", format!("artifact:{name}"))
                 .with("format_version", codes::FORMAT_VERSION),
         );
     }
-    if output.include_symbol_table {
+    // `include_symbol_table` selects the Level 1 `symbols[]`; at Level 0 there
+    // is no table to select, so asking for one is a version error rather than a
+    // field that is silently ignored (`ADR-0096`).
+    if output.include_symbol_table && output.artifact != Artifact::Sections {
         errors.push(
             Diagnostic::new(
                 codes::E_VERSION_001,

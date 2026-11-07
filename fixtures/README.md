@@ -12,6 +12,7 @@ fixtures/<isa>/
     <ID>-<slug>.fmp.json        frozen plan under test
     <ID>-<slug>.expected.bin    bytes from the oracle
     <ID>-<slug>.oracle.json     tool, version, exact command, sha256
+    <ID>-<slug>.expected-artifact.json  optional complete Level 1 envelope
   negative/
     N0X-<slug>.fmp.json         invalid plan
     N0X-<slug>.expected-error.json  { phase, errors: [{ code, path, detail_keys }] }
@@ -60,6 +61,18 @@ input by that hash, runs the pinned command, and compares the bytes with
 as `input-not-stored` instead of being trusted. A `kind` of
 `manual+disassembly` states that the expected bytes are not the assembler output
 (a hand-picked second encoding); the harness skips those.
+
+## `expected-artifact.json` (Level 1)
+
+A positive fixture with `artifact: sections` may carry
+`<ID>-<slug>.expected-artifact.json`: the complete `01_contract.md` §11.2
+envelope, including `sections[]`, `symbols[]`, `fixups[]` and `fingerprint`.
+The gate compares the parsed value, so it pins both the content and the
+documented field order. The file is authored from the plan and `expected.bin`
+(the section split is the plan's `sections[]`, the bytes are the oracle's), not
+printed from the materializer; the fingerprint is recomputed from the plan by
+the §12 formula. When the file is absent, the positive gate still checks
+`expected.bin` and the oracle record count, but not the Level 1 envelope.
 
 ## Rules
 
