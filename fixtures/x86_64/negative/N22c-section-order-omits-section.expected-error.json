@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-LAYOUT-006", "path": "/output_contract/section_order", "detail_keys": ["problem", "section_id"] }
+  ]
+}

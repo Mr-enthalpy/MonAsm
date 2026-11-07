@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-LAYOUT-007", "path": "/instructions/1/instruction_id", "detail_keys": ["instruction_id", "offset", "section_id"] }
+  ]
+}

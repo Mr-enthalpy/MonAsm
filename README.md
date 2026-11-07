@@ -391,9 +391,9 @@ rejected; `8(%rax), %ah` is `8a 60 08`).
 Eighty-four definition documents are frozen and oracle-verified; the materializer
 and its fixture gate are implemented. Phase 4 has verified `EXP-R3` on three CI
 hosts (Ubuntu 24.04 `x86_64`, macOS 26 `aarch64`, Windows Server 2025) with the
-pinned 1.96.0 toolchain and filled the invariant-to-test map in
-`01_contract.md` §2; the remaining gap is the `E-LAYOUT-004`/`006`/`007`
-fixtures.
+pinned 1.96.0 toolchain, filled the invariant-to-test map in `01_contract.md`
+§2, and closed INV-04 with the `N22` ordering fixtures; INV-06 stays `partial`
+until the data-only plan grammar has a test of its own.
 
 | Area | State |
 |---|---|

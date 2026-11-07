@@ -55,10 +55,10 @@ Rules:
 | E-LAYOUT-001 | Fragments overlap | `first`, `second` | N09 |
 | E-LAYOUT-002 | Fragment gap, or fragment sum != `declared_size` | `declared`, `covered` | N11 |
 | E-LAYOUT-003 | Instruction offset/size does not match its fragment | `instruction_id`, `fragment` | N05 |
-| E-LAYOUT-004 | List order violates the contract's declared order | `list`, `index` | — |
+| E-LAYOUT-004 | List order violates the contract's declared order | `list`, `index` | N22a, N22f |
 | E-LAYOUT-005 | Layout requires the materializer to compute padding or alignment | `section_id`, `offset`, `required_align` | N11 |
-| E-LAYOUT-006 | Duplicate `section_id`, or `section_order` is not a permutation of `sections[]` | `section_id`, `problem` | — |
-| E-LAYOUT-007 | Duplicate `instruction_id`, or two instructions at the same `(section_id, offset)` | `instruction_id`, `section_id`, `offset` | — |
+| E-LAYOUT-006 | Duplicate `section_id`, or `section_order` is not a permutation of `sections[]` | `section_id`, `problem` | N22b, N22c |
+| E-LAYOUT-007 | Duplicate `instruction_id`, or two instructions at the same `(section_id, offset)` | `instruction_id`, `section_id`, `offset` | N22d, N22e |
 | E-SYMBOL-001 | A reference names a `symbol_id` that `symbols[]` does not declare | `symbol_id`, `mode` | N08 |
 | E-SYMBOL-002 | Duplicate `symbol_id`, or duplicate emitted name with conflicting binding | `symbol_id` | — |
 | E-SYMBOL-003 | Defined symbol without a resolvable location: `section_id`/`offset` missing, or `section_id` names no section | `symbol_id` | — |

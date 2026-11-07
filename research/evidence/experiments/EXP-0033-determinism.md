@@ -186,11 +186,13 @@ fifty-seventh time on 2026-11-08 after `0.62.0` and `X86-P66`, a
 fifty-eighth time on 2026-11-08 after `0.63.0` and `X86-P67`, a
 fifty-ninth time on 2026-11-08 after `0.64.0` and `X86-P68`, and a
 sixtieth time on 2026-11-08 after `0.65.0` and `X86-P69`, and a
-sixty-first time on 2026-11-08 after `X86-P70` (no definition change).
+sixty-first time on 2026-11-08 after `X86-P70` (no definition change), and a
+sixty-second time on 2026-11-08 after the six `N22` layout fixtures (no
+definition change).
 The corpus is now
-**100 positive and 530 negative** fixtures (x86 71/461, AArch64 20/57, RV64 9/12).
+**100 positive and 536 negative** fixtures (x86 71/467, AArch64 20/57, RV64 9/12).
 Result: all five same-host tests still pass, with the same method (`EXP-R1`
 100 × 100, `EXP-R2` 12 processes, `EXP-R4` 100 × 2, `EXP-R5` unchanged,
-`EXP-R6` 530 × 100). The counts in §1–§5 are the original run's; this section
+`EXP-R6` 536 × 100). The counts in §1–§5 are the original run's; this section
 records the current corpus instead of rewriting them. `EXP-R3` is the cross-host
 half and is recorded in §6, not in this same-host re-run.

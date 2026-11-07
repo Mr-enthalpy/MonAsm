@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-LAYOUT-004", "path": "/symbols/1", "detail_keys": ["index", "list"] }
+  ]
+}
