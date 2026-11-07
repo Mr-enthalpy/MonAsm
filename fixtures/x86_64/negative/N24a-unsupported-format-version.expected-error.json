@@ -1,0 +1,6 @@
+{
+  "errors": [
+    { "code": "E-PLAN-001", "path": "/format_version", "detail_keys": ["found", "supported"] }
+  ],
+  "phase": "read"
+}

@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-TARGET-004", "path": "/target_identity/byte_order", "detail_keys": ["found"] }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-VERSION-001", "path": "/output_contract/artifact", "detail_keys": ["feature", "format_version"] }
+  ]
+}

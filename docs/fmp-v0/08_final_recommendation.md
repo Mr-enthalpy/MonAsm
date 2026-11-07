@@ -71,7 +71,7 @@ change the decision; §F records the evidence.
 | Evidence | Source | What it proves |
 |---|---|---|
 | Three ISA vertical loops close byte-exactly | `06_validation_matrix.md` §4; `fixtures/` | 100 positive plans reproduce independently derived bytes; x86 71, AArch64 20, RV64 9 |
-| Strict rejection is exercised, not asserted | `06_validation_matrix.md` §1; `04_errors.md` §2 | 537 negative plans, each pinned to a code, JSON Pointer and detail-key set |
+| Strict rejection is exercised, not asserted | `06_validation_matrix.md` §1; `04_errors.md` §2 | 545 negative plans, each pinned to a code, JSON Pointer and detail-key set |
 | Determinism replays on three hosts | `EXP-0033` §6; CI runs on Ubuntu, macOS, Windows | Identical artifacts and diagnostics across hosts and processes |
 | Every invariant has an executable test | `01_contract.md` §2 | INV-01 through INV-08 are `verified` |
 | Encoding ambiguity has counterexamples | `02_encoding_choices.md`; `EXP-0096` | 40 `EC` rows frozen; the seven absent families are rejected `E-FORM-001` |
@@ -92,9 +92,11 @@ deliberate deferrals, recorded here so they cannot be mistaken for coverage:
    `E-VERSION-001` at Level 0; it is not a materializable v0 plan.
 2. **`section_relative` fixups** are named by the contract but unexercised
    (`03_fixup_model.md` §2.1).
-3. **Eight reachable error codes have no fixture** (M1 in §H); the behaviour is
-   implemented and unit-tested in some cases, but the end-to-end fixture is
-   missing.
+3. **Eight reachable error codes had no fixture when this report was written.**
+   M1 closed that gap on 2026-11-08 with `N24a`–`N24h`; `04_errors.md` §2.4 now
+   records 37 of the 43 active codes as fixture-covered, and the six remaining
+   are the JSON-layer, non-plan, structurally unreachable and internal groups
+   listed there.
 4. **LLVM internals remain unverified** (`90_boundary_audit.md` §8). LLVM was used
    only as an oracle; no LLVM source path was traced, so no LLVM-internal claim is
    made.
@@ -251,7 +253,7 @@ recorded as out of v0 scope, not as frozen facts.
   table has **509 forms** (measured from
   `definitions/x86_64/0.65.0.json`). Fifteen `EC` rows are carried by this slice
   (`02_encoding_choices.md` §"v0 surface").
-- **Fixtures.** 71 positive plans and 468 negative plans. The positive set covers
+- **Fixtures.** 71 positive plans and 476 negative plans. The positive set covers
   `mov`/`add` in both directions, `imm8`/`imm32`, `rel8`/`rel32`, register
   extension through `REX`, base/index/scale, absolute and RIP-relative
   addressing, SSE/VEX/EVEX register and memory shapes, and the byte-register
@@ -340,7 +342,7 @@ Each invariant has an executable test and a recorded result (`01_contract.md`
 with identical artifact digests. CI runs `42402997326`, `42403439382`,
 `42403938259`, `42404376743` are green on all three hosts.
 
-The negative side is not a gesture: 537 negative plans are compared by exact code,
+The negative side is not a gesture: 545 negative plans are compared by exact code,
 JSON Pointer, and detail-key set (`fixtures/README.md`; `fixtures.rs` requires
 equality, not containment). That is the executable form of "does not secretly
 plan": a plan that asks the materializer to choose gets a rejection, not a
@@ -464,7 +466,7 @@ The order is fixed: close the evidence gate before adding surface.
 
 | Step | Module | Scope | Exit gate |
 |---|---|---|---|
-| M1 | Error-coverage gate | Add end-to-end fixtures for the eight reachable uncovered codes; keep the two JSON-layer-only codes as unit tests | `04_errors.md` §2.4 list is empty of "reachable, no fixture"; `cargo test --test fixtures` green |
+| M1 | Error-coverage gate | Add end-to-end fixtures for the eight reachable uncovered codes; keep the two JSON-layer-only codes as unit tests | **closed 2026-11-08**: `N24a`–`N24h` land, `04_errors.md` §2.4 has no "reachable, no fixture" group, and `cargo test -p fmp-cli --test fixtures` is green |
 | M2 | Oracle rerun harness | One command that re-derives every `*.expected.bin` from `llvm-mc` (or records a manual derivation) and diffs | Corpus regenerates byte-identically; `*.oracle.json` hashes match |
 | M3 | Level 1 object writer | `artifact: sections` + `include_symbol_table`; sections, symbols and relocation records from the plan, no relaxation and no container format (Level 2) | New fixtures validate; Level 0 bytes unchanged |
 | M4 | Planner boundary/API | Export the plan builder as a library boundary, with the same closed-object discipline | API tests reject illegal plans at the same codes |
@@ -563,7 +565,7 @@ because it carries the target-specific pieces as data.
 ### Q8. How is "does not secretly plan" proven?
 
 By executable evidence, not a diagram: `form_id` exact lookup, no fallback paths,
-537 negative plans compared by exact diagnostic, replay tests across three hosts,
+545 negative plans compared by exact diagnostic, replay tests across three hosts,
 and a definition-drift test that is loud. A plan that asks for a decision gets a
 rejection; a byte that would require a choice cannot be produced.
 

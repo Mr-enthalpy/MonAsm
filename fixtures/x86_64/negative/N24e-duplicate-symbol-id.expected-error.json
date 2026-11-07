@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-SYMBOL-002", "path": "/symbols/1/symbol_id", "detail_keys": ["symbol_id"] }
+  ]
+}

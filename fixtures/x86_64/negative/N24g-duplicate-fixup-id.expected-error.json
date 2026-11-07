@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-FIXUP-008", "path": "/fixups/1/fixup_id", "detail_keys": ["fixup_id", "offset"] }
+  ]
+}

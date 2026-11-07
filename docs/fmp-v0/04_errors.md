@@ -32,16 +32,16 @@ Rules:
 
 | Code | Trigger | Fixed detail keys | Related test |
 |---|---|---|---|
-| E-PLAN-001 | Unknown or unsupported `format_version` | `found`, `supported` | — |
+| E-PLAN-001 | Unknown or unsupported `format_version` | `found`, `supported` | N24a |
 | E-PLAN-002 | Value has the wrong type or literal form (a non-integer number, a malformed hex byte string), or lies outside the declared domain for its path | `path_type`, `found_kind` | N23a |
 | E-PLAN-003 | Unknown field in a strict object | `field`, `object` | N21a, N21b |
 | E-PLAN-004 | Document is not parseable, or has duplicate keys | `reason` | unit `rejects_duplicate_keys` |
 | E-PLAN-005 | Canonical-form violation that changes bytes (e.g. float, BOM, CRLF-dependent content) | `reason` | unit `rejects_a_byte_order_mark` |
-| E-PLAN-006 | Required field absent from a strict object | `field`, `object` | — |
+| E-PLAN-006 | Required field absent from a strict object | `field`, `object` | N24b |
 | E-TARGET-001 | Unsupported or mismatched `isa_family`, `isa_variant`, or `enabled_extensions` | `found` | N06 |
-| E-TARGET-002 | Invalid or missing `execution_mode` for the family | `found`, `required` | — |
+| E-TARGET-002 | Invalid or missing `execution_mode` for the family | `found`, `required` | N24c |
 | E-TARGET-003 | Form requires an extension that is not enabled | `extension`, `form_id` | — |
-| E-TARGET-004 | Unsupported `byte_order` or `address_width` | `found` | — |
+| E-TARGET-004 | Unsupported `byte_order` or `address_width` | `found` | N24d |
 | E-DEF-001 | The definition cannot be loaded (unknown `definition_format`, duplicate form, bad template or placement), or `definition_identity.digest` does not match the loaded definition | `declared`, `actual`, `reason` | N10 |
 | E-DEF-002 | Namespace or version not available in this materializer | `namespace`, `version` | EXP-R5 |
 | E-FORM-001 | `form_id` is not present in the pinned definition | `form_id`, `namespace`, `version` | N01 |
@@ -61,19 +61,19 @@ Rules:
 | E-LAYOUT-006 | Duplicate `section_id`, or `section_order` is not a permutation of `sections[]` | `section_id`, `problem` | N22b, N22c |
 | E-LAYOUT-007 | Duplicate `instruction_id`, or two instructions at the same `(section_id, offset)` | `instruction_id`, `section_id`, `offset` | N22d, N22e |
 | E-SYMBOL-001 | A reference names a `symbol_id` that `symbols[]` does not declare | `symbol_id`, `mode` | N08 |
-| E-SYMBOL-002 | Duplicate `symbol_id`, or duplicate emitted name with conflicting binding | `symbol_id` | — |
-| E-SYMBOL-003 | Defined symbol without a resolvable location: `section_id`/`offset` missing, or `section_id` names no section | `symbol_id` | — |
+| E-SYMBOL-002 | Duplicate `symbol_id`, or duplicate emitted name with conflicting binding | `symbol_id` | N24e |
+| E-SYMBOL-003 | Defined symbol without a resolvable location: `section_id`/`offset` missing, or `section_id` names no section | `symbol_id` | N24f |
 | E-FIXUP-001 | Fixup is incompatible with the form, the descriptor, or the instruction's operands: the fixup kind does not fit the form; the descriptor widths do not sum to `range_constraint.bits`; a target operand and `fixup.target` disagree | `kind`, `form_id`, `field` | N07 |
 | E-FIXUP-002 | Target has no address in a `resolve_in_place` fixup: an undefined or external symbol; a symbol or `section_relative` target whose section has no `base_address`, including a same-section symbol under `pc_reference_rule = none` (only `pcrel_begin`/`pcrel_end`/`pcrel_hi` may use offsets alone); or an `absolute` target under a PC rule whose site section has no `base_address` | `fixup_id`, `target` | N08 |
 | E-FIXUP-003 | Computed fixup value outside `range_constraint` | `fixup_id`, `min`, `max`, `value` | N04 |
 | E-FIXUP-005 | Field descriptor out of bounds or self-overlapping, or the site is not the first byte of a planned instruction | `fixup_id`, `descriptor` | N07 |
 | E-FIXUP-006 | Two writers patch overlapping bits — two fixups, or an operand-supplied field and a fixup | `first`, `second` | N07 |
 | E-FIXUP-007 | Pair group incomplete or inconsistent: no `hi`, more than one `hi`, no `lo`, a target mismatch, a `pcrel_hi` member whose `hi` is in another section, or `pair_role` without `pair_group` | `pair_group`, `problem` | N12, N17b, N17c |
-| E-FIXUP-008 | Duplicate `fixup_id` | `fixup_id`, `offset` | — |
+| E-FIXUP-008 | Duplicate `fixup_id` | `fixup_id`, `offset` | N24g |
 | E-FIXUP-009 | Fixup addend not allowed by its kind: an RV64 `pcrel_lo12` low half with a non-zero `addend` | `fixup_id`, `addend`, `value_transform` | N17a |
 | E-SIZE-001 | Encoded length != `expected_size` | `instruction_id`, `expected`, `actual` | N05 |
 | E-BYTE-001 | Emitted bytes do not match `expected_digest` | `instruction_id`, `declared`, `actual` | N13 |
-| E-VERSION-001 | Materializer cannot honor a declared plan feature | `feature`, `format_version` | — |
+| E-VERSION-001 | Materializer cannot honor a declared plan feature | `feature`, `format_version` | N24h |
 | E-INTERNAL-001 | Internal invariant violated (bug); never used for user input | `invariant` | — (not user-reachable) |
 
 `E-PLAN-002`'s two detail keys describe one fault from two sides: `path_type` is
@@ -284,17 +284,23 @@ a silent omission would make a later slice look like it had always been covered.
 
 The registry is the declared surface; a code is *covered* only when a test
 asserts its exact code, JSON Pointer and detail-key set (`fixtures/README.md`).
-Measured against the current corpus, 43 codes are active, 29 are covered by a
-fixture, and the remaining 14 split as follows. This is the Phase 6 M1 work list;
-it is recorded here so a widening slice cannot claim coverage it does not have.
+M1 closed the reachable gap on 2026-11-08: 43 codes are active, 37 are covered by
+a fixture, and the six that are not cannot be reached by a well-formed plan or
+do not belong to the plan layer.
 
-| Group | Codes | Current evidence | M1 action |
-|---|---|---|---|
-| Reachable, no fixture | `E-PLAN-001`, `E-PLAN-006`, `E-TARGET-002`, `E-TARGET-004`, `E-SYMBOL-002`, `E-SYMBOL-003`, `E-FIXUP-008`, `E-VERSION-001` | behaviour exists in the validator; no end-to-end fixture | add one negative fixture per code |
-| JSON layer, unit only | `E-PLAN-004`, `E-PLAN-005` | `rejects_duplicate_keys`, `rejects_a_byte_order_mark` | keep as unit tests; no fixture can reach the plan layer |
-| Non-plan conditions | `E-DEF-002` | `exp_r5_definition_perturbation_is_loud` | keep the replay test |
-| Structurally unreachable | `E-TARGET-003`, `E-LAYOUT-005` | §2.3 | leave unreachable; revisit only if the format gains the trigger |
-| Not user-input | `E-INTERNAL-001` | §2.3 | leave as the bug marker |
+| Group | Codes | Evidence |
+|---|---|---|
+| Fixture-covered | 37 active codes | `fixtures/`; `N24a`–`N24h` are the M1 additions |
+| JSON layer, unit only | `E-PLAN-004`, `E-PLAN-005` | `rejects_duplicate_keys`, `rejects_a_byte_order_mark`; no plan-layer fixture can reach them |
+| Non-plan conditions | `E-DEF-002` | `exp_r5_definition_perturbation_is_loud` |
+| Structurally unreachable | `E-TARGET-003`, `E-LAYOUT-005` | §2.3; revisit only if the format gains the trigger |
+| Not user-input | `E-INTERNAL-001` | §2.3; the bug marker |
+
+The `N24` family holds the eight M1 fixtures: `N24a` (`E-PLAN-001`), `N24b`
+(`E-PLAN-006`), `N24c` (`E-TARGET-002`), `N24d` (`E-TARGET-004`), `N24e`
+(`E-SYMBOL-002`), `N24f` (`E-SYMBOL-003`), `N24g` (`E-FIXUP-008`) and `N24h`
+(`E-VERSION-001`). Each one is an otherwise valid plan with exactly the named
+fault, so the fixture asserts a single diagnostic rather than a cascade.
 
 `E-PLAN-002` is covered twice: `N23a` (expression-shaped scalar) and the JSON unit
 tests `rejects_floats_and_exponents` / `rejects_a_negative_zero_fraction`.

@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-08
-Phase: **5 complete**: Phase 4 is complete (all eight invariants `verified`; `EXP-R3` passes on three CI hosts; `N22` closes INV-04 and `N23a` closes INV-06). Phase 5 froze the contract set for the v0 scope (`ADR-0095`), published `08_final_recommendation.md` (§A–§H plus Q1–Q10) and closed `AC-10` with the Phase 6 roadmap M1–M5
+Phase: **6 in progress**: Phase 4 is complete (all eight invariants `verified`; `EXP-R3` passes on three CI hosts; `N22` closes INV-04 and `N23a` closes INV-06). Phase 5 froze the contract set for the v0 scope (`ADR-0095`), published `08_final_recommendation.md` (§A–§H plus Q1–Q10) and closed `AC-10` with the Phase 6 roadmap M1–M5. Phase 6 M1 (error-coverage gate) is complete with `N24a`–`N24h`; M2 is next
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -14,9 +14,10 @@ this file plus `AGENTS.md` alone.
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
-| 3 | Three-ISA vertical prototype | **complete** (2026-11-08): eighty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 71 positive and 468 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate; exit criteria below |
+| 3 | Three-ISA vertical prototype | **complete** (2026-11-08): eighty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 71 positive and 476 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate; exit criteria below |
 | 4 | Invariants, negative tests, replay | **complete** (2026-11-08): `EXP-R1`–`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs`; `EXP-R3` also passes on Ubuntu 24.04 (`x86_64`), macOS 26.7.2 (`aarch64`) and Windows Server 2025 with the pinned 1.96.0 toolchain (`EXP-0033` §6, run 42402997326); the invariant-to-test map in `01_contract.md` §2 is filled and every row is `verified` (`N22` closes `E-LAYOUT-004`/`006`/`007`, `N23a` closes the expression-shaped-value gap in INV-06) |
 | 5 | Convergence, route evaluation, roadmap | **complete** (2026-11-08): `08_final_recommendation.md` §A–§H and Q1–Q10; `ADR-0095` moves the contract set to `frozen for the v0 scope`; `AC-10` satisfied; Phase 6 order fixed as M1 error-coverage gate → M2 oracle rerun harness → M3 Level 1 object writer → M4 planner boundary → M5 coverage widening |
+| 6 | Implementation roadmap (M1–M5) | **in progress**: M1 error-coverage gate **complete** (2026-11-08) with `N24a`–`N24h`; M2 oracle rerun harness next; M3–M5 pending |
 
 ## Gates
 
@@ -25,7 +26,7 @@ this file plus `AGENTS.md` alone.
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
 | G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **passed** 2026-11-08: 40 of 40 rows are frozen. The last seven (`EC-10`, `EC-16`, `EC-18`, `EC-23`, `EC-24`, `EC-25`, `EC-26`) are absent-in-v0 decisions with measured counterexamples in `EXP-0096` and decided carriers in `ADR-0094` |
-| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 71 positive, 468 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 12 negative) |
+| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 71 positive, 476 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 12 negative) |
 
 ### Phase 3 exit criteria
 
@@ -34,7 +35,7 @@ on a slice count:
 
 - **Gate G3** — each ISA carries at least three positive and two negative
   vectors whose bytes and diagnostics match a recorded oracle
-  (`06_validation_matrix.md` §5). x86 has 71/468, AArch64 20/57 and RV64 9/12.
+  (`06_validation_matrix.md` §5). x86 has 71/476, AArch64 20/57 and RV64 9/12.
 - **Directive §6.1** (x86-64) — all nine items are carried by the positive rows
   in `06_validation_matrix.md` §4: register transfer, immediate arithmetic, two
   legal encodings of one operation, displacement widths, prefix rules,
@@ -251,17 +252,16 @@ not cover is caught only by the weaker size check; it is now settled, and
 
 ## Next action
 
-Phases 3, 4 and 5 are complete. Phase 5 published
-`08_final_recommendation.md` (§A–§H plus Q1–Q10) and `ADR-0095` moved the contract
-set to `frozen for the v0 scope`; `AC-10` is satisfied. The next action is **M1,
-the error-coverage gate**: add one end-to-end negative fixture for each of the
-eight reachable uncovered codes listed in `04_errors.md` §2.4
-(`E-PLAN-001`, `E-PLAN-006`, `E-TARGET-002`, `E-TARGET-004`, `E-SYMBOL-002`,
-`E-SYMBOL-003`, `E-FIXUP-008`, `E-VERSION-001`). After M1, the order is fixed:
-M2 oracle rerun harness, M3 Level 1 object writer, M4 planner boundary/API, M5
-coverage widening (`08_final_recommendation.md` §H). The numbered list below is
-the widening backlog retained for M5 and later; each item still needs its own ADR
-before a table changes.
+Phases 3, 4 and 5 are complete, and Phase 6 **M1 is complete**: `N24a`–`N24h`
+add the eight end-to-end negative fixtures for the codes that had none, and
+`04_errors.md` §2.4 now records 37 of the 43 active codes as fixture-covered.
+The next action is **M2, the oracle rerun harness**: one command that re-derives
+every `*.expected.bin` from `llvm-mc` (or records a manual derivation) and diffs,
+so each `*.oracle.json` hash is reproducible. After M2 the order is fixed:
+M3 Level 1 object writer, M4 planner boundary/API, M5 coverage widening
+(`08_final_recommendation.md` §H). The numbered list below is the widening
+backlog retained for M5 and later; each item still needs its own ADR before a
+table changes.
 
 ### Widening backlog
 

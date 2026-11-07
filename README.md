@@ -395,7 +395,9 @@ and its fixture gate are implemented. Phase 4 verified `EXP-R3` on three CI host
 closed INV-04 (`N22` ordering/uniqueness) and INV-06 (`N23a` expression-shaped
 value) so every row is `verified`. Phase 5 froze the contract set for the v0
 scope (`ADR-0095`), published `docs/fmp-v0/08_final_recommendation.md` and closed
-the last acceptance criterion, `AC-10`, with the Phase 6 roadmap M1–M5.
+the last acceptance criterion, `AC-10`, with the Phase 6 roadmap M1–M5. Phase 6
+is underway: M1 (error-coverage gate) landed `N24a`–`N24h`, so every reachable
+error code now has an end-to-end fixture; M2 is next.
 
 | Area | State |
 |---|---|

@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-TARGET-002", "path": "/target_identity/execution_mode", "detail_keys": ["found", "required"] }
+  ]
+}
