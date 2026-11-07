@@ -721,12 +721,16 @@ fn apply(
                 }
                 Transform::Lo12I => value & 0xFFF,
                 Transform::PcrelHi20 => (displaced + 0x800) >> 12,
+                // The absolute split: `pc_reference_rule` is `none` (enforced by
+                // `check_fixup_kind`), so `displaced` is `S + A`
+                // (`03_fixup_model.md` §6).
+                Transform::Hi20 => (displaced + 0x800) >> 12,
                 // A mask, never range-checked — the same class as `lo12_i`,
                 // applied to the displaced value (ADR-0010).
                 Transform::PcrelLo12 => displaced & 0xFFF,
                 // `fmp/0.1` has no semantics for these; `check_fixup_kind`
                 // rejected the plan before emission.
-                Transform::Hi20 | Transform::Lo12S | Transform::Unknown(_) => {
+                Transform::Lo12S | Transform::Unknown(_) => {
                     return Err(internal("validated transform disappeared"))
                 }
             };

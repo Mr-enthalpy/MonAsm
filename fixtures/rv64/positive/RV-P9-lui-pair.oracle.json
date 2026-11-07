@@ -1,0 +1,13 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -filetype=obj research/evidence/experiments/EXP-0098/pair.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "4fd9a798b5799876b44f8dd4129d6b33e4ad8f64448ffb447fc2e7e2397b4b95",
+  "output_sha256": "af9ccd207edf7767ed47ddf54135e453efa0b6eaac9c6f55a71727fb60e70561",
+  "size": 8,
+  "records": 2,
+  "notes": "Input (LF, trailing newline): `  .text` / `  lui a0, %hi(blob)` / `  addi a0, a0, %lo(blob)`. The object bytes are `37 05 00 00 13 05 05 00`; both fields are zero because the symbol is external, which is exactly what `emit_relocation` writes. `llvm-readobj --relocations` reports `R_RISCV_HI20 blob` at 0x0 and `R_RISCV_LO12_I blob` at 0x4. The plan uses `pc_reference_rule = none` for both members: `%hi`/`%lo` name the absolute `S + A`, not a PC-relative displacement, and the low half masks the same absolute value.",
+  "relocation_check": "llvm-readobj --relocations: 0x0 R_RISCV_HI20 blob 0x0; 0x4 R_RISCV_LO12_I blob 0x0",
+  "source": "measured relocation names and offsets from `llvm-readobj --relocations`; RISC-V UDB `inst/I/lui.yaml` for the `imm` field at 31-12"
+}

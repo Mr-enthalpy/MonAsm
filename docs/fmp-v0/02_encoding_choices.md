@@ -1000,10 +1000,11 @@ word operand on a byte row is two `E-OPERAND-001` (`N02u`), content `128` on a
 (`N14v`), number `0` on a `40` row is `E-RANGE-004` (`N16y`), and the absent
 high-byte `%r12` row is `E-FORM-001` (`N01aq`, `EXP-0048`).
 
-The RV64 slice is eight forms across two documents, generated from the pinned UDB
+The RV64 slice is nine forms across three documents, generated from the pinned UDB
 nodes (ADR-0007, ADR-0009). Seven base-`I` forms are in `0.1.0`; `c.addi` joins
 them in `0.2.0`, because it needs `rv64c` and the document's extension set is part
-of its identity:
+of its identity, and `lui` joins them in `0.3.0` as the absolute half of
+`EC-21` (`ADR-0098`):
 
 | `form_id` | Encoding | Operand signature | Table | Covers |
 |---|---|---|---|---|
@@ -1015,6 +1016,7 @@ of its identity:
 | `riscv:ld/rd-base-imm12` | `LOAD` I-type, `funct3=011` | dest `xreg`, base `xreg`, disp `imm12` | `0.1.0` | `RV-P3` |
 | `riscv:sd/rs-base-imm12` | `STORE` S-type, `funct3=011` | src `xreg`, base `xreg`, disp `imm12` | `0.1.0` | `RV-P3` |
 | `riscv:c.addi/rd-imm6` | `C.ADDI` CI-format, 16-bit | dest `xreg` (`excl 0`), imm `imm6` (`excl 0`) | `0.2.0` | `RV-P7`, `EC-19`, `OD-14` |
+| `riscv:lui/rd-imm20` | `LUI` U-type | dest `xreg`, `imm20` field (unsigned) | `0.3.0` | `RV-P9` (field half), `EC-21` (absolute half) |
 
 The two memory forms decompose the address into `base` + `disp` rather than one
 payload operand, and the addressing form is the `form_id` (ADR-0008, `OD-13`).
@@ -1027,16 +1029,19 @@ displacement's value.
 (`N01c`). Its `not: 0` is the `excluded` field of ADR-0009/`OD-14`; naming either
 zero is `E-RANGE-004` (`N16a`, `N16b`), never a silent `c.nop`/HINT.
 
-`EC-21` is now carried on its PC-relative side. The `auipc` form fixes the
-instruction, `pcrel_hi20`/`pcrel_lo12` carry the transform, ADR-0010 pins the
-psABI relation as `pc_reference_rule: pcrel_hi` plus a 1:N `pair_group`, and two
-fixtures claim it — `RV-P8-pcrel-pair` on the record side and
-`RV-P8-pcrel-pair-resolved` against a linked binary. What EC-21 still does not
-decide is the *absolute* alternative `lui`+`addi`: no v0 form carries `lui`, so
-the choice is embodied by which form the plan names and cannot yet be measured
-against both sides. `EC-20` stays without a carrier because v0 has no 3-bit
-compressed register field (`c.lw`-style CL/CS forms are not in either table); its
-example is `c.lw`.
+`EC-21` is carried on both sides. The PC-relative side: the `auipc` form fixes
+the instruction, `pcrel_hi20`/`pcrel_lo12` carry the transform, ADR-0010 pins
+the psABI relation as `pc_reference_rule: pcrel_hi` plus a 1:N `pair_group`, and
+two fixtures claim it — `RV-P8-pcrel-pair` on the record side and
+`RV-P8-pcrel-pair-resolved` against a linked binary. The absolute side is
+ADR-0098: `definitions/rv64/0.3.0.json` adds `riscv:lui/rd-imm20`, the
+`hi20`/`lo12_i` transforms carry the split, both members name
+`pc_reference_rule: none`, and `RV-P9-lui-pair`/`RV-P9-lui-pair-resolved` claim
+it. The choice between the two stays a `form variant` plus a `fixup field`
+decision: the materializer never turns one into the other, and a `lui` plan that
+names a PC rule is `E-FIXUP-001` (`N07f`). `EC-20` stays without a carrier
+because v0 has no 3-bit compressed register field (`c.lw`-style CL/CS forms are
+not in either table); its example is `c.lw`.
 
 ## Evidence
 

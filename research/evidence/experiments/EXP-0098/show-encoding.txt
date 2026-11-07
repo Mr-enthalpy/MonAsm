@@ -1,0 +1,4 @@
+	.text
+	lui	a0, 0                           # encoding: [0x37,0x05,0x00,0x00]
+	lui	a0, 1                           # encoding: [0x37,0x15,0x00,0x00]
+	lui	a0, 1048575                     # encoding: [0x37,0xf5,0xff,0xff]

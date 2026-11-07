@@ -326,6 +326,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/aarch64/0.17.0.json` | `monasm.isa.aarch64` | `sha256:de2c53e1871f5c24f6af73082dcc402729786d2e6e2495f84e3ed553adb4e4ed` |
 | `definitions/rv64/0.1.0.json` | `monasm.isa.riscv` | `sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083` |
 | `definitions/rv64/0.2.0.json` | `monasm.isa.riscv` | `sha256:8329a38faa964f9c69207a48e3bfb45c13fb0ddbaeb829ddcc0dbd1cffa8de10` |
+| `definitions/rv64/0.3.0.json` | `monasm.isa.riscv` | `sha256:484eae4ba4c80c1ff4d91bc11a6fd9bd36bdc511a8271815d76c0883869ad2af` |
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
@@ -2506,6 +2507,7 @@ unallocated, so they are excluded rather than scaled or clamped.
 | `riscv:beq/rs1-rs2-imm12` | `63000000` | src: `riscv.xreg`/`xreg` → `[15,5]`; src2: `riscv.xreg`/`xreg` → `[20,5]`; target: `riscv.rel`/`imm12` → `[31,1]`, `[7,1]`, `[25,6]`, `[8,4]` | 4 | `RV-P4`, `RV-P6` |
 | `riscv:jal/rd-imm20` | `6f000000` | dest: `riscv.xreg`/`xreg` → `[7,5]`; target: `riscv.rel`/`imm20` → `[31,1]`, `[12,8]`, `[20,1]`, `[21,10]` | 4 | `RV-P5`, `RV-P6` |
 | `riscv:auipc/rd-imm20` | `17000000` | dest: `riscv.xreg`/`xreg` → `[7,5]`; target: `riscv.rel`/`imm20` → `[12,20]` | 4 | `RV-P8` (field half) |
+| `riscv:lui/rd-imm20` | `37000000` | dest: `riscv.xreg`/`xreg` → `[7,5]`; target: `riscv.rel`/`imm20` → `[12,20]` | 4 | `RV-P9` (field half) |
 | `riscv:ld/rd-base-imm12` | `03300000` | dest: `riscv.xreg`/`xreg` → `[7,5]`; base: `riscv.xreg`/`xreg` → `[15,5]`; disp: `riscv.imm`/`imm12` → `[20,12]` | 4 | `RV-P3` |
 | `riscv:sd/rs-base-imm12` | `23300000` | src: `riscv.xreg`/`xreg` → `[20,5]`; base: `riscv.xreg`/`xreg` → `[15,5]`; disp: `riscv.imm`/`imm12` → `[25,7]`, `[7,5]` | 4 | `RV-P3` |
 

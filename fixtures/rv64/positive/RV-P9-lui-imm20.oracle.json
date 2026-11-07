@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -filetype=obj research/evidence/experiments/EXP-0098/literal.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "b77ad4d5268ba75984be570a3c466f0e86b3b29a44828e44235b57bffd971d47",
+  "output_sha256": "d5a3d6bc147dc17c771c1ae858be44f2620a47ebceab3a32b7a545e5c55c7d31",
+  "size": 12,
+  "records": 0,
+  "notes": "Input (LF, trailing newline): `  .text` / `  lui a0, 0` / `  lui a0, 1` / `  lui a0, 0xfffff`. The three words are `37 05 00 00`, `37 15 00 00` and `37 f5 ff ff`: `imm20` at 31-12, `rd` at 11-7, `opcode = 0110111`. llvm-mc requires the literal in [0, 1048575] and rejects `-1` as well as `0x100000`, so the definition marks the slot `signed: false`; the measured domain is the whole 20-bit field. There is no fixup: this fixture covers the form's field, not the %hi/%lo pair.",
+  "source": "RISC-V UDB I/lui.yaml, `location` 31-12; measured operand range from llvm-mc 23.1.2"
+}

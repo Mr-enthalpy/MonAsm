@@ -126,7 +126,8 @@ Rules:
   `48 05 00 00 00 80`, which is `add rax, -2147483648` — a different program
   (`EXP-0002` W3). The plan is rejected `E-RANGE-001`.
 - **A 33-bit intermediate.** RV64 `pcrel_hi20` computes
-  `hi20 = (D + 0x800) >> 12` with `D = S + A - P`. For `D = 0x7FFF_F800`
+  `hi20 = (D + 0x800) >> 12` with `D = S + A - P`; the absolute transform
+  `hi20` is the same arithmetic with `D = S + A`. For `D = 0x7FFF_F800`
   (2147481600, inside the signed 32-bit range) the sum is `0x8000_0000`. A
   32-bit implementation wraps that to `-2147483648`; the arithmetic shift then
   gives `hi20 = -524288`, which fits signed 20 bits and emits

@@ -220,23 +220,36 @@ record.
 ## 6. Target-specific semantics (v0 candidates)
 
 `value_transform` is applied to `D`, the value `pc_reference_rule` produced. The
-six transforms `fmp/0.1` defines, and nothing else:
+seven transforms `fmp/0.1` defines, and nothing else:
 
 | Transform | Applied as | Where it comes from |
 |---|---|---|
 | `identity` | `v = D` | — |
 | `scale` | `v = D >> transform_shift`, arithmetic | `scale(2)` for AArch64 `b`, `b.cond` and `ldr (literal)` below |
 | `page` | `v = (page(S + A) - page(P)) >> 12`, with `page(x) = x & !0xFFF` | `adrp` below |
+| `hi20` | `v = (D + 0x800) >> 12` | RV64 `lui` below |
 | `lo12_i` | `v = (S + A) & 0xFFF` — a mask, never range-checked | `add :lo12:` below |
 | `pcrel_hi20` | `v = (D + 0x800) >> 12` | RV64 `auipc` below |
 | `pcrel_lo12` | `v = D & 0xFFF` — a mask, never range-checked | RV64 `addi`/load/store low half below |
 
-`hi20` and `lo12_s` are named in the schema's `value_transform` enum, but this
-document defines no semantics for them and no v0 fixture uses them. A plan that
-names one is `E-VERSION-001` (`feature: value_transform:hi20`): `fmp/0.1` cannot
-express what the plan means, and inventing a definition at materialization time
-would be a decision, not a validation. They are reserved for the AArch64 and RV64
-tables, which add their definitions together with the slice that needs them.
+`hi20` and `pcrel_hi20` share the same arithmetic and differ only in `D`: an
+absolute split pairs `hi20` with `pc_reference_rule = none`, so `D = S + A`,
+while `pcrel_hi20` pairs with `pcrel_begin`, so `D = S + A - P`. The rule is part
+of the meaning, and it is not interchangeable. Take `S = 0x2340`, `P = 0x1000`
+and `A = 0`: the absolute high half is `(0x2340 + 0x800) >> 12 = 2` and the
+matching `lo12_i` is `0x340`, so `lui`+`addi` rebuilds `0x2340`; the PC-relative
+reading gives `(0x1340 + 0x800) >> 12 = 1`, and the same low half then rebuilds
+`0x1340`. That is a silently wrong address, not a rounding difference, so a
+`hi20` fixup whose rule is not `none` is `E-FIXUP-001` (`N07f`). Without the
+transform the same plan has no expressible form at all: `pcrel_hi20` forces a
+`P` the address does not have, and `identity` cannot name the upper 20 bits.
+
+`lo12_s` is named in the schema's `value_transform` enum, but this document
+defines no semantics for it and no v0 fixture uses it. A plan that names one is
+`E-VERSION-001` (`feature: value_transform:lo12_s`): `fmp/0.1` cannot express
+what the plan means, and inventing a definition at materialization time would be
+a decision, not a validation. It is reserved for the AArch64 table, which adds
+its definition together with the slice that needs it.
 `lo12_s` stays reserved on purpose (ADR-0010): the `_i`/`_s` suffix names the
 instruction form, which `form_id` already carries, so an S-type low half is
 `pcrel_lo12` with an S-type `field_descriptor`. `pcrel_lo12` is *not* a synonym
@@ -258,6 +271,8 @@ The ISA table:
 | RV64 B-type | imm12…imm1 scattered; `P` = instruction address; ±4 KiB, 2-byte aligned | `pcrel_begin`, `range.bits = 12`, `align_bits = 1` |
 | RV64 J-type (`jal`) | imm20…imm1 scattered; ±1 MiB | `pcrel_begin`, `range.bits = 20`, `align_bits = 1` |
 | RV64 `auipc` hi20 | `hi20 = (S + A - P + 0x800) >> 12` in exact arithmetic, `P` = the `auipc`'s address | pair `hi`, `pcrel_begin`, `pcrel_hi20` |
+| RV64 `lui` hi20 | `hi20 = (S + A + 0x800) >> 12` in exact arithmetic; the upper 20 bits of an absolute address, with no `P` | pair `hi`, `pc_reference_rule = none`, `hi20`; `emit_relocation` zeroes the field and records `R_RISCV_HI20`, and `resolve_in_place` needs the target section's `base_address` because a `none` rule cannot cancel the site (§4) |
+| RV64 `addi`/load/store lo12 (absolute) | `lo12 = (S + A) & 0xFFF` | pair `lo`, `pc_reference_rule = none`, `lo12_i`; `emit_relocation` records `R_RISCV_LO12_I` and `resolve_in_place` needs `base_address` |
 | RV64 `addi`/load/store lo12 | `lo12 = (S + A - P_hi) & 0xFFF`, `P_hi` = the paired `auipc`'s address | pair `lo`, `pcrel_hi`, `pcrel_lo12`, `addend` MUST be 0 |
 
 The literal load is the first non-branch PC-relative slot. Every earlier row with

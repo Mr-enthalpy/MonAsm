@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-FIXUP-001", "path": "/fixups/0/value_transform", "detail_keys": ["kind", "form_id", "field"] }
+  ]
+}

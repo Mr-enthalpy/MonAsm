@@ -63,7 +63,7 @@ Rules:
 | E-SYMBOL-001 | A reference names a `symbol_id` that `symbols[]` does not declare | `symbol_id`, `mode` | N08 |
 | E-SYMBOL-002 | Duplicate `symbol_id`, or duplicate emitted name with conflicting binding | `symbol_id` | N24e |
 | E-SYMBOL-003 | Defined symbol without a resolvable location: `section_id`/`offset` missing, or `section_id` names no section | `symbol_id` | N24f |
-| E-FIXUP-001 | Fixup is incompatible with the form, the descriptor, or the instruction's operands: the fixup kind does not fit the form; the descriptor widths do not sum to `range_constraint.bits`; a target operand and `fixup.target` disagree | `kind`, `form_id`, `field` | N07 |
+| E-FIXUP-001 | Fixup is incompatible with the form, the descriptor, or the instruction's operands: the fixup kind does not fit the form (including a `hi20` transform whose `pc_reference_rule` is not `none`); the descriptor widths do not sum to `range_constraint.bits`; a target operand and `fixup.target` disagree | `kind`, `form_id`, `field` | N07, N07f |
 | E-FIXUP-002 | Target has no address in a `resolve_in_place` fixup: an undefined or external symbol; a symbol or `section_relative` target whose section has no `base_address`, including a same-section symbol under `pc_reference_rule = none` (only `pcrel_begin`/`pcrel_end`/`pcrel_hi` may use offsets alone); or an `absolute` target under a PC rule whose site section has no `base_address` | `fixup_id`, `target` | N08 |
 | E-FIXUP-003 | Computed fixup value outside `range_constraint` | `fixup_id`, `min`, `max`, `value` | N04 |
 | E-FIXUP-005 | Field descriptor out of bounds or self-overlapping, or the site is not the first byte of a planned instruction | `fixup_id`, `descriptor` | N07 |

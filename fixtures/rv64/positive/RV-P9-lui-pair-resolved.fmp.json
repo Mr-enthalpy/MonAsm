@@ -1,0 +1,97 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "riscv",
+    "isa_variant": "rv64",
+    "execution_mode": "n/a",
+    "enabled_extensions": ["rv64i", "rv64c"],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.riscv",
+    "version": "0.3.0",
+    "digest": "sha256:484eae4ba4c80c1ff4d91bc11a6fd9bd36bdc511a8271815d76c0883869ad2af"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [".text"],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "base_address": 4096,
+      "declared_size": 568,
+      "fragments": [
+        { "offset": 0, "size": 4, "kind": "instruction", "instruction_id": "I0001" },
+        { "offset": 4, "size": 4, "kind": "instruction", "instruction_id": "I0002" },
+        { "offset": 8, "size": 556, "kind": "fill", "fill_byte": 0 },
+        { "offset": 564, "size": 4, "kind": "fill", "fill_byte": 0 }
+      ]
+    }
+  ],
+  "symbols": [
+    { "symbol_id": "S1", "name": "L1", "kind": "defined", "binding": "local", "section_id": ".text", "offset": 564 }
+  ],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "riscv:lui/rd-imm20",
+      "operands": [
+        { "role": "dest", "kind": "riscv.xreg", "target_type": "xreg", "payload": { "reg": 10 }, "modifiers": [] },
+        { "role": "target", "kind": "riscv.rel", "target_type": "imm20", "payload": { "symbol_id": "S1" }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0002",
+      "section_id": ".text",
+      "offset": 4,
+      "form_id": "riscv:addi/rd-rs1-imm12",
+      "operands": [
+        { "role": "dest", "kind": "riscv.xreg", "target_type": "xreg", "payload": { "reg": 10 }, "modifiers": [] },
+        { "role": "src", "kind": "riscv.xreg", "target_type": "xreg", "payload": { "reg": 10 }, "modifiers": [] },
+        { "role": "imm", "kind": "riscv.imm", "target_type": "imm12", "payload": {}, "modifiers": [] }
+      ],
+      "expected_size": 4
+    }
+  ],
+  "fixups": [
+    {
+      "fixup_id": "F0001",
+      "section_id": ".text",
+      "offset": 0,
+      "field_descriptor": [ { "lsb": 12, "width": 20 } ],
+      "target": { "kind": "symbol", "symbol_id": "S1" },
+      "addend": 0,
+      "pc_reference_rule": "none",
+      "value_transform": "hi20",
+      "range_constraint": { "signed": false, "bits": 20, "align_bits": 0 },
+      "resolution_mode": "resolve_in_place",
+      "pair_group": "P9",
+      "pair_role": "hi"
+    },
+    {
+      "fixup_id": "F0002",
+      "section_id": ".text",
+      "offset": 4,
+      "field_descriptor": [ { "lsb": 20, "width": 12 } ],
+      "target": { "kind": "symbol", "symbol_id": "S1" },
+      "addend": 0,
+      "pc_reference_rule": "none",
+      "value_transform": "lo12_i",
+      "range_constraint": { "signed": false, "bits": 12, "align_bits": 0 },
+      "resolution_mode": "resolve_in_place",
+      "pair_group": "P9",
+      "pair_role": "lo"
+    }
+  ]
+}

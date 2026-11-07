@@ -1328,6 +1328,7 @@ this width, and `N01r` the version boundary: `0.15.0` predates the rows
 | RV-P6 | Scattered fields | B-type and J-type bit placement verified byte-for-byte | llvm-mc | **passing** with `RV-P4`/`RV-P5`; `beq` uses four placements, `jal` four |
 | RV-P7 | Compressed vs standard | `c.addi` (2 bytes) vs `addi` (4 bytes), never chosen by the encoder | llvm-mc | **passing** — `RV-P7-caddi` (four immediates), with `N16a`/`N16b` rejecting the zero cases |
 | RV-P8 | Associated reference | `auipc`+`addi` pair with `hi20`/`lo12` | llvm-mc + llvm-readobj + ld.lld | **passing** — `RV-P8-auipc-imm20` covers the form's field; `RV-P8-pcrel-pair` the 1:N group (three records); `RV-P8-pcrel-pair-resolved` the arithmetic against a linked binary |
+| RV-P9 | Absolute address split | `lui` upper 20 bits of an absolute `S + A` plus `addi` low 12 (`%hi`/`%lo`), `pc_reference_rule = none` on both members, `hi20`/`lo12_i` | llvm-mc + llvm-readobj + ld.lld | **passing** — `RV-P9-lui-imm20` covers the form's field (`0`, `1`, `0xfffff`); `RV-P9-lui-pair` the two relocation records (`R_RISCV_HI20` at 0x0, `R_RISCV_LO12_I` at 0x4) under `emit_relocation`; `RV-P9-lui-pair-resolved` the arithmetic against a linked image (`L1` at `0x1234` yields `lui a0, 1` + `addi a0, a0, 0x234`); `N01eh` rejects the absent `c.lui` with `E-FORM-001`, and `N07f` rejects `hi20` with a PC rule as `E-FIXUP-001` |
 
 The source is pinned (`OD-12`, ADR-0007): the UDB resolved-spec nodes named in
 `check_rv64_source.py`, with `EXP-0009` deriving the B/J/RVC placements and

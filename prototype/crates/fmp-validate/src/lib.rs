@@ -1081,14 +1081,6 @@ fn check_fixup_kind(fixup: &Fixup, errors: &mut Vec<Diagnostic>) {
             .with("feature", format!("value_transform:{name}"))
             .with("format_version", codes::FORMAT_VERSION),
         ),
-        Transform::Hi20 => errors.push(
-            Diagnostic::new(
-                codes::E_VERSION_001,
-                fixup.path.clone() + "/value_transform",
-            )
-            .with("feature", "value_transform:hi20")
-            .with("format_version", codes::FORMAT_VERSION),
-        ),
         Transform::Lo12S => errors.push(
             Diagnostic::new(
                 codes::E_VERSION_001,
@@ -1110,6 +1102,19 @@ fn check_fixup_kind(fixup: &Fixup, errors: &mut Vec<Diagnostic>) {
                 .with("kind", "value_transform:pcrel_lo12")
                 .with("form_id", "")
                 .with("field", "pcrel_lo12 requires pc_reference_rule pcrel_hi"),
+        );
+    }
+    if matches!(fixup.value_transform, Transform::Hi20)
+        && !matches!(fixup.pc_reference_rule, PcRule::None)
+    {
+        // `03_fixup_model.md` §6: the absolute split is `hi20` over `S + A`;
+        // the low half masks the absolute `S + A`, so a PC rule here would
+        // subtract `P` from the high half only.
+        errors.push(
+            Diagnostic::new(codes::E_FIXUP_001, fixup.path.clone() + "/value_transform")
+                .with("kind", "value_transform:hi20")
+                .with("form_id", "")
+                .with("field", "hi20 requires pc_reference_rule none"),
         );
     }
     if matches!(fixup.pc_reference_rule, PcRule::PcrelHi)

@@ -205,7 +205,7 @@ document path cannot provide on its own.
 `from_model` is a convenience for that test, not the claim. The from-scratch
 test keeps the claim honest: the API can author a plan with no bound model in
 hand. The optional-member and enum-spelling tests cover the values the corpus
-does not exercise (`data`, `rodata`, `undefined`, `weak`, `hi20`, `lo12_s`,
+does not exercise (`data`, `rodata`, `undefined`, `weak`, `lo12_s`,
 `provenance`), so a spelling that no fixture happens to use is still checked.
 
 ## 8. Non-goals and recorded defects
