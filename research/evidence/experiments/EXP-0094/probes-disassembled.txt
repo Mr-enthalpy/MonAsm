@@ -1,0 +1,10 @@
+	addr32		movw	4660, %ax
+	addr32		movw	%ax, 4660
+	addr32		movw	4660, %r8w
+	addr32		movw	%r8w, 4660
+	addr32		movw	0, %ax
+	addr32		movw	-1, %ax
+	addr32		movw	2147483647, %ax
+	addr32		movw	-2147483648, %ax
+	addr32		movw	4660, %r15w
+	addr32		movw	%r15w, 4660

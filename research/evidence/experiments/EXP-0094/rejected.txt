@@ -1,0 +1,8 @@
+	addr32                                  # encoding: [0x67]
+	addr32                                  # encoding: [0x67]
+C:\Users\hanni\Projects\MonAsm\research\evidence\experiments\EXP-0094\rejected.asm:1:19: error: invalid operand for instruction
+addr32 movw 4660, %eax
+                  ^~~~
+C:\Users\hanni\Projects\MonAsm\research\evidence\experiments\EXP-0094\rejected.asm:2:19: error: invalid operand for instruction
+addr32 movw 4660, %rax
+                  ^~~~

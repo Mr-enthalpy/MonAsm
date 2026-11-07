@@ -304,6 +304,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.62.0.json` | `monasm.isa.x86` | `sha256:bbcd8062c84580e208c1cbf275254593a7d937fd7de28fde19e7dc5c5049e3b3` |
 | `definitions/x86_64/0.63.0.json` | `monasm.isa.x86` | `sha256:72c7e8f2fcf4c73ad816d7de274d9b46edec7d9ef99b4834c27140d83d6c91e8` |
 | `definitions/x86_64/0.64.0.json` | `monasm.isa.x86` | `sha256:fc98a834b7840d3f2383b05a5d2950966a81187234a080f24f7ad85ab6c07a4f` |
+| `definitions/x86_64/0.65.0.json` | `monasm.isa.x86` | `sha256:9f5bc421a67688426dea259a7f5a9c4c5eb0746db0dd1c5b473a30ba3612b42a` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -326,7 +327,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.64.0`
+### 8.1 `x86-64` `0.1.0` … `0.65.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -835,6 +836,10 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:mov/addr32-abs32-r32-ext/legacy` | `674489042500000000` | src: `x86.gpr32`/`r32` → `[10,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37`, `EC-38`, `X86-P67` |
 | `x86:mov/r64-addr32-abs32/legacy` | `67488b042500000000` | dest: `x86.gpr64`/`r64` → `[10,1]`, `[27,3]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37`, `EC-38`, `X86-P68` |
 | `x86:mov/addr32-abs32-r64/legacy` | `674889042500000000` | src: `x86.gpr64`/`r64` → `[10,1]`, `[27,3]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37`, `EC-38`, `X86-P68` |
+| `x86:mov/r16-addr32-abs32/legacy` | `67668b042500000000` | dest: `x86.gpr16`/`r16` → `[27,3]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37`, `EC-38`, `X86-P69` |
+| `x86:mov/addr32-abs32-r16/legacy` | `676689042500000000` | src: `x86.gpr16`/`r16` → `[27,3]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37`, `EC-38`, `X86-P69` |
+| `x86:mov/r16-ext-addr32-abs32/legacy` | `6766448b042500000000` | dest: `x86.gpr16`/`r16` → `[18,1]`, `[35,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); disp: `x86.imm`/`disp32` → `[48,32]` | 10 | `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37`, `EC-38`, `X86-P69` |
+| `x86:mov/addr32-abs32-r16-ext/legacy` | `67664489042500000000` | src: `x86.gpr16`/`r16` → `[18,1]`, `[35,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); disp: `x86.imm`/`disp32` → `[48,32]` | 10 | `EC-02`, `EC-06`, `EC-07`, `EC-08`, `EC-37`, `EC-38`, `X86-P69` |
 
 Placements are written `[bit_offset, width]`, with ` inverted` appended when the
 chunk is complemented. In the legacy SSE row
@@ -1991,6 +1996,28 @@ displacement is four bytes at every value
 manual derivation disagree about the offset width), the RIP-relative
 `67 48 8b 05` row, a symbol in the displacement, APX `d5` and EVEX
 masking/broadcast.
+
+`0.65.0` adds the `0x67 66` absolute rows (`ADR-0092`):
+`addr32 movw 4660, %ax` is `67 66 8b 04 25 34 12 00 00` (nine), with
+`0x67` at byte 0, `0x66` at byte 1, the opcode at byte 2, `ModRM = 04` at
+byte 3, `SIB = 25` at byte 4 and the displacement at `[40,32]`. The
+`REX.R` rows put `REX` at byte 2, the value at `[18,1]`+`[35,3]`
+(excluding `0`-`7`) and the displacement at `[48,32]`:
+`addr32 movw 4660, %r8w` is `67 66 44 8b 04 25 34 12 00 00` (ten), while
+the bare rows keep a three-bit value field at `[27,3]`, so `8` is
+`E-OPERAND-004` there (`N14cf`) and `16` is `E-OPERAND-004` on the
+extended row (`N14ce`). The displacement is four bytes at every value
+(`67 66 8b 04 25 00 00 00 00`), its signed ends are
+`67 66 8b 04 25 00 00 00 80` and `67 66 8b 04 25 ff ff ff 7f`, and
+`2147483648` is `E-RANGE-001` (`N03zr`). `SIB = 25` never changes
+(`%r15w` is `67 66 44 8b 3c 25 34 12 00 00`), a supplied base and a
+missing displacement are both `E-OPERAND-002` (`N02cq`/`N02cr`), a 32-bit
+operand misses both the kind and the target type (`N02cs`), value `0` on
+the `-ext` row is `E-RANGE-004` (`N16dg`), and naming a row against
+`0.64.0` is `E-FORM-001` (`N01ef`/`N01eg`). Still deferred: `moffs` with
+`0x67 66` (the measurement and a manual derivation disagree about the
+offset width), the `0x67 66` RIP-relative row, a symbol in the
+displacement, APX `d5` and EVEX masking/broadcast.
 
 ### 8.2 `aarch64` `0.1.0` … `0.17.0`
 
