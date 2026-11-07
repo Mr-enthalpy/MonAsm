@@ -1,0 +1,13 @@
+
+resolved.elf:	file format elf64-x86-64
+
+Disassembly of section .text:
+
+0000000000001000 <.text>:
+    1000:      	movq	0x101e, %rax
+    1008:      	movl	0x1022, %eax
+    100f:      	movl	%ecx, 0x101e
+    1016:      	movw	%dx, 0x1020
+
+000000000000101e <L1>:
+    101e:      	movb	0x101e, %al

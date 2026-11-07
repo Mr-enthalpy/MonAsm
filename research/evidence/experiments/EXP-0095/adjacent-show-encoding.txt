@@ -1,0 +1,11 @@
+
+	movl	ext, %eax                       # encoding: [0x8b,0x04,0x25,A,A,A,A]
+                                        #   fixup A - offset: 3, value: ext, kind: reloc_signed_4byte
+	movl	ext(%rip), %eax                 # encoding: [0x8b,0x05,A,A,A,A]
+                                        #   fixup A - offset: 2, value: ext, kind: reloc_riprel_4byte_relax
+	movabsq	ext, %rax                       # encoding: [0x48,0xa1,A,A,A,A,A,A,A,A]
+                                        #   fixup A - offset: 2, value: ext, kind: FK_Data_8
+	movl	$ext, %eax                      # encoding: [0xb8,A,A,A,A]
+                                        #   fixup A - offset: 1, value: ext, kind: FK_Data_4
+	addq	$ext, %rax                      # encoding: [0x48,0x83,0xc0,A]
+                                        #   fixup A - offset: 3, value: ext, kind: FK_Data_1

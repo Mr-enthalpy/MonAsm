@@ -1,0 +1,12 @@
+{
+  "errors": [
+    {
+      "code": "E-OPERAND-003",
+      "path": "/instructions/0/operands/1/payload",
+      "detail_keys": [
+        "kind",
+        "reason"
+      ]
+    }
+  ]
+}

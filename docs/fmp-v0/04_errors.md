@@ -46,7 +46,7 @@ Rules:
 | E-FORM-001 | `form_id` is not present in the pinned definition | `form_id`, `namespace`, `version` | N01 |
 | E-OPERAND-001 | Operand kind or register class does not match the form | `expected`, `found` | N02 |
 | E-OPERAND-002 | Operand count or role sequence mismatch | `expected`, `found` | N02e |
-| E-OPERAND-003 | Operand payload malformed for its kind | `kind`, `reason` | N19, N19b, N19c |
+| E-OPERAND-003 | Operand payload malformed for its kind: a composite memory payload, a `symbol_id` on a non-`target` role, an empty payload with no covering fixup, a modifier the slot does not permit | `kind`, `reason` | N15b, N15c, N19, N19b, N19c |
 | E-OPERAND-004 | Operand value is not representable in the slot's field width (register number wider than the encoded field) | `target_type`, `value`, `field_bits` | N14 |
 | E-RANGE-001 | Immediate outside the legal encoding range | `min`, `max`, `value`, `target_type` | N03, N18a, N18b |
 | E-RANGE-002 | Displacement or branch offset outside the legal range | `min`, `max`, `value`, `bits`, `align_bits` | N04 |
@@ -63,10 +63,10 @@ Rules:
 | E-SYMBOL-002 | Duplicate `symbol_id`, or duplicate emitted name with conflicting binding | `symbol_id` | — |
 | E-SYMBOL-003 | Defined symbol without a resolvable location: `section_id`/`offset` missing, or `section_id` names no section | `symbol_id` | — |
 | E-FIXUP-001 | Fixup is incompatible with the form, the descriptor, or the instruction's operands: the fixup kind does not fit the form; the descriptor widths do not sum to `range_constraint.bits`; a target operand and `fixup.target` disagree | `kind`, `form_id`, `field` | N07 |
-| E-FIXUP-002 | Target has no address in a `resolve_in_place` fixup: an undefined or external symbol, a cross-section reference whose section has no `base_address`, or an `absolute` target under a PC rule whose site section has no `base_address` | `fixup_id`, `target` | N08 |
+| E-FIXUP-002 | Target has no address in a `resolve_in_place` fixup: an undefined or external symbol; a symbol or `section_relative` target whose section has no `base_address`, including a same-section symbol under `pc_reference_rule = none` (only `pcrel_begin`/`pcrel_end`/`pcrel_hi` may use offsets alone); or an `absolute` target under a PC rule whose site section has no `base_address` | `fixup_id`, `target` | N08 |
 | E-FIXUP-003 | Computed fixup value outside `range_constraint` | `fixup_id`, `min`, `max`, `value` | N04 |
-| E-FIXUP-005 | Field descriptor out of bounds or self-overlapping, or the site is not the first byte of a planned instruction | `fixup_id`, `descriptor` | — |
-| E-FIXUP-006 | Two writers patch overlapping bits — two fixups, or an operand-supplied field and a fixup | `first`, `second` | — |
+| E-FIXUP-005 | Field descriptor out of bounds or self-overlapping, or the site is not the first byte of a planned instruction | `fixup_id`, `descriptor` | N07 |
+| E-FIXUP-006 | Two writers patch overlapping bits — two fixups, or an operand-supplied field and a fixup | `first`, `second` | N07 |
 | E-FIXUP-007 | Pair group incomplete or inconsistent: no `hi`, more than one `hi`, no `lo`, a target mismatch, a `pcrel_hi` member whose `hi` is in another section, or `pair_role` without `pair_group` | `pair_group`, `problem` | N12, N17b, N17c |
 | E-FIXUP-008 | Duplicate `fixup_id` | `fixup_id`, `offset` | — |
 | E-FIXUP-009 | Fixup addend not allowed by its kind: an RV64 `pcrel_lo12` low half with a non-zero `addend` | `fixup_id`, `addend`, `value_transform` | N17a |

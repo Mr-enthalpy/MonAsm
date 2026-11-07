@@ -1,0 +1,12 @@
+{
+  "errors": [
+    {
+      "code": "E-FIXUP-002",
+      "path": "/fixups/0/target",
+      "detail_keys": [
+        "fixup_id",
+        "target"
+      ]
+    }
+  ]
+}

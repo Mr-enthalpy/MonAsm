@@ -1,0 +1,19 @@
+
+File: out.o
+Format: elf64-x86-64
+Arch: x86_64
+AddressSize: 64bit
+LoadName: <Not found>
+Relocations [
+  Section (3) .rela.text {
+    0x3 R_X86_64_32S ext 0x0
+    0xA R_X86_64_32S ext 0x0
+    0x12 R_X86_64_32S ext 0x0
+    0x1A R_X86_64_32S ext 0x0
+    0x23 R_X86_64_32S ext 0x0
+    0x2A R_X86_64_32S ext 0x0
+    0x31 R_X86_64_32S ext 0x0
+    0x3C R_X86_64_32S ext 0x0
+    0x43 R_X86_64_32S ext 0x0
+  }
+]

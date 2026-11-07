@@ -247,6 +247,7 @@ The ISA table:
 | Case | Encoding facts | What the plan must pin |
 |---|---|---|
 | x86-64 `rel32` | `R_X86_64_PC32`-style: value = `S + A - P`, `P` = end of instruction | `pc_reference_rule = pcrel_end`, range `i32` |
+| x86-64 `abs32` | `R_X86_64_32S`-style: value = `S + A` in a 32-bit content field, PC not involved; the consumer range-checks it | `pc_reference_rule = none`, `value_transform = identity`, range `i32`; `emit_relocation` cannot check the value (§5), and `resolve_in_place` needs the target's section `base_address` because a `none` rule cannot cancel the site (§4) |
 | x86-64 PLT/GOT | semantics depend on link-time policy | v0: not expressible; a plan that names it is `E-VERSION-001` (§10) |
 | AArch64 `b`/`bl` | imm26, signed, scaled by 4, `P` = instruction address, ±128 MiB | `pcrel_begin`, `scale(2)`, `range.bits = 26`, `align_bits = 2` |
 | AArch64 `b.cond` | imm19, signed, scaled by 4, `P` = instruction address, −1 MiB…+1048572 B (`imm19` ends at 262143, so the upward end is not a round MiB) | `pcrel_begin`, `scale(2)`, `range.bits = 19`, `align_bits = 2`; the condition is an operand of the form, never a fixup field (`EC-29`) |

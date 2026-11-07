@@ -1,0 +1,12 @@
+{
+  "errors": [
+    {
+      "code": "E-FIXUP-006",
+      "path": "/instructions/0/operands/1/payload",
+      "detail_keys": [
+        "first",
+        "second"
+      ]
+    }
+  ]
+}

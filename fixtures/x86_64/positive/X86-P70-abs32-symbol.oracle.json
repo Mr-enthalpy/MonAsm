@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0095/probe.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "ff720f71f093b85ba530abdc7ad437ba30115c50f89c55cd483dcc62b93a959c",
+  "output_sha256": "c7fa4545bd1224c3fb8fca37fc331f41797b733a39fa8c6d326326973f8481ee",
+  "size": 71,
+  "records": 9,
+  "notes": "One external symbol `ext` in nine absolute 32-bit content fields, all `emit_relocation`: the eight `disp32` rows are 7/7/8/8/9/7/7/11 bytes with the field at [24,32], [24,32], [32,32], [32,32], [40,32], [24,32], [24,32] and [56,32], and `addq $ext, %rax` puts the same symbol in an `imm32` slot at [24,32]. Every field is zero in the bytes: `llvm-mc -disassemble` reads `0`, and each record carries the symbol, not a value. input_sha256 is probe.asm; output_sha256 is the 71-byte .text.",
+  "relocation_check": "llvm-readobj --relocations reports nine `R_X86_64_32S ext 0x0` records at 0x3, 0xA, 0x12, 0x1A, 0x23, 0x2A, 0x31, 0x3C and 0x43"
+}

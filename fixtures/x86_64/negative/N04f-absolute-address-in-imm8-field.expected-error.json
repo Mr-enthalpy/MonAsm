@@ -1,0 +1,14 @@
+{
+  "errors": [
+    {
+      "code": "E-FIXUP-003",
+      "path": "/fixups/0",
+      "detail_keys": [
+        "fixup_id",
+        "min",
+        "max",
+        "value"
+      ]
+    }
+  ]
+}

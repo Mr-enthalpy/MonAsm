@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + ld.lld 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0095/resolved.asm -o out.o && ld.lld -m elf_x86_64 --image-base=0 -Ttext 0x1000 -o out.elf out.o && llvm-objcopy -O binary --only-section=.text out.elf out.bin",
+  "kind": "assembler",
+  "input_sha256": "3bd452a436d7f07d7d7fae61dc900fda576d9095ae72b82c87f038d72a0678a9",
+  "output_sha256": "a871d52cc781bc8745549e9b19573c01b1dab3b63a7ff5e482d1e3164b31ac86",
+  "size": 37,
+  "records": 0,
+  "notes": "The same field resolved in place. `.text` is bound to 0x1000 and `L1` sits at offset 30, so S = 0x101e; the five displacements are 0x101e, 0x1022 (addend 4), 0x101e, 0x1020 (addend 2) and 0x101e, and the bytes are the linker's, not the materializer's. Before linking, `llvm-readobj --relocations` reports five `R_X86_64_32S .text` records with addends 0x1E, 0x22, 0x1E, 0x20 and 0x1E, which is the same arithmetic the plan states. `resolve_in_place` writes the bytes and emits no record, so `records: 0` is five fixups applied, not zero fixups. input_sha256 is resolved.asm.",
+  "relocation_check": "llvm-nm on the linked image reports '000000000000101e t L1'"
+}

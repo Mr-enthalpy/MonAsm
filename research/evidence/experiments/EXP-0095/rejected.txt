@@ -1,0 +1,10 @@
+
+C:\Users\hanni\Projects\MonAsm\research\evidence\experiments\EXP-0095\rejected.asm:4:11: error: invalid operand for instruction
+movl ext, %ax
+          ^~~
+C:\Users\hanni\Projects\MonAsm\research\evidence\experiments\EXP-0095\rejected.asm:5:11: error: invalid operand for instruction
+movq ext, %eax
+          ^~~~
+C:\Users\hanni\Projects\MonAsm\research\evidence\experiments\EXP-0095\rejected.asm:6:11: error: invalid operand for instruction
+movw ext, %r9d
+          ^~~~

@@ -1,0 +1,21 @@
+{
+  "errors": [
+    {
+      "code": "E-FIXUP-005",
+      "path": "/fixups/0/field_descriptor",
+      "detail_keys": [
+        "fixup_id",
+        "descriptor"
+      ]
+    },
+    {
+      "code": "E-FIXUP-001",
+      "path": "/instructions/0/operands/1",
+      "detail_keys": [
+        "kind",
+        "form_id",
+        "field"
+      ]
+    }
+  ]
+}

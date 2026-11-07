@@ -1,0 +1,19 @@
+
+	movl	ext, %eax                       # encoding: [0x8b,0x04,0x25,A,A,A,A]
+                                        #   fixup A - offset: 3, value: ext, kind: reloc_signed_4byte
+	movl	%eax, ext                       # encoding: [0x89,0x04,0x25,A,A,A,A]
+                                        #   fixup A - offset: 3, value: ext, kind: reloc_signed_4byte
+	movl	ext, %r8d                       # encoding: [0x44,0x8b,0x04,0x25,A,A,A,A]
+                                        #   fixup A - offset: 4, value: ext, kind: reloc_signed_4byte
+	movq	ext, %rax                       # encoding: [0x48,0x8b,0x04,0x25,A,A,A,A]
+                                        #   fixup A - offset: 4, value: ext, kind: reloc_signed_4byte
+	movw	%r9w, ext                       # encoding: [0x66,0x44,0x89,0x0c,0x25,A,A,A,A]
+                                        #   fixup A - offset: 5, value: ext, kind: reloc_signed_4byte
+	movb	%ah, ext                        # encoding: [0x88,0x24,0x25,A,A,A,A]
+                                        #   fixup A - offset: 3, value: ext, kind: reloc_signed_4byte
+	movb	ext, %al                        # encoding: [0x8a,0x04,0x25,A,A,A,A]
+                                        #   fixup A - offset: 3, value: ext, kind: reloc_signed_4byte
+	vmovaps	ext, %zmm1                      # encoding: [0x62,0xf1,0x7c,0x48,0x28,0x0c,0x25,A,A,A,A]
+                                        #   fixup A - offset: 7, value: ext, kind: reloc_signed_4byte
+	addq	$ext, %rax                      # encoding: [0x48,0x83,0xc0,A]
+                                        #   fixup A - offset: 3, value: ext, kind: FK_Data_1
