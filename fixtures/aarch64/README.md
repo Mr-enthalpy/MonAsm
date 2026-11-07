@@ -1,6 +1,6 @@
 # AArch64 fixtures
 
-Vectors: `A64-P1` … `A64-P19` in `docs/fmp-v0/06_validation_matrix.md`.
+Vectors: `A64-P1` … `A64-P22` in `docs/fmp-v0/06_validation_matrix.md`.
 
 ## What is here
 
@@ -26,6 +26,10 @@ Vectors: `A64-P1` … `A64-P19` in `docs/fmp-v0/06_validation_matrix.md`.
 | `positive/A64-P17-regoff` | `aarch64:ldr/x64-base-regoff-*` ×8 and `str/x64-base-regoff-*` ×8 (`0.15.0`), one per `option`/`S` pair, plus four register-31 rows (`sp` in `Rn`, `xzr`/`wzr` in `Rm`); twenty instructions, 80 B | `llvm-mc` (no linker: registers only, no relocations) |
 | `positive/A64-P18-w32regoff` | `aarch64:ldr/w32-base-regoff-*` ×8 and `str/w32-base-regoff-*` ×8 (`0.16.0`), one per `option`/`S` pair at `#0`/`#2`, plus the same four register-31 rows; twenty instructions, 80 B, `w32` destination/source and `x64` base/index | `llvm-mc` (no linker: registers only, no relocations) |
 | `positive/A64-P19-movwide` | `aarch64:movk/x64-imm16-lsl*` ×4 and `movn/x64-imm16-lsl*` ×4 (`0.17.0`), one per `hw` lane in lane order, plus four boundary rows (`x31`, `#0`, `#0xffff` at `lsl #48`, `movn` at `lsl #48` with `#0`); twelve instructions, 48 B | `llvm-mc` (no linker: registers and immediates only, no relocations) |
+| `positive/A64-P20-asr-rows` | the three `imm6-asr` rows no earlier fixture named — `aarch64:sub/w32-w32-w32-imm6-asr`, `subs/x64-x64-x64-imm6-asr`, `subs/w32-w32-w32-imm6-asr` at `#3` — plus the two field ends (`imm6 = 63` on the 64-bit row, `31` on the 32-bit row); five instructions, 20 B, no definition change | `llvm-mc` (no linker: registers and immediates only, no relocations) |
+| `positive/A64-P21-b-imm26` | `aarch64:b/imm26` ×3 (`0.18.0`), field values 0, 1 and −1 | `llvm-mc` (no linker: literal displacements, no relocations) |
+| `positive/A64-P21-b-local-symbol` | `aarch64:b/imm26` ×3 against labels at 0/4/8, so the fields are 2, 0 and −2 through the `pcrel_begin` + `scale(2)` path | `llvm-mc` (no linker: resolved labels, no relocations) |
+| `positive/A64-P22-register-branch` | `aarch64:br/rn`, `blr/rn` and `ret/rn` (`0.18.0`): `br x1`, `br x0`, `blr x2`, `ret x30`, `ret x0`, `ret x19`; six instructions, 24 B | `llvm-mc` (no linker: registers only, no relocations) |
 | `negative/N01-absent-scaled-form` | `aarch64:add/x64-imm12-lsl12` against `0.1.0`, which lacks it | `E-FORM-001` |
 | `negative/N01b-absent-register-offset-form` | `aarch64:ldr/x64-base-regoff` (`0.4.0` has no such form) | `E-FORM-001` |
 | `negative/N01d-absent-movz-lane` | `aarch64:movz/x64-imm16-lsl8` (`0.5.0` has four lanes, not eight) | `E-FORM-001` |
@@ -48,6 +52,8 @@ Vectors: `A64-P1` … `A64-P19` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N01u-movk-absent-in-previous-version` | `aarch64:movk/x64-imm16-lsl16` against `0.16.0`, which does not have the `movk` rows yet | `E-FORM-001` |
 | `negative/N01v-absent-w32-movk-lane` | `aarch64:movk/w32-imm16-lsl16`: the `sf = 0` node is in no document | `E-FORM-001` |
 | `negative/N01w-absent-mov-alias` | `aarch64:mov/x64-imm16-lsl0`: the alias picks its operation and lane from the literal's value | `E-FORM-001` |
+| `negative/N01x-absent-cbz-form` | `aarch64:cbz/x64-imm19` against `0.18.0`: the conditional siblings carry a register plus `imm19`, and `EC-18` keeps only `b.cond` | `E-FORM-001` |
+| `negative/N01y-absent-ret-default-operand` | `aarch64:ret` (no operand): the assembler's bare `ret` means `ret x30`, and a hidden default is `INV-05`, so the row is `ret/rn` only | `E-FORM-001` |
 | `negative/N02b-w-source-in-shift-form` | a `w32` operand on the `x`-source `-imm6-lsl` row | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02c-x-dest-on-w-row` | an `x64` destination on `aarch64:add/w32-w32-w32-lsl0` | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02d-ext-x-source-on-w-keyword` | an `x64` source on `aarch64:sub/x64-x64-w32-imm3-uxtb` | `E-OPERAND-001` (kind and target_type) |
@@ -67,6 +73,7 @@ Vectors: `A64-P1` … `A64-P19` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N03-movk-imm16-out-of-range` | `imm16 = 65536`, one past the 16-bit move-wide field | `E-RANGE-001` |
 | `negative/N04c-bcond-imm19-out-of-range` | `imm19 = 262144`, one past the signed 19-bit field | `E-RANGE-002` |
 | `negative/N04d-loadlit-imm19-out-of-range` | `imm19 = 262144` on the literal row, one past the same signed field | `E-RANGE-002` |
+| `negative/N04e-b-imm26-out-of-range` | `imm26 = 33554432` on `aarch64:b/imm26`, one past the signed 26-bit field (`llvm-mc` wraps it to `0x14800000`; v0 rejects) | `E-RANGE-002` |
 | `negative/N12a-pair-without-lo` | two `hi` members in one `pair_group` | `E-FIXUP-007` |
 | `negative/N14-register-wider-than-field` | register 32 in a 5-bit field | `E-OPERAND-004` |
 | `negative/N18a-no-form-switch` | `0x1000` stated on `-lsl0` (legal only as a scaled literal) | `E-RANGE-001` |
@@ -82,6 +89,7 @@ Vectors: `A64-P1` … `A64-P19` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N19-modifier-is-not-a-carrier` | `{"name": "lsl", "value": 3}` in a `modifiers` entry on `aarch64:add/x64-x64-x64-lsl0` | `E-OPERAND-003` |
 | `negative/N19b-regoff-modifier-is-not-a-carrier` | `{"name": "lsl", "value": 3}` in a `modifiers` entry on the `index` of `aarch64:ldr/x64-base-regoff-lsl0` | `E-OPERAND-003` |
 | `negative/N19c-w32-regoff-modifier-is-not-a-carrier` | `{"name": "lsl", "value": 2}` in a `modifiers` entry on the `index` of `aarch64:ldr/w32-base-regoff-lsl0` | `E-OPERAND-003` |
+| `negative/N19d-b-link-modifier-is-not-a-carrier` | `{"name": "link", "value": true}` in a `modifiers` entry on the target of `aarch64:b/imm26`: the link bit is the `form_id` (`EC-41`) | `E-OPERAND-003` |
 | `negative/N20-loadlit-fixup-misaligned` | a `pcrel_begin` literal-load fixup whose symbol is 2 bytes away, so the displacement is not a multiple of 4 | `E-RANGE-003` (`required_align 2`, `value 2`) |
 
 `N01` is why the version split matters: a form exists, but not in an older
@@ -98,11 +106,15 @@ now shows for `subs`), a plan bound to `0.9.0` cannot reach the `w` rows
 store `imm9` rows (`N01n`), a plan bound to `0.13.0` cannot reach the
 literal load (`N01o`), a plan bound to `0.14.0` cannot reach the
 register-offset rows (`N01p`), a plan bound to `0.15.0` cannot reach the
-32-bit register-offset rows (`N01r`), and a plan bound to `0.16.0` cannot reach
-the `movk`/`movn` rows (`N01u`). `N01t` and `N01v` are a different negation: they
+32-bit register-offset rows (`N01r`), a plan bound to `0.16.0` cannot reach
+the `movk`/`movn` rows (`N01u`), and a plan bound to `0.17.0` cannot reach the
+unconditional-transfer rows (`ADR-0100`). `N01t` and `N01v` are a different negation: they
 name a lane no version has (`-lsl8`) and a width no version has (`w32`), and
 `N01w` names the `mov` alias, which no version has because its literal chooses
-the operation and lane. `N01h` and `N01j` are the same shape one
+the operation and lane. `N01x` and `N01y` are the third shape: a conditional
+sibling (`cbz`) that `EC-18` keeps out of v0, and a `ret` with no operand, whose
+default would be a hidden input rather than a form. `N01h` and `N01j` are the
+same shape one
 version earlier for the `w`
 rows of `0.8.0`/`0.9.0`.
 Each fixture names the document it targets and that
@@ -287,6 +299,23 @@ and `65536` or a pre-scaled literal is `E-RANGE-001`
 (`N03-movk-imm16-out-of-range`, `N18g`). The four boundary rows pin `Rd = 31`,
 both ends of `imm16` on the top lane, and the one word `llvm-objdump` prints as
 `movn` rather than the `mov` alias.
+
+The unconditional-transfer rows are the fifteenth instance, and the one where a
+single bit is the whole decision. `A64-P21` covers `aarch64:b/imm26`
+(`0.18.0`, `ADR-0100`, `EXP-0101` §1, §3): `b` is `BL_only_branch_imm`'s layout
+with bit 31 cleared, `imm26` is field content in 4-byte units, so the three
+plain values state `0`, `1` and `−1` and the local labels at 0/4/8 give `2`,
+`0` and `−2` through `pcrel_begin` + `scale(2)`. Stating `33554432` is
+`E-RANGE-002` (`N04e`), although `llvm-mc` silently wraps it to `0x14800000`.
+The link bit cannot be a modifier: `{"name": "link", "value": true}` on the
+target is `E-OPERAND-003` (`N19d`), because `b` and `bl` are two `form_id`s that
+differ in bit 31 **and** in their relocation kind (`R_AARCH64_JUMP26` vs
+`R_AARCH64_CALL26`, `EC-41`). `A64-P22` covers the three register forms
+(`EXP-0101` §2): `br/rn`, `blr/rn` and `ret/rn` differ in `op` at 21–22, `Rn`
+sits at 5+5 as a `src`, and the node's register is `Xn`, so 31 is `xzr` and no
+`excluded` list is needed. `ret` carries no implicit `x30` — the assembler's bare
+`ret` is `0xd65f03c0`, a hidden default — so a no-operand `ret` is
+`E-FORM-001` (`N01y`), and the conditional siblings stay absent (`N01x`).
 
 **An operand whose bits a fixup owns has an empty payload.** `{"payload": {}}`,
 not a `symbol_id`: `01_contract.md` §8.1 only allows `symbol_id` on a `target`

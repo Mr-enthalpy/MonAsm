@@ -17,7 +17,7 @@ this file plus `AGENTS.md` alone.
 | 3 | Three-ISA vertical prototype | **complete** (2026-11-08): eighty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 72 positive and 477 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate; exit criteria below |
 | 4 | Invariants, negative tests, replay | **complete** (2026-11-08): `EXP-R1`–`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs`; `EXP-R3` also passes on Ubuntu 24.04 (`x86_64`), macOS 26.7.2 (`aarch64`) and Windows Server 2025 with the pinned 1.96.0 toolchain (`EXP-0033` §6, run 42402997326); the invariant-to-test map in `01_contract.md` §2 is filled and every row is `verified` (`N22` closes `E-LAYOUT-004`/`006`/`007`, `N23a` closes the expression-shaped-value gap in INV-06) |
 | 5 | Convergence, route evaluation, roadmap | **complete** (2026-11-08): `08_final_recommendation.md` §A–§H and Q1–Q10; `ADR-0095` moves the contract set to `frozen for the v0 scope`; `AC-10` satisfied; Phase 6 order fixed as M1 error-coverage gate → M2 oracle rerun harness → M3 Level 1 object writer → M4 planner boundary → M5 coverage widening |
-| 6 | Implementation roadmap (M1–M5) | **in progress**: M1 error-coverage gate **complete** (2026-11-08) with `N24a`–`N24h`, CI run `42407621760` green on Ubuntu, macOS and Windows; M2 oracle rerun harness **complete** (`tools/oracle/rerun.py`: 67/101 re-derived after `P71`, 29 `input-not-stored`, 5 `manual-derivation`; CI run `42408219370` green); M3 Level 1 object writer **complete** (2026-11-08) with `ADR-0096`, `X86-P71` and `EXP-0100`, plus `N24i` and the repointed `N24h`; CI run `42409630161` green on Ubuntu, macOS and Windows; Level 0 bytes unchanged; M4 planner boundary/API **complete** (2026-11-08): `ADR-0097` and `09_planner_api.md` define `fmp-plan`, a total closed builder over `fmp-model` with no validator and no planner authority; the crate is implemented and `cargo tree -p fmp-plan` shows `fmp-model` as its only workspace dependency; `planner_api.rs` runs ten tests (108 positive and 544 `materialize`-phase negative parity, from-scratch authoring for `X86-P1`/`A64-P2`/`RV-P1`/`X86-P71`, closed key sets, optional-member and enum-spelling round trips, fixed-point re-emission, the six `read`-phase negatives, determinism and typed `Unrepresentable` failures), and a removal of `expected_digest` was observed to fail the gate; CI run `42412752660` green on Ubuntu, macOS and Windows; M5 coverage widening **in progress** (2026-11-08): `A64-P20` closes the three unused `imm6-asr` rows and `tools/check_definition.py` now fails when a frozen row has no positive fixture; `ADR-0098` defines `hi20`, adds `definitions/rv64/0.3.0.json` (`riscv:lui/rd-imm20`), the three `RV-P9` vectors and `N01eh`/`N07f`; `ADR-0099` adds `riscv:jalr/rd-rs1-imm12` as `definitions/rv64/0.4.0.json`, the three `RV-P10` vectors including the `pcrel_lo12` call pair, and `N01ei`/`N03x`; the remaining first-wave items are the AArch64 `b`/`ret`/`br`/`blr` family, x86 `sub` and x86 `call rel32` |
+| 6 | Implementation roadmap (M1–M5) | **in progress**: M1 error-coverage gate **complete** (2026-11-08) with `N24a`–`N24h`, CI run `42407621760` green on Ubuntu, macOS and Windows; M2 oracle rerun harness **complete** (`tools/oracle/rerun.py`: 67/101 re-derived after `P71`, 29 `input-not-stored`, 5 `manual-derivation`; CI run `42408219370` green); M3 Level 1 object writer **complete** (2026-11-08) with `ADR-0096`, `X86-P71` and `EXP-0100`, plus `N24i` and the repointed `N24h`; CI run `42409630161` green on Ubuntu, macOS and Windows; Level 0 bytes unchanged; M4 planner boundary/API **complete** (2026-11-08): `ADR-0097` and `09_planner_api.md` define `fmp-plan`, a total closed builder over `fmp-model` with no validator and no planner authority; the crate is implemented and `cargo tree -p fmp-plan` shows `fmp-model` as its only workspace dependency; `planner_api.rs` runs ten tests (111 positive and 548 `materialize`-phase negative parity, from-scratch authoring for `X86-P1`/`A64-P2`/`RV-P1`/`X86-P71`, closed key sets, optional-member and enum-spelling round trips, fixed-point re-emission, the six `read`-phase negatives, determinism and typed `Unrepresentable` failures), and a removal of `expected_digest` was observed to fail the gate; CI run `42412752660` green on Ubuntu, macOS and Windows; M5 coverage widening **in progress** (2026-11-08): `A64-P20` closes the three unused `imm6-asr` rows and `tools/check_definition.py` now fails when a frozen row has no positive fixture; `ADR-0098` defines `hi20`, adds `definitions/rv64/0.3.0.json` (`riscv:lui/rd-imm20`), the three `RV-P9` vectors and `N01eh`/`N07f`; `ADR-0099` adds `riscv:jalr/rd-rs1-imm12` as `definitions/rv64/0.4.0.json`, the three `RV-P10` vectors including the `pcrel_lo12` call pair, and `N01ei`/`N03x`; `ADR-0100` adds `aarch64:b/imm26`, `br/rn`, `blr/rn` and `ret/rn` as `definitions/aarch64/0.18.0.json`, the `A64-P21`/`A64-P22` vectors, `EC-41` and `N01x`/`N01y`/`N04e`/`N19d`; the remaining first-wave items are x86 `sub` and x86 `call rel32`, followed by the `fmp-def/0.2` per-form `requires_extensions` decision |
 
 ## Gates
 
@@ -159,6 +159,7 @@ on a slice count:
 | ADR-0097 | The planner boundary is `fmp-plan`: a total, closed plan builder that depends only on `fmp-model`, has no validator and no planner authority, exposes the frozen v0 surface (`source_ref`, `source_trace`, `symbol.type`, `section_relative` and `symbol.size` excluded), and proves "same codes" by re-reading its own bytes through the shipped reader and validator; implemented in `prototype/crates/fmp-plan` with the ten-test `planner_api.rs` parity gate | `09_planner_api.md`; `ADR-0031`; `ADR-0095`; `ADR-0096`; `planner_api.rs` |
 | ADR-0098 | `hi20` is the absolute high half: `v = (D + 0x800) >> 12` with `D = S + A`, so `pc_reference_rule` MUST be `none` (`E-FIXUP-001`, `N07f`) and the matching low half is `lo12_i` on the same absolute value; `definitions/rv64/0.3.0.json` appends `riscv:lui/rd-imm20` (`37000000`, `dest` 7+5, `target` 12+20, `signed: false`), measured at `0`, `1` and `0xfffff` and against the linked pair (`L1` at `0x1234` gives `lui a0, 1` + `addi a0, a0, 0x234`); the absent sibling `c.lui` stays `E-FORM-001` (`N01eh`), `lo12_s` stays reserved, and no transform selects an encoding form | `EXP-0098`; `RV-P9`; `03_fixup_model.md` §6; `07_definition_format.md` §8 |
 | ADR-0099 | RV64 `jalr` is a form, not a relaxation: `definitions/rv64/0.4.0.json` appends `riscv:jalr/rd-rs1-imm12` (`67000000`, `dest` 7+5, `src` 15+5, `imm` 20+12 `signed: true`), and the `auipc` + `jalr` call pair reuses `pcrel_hi20`/`pcrel_lo12` with `pair_role` `hi`/`lo` -- no new transform, because the mask and the instruction's sign extension agree; the low half stays `signed: false` and a masked value with bit 11 set is legal (`L1` at `0x1900` gives `auipc ra, 1` + `jalr ra, 0x900`, read back as `jalr -0x700(ra) <L1>`); `rs1` is an operand the plan supplies, so the materializer never infers a base register, and `c.jalr` stays `E-FORM-001` (`N01ei`) while `2048` stays `E-RANGE-001` (`N03x`) | `EXP-0099`; `RV-P10`; `EC-23`; `03_fixup_model.md` §4, §6; `07_definition_format.md` §8 |
+| ADR-0100 | AArch64 unconditional transfers are four forms and one bit: `definitions/aarch64/0.18.0.json` appends `aarch64:b/imm26` (`00000014`), `br/rn` (`00001fd6`), `blr/rn` (`00003fd6`) and `ret/rn` (`00005fd6`), with `imm26` at 0+25 as field content and `Rn` at 5+5 as a `src` operand (register 31 is `xzr`); the `b`/`bl` split is the `form_id` (`EC-41`) because the link bit changes the relocation (`R_AARCH64_JUMP26` vs `R_AARCH64_CALL26`) and a `link` modifier is `E-OPERAND-003` (`N19d`); `ret` carries no implicit `x30` (`N01y`), `cbz` stays `E-FORM-001` (`N01x`) and `imm26 = 33554432` is `E-RANGE-002` (`N04e`) although llvm-mc wraps it | `EXP-0101`; `A64-P21`; `A64-P22`; `EC-41`; `03_fixup_model.md` §6; `07_definition_format.md` §8 |
 
 ## Settled decisions (contract level)
 
@@ -261,7 +262,7 @@ Phases 3, 4 and 5 are complete, and Phase 6 **M1, M2, M3 and M4 are
 complete**. M1 added `N24a`–`N24i`, so `04_errors.md` §2.4 records 37 of the 43
 active codes as fixture-covered. M2 added `tools/oracle/rerun.py`: it resolves
 each assembler input by `input_sha256` and re-runs the recorded command, so
-`74/108` positives reproduce byte-identically, `29` are `input-not-stored` (all
+`77/111` positives reproduce byte-identically, `29` are `input-not-stored` (all
 20 AArch64 and 9 RV64 inputs were never committed) and `5` are
 `manual-derivation` (`tools/oracle/README.md` §"State"). M3 added the Level 1
 writer (`ADR-0096`): `artifact: sections` emits `sections[]` in `section_order`,
@@ -270,25 +271,31 @@ an optional `symbols[]` in `symbol_order`, and the unchanged Level 0 records;
 oracle's 43 bytes. M4 is **complete**: `prototype/crates/fmp-plan` is the total
 closed builder (only workspace dependency `fmp-model`; no materializer crate
 links it outside the `fmp-cli` test target), and `planner_api.rs` runs ten
-tests — 108 positive and 544 `materialize`-phase negative parity, from-scratch
+tests — 111 positive and 548 `materialize`-phase negative parity, from-scratch
 authoring for `X86-P1`/`A64-P2`/`RV-P1`/`X86-P71`, closed key sets,
 optional-member and enum-spelling round trips, fixed-point re-emission,
 structural exclusion of the six `read`-phase negatives, determinism and typed
 `Unrepresentable` failures.
 
-M5 coverage widening is **in progress** (`08_final_recommendation.md` §H). Three
+M5 coverage widening is **in progress** (`08_final_recommendation.md` §H). Four
 first-wave items have landed: `A64-P20` names the three unused `imm6-asr` rows
 (and `tools/check_definition.py` now rejects a frozen row no positive fixture
 names), `ADR-0098`/`RV-P9` define `hi20` and add `riscv:lui/rd-imm20` as
 `definitions/rv64/0.3.0.json` with a positive field vector, an
 `emit_relocation` pair and a resolved pair, plus `N01eh` (`c.lui` absent,
-`E-FORM-001`) and `N07f` (`hi20` with a PC rule, `E-FIXUP-001`), and
+`E-FORM-001`) and `N07f` (`hi20` with a PC rule, `E-FIXUP-001`),
 `ADR-0099`/`RV-P10` add `riscv:jalr/rd-rs1-imm12` as
 `definitions/rv64/0.4.0.json` with the `auipc` + `jalr` call pair (the low half
 is the existing `pcrel_lo12`), plus `N01ei` (`c.jalr` absent, `E-FORM-001`) and
-`N03x` (`imm12 = 2048`, `E-RANGE-001`). The remaining first-wave items each
-still need their own ADR before a table changes: the AArch64
-`b`/`ret`/`br`/`blr` family, x86 `sub` (three rows) and x86 `call rel32`. The
+`N03x` (`imm12 = 2048`, `E-RANGE-001`), and `ADR-0100`/`A64-P21`/`A64-P22` add
+`aarch64:b/imm26` and the three register branches as
+`definitions/aarch64/0.18.0.json` (180 forms), plus `N04e` (`imm26 = 33554432`,
+`E-RANGE-002`), `N19d` (a `link` modifier, `E-OPERAND-003`), `N01x` (`cbz`
+absent) and `N01y` (a no-operand `ret`). The remaining first-wave items each
+still need their own ADR before a table changes: x86 `sub` (three rows) and x86
+`call rel32`. After the wave, extension-gated families need `fmp-def/0.2` with
+per-form `requires_extensions` (a new definition format version; `0.1`
+semantics are untouched). The
 numbered list below is the older widening backlog; the M5 first wave supersedes
 its ordering for these families.
 

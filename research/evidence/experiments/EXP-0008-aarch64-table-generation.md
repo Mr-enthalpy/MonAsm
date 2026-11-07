@@ -1,15 +1,15 @@
 # EXP-0008 — generating the AArch64 tables from the MRS nodes
 
 - Date: 2026-11-04 (`0.2.0` … `0.14.0` added the same day; `0.15.0`, `0.16.0`
-  and `0.17.0` added 2026-11-05)
-- Subject: how `definitions/aarch64/0.1.0.json` … `0.17.0.json` were derived, and
+  and `0.17.0` added 2026-11-05; `0.18.0` added 2026-11-08)
+- Subject: how `definitions/aarch64/0.1.0.json` … `0.18.0.json` were derived, and
   what they do and do not cover
 - Basis: **experiment** for every field range, template and byte quoted below
 - Reproduce:
   `python tools/check_mrs.py --archive <pinned .tar.gz>`, then
   `python research/evidence/experiments/EXP-0008/generate_aarch64.py`
 
-The script emits all seventeen documents. `0.1.0` … `0.16.0` are frozen and their
+The script emits all eighteen documents. `0.1.0` … `0.17.0` are frozen and their
 digests are asserted by the script, so a later edit that tries to move one fails
 instead of shipping. A form declares the version it starts in (`since`), so a
 later document is always a superset and cannot lose an earlier row.
@@ -28,7 +28,7 @@ sha256 a1ad2c6538a47cd97d8762791ac5af88bce1d5f6aff096c9b77aef853e76acfe
 BSD-3-Clause licence sentence before the drop may be used (ADR-0006). The file is
 not vendored; the shipped artifact is the JSON table plus its digest.
 
-The thirty-nine encode nodes are named exactly as the MRS names them. The
+The forty-three encode nodes are named exactly as the MRS names them. The
 generator walks `instructions` recursively, matches the node's `name`, rejects
 duplicates and refuses to run if any node is missing. It does not read groups or
 descriptions. From `0.12.0` it also indexes the `Instruction.InstructionAlias`
@@ -475,6 +475,39 @@ instruction's operation, not the plan's arithmetic. Register 31 stays a plain
 because its literal chooses `movz`/`movn` and the lane from the value
 (`EXP-0028` §2–§3, ADR-0026).
 
+### `B` / `BR` / `BLR` / `RET` → the four unconditional-transfer rows
+
+| Field | start+width | MRS value | Our use |
+|---|---|---|---|
+| `op` (link) | 31+1 | `0` (`B`) / `1` (`BL`) | fixed by the node |
+| — | 29+2 | `00` | fixed |
+| — | 26+3 | `101` | fixed |
+| `imm26` | 0+26 | `xx…` | slot `target`, signed (`B` only) |
+
+| Field | start+width | MRS value | Our use |
+|---|---|---|---|
+| `op0` | 29+3 | `110` | fixed |
+| — | 26+3 | `101` | fixed |
+| — | 25+1 | `1` | fixed |
+| `Z` | 24+1 | `0` | fixed |
+| — | 23+1 | `0` | fixed |
+| `op` | 21+2 | `00` / `01` / `10` | fixed per node (`br`/`blr`/`ret`) |
+| `op2` | 16+5 | `11111` | fixed |
+| — | 12+4 | `0000` | fixed |
+| `A` / `M` | 11+1 / 10+1 | `0` / `0` | fixed |
+| `Rn` | 5+5 | `xxxxx` | slot `src`, `x64` |
+| `Rm` | 0+5 | `00000` | fixed |
+
+`B_only_branch_imm` and `BL_only_branch_imm` are two nodes with the link bit
+fixed differently; `BL_only_branch_imm` has shipped since `0.1.0`, and `0.18.0`
+reads `B_only_branch_imm` and adds `b` as the second form of that layout.
+`BR_64_branch_reg`, `BLR_64_branch_reg` and `RET_64R_branch_reg` differ only in
+the 2-bit `op`, and each leaves `Rn` as its single operand. The node's register
+is `Xn`, so field value 31 is `xzr`, not `sp`: the measured `br xzr` is
+`0xd61f03e0`, while `blr sp` is an assembler error with no v0 spelling
+(`EXP-0101` §2, ADR-0100). All four new rows read one node each, which is why
+the node count grows by four.
+
 ## 3. How the template is built
 
 For each node the generator:
@@ -686,7 +719,7 @@ Templates are stored little-endian, the only byte order v0 definitions declare
 
 ## 4. Oracle
 
-`llvm-mc` 23.1.2 assembles all one hundred and seventy-six forms. It does **not** resolve AArch64
+`llvm-mc` 23.1.2 assembles all one hundred and eighty forms. It does **not** resolve AArch64
 branches or `adrp` when the target is a symbol: it emits zeros plus
 `fixup_aarch64_pcrel_call26`, `fixup_aarch64_pcrel_adrp_imm21` or
 `fixup_aarch64_add_imm12`. For the forms whose bits a fixup owns, the oracle is
@@ -863,8 +896,8 @@ literal rather than `imm16` content (`EXP-0028` §2–§4, ADR-0026).
   rejections, and §4 reproduces the eight move-wide rows.
 - **Not a statement about the other packagings.** Only the archive pinned by
   ADR-0006 was read (`EXP-0006`, `EXP-0007`).
-- **Not an encoding-selection mechanism.** Forty-nine MRS nodes are read because
-  one hundred and seventy-six forms exist in the table (thirty-nine encode nodes,
+- **Not an encoding-selection mechanism.** Fifty-three MRS nodes are read because
+  one hundred and eighty forms exist in the table (forty-three encode nodes,
   most of them read more than once, plus ten `CMP`/`CMN` alias nodes read only for
   verification; `ADD_64_addsub_shift` is read four times,
   `ADD_64_addsub_ext` eight times, `ADD_64_addsub_imm` twice,
@@ -892,8 +925,8 @@ literal rather than `imm16` content (`EXP-0028` §2–§4, ADR-0026).
   `0.5.0` (ADR-0014), `0.6.0` (ADR-0015), `0.7.0` (ADR-0016),
   `0.8.0` (ADR-0017), `0.9.0` (ADR-0018), `0.10.0` (ADR-0019),
   `0.11.0` (ADR-0020), `0.12.0` (ADR-0021), `0.13.0` (ADR-0022),
-  `0.14.0` (ADR-0023), `0.15.0` (ADR-0024), `0.16.0` (ADR-0025) and
-  `0.17.0` (ADR-0026)
+  `0.14.0` (ADR-0023), `0.15.0` (ADR-0024), `0.16.0` (ADR-0025),
+  `0.17.0` (ADR-0026) and `0.18.0` (ADR-0100)
   respectively, none of them a
   slot-level scaling rule or a value-driven form choice; the ten `cmp`/`cmn`
   alias nodes are verification sources for those rows rather than byte sources,
@@ -1013,13 +1046,19 @@ namespace   monasm.isa.aarch64
 version     0.17.0
 forms       176
 digest      sha256:de2c53e1871f5c24f6af73082dcc402729786d2e6e2495f84e3ed553adb4e4ed
+
+definition  definitions/aarch64/0.18.0.json
+namespace   monasm.isa.aarch64
+version     0.18.0
+forms       180
+digest      sha256:c32e3674bf50140276d29fd01891bab20a86b849fa1503d2c9d02ae6aa503824
 ```
 
 The digests are computed over the canonical form of each whole document
 (`01_contract.md` §12, `OD-06`) and printed by `tools/check_definition.py`,
 which also checks that the reading-aid table in `07_definition_format.md` §8.2
 matches the JSON row by row. `definitions/aarch64/NOTICE` reproduces the upstream
-BSD-3-Clause notice and names the archive hash; `0.2.0` … `0.16.0` need
+BSD-3-Clause notice and names the archive hash; `0.2.0` … `0.17.0` need
 no second notice because they are generated from the same drop and ship under the
 same terms.
 
@@ -1048,6 +1087,8 @@ from `0.14.0` is the sixteen register-offset rows; because `0.16.0` repeats
 all one hundred and fifty-two earlier rows verbatim, the only difference from
 `0.15.0` is the sixteen 32-bit register-offset rows; and because `0.17.0` repeats
 all one hundred and sixty-eight earlier rows verbatim, the only difference from
-`0.16.0` is the eight `movk`/`movn` rows. The
+`0.16.0` is the eight `movk`/`movn` rows; and because `0.18.0` repeats all one
+hundred and seventy-six earlier rows verbatim, the only difference from `0.17.0`
+is the four unconditional-transfer rows. The
 generator's frozen-digest assertions are what prove
 that no earlier row moved while a new one landed.

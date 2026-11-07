@@ -1,0 +1,30 @@
+
+	b	#0                              // encoding: [0x00,0x00,0x00,0x14]
+	b	#4                              // encoding: [0x01,0x00,0x00,0x14]
+	b	#-4                             // encoding: [0xff,0xff,0xff,0x17]
+
+	br	x1                              // encoding: [0x20,0x00,0x1f,0xd6]
+	br	x0                              // encoding: [0x00,0x00,0x1f,0xd6]
+	blr	x2                              // encoding: [0x40,0x00,0x3f,0xd6]
+	ret                                     // encoding: [0xc0,0x03,0x5f,0xd6]
+	ret	x0                              // encoding: [0x00,0x00,0x5f,0xd6]
+	ret	x19                             // encoding: [0x60,0x02,0x5f,0xd6]
+
+	.text
+back:
+	b	ahead                           // encoding: [A,A,A,0b000101AA]
+                                        //   fixup A - offset: 0, value: ahead, kind: fixup_aarch64_pcrel_branch26
+here:
+	b	here                            // encoding: [A,A,A,0b000101AA]
+                                        //   fixup A - offset: 0, value: here, kind: fixup_aarch64_pcrel_branch26
+ahead:
+	b	back                            // encoding: [A,A,A,0b000101AA]
+                                        //   fixup A - offset: 0, value: back, kind: fixup_aarch64_pcrel_branch26
+
+	.text
+	b	ext                             // encoding: [A,A,A,0b000101AA]
+                                        //   fixup A - offset: 0, value: ext, kind: fixup_aarch64_pcrel_branch26
+	bl	ext                             // encoding: [A,A,A,0b100101AA]
+                                        //   fixup A - offset: 0, value: ext, kind: fixup_aarch64_pcrel_call26
+
+	ret                                     // encoding: [0xc0,0x03,0x5f,0xd6]

@@ -22,7 +22,7 @@ What it does, per form:
 Documents are emitted per version. A form appears in a document when the
 document's version is at or after the form's `since` (absent `since` means every
 version), so a later document cannot silently lose an earlier form. `0.1.0` …
-`0.16.0` stay frozen: their digests are asserted below, so a later edit that
+`0.17.0` stay frozen: their digests are asserted below, so a later edit that
 perturbs any of them fails loudly instead of shipping.
 
 Reads:  research/external/arm-mrs/Instructions.json (pinned by check_mrs.py)
@@ -43,6 +43,7 @@ Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.15.0.json
         definitions/aarch64/0.16.0.json
         definitions/aarch64/0.17.0.json
+        definitions/aarch64/0.18.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -63,7 +64,7 @@ OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
 VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0",
             "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0",
-            "0.14.0", "0.15.0", "0.16.0", "0.17.0"]
+            "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0"]
 
 # Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
@@ -83,6 +84,7 @@ FROZEN_DIGESTS = {
     "0.14.0": "sha256:a90ceac19824fbb00731e040346daa191973652e58522fab72336e24f769a5ba",
     "0.15.0": "sha256:422ebb83b897b18e010da37539796b0b97cfc9018a47209fc4a6ddc5b14af5d3",
     "0.16.0": "sha256:1e83c6cad91594e8315500f39d0bcffa235edc90c5f47c012555c077a8dbc457",
+    "0.17.0": "sha256:de2c53e1871f5c24f6af73082dcc402729786d2e6e2495f84e3ed553adb4e4ed",
 }
 
 WIDTH = 32
@@ -1837,6 +1839,68 @@ def _alias_forms():
 
 
 FORMS.extend(_alias_forms())
+
+
+def _transfer_forms():
+    """The unconditional transfer family (ADR-0100).
+
+    Four nodes, one per shape. `B_only_branch_imm` and `BL_only_branch_imm`
+    differ only in the fixed link bit, so they are two specs of one layout.
+    `BR_64_branch_reg`, `BLR_64_branch_reg` and `RET_64R_branch_reg` fix
+    `op` at 21-22 to 00/01/10 and leave `Rn` at 5-9 as the single operand.
+    Register 31 is a plain `reg_number` (the `Xn` reading is `xzr`), so there
+    is no `excluded` list.
+    """
+    return [
+        {
+            "form_id": "aarch64:b/imm26",
+            "mrs": "B_only_branch_imm",
+            "decision": "link bit 31 = 0, fixed by the node",
+            "pinned": {},
+            "since": "0.18.0",
+            "slots": [
+                {"mrs": ["imm26"], "role": "target", "kind": "aarch64.rel",
+                 "from": "operand_value", "target_type": "imm26",
+                 "range": {"signed": True, "bits": 26, "align_bits": 0}},
+            ],
+        },
+        {
+            "form_id": "aarch64:br/rn",
+            "mrs": "BR_64_branch_reg",
+            "decision": "op = 00 at 21-22, fixed by the node",
+            "pinned": {},
+            "since": "0.18.0",
+            "slots": [
+                {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+                 "from": "reg_number", "target_type": "x64"},
+            ],
+        },
+        {
+            "form_id": "aarch64:blr/rn",
+            "mrs": "BLR_64_branch_reg",
+            "decision": "op = 01 at 21-22, fixed by the node",
+            "pinned": {},
+            "since": "0.18.0",
+            "slots": [
+                {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+                 "from": "reg_number", "target_type": "x64"},
+            ],
+        },
+        {
+            "form_id": "aarch64:ret/rn",
+            "mrs": "RET_64R_branch_reg",
+            "decision": "op = 10 at 21-22; Rn is required, no x30 default",
+            "pinned": {},
+            "since": "0.18.0",
+            "slots": [
+                {"mrs": ["Rn"], "role": "src", "kind": "aarch64.gpr64",
+                 "from": "reg_number", "target_type": "x64"},
+            ],
+        },
+    ]
+
+
+FORMS.extend(_transfer_forms())
 
 
 def _alias_stem(base):

@@ -1,7 +1,7 @@
 # Definition Format
 
 Status: **frozen for the v0 scope** (`ADR-0095`): the format and the shipped
-tables (`x86-64` `0.1.0` … `0.65.0`, `aarch64` `0.1.0` … `0.17.0`, `rv64`
+tables (`x86-64` `0.1.0` … `0.65.0`, `aarch64` `0.1.0` … `0.18.0`, `rv64`
 `0.1.0`/`0.2.0`). The format is intended for the other targets, whose tables wait
 on source data, not on an open decision (`OD-07` is settled by ADR-0005 and
 pinned by ADR-0006). This document defines the artifact a pinned
@@ -324,6 +324,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/aarch64/0.15.0.json` | `monasm.isa.aarch64` | `sha256:422ebb83b897b18e010da37539796b0b97cfc9018a47209fc4a6ddc5b14af5d3` |
 | `definitions/aarch64/0.16.0.json` | `monasm.isa.aarch64` | `sha256:1e83c6cad91594e8315500f39d0bcffa235edc90c5f47c012555c077a8dbc457` |
 | `definitions/aarch64/0.17.0.json` | `monasm.isa.aarch64` | `sha256:de2c53e1871f5c24f6af73082dcc402729786d2e6e2495f84e3ed553adb4e4ed` |
+| `definitions/aarch64/0.18.0.json` | `monasm.isa.aarch64` | `sha256:c32e3674bf50140276d29fd01891bab20a86b849fa1503d2c9d02ae6aa503824` |
 | `definitions/rv64/0.1.0.json` | `monasm.isa.riscv` | `sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083` |
 | `definitions/rv64/0.2.0.json` | `monasm.isa.riscv` | `sha256:8329a38faa964f9c69207a48e3bfb45c13fb0ddbaeb829ddcc0dbd1cffa8de10` |
 | `definitions/rv64/0.3.0.json` | `monasm.isa.riscv` | `sha256:484eae4ba4c80c1ff4d91bc11a6fd9bd36bdc511a8271815d76c0883869ad2af` |
@@ -2023,7 +2024,7 @@ the `-ext` row is `E-RANGE-004` (`N16dg`), and naming a row against
 offset width), the `0x67 66` RIP-relative row, a symbol in the
 displacement, APX `d5` and EVEX masking/broadcast.
 
-### 8.2 `aarch64` `0.1.0` … `0.17.0`
+### 8.2 `aarch64` `0.1.0` … `0.18.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -2203,6 +2204,10 @@ displacement, APX `d5` and EVEX masking/broadcast.
 | `aarch64:str/w32-base-regoff-sxtw2` | `00d820b8` | src: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
 | `aarch64:str/w32-base-regoff-sxtx0` | `00e820b8` | src: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
 | `aarch64:str/w32-base-regoff-sxtx2` | `00f820b8` | src: `aarch64.gpr32`/`w32` → `[0,5]`; base: `aarch64.gpr64`/`x64` → `[5,5]`; index: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-14`, `A64-P18` |
+| `aarch64:b/imm26` | `00000014` | target: `aarch64.rel`/`imm26` → `[0,26]` | 4 | `A64-P21` — `0.18.0` only |
+| `aarch64:br/rn` | `00001fd6` | src: `aarch64.gpr64`/`x64` → `[5,5]` | 4 | `A64-P22` — `0.18.0` only |
+| `aarch64:blr/rn` | `00003fd6` | src: `aarch64.gpr64`/`x64` → `[5,5]` | 4 | `A64-P22` — `0.18.0` only |
+| `aarch64:ret/rn` | `00005fd6` | src: `aarch64.gpr64`/`x64` → `[5,5]` | 4 | `A64-P22` — `0.18.0` only |
 
 `0.1.0` holds the first, second, fourth and fifth rows; `0.2.0` adds
 `aarch64:add/x64-imm12-lsl12` (ADR-0011); `0.3.0` repeats all five and adds
@@ -2221,7 +2226,9 @@ one hundred and thirty-five and adds the literal load row (ADR-0023); `0.15.0`
 repeats all one hundred and thirty-six and adds the sixteen register-offset rows
 (ADR-0024); `0.16.0` repeats all one hundred and fifty-two and adds the sixteen
 32-bit register-offset rows (ADR-0025); `0.17.0` repeats all one hundred and
-sixty-eight and adds the eight `movk`/`movn` rows (ADR-0026).
+sixty-eight and adds the eight `movk`/`movn` rows (ADR-0026); `0.18.0` repeats
+all one hundred and seventy-six and adds the four unconditional-transfer rows
+(ADR-0100).
 Each document therefore shares its earlier rows
 unchanged and differs only in the rows its version introduced, so a plan bound to
 an older version cannot reach a newer form (`E-FORM-001`, `N01`) even though the
@@ -2233,8 +2240,8 @@ The templates are little-endian file order, so `0000008b` is the word
 bit from the MRS node, requires the MRS node name to exist, and refuses to emit
 unless all 32 bits are covered exactly once by a fixed bit or a slot placement;
 `EXP-0008` §2–§3 records the nodes and the coverage check. The one hundred and
-seventy-six forms come
-from thirty-nine encode nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
+eighty forms come
+from forty-three encode nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
 pinned to 0 and once per shift keyword, `ADD_64_addsub_ext` eight times, once per
 `option` value, `ADD_64_addsub_imm` twice, once with
 `sh = 0` and once with `sh = 1`, `MOVZ_64_movewide` four times, once per `hw`
@@ -2247,7 +2254,11 @@ per row it shares with the `add` half (`ADR-0017`), `ADDS_64_addsub_shift` and
 `SUB_64_addsub_ext`, `ADDS_64S_addsub_ext` and `SUBS_64S_addsub_ext` eight times
 each, once per `option` value (`ADR-0020`),
 `B_only_condbranch` contributes one row with both of its variable
-fields as operands, and each of the eight load/store rows reads one node whose
+fields as operands, `B_only_branch_imm` contributes `b`'s row (its
+`BL_only_branch_imm` sibling has been `bl` since `0.1.0`), and
+`BR_64_branch_reg`, `BLR_64_branch_reg` and `RET_64R_branch_reg` contribute one
+row each with `Rn` as the single operand (`ADR-0100`), and each of the eight
+load/store rows reads one node whose
 addressing-kind bits are fixed and whose `imm12`/`imm9` is the single variable
 field (`ADR-0022` adds the three store `imm9` nodes); `LDR_64_loadlit` is the one
 node with no base register, and its `imm19` is the single variable field
@@ -2257,7 +2268,7 @@ times, once per `option`/`S` pair (`ADR-0024`), and the 32-bit pair
 (`ADR-0025`); the ten `CMP`/`CMN` alias
 nodes are read for verification only, because
 they carry no `encoding` and the bytes stay the base node's (`ADR-0021`). The
-generator states each pinned value explicitly and asserts that `0.1.0` … `0.15.0`
+generator states each pinned value explicitly and asserts that `0.1.0` … `0.17.0`
 still hash to their frozen digests.
 
 The literal row's `imm19` follows §8.3's rule, not a slot transform: the slot is
@@ -2616,9 +2627,9 @@ without a plan error: the input is the definition.
   ADR-0006: the facts come from the Arm MRS 2026-06 OPENSOURCE packaging, and
   the Arm notice ships with the generated table. The format did not need to
   change for it: `adrp`'s split `immhi:immlo` is two placements of one slot, as
-  §4.1 anticipated. `definitions/aarch64/0.1.0.json` … `0.17.0.json` now exist
+  §4.1 anticipated. `definitions/aarch64/0.1.0.json` … `0.18.0.json` now exist
   (§8.2); each is a superset that adds its own rows without a format change
-  (ADR-0011 to ADR-0026). What is
+  (ADR-0011 to ADR-0026, ADR-0100). What is
   missing is coverage, not design: the `b`/`h` load/store widths, the signed and
   extended load rows (`LDRSW`/`LDRSB`/`LDRSH`), `prfm`, the 32-bit
   extended `add`/`sub` nodes and their aliases, and the `mov` alias and the

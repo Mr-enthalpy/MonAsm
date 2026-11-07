@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj local.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "9eaaa62df886ef88bf1a4b03c10fe39f790c3ac30d474a256465ff3ca676d980",
+  "output_sha256": "b67099c0ca6daba5dacc32d4bcfe2685cca78a9e02b8df306078126aef342011",
+  "size": 12,
+  "records": 0,
+  "notes": "Input (LF, trailing newline): `.text` / `back:` / `  b ahead` / `here:` / `  b here` / `ahead:` / `  b back`. `back` and the first site are at 0, `here` and the second site at 4, `ahead` and the third site at 8. The plan names the same three targets (S1 = 4, S2 = 8, S3 = 0) and resolves with `pcrel_begin` + `scale(2)`, so the field values are (8 - 0) / 4 = 2, (4 - 4) / 4 = 0 and (0 - 8) / 4 = -2. Measured words: `02 00 00 14`, `00 00 00 14`, `fe ff ff 17`. llvm-mc resolves the local labels, so `llvm-readobj -r` is empty and no linker is involved.",
+  "source": "Arm MRS `B` (imm26 at 0-25); byte displacements measured in EXP-0101 §3"
+}

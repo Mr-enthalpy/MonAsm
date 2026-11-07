@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj field.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "c2b2f971d59a71ea344665fb003838d87de98db6d0e2c8db84fd93a73ee42045",
+  "output_sha256": "ee1a57b2ea539ce40a4e80270045b20bd33ac957af93a4455227f3bb87775cd8",
+  "size": 12,
+  "records": 0,
+  "notes": "Input (LF, trailing newline): a comment block then `b #0` / `b #4` / `b #-4`. The three words are `00 00 00 14`, `01 00 00 14` and `ff ff ff 17`: bit 31 is 0 for `b` (it is 1 for `bl`), bits 29-26 are `1001`, and imm26 sits at 0-25. llvm-mc's `#n` is a byte displacement, so the plan's field values 0, 1 and -1 are spelled `#0`, `#4` and `#-4` in the source. No relocations: the values are literals.",
+  "source": "Arm MRS `B` (op = 0 at 31, 00 at 29-30, 101 at 26-28, imm26 at 0-25), measured in EXP-0101 §1"
+}

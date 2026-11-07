@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj indirect.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "c65fb1be3154c8d5a58e6354a12f050cd663f4c36890f8f9a57d805e2a1f0f36",
+  "output_sha256": "1dbda652186862c1c409cbdc77af80ea7ef605f14824e146182b96f2afbb8f03",
+  "size": 24,
+  "records": 0,
+  "notes": "Input (LF, trailing newline): a comment block then `br x1` / `br x0` / `blr x2` / `ret x30` / `ret x0` / `ret x19`. The three instructions share `op0 = 110` at 29-31, `101` at 26-28, bit 25 = 1, `Z = 0` at 24, bit 23 = 0, `op2 = 11111` at 16-20, `0000` at 12-15, `A = 0`/`M = 0` at 10-11 and `Rm = 00000` at 0-4; only `op` at 21-22 and `Rn` at 5-9 differ, and the measured words are `20 00 1f d6` (br x1), `00 00 1f d6` (br x0), `40 00 3f d6` (blr x2), `c0 03 5f d6` (ret x30), `00 00 5f d6` (ret x0) and `60 02 5f d6` (ret x19). No relocations: every operand is a register.",
+  "source": "Arm MRS `BR`/`BLR`/`RET` (op = 00/01/10 at 21-22, Rn at 5-9), measured in EXP-0101 §2"
+}

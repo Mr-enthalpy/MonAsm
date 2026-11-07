@@ -1038,9 +1038,12 @@ and all twelve probe strings round-trip through `llvm-mc -disassemble`.
 | A64-P18 | Widening: the 32-bit register offset | `ldr`/`str w0, [x1, x2, <keyword>]`: the same nodes as A64-P17 with `size = 10`, so `S = 1` scales by the 4-byte access (`#2`) and only `Rt` changes class (`w32`); `Rn`/`Rm` stay `x64` | llvm-mc | **passing** — `A64-P18-w32regoff` (twenty instructions: all sixteen new rows, once each, plus four register-31 rows — `sp` in `Rn`, `xzr`/`wzr` in `Rm`) through `aarch64:ldr/w32-base-regoff-lsl0` … `str/w32-base-regoff-sxtx2`; `N01r` rejects the id against `0.15.0`, `N01s` rejects a `-lsl3` row, `N02g` rejects a `w32` index on a `-lsl0` row, `N02h` rejects an `x64` destination, and `N19c` rejects `lsl #2` as a modifier |
 | A64-P19 | Widening: the 64-bit move-wide mnemonics | `movk`/`movn x0, #imm16, <lane>`: `MOVK_64_movewide`/`MOVN_64_movewide` fix `opc = 11`/`00` and `sf = 1`, `hw` at 22–21 is pinned per row, `imm16` at 5+16 is field content, `Rd` at 0+5 is the destination | llvm-mc | **passing** — `A64-P19-movwide` (twelve instructions: the eight new rows once each in lane order plus four boundary rows — `x31` as destination, `#0`, `#0xffff` at `lsl #48`, `#0` on `movn` at `lsl #48`) through `aarch64:movk/x64-imm16-lsl0` … `movn/x64-imm16-lsl48`; `N01t` rejects a `-lsl8` lane, `N01u` rejects the id against `0.16.0`, `N01v` rejects a `w32` lane, `N01w` rejects the `mov` alias, `N02i` rejects a `w32` destination, `N03-movk-imm16` rejects `imm16 = 65536`, and `N18g` rejects a pre-scaled literal |
 | A64-P20 | Evidence gap: the three `imm6-asr` rows that no fixture named | `sub/w32-w32-w32-imm6-asr`, `subs/x64-x64-x64-imm6-asr` and `subs/w32-w32-w32-imm6-asr` at `#3`, plus the boundary values `imm6 = 63` on the 64-bit row and `imm6 = 31` on the 32-bit row; `S` (bit 29) and `opc` (bits 30-31) are pinned by the `form_id`, `imm6` sits at 10+6, and the 32-bit rows keep their `excluded 32..63` | llvm-mc | **passing** — `A64-P20-asr-rows` (five instructions, 20 bytes) through `aarch64:sub/w32-w32-w32-imm6-asr`, `subs/x64-x64-x64-imm6-asr` and `subs/w32-w32-w32-imm6-asr`; no definition change, no new `EC` row, and `N16d` already pins the `w32` ceiling rejection |
+| A64-P21 | Widening: the direct branch without a link | `b <label>`: `imm26` at 0+25 as field content, bit 31 = 0 and the rest of the word fixed; the target is a `pcrel_begin` fixup with `scale(2)` and `align_bits 2` | llvm-mc | **passing** — `A64-P21-b-imm26` (three field values `0`, `1`, `−1`) and `A64-P21-b-local-symbol` (symbols at 0/4/8 giving the fields `2`, `0`, `−2` from arithmetically resolved displacements) through `aarch64:b/imm26`; `N04e` rejects `imm26 = 33554432` (`E-RANGE-002`), `N19d` rejects a `link` modifier on the target (`E-OPERAND-003`), `N01x` rejects `aarch64:cbz/x64-imm19` (`E-FORM-001`), and `A64-P5` keeps covering `bl` |
+| A64-P22 | Widening: the three register transfers | `br`/`blr`/`ret <Rn>`: `op` at 21–22 fixed to `00`/`01`/`10` by the row, `Rn` at 5+5 as a `src` operand; no displacement field, no `P`, and `ret` carries no implicit `x30` | llvm-mc | **passing** — `A64-P22-register-branch` (six instructions: `br x1`, `br x0`, `blr x2`, `ret x30`, `ret x0`, `ret x19`) through `aarch64:br/rn`, `aarch64:blr/rn` and `aarch64:ret/rn`; `N01y` rejects the no-operand `aarch64:ret` id (`E-FORM-001`) |no new `EC` row, and `N16d` already pins the `w32` ceiling rejection |
 
-Definition anchor for A64-P1/P2/P3/P4/P5/P6/P7/P8/P9/P10/P11/P12/P13/P14/P15/P16/P17/P18/P19,
-measured 2026-11-04 (A64-P18 and A64-P19 measured 2026-11-05): the four base
+Definition anchor for A64-P1/P2/P3/P4/P5/P6/P7/P8/P9/P10/P11/P12/P13/P14/P15/P16/P17/P18/P19/P20/P21/P22,
+measured 2026-11-04 (A64-P18 and A64-P19 measured 2026-11-05; A64-P20,
+A64-P21 and A64-P22 measured 2026-11-08): the four base
 forms live in `definitions/aarch64/0.1.0.json` (digest
 `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e`),
 generated from the Arm MRS 2026-06 drop by `EXP-0008`. `0.2.0` adds the fifth,
@@ -1102,7 +1105,11 @@ the same eight pairs with `size = 10`, `S` as `#2` and a `w32` destination/sourc
 (`EC-14`, ADR-0025); `0.17.0` adds the eight 64-bit `movk`/`movn` rows (digest
 `sha256:de2c53e1871f5c24f6af73082dcc402729786d2e6e2495f84e3ed553adb4e4ed`), the
 four `hw` lanes on each of the two `opc`-fixed nodes with `imm16` as field
-content (`EC-30`, `EC-16`, ADR-0026); `0.1.0`…`0.16.0` are unchanged.
+content (`EC-30`, `EC-16`, ADR-0026); `0.18.0` adds the four unconditional-transfer
+rows (digest
+`sha256:c32e3674bf50140276d29fd01891bab20a86b849fa1503d2c9d02ae6aa503824`), the
+direct `b` and the three register branches with `Rn` as an operand (`EC-41`,
+ADR-0100); `0.1.0`…`0.17.0` are unchanged.
 `llvm-mc` does not resolve AArch64 branch or `adrp` immediates when
 they name a symbol, so A64-P5/P6 take their bytes after
 `ld.lld --image-base=0 -Ttext=0` has resolved the same `(S, P)` pair; the

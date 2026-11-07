@@ -75,12 +75,13 @@ are backfilled. The summary always prints `<pass>/<total> re-derived,
 
 ### State (2026-11-08, llvm-mc 23.1.2)
 
-`74/108 re-derived, 34 skipped, 0 failed`:
+`77/111 re-derived, 34 skipped, 0 failed`:
 
 - 67 x86-64 records reproduce byte-identically, including the `ld.lld` one.
 - 6 RV64 records reproduce: the committed `jal`, `pcrel_hi`/`pcrel_lo12`, `lui`
   and `jalr` inputs. 9 RV64 records are `input-not-stored`.
-- 1 AArch64 record reproduces; the other 20 are `input-not-stored`.
+- 4 AArch64 records reproduce: the committed `A64-P21` (two inputs) and
+  `A64-P22` inputs; the other 20 are `input-not-stored`.
 - 5 x86-64 records are `manual-derivation`: the expected bytes include an
   encoding `llvm-mc` will not select from a mnemonic (documented per record).
 
