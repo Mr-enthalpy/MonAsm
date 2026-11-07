@@ -1,0 +1,10 @@
+	.text
+	callq	L1                              # encoding: [0xe8,A,A,A,A]
+                                        #   fixup A - offset: 1, value: L1, kind: reloc_branch_4byte_pcrel
+	callq	ext                             # encoding: [0xe8,A,A,A,A]
+                                        #   fixup A - offset: 1, value: ext, kind: reloc_branch_4byte_pcrel
+L1:
+	addq	$1, %rax                        # encoding: [0x48,0x83,0xc0,0x01]
+.Ltmp0:
+	callq	.Ltmp0+130                      # encoding: [0xe8,A,A,A,A]
+                                        #   fixup A - offset: 1, value: .Ltmp0+130, kind: FK_PCRel_4

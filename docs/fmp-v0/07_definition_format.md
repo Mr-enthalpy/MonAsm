@@ -1,7 +1,7 @@
 # Definition Format
 
 Status: **frozen for the v0 scope** (`ADR-0095`): the format and the shipped
-tables (`x86-64` `0.1.0` … `0.66.0`, `aarch64` `0.1.0` … `0.18.0`, `rv64`
+tables (`x86-64` `0.1.0` … `0.67.0`, `aarch64` `0.1.0` … `0.18.0`, `rv64`
 `0.1.0`/`0.2.0`). The format is intended for the other targets, whose tables wait
 on source data, not on an open decision (`OD-07` is settled by ADR-0005 and
 pinned by ADR-0006). This document defines the artifact a pinned
@@ -308,6 +308,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.64.0.json` | `monasm.isa.x86` | `sha256:fc98a834b7840d3f2383b05a5d2950966a81187234a080f24f7ad85ab6c07a4f` |
 | `definitions/x86_64/0.65.0.json` | `monasm.isa.x86` | `sha256:9f5bc421a67688426dea259a7f5a9c4c5eb0746db0dd1c5b473a30ba3612b42a` |
 | `definitions/x86_64/0.66.0.json` | `monasm.isa.x86` | `sha256:63b3b3a153aa0b5508f2055496efa1c56ac74e56b03d56f56f5c522b6d2e1904` |
+| `definitions/x86_64/0.67.0.json` | `monasm.isa.x86` | `sha256:367d76ebf89ee9c1cf51f561b4798eeb0a2000ae3688ee9a52a4c4a9eaea5c9e` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -333,7 +334,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.66.0`
+### 8.1 `x86-64` `0.1.0` … `0.67.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -849,6 +850,7 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:sub/rm64-imm8/legacy` | `4883e800` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm8` → `[24,8]` | 4 | `EC-01`, `EC-06` — 4-bit dest from `0.6.0`, `0.66.0`+ |
 | `x86:sub/rm64-imm32/legacy` | `4881e800000000` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm32` → `[24,32]` | 7 | `EC-01`, `EC-04`, `EC-06` — 4-bit dest from `0.6.0`, `0.66.0`+ |
 | `x86:sub/rax-imm32/legacy` | `482d00000000` | imm: `x86.imm`/`imm32` → `[16,32]` | 6 | `EC-04`, `0.66.0`+ |
+| `x86:call/rel32/legacy` | `e800000000` | target: `x86.rel`/`rel32` → `[8,32]` | 5 | `EC-03`, `X86-P73` — `0.67.0`+ |
 
 Placements are written `[bit_offset, width]`, with ` inverted` appended when the
 chunk is complemented. In the legacy SSE row
@@ -2043,6 +2045,19 @@ the kind and the target type (`N02ct`), the register form (`29`/`2B`) is
 absent (`N01ej`) and a `0.66.0` row against `0.65.0` is `E-FORM-001`
 (`N01ek`). Still deferred: the register-register pair, the other widths, a
 symbol in the immediate, APX `d5` and EVEX masking/broadcast.
+
+`0.67.0` adds the direct `call rel32` row (`ADR-0102`): `callq L1` is
+`e8 05 00 00 00` (the field is the displacement from the end of the
+instruction, `pcrel_end`), `callq ext` is `e8 00 00 00 00` with one
+`R_X86_64_PLT32 ext -4` record, and the same row takes a literal field
+value (`call .+130` is `e8 7d 00 00 00`). `E8` is the only difference from
+the `0.1.0` `jmp/rel32` row, so the row is `EC-03`'s rel32 half without a
+rel8 sibling. `2147483648` on the signed displacement is `E-RANGE-002`
+(`N04g`), a register operand misses both the kind and the target type
+(`N02cu`), a missing target is `E-OPERAND-002` (`N02cv`), the indirect
+`FF /2` family is absent (`N01el`) and a `0.67.0` row against `0.66.0` is
+`E-FORM-001` (`N01em`). Still deferred: the indirect call, the 16/32-bit
+operand sizes, APX `d5` and EVEX masking/broadcast.
 
 ### 8.2 `aarch64` `0.1.0` … `0.18.0`
 

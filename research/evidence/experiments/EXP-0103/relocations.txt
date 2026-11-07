@@ -1,0 +1,11 @@
+
+File: probe.o
+Format: elf64-x86-64
+Arch: x86_64
+AddressSize: 64bit
+LoadName: <Not found>
+Relocations [
+  Section (3) .rela.text {
+    0x6 R_X86_64_PLT32 ext 0xFFFFFFFFFFFFFFFC
+  }
+]

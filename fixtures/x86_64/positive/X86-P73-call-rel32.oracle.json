@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0103/probe.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "a282dfc425ca43038f9aa4a43b822ec4a32f290f1e77a576c3f2658498d2a90c",
+  "output_sha256": "0f9014099643ce792b93e64482d630ddee32310657e46211a1ab6aa9276521fb",
+  "size": 19,
+  "records": 1,
+  "notes": "The 0.67.0 call/rel32 row in three shapes: call L1 resolves in place (e8 05 00 00 00; L1 is at offset 10 and the instruction ends at 5), call ext assembles to e8 00 00 00 00 with one R_X86_64_PLT32 ext -4 record, and call .+130 is the literal field 125 (e8 7d 00 00 00). The addq is the 0.1.0 row that hosts L1. input_sha256 is probe.asm; output_sha256 is the 19-byte .text.",
+  "relocation_check": "llvm-readobj --relocations reports one record: 0x6 R_X86_64_PLT32 ext 0xFFFFFFFFFFFFFFFC; the .Ltmp0+130 literal resolves in place and emits none"
+}
