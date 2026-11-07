@@ -7,7 +7,7 @@
 //!
 //! Covered here:
 //!
-//! - all 101 positive fixtures, via `from_model`, including the Level 1
+//! - all 102 positive fixtures, via `from_model`, including the Level 1
 //!   envelope and the fingerprint;
 //! - all 540 `materialize`-phase negative fixtures, via `from_model`, comparing
 //!   code, JSON Pointer and detail-key set;
@@ -130,7 +130,7 @@ fn rebuild(path: &Path) -> (fmp_model::Plan, String) {
 fn positives_reproduce_the_oracle_through_the_builder() {
     let registry = registry();
     let paths = positives();
-    assert_eq!(paths.len(), 101, "the positive corpus is 101 plans");
+    assert_eq!(paths.len(), 102, "the positive corpus is 102 plans");
     for path in paths {
         let (plan, name) = rebuild(&path);
         let definition = registry

@@ -7,7 +7,11 @@ Checks, for every `definitions/<isa>/<version>.json`:
      hex templates, placements inside the template, no overlapping placements,
      slot widths that sum to `range.bits`.
   3. The reading-aid table in §8 of `07_definition_format.md` matches the JSON.
-  4. Prints the canonical digest so a plan can name it.
+  4. Every form in the newest table of an ISA is named by at least one positive
+     fixture (`fixtures/<isa>/positive/*.fmp.json`). A frozen row that no
+     fixture ever names is unverified coverage; `A64-P20` closed the first
+     three such rows on 2026-11-08.
+  5. Prints the canonical digest so a plan can name it.
 
 Exit code 0 means no errors.
 
@@ -372,6 +376,41 @@ def check_doc_table(documents, errors):
                 )
 
 
+def named_forms(isa: str) -> set:
+    """Every `form_id` a positive fixture of `isa` names, or `None` when the
+    ISA has no positive directory."""
+    directory = ROOT / "fixtures" / isa / "positive"
+    if not directory.is_dir():
+        return None
+    forms = set()
+    for path in sorted(directory.glob("*.fmp.json")):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        for instruction in document.get("instructions", []):
+            form_id = instruction.get("form_id")
+            if isinstance(form_id, str):
+                forms.add(form_id)
+    return forms
+
+
+def check_form_coverage(newest, errors):
+    """A form in the newest table that no positive fixture names is a frozen
+    decision with no vector behind it. Fail rather than let the gap return."""
+    for isa, document in sorted(newest.items()):
+        forms = named_forms(isa)
+        if forms is None:
+            continue
+        missing = [
+            form["form_id"] for form in document["forms"] if form["form_id"] not in forms
+        ]
+        if missing:
+            fail(
+                errors,
+                "definitions/%s/%s" % (isa, document["version"]),
+                "%d form(s) not named by any positive fixture: %s"
+                % (len(missing), ", ".join(missing)),
+            )
+
+
 def version_key(path: Path):
     """Order tables by numeric version, oldest first.
 
@@ -390,6 +429,7 @@ def version_key(path: Path):
 def main() -> int:
     errors = []
     documents = []
+    newest = {}
     if not DEFINITIONS.is_dir():
         print("no definitions directory; nothing to check")
         return 0
@@ -398,8 +438,10 @@ def main() -> int:
         document = check_definition(path, errors)
         if document is not None:
             documents.append(document)
+            newest[path.parent.name] = document
 
     check_doc_table(documents, errors)
+    check_form_coverage(newest, errors)
 
     for path in paths:
         document = json.loads(path.read_text(encoding="utf-8"))

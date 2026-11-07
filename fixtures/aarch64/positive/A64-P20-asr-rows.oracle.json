@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj research/evidence/experiments/EXP-0097/asr-rows.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "0fc2d59de96b56dfd3d5f63d254941780c2d18eaffac48836979639eb16a5a0b",
+  "output_sha256": "fcb5ad0bdd1e94589a23a612c2aa42e1bd21abb530a23643c2bb528bdae85be2",
+  "size": 20,
+  "records": 0,
+  "notes": "Input, one line each: `sub w0, w1, w2, asr #3`, `subs x0, x1, x2, asr #3`, `subs w0, w1, w2, asr #3`, `subs x3, x4, x5, asr #63`, `sub w6, w7, w8, asr #31`. The first three are the three `0.17.0` rows that no earlier fixture named; the last two are the boundary rows, `imm6 = 63` on the 64-bit row and `imm6 = 31` on the 32-bit row, which is the highest value that row's `excluded` list admits. All five are `ADDSUB_SHIFT` with `S`/`sf`/`shift` pinned by the form, `imm6` at 10+6.",
+  "source": "Arm MRS ADDSUB_SHIFT, fields Rd/Rn/Rm at 0+5, 5+5, 16+5"
+}

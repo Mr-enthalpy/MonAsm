@@ -80,6 +80,9 @@ the §12 formula. When the file is absent, the positive gate still checks
 - `expected.bin` is binary; `.gitattributes` disables line-ending conversion.
 - Each positive fixture maps to a vector ID in
   `docs/fmp-v0/06_validation_matrix.md`.
+- Every form in the newest definition of an ISA must be named by at least one
+  positive fixture. `tools/check_definition.py` enforces this, so a frozen row
+  cannot stay unexercised by accident (`A64-P20` closed the first three).
 - Each negative fixture maps to a registry code in `docs/fmp-v0/04_errors.md`.
 - A fixture that is excluded from v0 needs a rejection fixture so the exclusion
   cannot be mistaken for support.
