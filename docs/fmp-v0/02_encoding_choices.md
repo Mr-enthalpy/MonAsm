@@ -83,7 +83,7 @@ not be moved to `frozen` on the strength of an argument alone.
 | EC-20 | RV64 | Compressed register class `x8–x15` (3-bit field) vs full 5-bit register | Legality | `operand type` + definition rule | `c.lw a6, 0(a0)` is rejected ("register must be a GPR from x8 to x15"); `c.lw a2, 0(a0)` is `10 41`. `c.addi a6, 5` is legal (`15 08`): its `xd` is a 5-bit field, so the rule is per form, not per mnemonic prefix. | frozen |
 | EC-21 | RV64 | Absolute vs PC-relative symbol materialization: `lui`+`addi` vs `auipc`+`addi` | Instruction pair and relocation kind | `form variant` + `fixup field` (`kind`) | Choosing PC-relative changes both instructions and the fixup pair. | frozen |
 | EC-22 | RV64 | B-type/J-type immediate scatter is fixed by form, but the PC base is not | Fixup value | `fixup field` (`pc_reference_rule`) | Same form, different `P`, different bytes: a contract bug. | frozen |
-| EC-23 | RV64 | `jal` vs `jalr` for a call; `c.j` vs `jal` for a jump | Different instruction, range, link behavior | `form variant` | A "call" that becomes `jalr` needs a base register the plan never provided. Measured: `jal ra` is `ef 00 00 00` (4 B), `jal x0` and `c.j` are `01 a0` (2 B) and `jalr ra, 0(ra)` is `82 90` (2 B, `c.jalr`) under `.option rvc`, while `.option norvc` gives `6f 00 00 00` and `e7 80 00 00`; RV64 has no `c.jal`, so `jal ra` never shortens. The mnemonic is a form variant and v0 ships `jal` only (`ADR-0094`, `EXP-0096`). | frozen |
+| EC-23 | RV64 | `jal` vs `jalr` for a call; `c.j` vs `jal` for a jump | Different instruction, range, link behavior | `form variant` | A "call" that becomes `jalr` needs a base register the plan never provided. Measured: `jal ra` is `ef 00 00 00` (4 B), `jal x0` and `c.j` are `01 a0` (2 B) and `jalr ra, 0(ra)` is `82 90` (2 B, `c.jalr`) under `.option rvc`, while `.option norvc` gives `6f 00 00 00` and `e7 80 00 00`; RV64 has no `c.jal`, so `jal ra` never shortens. The mnemonic is a form variant: v0 ships `jal` and `jalr` as two separate forms (`ADR-0094`, `ADR-0099`), so no plan has a mnemonic the materializer could expand, and the aliases `call`/`ret`/`jr` together with the compressed `c.j`/`c.jalr` stay absent (`E-FORM-001`, `N01ei`). | frozen |
 | EC-24 | RV64 | `fence` `fm`/`pred`/`succ` field values | Bits 31–28, 27–24, 23–20 | `operand type` (`fence_mask`) | `fence rw,rw` vs `fence iorw,iorw` differ in fields, not in mnemonic. Measured: `fence rw, rw` is `0f 00 30 03`, `fence iorw, iorw` is `0f 00 f0 0f` and `fence r, w` is `0f 00 10 02`, so the `imm12` slot is `fm`/`pred`/`succ` (`0x033`, `0x0FF`, `0x021`). The masks are typed field operands, not a mnemonic choice; v0 has no `fence` row (`ADR-0094`, `EXP-0096`). | frozen |
 | EC-25 | RV64 | CSR operation immediate (`csrrwi`) vs register (`csrrw`) | Different funct3 | `form variant` | `csrrwi` cannot carry a register operand; a generic "CSR op" leaves the choice open. Measured: `csrrw x1, 0x300, x2` is `f3 10 01 30` (`funct3 = 001`) and `csrrwi x1, 0x300, 2` is `f3 50 01 30` (`funct3 = 101`), so the immediate form is a separate form variant; v0 has neither (`ADR-0094`, `EXP-0096`). | frozen |
 | EC-26 | RV64 | Atomic `aq`/`rl` bits | Bits 26–25 | `form variant` (the suffix is part of `form_id`) | `amoadd.w` vs `amoadd.w.aqrl` differ in ordering semantics and bytes. Measured: `amoadd.w` is `af a0 21 00`, `.aq` is `af a0 21 04` (bit 26), `.rl` is `af a0 21 02` (bit 25) and `.aqrl` is `af a0 21 06`. Each suffix fixes one of four bit pairs, so it is a form variant and never a modifier (a modifier must not write bits); v0 has no atomic row (`ADR-0015`, `ADR-0094`, `EXP-0096`). | frozen |
@@ -1000,11 +1000,12 @@ word operand on a byte row is two `E-OPERAND-001` (`N02u`), content `128` on a
 (`N14v`), number `0` on a `40` row is `E-RANGE-004` (`N16y`), and the absent
 high-byte `%r12` row is `E-FORM-001` (`N01aq`, `EXP-0048`).
 
-The RV64 slice is nine forms across three documents, generated from the pinned UDB
+The RV64 slice is ten forms across four documents, generated from the pinned UDB
 nodes (ADR-0007, ADR-0009). Seven base-`I` forms are in `0.1.0`; `c.addi` joins
 them in `0.2.0`, because it needs `rv64c` and the document's extension set is part
-of its identity, and `lui` joins them in `0.3.0` as the absolute half of
-`EC-21` (`ADR-0098`):
+of its identity; `lui` joins them in `0.3.0` as the absolute half of `EC-21`
+(`ADR-0098`); and `jalr` joins them in `0.4.0` as the call half of `EC-23`
+(`ADR-0099`):
 
 | `form_id` | Encoding | Operand signature | Table | Covers |
 |---|---|---|---|---|
@@ -1017,6 +1018,7 @@ of its identity, and `lui` joins them in `0.3.0` as the absolute half of
 | `riscv:sd/rs-base-imm12` | `STORE` S-type, `funct3=011` | src `xreg`, base `xreg`, disp `imm12` | `0.1.0` | `RV-P3` |
 | `riscv:c.addi/rd-imm6` | `C.ADDI` CI-format, 16-bit | dest `xreg` (`excl 0`), imm `imm6` (`excl 0`) | `0.2.0` | `RV-P7`, `EC-19`, `OD-14` |
 | `riscv:lui/rd-imm20` | `LUI` U-type | dest `xreg`, `imm20` field (unsigned) | `0.3.0` | `RV-P9` (field half), `EC-21` (absolute half) |
+| `riscv:jalr/rd-rs1-imm12` | `JALR` I-type, `funct3=0` | dest `xreg`, src `xreg`, imm `imm12` | `0.4.0` | `RV-P10`, `EC-23` |
 
 The two memory forms decompose the address into `base` + `disp` rather than one
 payload operand, and the addressing form is the `form_id` (ADR-0008, `OD-13`).

@@ -1,0 +1,13 @@
+
+	.option	norvc
+	jalr	a0, a1                          # encoding: [0x67,0x85,0x05,0x00]
+	jr	2047(a1)                        # encoding: [0x67,0x80,0xf5,0x7f]
+	jr	-2048(a1)                       # encoding: [0x67,0x80,0x05,0x80]
+
+	.text
+	.option	norvc
+.L0:
+	auipc	ra, %pcrel_hi(blob)             # encoding: [0x97,0bAAAA0000,A,A]
+                                        #   fixup A - offset: 0, value: %pcrel_hi(blob), kind: fixup_riscv_pcrel_hi20
+	jalr	ra, %pcrel_lo(.L0)(ra)          # encoding: [0xe7,0x80,0bAAAA0000,A]
+                                        #   fixup A - offset: 0, value: %pcrel_lo(.L0), kind: fixup_riscv_pcrel_lo12_i

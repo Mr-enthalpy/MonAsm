@@ -75,14 +75,18 @@ are backfilled. The summary always prints `<pass>/<total> re-derived,
 
 ### State (2026-11-08, llvm-mc 23.1.2)
 
-`67/101 re-derived, 34 skipped, 0 failed`:
+`74/108 re-derived, 34 skipped, 0 failed`:
 
 - 67 x86-64 records reproduce byte-identically, including the `ld.lld` one.
-- 29 records are `input-not-stored` — all 20 AArch64 and all 9 RV64 records.
-  Their inputs were never committed and the recorded `input_sha256` matches no
-  file in the evidence tree, so the harness refuses to treat them as verified.
+- 6 RV64 records reproduce: the committed `jal`, `pcrel_hi`/`pcrel_lo12`, `lui`
+  and `jalr` inputs. 9 RV64 records are `input-not-stored`.
+- 1 AArch64 record reproduces; the other 20 are `input-not-stored`.
 - 5 x86-64 records are `manual-derivation`: the expected bytes include an
   encoding `llvm-mc` will not select from a mnemonic (documented per record).
+
+The 29 `input-not-stored` records are exactly the 20 AArch64 and 9 RV64 records
+whose inputs were never committed; the recorded `input_sha256` matches no file
+in the evidence tree, so the harness refuses to treat them as verified.
 
 A corrupted `expected.bin` fails the run (byte offset is printed) and exits `1`;
 this was checked by flipping one byte of `X86-P6` and restoring it.

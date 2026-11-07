@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + ld.lld 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -filetype=obj research/evidence/experiments/EXP-0099/call-resolved.asm -o out.o && ld.lld -m elf64lriscv --image-base=0 -Ttext 0x1000 -o out.elf out.o && llvm-objcopy -O binary --only-section=.text out.elf out.bin",
+  "kind": "assembler + linker",
+  "input_sha256": "77c19ef1ff60f576813ccc44477e73f0af80443109c0dd05c956a1bcd9469bea",
+  "output_sha256": "7efe4aa9eb48eec597cb4afa82d9e7182f0335006c2c45293e79cfd03f2ce2c6",
+  "size": 2308,
+  "records": 0,
+  "notes": "Input (LF, trailing newline): `.text` / `.option norvc` / `.L0:` / `  auipc ra, %pcrel_hi(L1)` / `  jalr ra, %pcrel_lo(.L0)(ra)` / `  .space 0x8f8` / `L1:` / `  .word 0`. `.text` is linked at 0x1000, so the `auipc` site is 0x1000, the `jalr` site is 0x1004 and `L1` is at 0x1900. Hand derivation: high half = (0x1900 - 0x1000 + 0x800) >> 12 = 0x1100 >> 12 = 1; low half = (0x1900 - 0x1000) & 0xFFF = 0x900. The linked words are 0x00001097 and 0x90008067 (`97 10 00 00 e7 80 00 90`) followed by 2300 zero bytes. `llvm-objdump -d` reads the second word back as `jalr -0x700(ra) <L1>`: the 12-bit field has bit 11 set, the instruction sign-extends it, and 0x1000 + 0x1000 - 0x700 = 0x1900. That is why the low half is `signed: false` -- `pcrel_lo12` masks and the hardware reinterprets, so a signed range check on the masked value would reject a correct plan.",
+  "source": "measured bytes and disassembly from the linked image; RISC-V UDB `inst/I/jalr.yaml` and `inst/I/auipc.yaml` for the field placements"
+}

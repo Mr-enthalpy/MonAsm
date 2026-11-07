@@ -1,0 +1,13 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -filetype=obj research/evidence/experiments/EXP-0099/call.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "313410518f05aa306d3ece3b898c47ca6f330b2d5f0e48fe482f20652363908c",
+  "output_sha256": "495d0a9e831abc8af5a908c467a21d541c1e0e9732d6719683b365f436f7e976",
+  "size": 8,
+  "records": 2,
+  "notes": "Input (LF, trailing newline): `.text` / `.option norvc` / `.L0:` / `  auipc ra, %pcrel_hi(blob)` / `  jalr ra, %pcrel_lo(.L0)(ra)`. The object bytes are `97 00 00 00 e7 80 00 00`: both fields are zero because the symbol is external, which is exactly what `emit_relocation` writes. `%pcrel_lo(.L0)` names the `auipc` label, so the low half measures from the high half's site and not from the `jalr`. This is the call idiom EC-23 describes: the base register `rs1` is an operand of the form, never something the fixup or the materializer supplies.",
+  "relocation_check": "llvm-readobj --relocations: 0x0 R_RISCV_PCREL_HI20 blob 0x0; 0x4 R_RISCV_PCREL_LO12_I .L0 0x0",
+  "source": "measured relocation names and targets from `llvm-readobj --relocations`; RISC-V UDB `inst/I/jalr.yaml` for the field placements"
+}

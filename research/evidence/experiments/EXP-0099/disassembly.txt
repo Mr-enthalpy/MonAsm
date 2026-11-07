@@ -1,0 +1,12 @@
+
+resolved.elf:	file format elf64-littleriscv
+
+Disassembly of section .text:
+
+0000000000001000 <.text>:
+    1000:      	auipc	ra, 0x1
+    1004:      	jalr	-0x700(ra) <L1>
+		...
+
+0000000000001900 <L1>:
+    1900: 00 00 00 00  	.word	0x00000000

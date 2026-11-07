@@ -7,9 +7,9 @@
 //!
 //! Covered here:
 //!
-//! - all 105 positive fixtures, via `from_model`, including the Level 1
+//! - all 108 positive fixtures, via `from_model`, including the Level 1
 //!   envelope and the fingerprint;
-//! - all 542 `materialize`-phase negative fixtures, via `from_model`, comparing
+//! - all 544 `materialize`-phase negative fixtures, via `from_model`, comparing
 //!   code, JSON Pointer and detail-key set;
 //! - from-scratch authoring for one positive per ISA plus `X86-P71`;
 //! - the exact closed key set of every emitted object;
@@ -130,7 +130,7 @@ fn rebuild(path: &Path) -> (fmp_model::Plan, String) {
 fn positives_reproduce_the_oracle_through_the_builder() {
     let registry = registry();
     let paths = positives();
-    assert_eq!(paths.len(), 105, "the positive corpus is 105 plans");
+    assert_eq!(paths.len(), 108, "the positive corpus is 108 plans");
     for path in paths {
         let (plan, name) = rebuild(&path);
         let definition = registry
@@ -206,8 +206,8 @@ fn negatives_reject_at_the_same_code_path_and_detail_keys() {
     let paths = negatives();
     assert_eq!(
         paths.len(),
-        548,
-        "the corpus is 542 materialize-phase plus 6 read-phase negatives"
+        550,
+        "the corpus is 544 materialize-phase plus 6 read-phase negatives"
     );
     let mut materialize_phase = 0usize;
     for path in paths {
@@ -291,7 +291,7 @@ fn negatives_reject_at_the_same_code_path_and_detail_keys() {
         );
     }
     assert_eq!(
-        materialize_phase, 542,
+        materialize_phase, 544,
         "every materialize-phase negative must be rebuildable and compared"
     );
 }

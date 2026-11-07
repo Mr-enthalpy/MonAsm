@@ -128,7 +128,7 @@ defaulted.
 | `pcrel_begin` | address of the fixup site | RISC-V B-type and J-type, AArch64 `b`/`bl`/`b.cond` |
 | `pcrel_end` | address immediately after the instruction that contains the site | x86-64 `rel32` |
 | `pcrel_page` | page base of `P` | AArch64 `adrp` |
-| `pcrel_hi` | address of the paired `hi` member's site | RV64 `addi`/load/store low half (`pcrel_lo12`) |
+| `pcrel_hi` | address of the paired `hi` member's site | RV64 `addi`/load/store/`jalr` low half (`pcrel_lo12`) |
 
 For `pcrel_end` the containing instruction is found through the section's
 fragments, not by arithmetic on the site offset: the site may sit several bytes
@@ -273,7 +273,7 @@ The ISA table:
 | RV64 `auipc` hi20 | `hi20 = (S + A - P + 0x800) >> 12` in exact arithmetic, `P` = the `auipc`'s address | pair `hi`, `pcrel_begin`, `pcrel_hi20` |
 | RV64 `lui` hi20 | `hi20 = (S + A + 0x800) >> 12` in exact arithmetic; the upper 20 bits of an absolute address, with no `P` | pair `hi`, `pc_reference_rule = none`, `hi20`; `emit_relocation` zeroes the field and records `R_RISCV_HI20`, and `resolve_in_place` needs the target section's `base_address` because a `none` rule cannot cancel the site (§4) |
 | RV64 `addi`/load/store lo12 (absolute) | `lo12 = (S + A) & 0xFFF` | pair `lo`, `pc_reference_rule = none`, `lo12_i`; `emit_relocation` records `R_RISCV_LO12_I` and `resolve_in_place` needs `base_address` |
-| RV64 `addi`/load/store lo12 | `lo12 = (S + A - P_hi) & 0xFFF`, `P_hi` = the paired `auipc`'s address | pair `lo`, `pcrel_hi`, `pcrel_lo12`, `addend` MUST be 0 |
+| RV64 `addi`/load/store/`jalr` lo12 | `lo12 = (S + A - P_hi) & 0xFFF`, `P_hi` = the paired `auipc`'s address | pair `lo`, `pcrel_hi`, `pcrel_lo12`, `addend` MUST be 0 |
 
 The literal load is the first non-branch PC-relative slot. Every earlier row with
 `pcrel_begin` and `scale(2)` was a branch, so the fact that the target is a data
@@ -295,6 +295,30 @@ The RISC-V `%pcrel_lo` semantics are the sharpest case: the low fixup references
 the *high instruction*, not the symbol directly, because the linker needs the
 paired PC. A model that only stores "symbol + addend" cannot express it. This is
 AC-05's associated-relocation requirement.
+
+`jalr` reuses the same low half without a new transform, and that is worth
+stating because its immediate is not measured from `pc`. The instruction jumps
+to `X[rs1] + imm` after clearing bit 0, so the plan must also supply `rs1` as a
+register operand; the fixup cannot name it. In the `auipc` + `jalr` call idiom
+`rs1` is the `auipc`'s destination, so `X[rs1]` holds `P_hi + hi20 * 4096` and
+the correct immediate is `S + A - (P_hi + hi20 * 4096)`. That value is congruent
+to `S + A - P_hi` modulo 4096, so the 12-bit pattern `pcrel_lo12` writes is the
+same one, and the instruction's own sign extension recovers the negative
+remainder. Two consequences: the low half stays `signed: false` (`pcrel_lo12`
+masks, it never range-checks), and a low half whose mask sets bit 11 is legal
+rather than out of range. `EXP-0099` measures the case -- with `.text` at `0x1000` and the target at
+`0x1900` the linked `jalr` field holds `0x900`, which `llvm-objdump` reads back
+as `jalr -0x700(ra) <L1>`, and the plan writes the same bits as `0x900` -- which
+is the counterexample to a `signed: true` low half: reading the masked value as
+signed would reject a plan the hardware executes correctly.
+
+Because `X[rs1]` is not a field of the fixup, the materializer cannot check that
+the register holds `P_hi`; it validates and writes the value the plan asked for.
+A plan that pairs `jalr` with `pcrel_begin` instead of `pcrel_hi` is not
+rejected, and it is not the same program: `pcrel_begin` measures from the
+`jalr`'s own address, which is not what the instruction adds. The plan is
+responsible for the base register, exactly as it is for every other operand
+(`INV-05`: no environment input, here no inferred register).
 
 ### 6.1 Observed in an object file (EXP-0002 §6.2)
 

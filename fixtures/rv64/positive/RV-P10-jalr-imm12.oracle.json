@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -filetype=obj research/evidence/experiments/EXP-0099/field.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "dd1d68552e217a101a0945e21e9bc2287be02254b5fc582f0ddaa090bc355378",
+  "output_sha256": "e785077f6094725f1836356e2d0f1f3fa4e53aae6c2f360e61fc54d1c4f1f27a",
+  "size": 12,
+  "records": 0,
+  "notes": "Input (LF, trailing newline): `.option norvc` / `jalr a0, 0(a1)` / `jalr x0, 2047(a1)` / `jalr x0, -2048(a1)`. The three words are `67 85 05 00`, `67 80 f5 7f` and `67 80 05 80`: `imm` at 31-20 (signed), `xs1` at 19-15, `funct3 = 000`, `xd` at 11-7, `opcode = 1100111`. `.option norvc` is explicit because with C enabled the first line would be the two-byte `c.jalr` (`82 90`, EXP-0096); the materializer must never make that substitution, so the form fixes the length. There is no fixup: this fixture covers the field and the signed domain [-2048, 2047].",
+  "source": "RISC-V UDB `inst/I/jalr.yaml`, `location` 31-20 / 19-15 / 11-7; `.option norvc` measurement from EXP-0096"
+}

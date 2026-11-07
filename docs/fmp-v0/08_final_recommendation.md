@@ -444,7 +444,7 @@ trust; Route C places it in the plan, where a test can reject it.
 | `lock`/`rep`/segment prefixes | absent; multiple encodings | `ADR-0094`, `EC-10` |
 | AArch64 `mov` alias | absent | `ADR-0094`, `EC-16` |
 | AArch64 `cbz`/`cbnz`/`tbz`/`tbnz` | absent | `ADR-0094`, `EC-18` |
-| RV64 `jal`/`c.j`/`jalr` aliases | absent | `ADR-0094`, `EC-23` |
+| RV64 `call`/`ret`/`jr`/`j` aliases, and `c.j`/`c.jalr` | absent; `jal` and `jalr` ship as separate forms (`ADR-0099`) | `ADR-0094`, `ADR-0099`, `EC-23` |
 | RV64 `fence` masks | absent | `ADR-0094`, `EC-24` |
 | RV64 CSR immediate form | absent | `ADR-0094`, `EC-25` |
 | RV64 `aq`/`rl` | absent | `ADR-0094`, `EC-26` |
