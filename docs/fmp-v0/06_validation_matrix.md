@@ -94,13 +94,14 @@ raw commands in `research/evidence/experiments/EXP-0001-xirasm-boundary-probes.m
 |---|---|---|---|---|
 | EXP-R1 | Repeated execution | Materialize the same plan 100 times in one process; compare bytes, fixup records, fingerprints | Byte equality | **passing** — 98 positive fixtures × 100 runs, canonical artifact equal (`EXP-0033` §1, re-run in §7) |
 | EXP-R2 | Cross-process | Run the CLI in N independent processes; compare hashes of artifacts | Hash equality | **passing** — 3 plans × 4 CLI processes, canonical artifact equal to the in-process result (`EXP-0033` §2) |
-| EXP-R3 | Different host environment | Run on a second OS/compiler/host where available; otherwise mark unverified | Hash equality or explicit `unverified` | **unverified** — one Windows host; WSL has no distribution, no second machine was used (`EXP-0033` §6) |
+| EXP-R3 | Different host environment | Run on a second OS/compiler/host where available; otherwise mark unverified | Hash equality or explicit `unverified` | **passing** (2026-11-08): Ubuntu 24.04.5 (`x86_64`), macOS 26.7.2 (`aarch64`) and Windows Server 2025, all on the pinned 1.96.0 toolchain; the three recorded canonical artifact digests and all 100 positive oracle bytes match (`EXP-0033` §6) |
 | EXP-R4 | Serialization replay | Serialize → parse → materialize; compare with direct materialization | Byte equality | **passing** — 98 positives × canonical and pretty round trips (`EXP-0033` §3, re-run in §7) |
 | EXP-R5 | Definition perturbation | Swap the definition for a modified one; expect E-DEF-001, not silent bytes | Error identity | **passing** — a changed template is `E-DEF-001` at `/definition_identity/digest`, a renamed version is `E-DEF-002`; neither emits bytes (`EXP-0033` §4) |
 | EXP-R6 | Negative determinism | Repeat an invalid plan; compare error identity (code+path+detail keys), ignoring `message` | Identity equality | **passing** — 523 negatives × 100 runs (`EXP-0033` §7) |
 
-EXP-R3 must not be claimed unless actually executed. "Not tested on a second
-host" is the honest result.
+`EXP-R3` is claimed only from the run recorded in `EXP-0033` §6, not from a
+same-host pass: the digest test pins the values, and the CI job supplies the
+second, third and fourth hosts.
 
 ## 3. Acceptance criteria (`AC-*`)
 
@@ -112,7 +113,7 @@ host" is the honest result.
 | AC-04 | Encoding ambiguity proven absent | x86 `imm8`/`imm32`, `rel8`/`rel32`, `89`/`8B`, the `88`/`40 88`/`88h` register sets, the `legacy`/`vex`/`evex` families at register and memory shapes, the `L`/`L'L` widths (`xmm`/`ymm`/`zmm`), the `-base-index-` shape with its two-bit scale, the two SSE base windows, the three SSE register windows, the three memory displacement widths (none, `disp8`, `disp32`), the inverted extension bits (including the second EVEX host bit for `xmm16`–`xmm31`), and the EVEX `disp8x16`/`disp8x32`/`disp8x64` content, plus RV64 `c.*` vs standard, are distinct `form_id`s and field types; per-`EC` negative test per `02_encoding_choices.md`, "Validation obligation" | **satisfied for all 40 rows** (2026-11-08): each frozen `EC` row names a carrier that the fixtures reject when falsified (form variants through `N01`, operand classes through `N02`, excluded values through `N16`, the scale's and the EVEX `disp8*N` units through `N03`); the seven families v0 keeps absent are frozen with a measured counterexample in `EXP-0096` and a carrier in `ADR-0094`, and their rejection path is `E-FORM-001` (the `N01` family) |
 | AC-05 | Fixups validated | x86 `rel32`; AArch64 `adrp`+`:lo12:`; RV64 `auipc`+`lo12` or B-type scatter | **satisfied** (2026-11-05): `X86-P8-local-and-external-branch` (`rel32` record), `X86-P6-rip-relative` (`R_X86_64_PC32`), `A64-P6-adrp-lo12-pair` (`adrp`+`lo12`), `RV-P8-pcrel-pair` (three records) and `RV-P8-pcrel-pair-resolved` (linked arithmetic) |
 | AC-06 | Strict rejection | All applicable N01–N13 with recorded codes | **satisfied for N01–N20 as applicable** (2026-11-05): every row has at least one fixture whose code, JSON Pointer and detail keys are compared exactly; N12 is not applicable to x86 v0 (single-site `rel32`), and N06 is exercised on x86 and rv64 |
-| AC-07 | Deterministic replay | EXP-R1, EXP-R2, EXP-R4, EXP-R5 | **satisfied for one host** (2026-11-05): `EXP-R1`/`R2`/`R4`/`R5` pass, and `R6` covers negative identity (`EXP-0033`); `EXP-R3` stays `unverified`, so cross-platform replay is not claimed |
+| AC-07 | Deterministic replay | EXP-R1, EXP-R2, EXP-R3, EXP-R4, EXP-R5 | **satisfied** (2026-11-08): `EXP-R1`/`R2`/`R4`/`R5` pass, `R6` covers negative identity, and `EXP-R3` passes on three CI hosts (Ubuntu 24.04 `x86_64`, macOS 26.7.2 `aarch64`, Windows Server 2025) with the pinned 1.96.0 toolchain (`EXP-0033` §6) |
 | AC-08 | Reuse boundary backed by source evidence | `90_boundary_audit.md` with revision, file, symbol, line range | **done** for XirAsm; LLVM internals deferred (see audit §8) |
 | AC-09 | Unresolved problems stated | `05_open_decisions.md` with blocking impact, no "later" hand-waving | **satisfied** (2026-11-05): every `OD-*` row is accepted, including OD-05 (ADR-0031) and OD-08 (ADR-0032); the only deferred item is the Level 1 envelope, which OD-03 records as out of scope |
 | AC-10 | Executable next step | Final report §H: modules, order, gates, blockers | planned |

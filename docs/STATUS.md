@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-08
-Phase: **3 complete (x86, AArch64 and RV64 slices): eighty-four definition documents, the materializer and the fixture gate are in place; every directive §6.1/§6.2/§6.3 item is carried, all 40 `EC` rows are frozen, and every coverage row in the three ISAs passes its two-source gate, so further work is Phase 4 or coverage with its own ADR per slice**
+Phase: **4 in progress**: Phase 3 is complete (eighty-four definition documents, the materializer and the fixture gate; all 40 `EC` rows frozen; every directive §6.1/§6.2/§6.3 item carried). `EXP-R3` now passes on three CI hosts, and the invariant-to-test map in `01_contract.md` is filled; the remaining Phase 4 gap is the `E-LAYOUT-004`/`006`/`007` fixtures
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -15,7 +15,7 @@ this file plus `AGENTS.md` alone.
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
 | 3 | Three-ISA vertical prototype | **complete** (2026-11-08): eighty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 71 positive and 461 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate; exit criteria below |
-| 4 | Invariants, negative tests, replay | **in progress**: `EXP-R1`/`R2`/`R4`/`R5`/`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs` (`EXP-0033`); `EXP-R3` is `unverified` because only one host exists |
+| 4 | Invariants, negative tests, replay | **in progress**: `EXP-R1`–`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs`; `EXP-R3` also passes on Ubuntu 24.04 (`x86_64`), macOS 26.7.2 (`aarch64`) and Windows Server 2025 with the pinned 1.96.0 toolchain (`EXP-0033` §6, run 42402997326); the invariant-to-test map in `01_contract.md` §2 is filled, with `E-LAYOUT-004`/`006`/`007` still without fixtures |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
 ## Gates
@@ -51,9 +51,9 @@ on a slice count:
   counterexample and a decided carrier (`ADR-0094`). `EXP-0096` records the
   seven families v0 keeps absent with no fixture; the rejection path is
   `E-FORM-001`, already pinned by the `N01` family.
-- **Determinism** — `EXP-R1`, `EXP-R2`, `EXP-R4`, `EXP-R5` and `EXP-R6` pass on
-  this host (`EXP-0033`); `EXP-R3` stays `unverified` because no second host
-  exists, and Phase 3 does not claim it.
+- **Determinism** — `EXP-R1`, `EXP-R2`, `EXP-R4`, `EXP-R5` and `EXP-R6` passed
+  on this host at close-out (`EXP-0033`); `EXP-R3` was outside the Phase 3 claim
+  then and now passes in Phase 4 on three CI hosts (`EXP-0033` §6).
 
 ## Decisions
 
@@ -251,11 +251,14 @@ not cover is caught only by the weaker size check; it is now settled, and
 
 ## Next action
 
-Phase 3 is complete (exit criteria above). Phase 4 is next: move `EXP-R3` from
-`unverified` to verified on a second host, and keep the invariant-to-test map in
-`01_contract.md` current. The numbered list below is the widening backlog
-retained for a later phase; no item is part of the Phase 3 close-out, and each
-still needs its own ADR before a table changes.
+Phase 3 is complete. Phase 4 is in progress: `EXP-R3` passes on the three CI
+hosts (`EXP-0033` §6), and the invariant-to-test map in `01_contract.md` §2 is
+filled. What remains is the map's `partial` rows: add fixtures for
+`E-LAYOUT-004` (list order), `E-LAYOUT-006` (duplicate section or permutation)
+and `E-LAYOUT-007` (duplicate instruction id or offset), then close INV-04 and
+INV-06 or record why they stay partial. The numbered list below is the widening
+backlog retained for a later phase; no item is part of the Phase 3 close-out,
+and each still needs its own ADR before a table changes.
 
 ### Widening backlog
 
@@ -1687,6 +1690,7 @@ Raw experiment records: `research/evidence/experiments/EXP-0001-*.md`,
 | Visual Studio | 2022 present |
 | Python | 3.8 |
 | WSL | executable present, no distribution installed |
+| CI hosts | GitHub Actions `ubuntu-24.04` 20261101.360 (`x86_64`), `macos-26-arm64` 20261102.0473 (`aarch64`) and `windows-2025-vs2026` 20261103.298, all with Rust 1.96.0 |
 
 ## Immutable source text
 

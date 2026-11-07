@@ -1,10 +1,12 @@
-# EXP-0033 — Deterministic replay: `EXP-R1`, `EXP-R2`, `EXP-R4`, `EXP-R5`, `EXP-R6`
+# EXP-0033 — Deterministic replay: `EXP-R1`, `EXP-R2`, `EXP-R3`, `EXP-R4`, `EXP-R5`, `EXP-R6`
 
 - Date: 2026-11-05
 - Questions: does the same plan yield the same artifact across repetitions, across
   processes, across serialization, and across a perturbed definition; and does an
   invalid plan keep one diagnostic identity?
-- Toolchain: Rust 1.96.0 (`stable-x86_64-pc-windows-msvc`), one Windows host.
+- Toolchain: Rust 1.96.0. The primary host is Windows
+  (`x86_64-pc-windows-msvc`); §6 adds Ubuntu, macOS arm64 and a second Windows
+  host for `EXP-R3`.
 - Test: `prototype/crates/fmp-cli/tests/determinism.rs`
 - Command: `cargo test -p fmp-cli --test determinism`
 - Corpus: 38 positive and 99 negative fixtures at the time of the run
@@ -91,12 +93,42 @@ Result: **99 fixtures × 100 runs, all identities equal.** Multi-diagnostic
 fixtures (`N02f`, `N02g`, `N02h`, `N02l`, `N14`, `N14b`) keep both entries and
 their order, because diagnostics are sorted by `(path, code)`.
 
-## 6. Not run — `EXP-R3`
+## 6. `EXP-R3` — second host (GitHub Actions)
 
-`EXP-R3` asks for a second OS, compiler build or host CPU. Only one Windows host
-is available: WSL has no distribution installed and no second machine was used.
-**Cross-platform determinism is `unverified`.** This record does not turn a
-same-host result into a cross-host claim.
+Run [`42402997326`](https://github.com/Mr-enthalpy/MonAsm/actions/runs/42402997326)
+triggered 2026-11-07 18:47 UTC (2026-11-08 local), by
+`.github/workflows/determinism.yml`. The workflow installs the same pinned
+`rustc`/`cargo` 1.96.0 (`ac68faa20 2026-05-25`) as the primary host and runs
+`cargo test --workspace` from `prototype/` on three hosts:
+
+| Host | Image | Target | Result |
+|---|---|---|---|
+| Ubuntu 24.04.5 LTS | `ubuntu-24.04` 20261101.360 | `x86_64-unknown-linux-gnu` | all tests pass |
+| macOS 26.7.2 (25G332) | `macos-26-arm64` 20261102.0473 | `aarch64-apple-darwin` | all tests pass |
+| Windows Server 2025 (10.0.26100) | `windows-2025-vs2026` 20261103.298 | `x86_64-pc-windows-msvc` | all tests pass |
+
+Every host passed 6 determinism tests, 2 fixture tests (100 positives, 530
+negatives), 5 `fmp-materialize` unit tests and 16 `fmp-model` unit tests. The
+new `exp_r3_artifact_digests_match_the_recorded_values` compares the canonical
+artifact digest of one plan per ISA against the value recorded on the primary
+host:
+
+| ISA | Fixture | Canonical artifact digest |
+|---|---|---|
+| x86-64 | `X86-P9-sse-vex-evex` | `sha256:da97dcaad805b973984a92d2ffb933a82a407b1a4cc9a1aa87bfc8a9c715c660` |
+| AArch64 | `A64-P14-cmp-cmn-family` | `sha256:638e769fb8fe17ab3ed6d2259d1eab3f503ca9b25ca2133745076e7f64bf5a65` |
+| RV64 | `RV-P8-pcrel-pair` | `sha256:19bae975204dbe62ff46cf11a2fd70114356ff9656687c8fefc1aa459d032f7c` |
+
+The same values passed on the primary Windows host and on all three CI hosts.
+`positives_reproduce_the_oracle_bytes` also compared all 100 positives to the
+recorded `expected.bin` bytes on each host, so byte equality is anchored to the
+oracle rather than to any one run; the arm64 macOS host additionally covers a
+second CPU architecture. **`EXP-R3` is `passing` for the four hosts above.**
+It is not claimed for an untested host.
+
+The run log warns that the `ubuntu-latest` label migrates to Ubuntu 26 after
+2026-10-19; this run used the `ubuntu-24.04` image named above, and the workflow
+pins the toolchain rather than the image. A later image is a new observation.
 
 ## 7. Re-run after `X86-P10` … `X86-P48`
 
@@ -157,7 +189,8 @@ sixtieth time on 2026-11-08 after `0.65.0` and `X86-P69`, and a
 sixty-first time on 2026-11-08 after `X86-P70` (no definition change).
 The corpus is now
 **100 positive and 530 negative** fixtures (x86 71/461, AArch64 20/57, RV64 9/12).
-Result: all five tests still pass, with the same method (`EXP-R1` 100 × 100,
-`EXP-R2` 12 processes, `EXP-R4` 100 × 2, `EXP-R5` unchanged, `EXP-R6` 530
-× 100). The counts in §1–§5 are the original run's; this section records
-the current corpus instead of rewriting them.
+Result: all five same-host tests still pass, with the same method (`EXP-R1`
+100 × 100, `EXP-R2` 12 processes, `EXP-R4` 100 × 2, `EXP-R5` unchanged,
+`EXP-R6` 530 × 100). The counts in §1–§5 are the original run's; this section
+records the current corpus instead of rewriting them. `EXP-R3` is the cross-host
+half and is recorded in §6, not in this same-host re-run.

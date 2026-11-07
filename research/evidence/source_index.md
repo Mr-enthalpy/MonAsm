@@ -278,7 +278,10 @@ Findings and interpretations: `docs/fmp-v0/90_boundary_audit.md`.
   the two zeroes are in range and are rejected only because the form excludes
   them (`EXP-0012`). The same construct's 16-value Zilsd list is read from the
   `RV32` block of `ld.yaml` but is not exercised end to end, because v0 is RV64.
-- Cross-host determinism (EXP-R3) is untested and must stay marked `unverified`.
+- Cross-host determinism (`EXP-R3`) is `passing`: run 42402997326 executed the
+  suite on Ubuntu 24.04, macOS 26 arm64 and Windows Server 2025 with the pinned
+  1.96.0 toolchain (`EXP-0033` §6). A host not in that table is untested and
+  must not inherit the claim.
 - The LLVM archive hash is recorded from the download, not cross-checked against
   an upstream digest (the `.jsonl` asset downloaded empty and the API request was
   rate-limited). Re-check when convenient.
