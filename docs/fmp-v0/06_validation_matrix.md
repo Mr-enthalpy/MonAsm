@@ -150,7 +150,7 @@ second, third and fourth hosts.
 | AC-07 | Deterministic replay | EXP-R1, EXP-R2, EXP-R3, EXP-R4, EXP-R5 | **satisfied** (2026-11-08): `EXP-R1`/`R2`/`R4`/`R5` pass, `R6` covers negative identity, and `EXP-R3` passes on three CI hosts (Ubuntu 24.04 `x86_64`, macOS 26.7.2 `aarch64`, Windows Server 2025) with the pinned 1.96.0 toolchain (`EXP-0033` §6) |
 | AC-08 | Reuse boundary backed by source evidence | `90_boundary_audit.md` with revision, file, symbol, line range | **done** for XirAsm; LLVM internals deferred (see audit §8) |
 | AC-09 | Unresolved problems stated | `05_open_decisions.md` with blocking impact, no "later" hand-waving | **satisfied** (2026-11-08): every `OD-*` row is accepted, including OD-05 (ADR-0031), OD-08 (ADR-0032) and OD-03 (ADR-0096); Level 1 is implemented, while Level 2 containers and RV64 synthetic symbols are named as out of `fmp/0.1` |
-| AC-10 | Executable next step | Final report §H: modules, order, gates, blockers | **satisfied** (2026-11-08): `08_final_recommendation.md` §H names M1–M5 in order (error-coverage gate → oracle rerun harness → Level 1 writer → planner API → coverage widening), with the test gate and the risk table; M1's work list is `04_errors.md` §2.4 |
+| AC-10 | Executable next step | Final report §H: modules, order, gates, blockers | **satisfied** (2026-11-08): `08_final_recommendation.md` §H names M1–M5 in order (error-coverage gate → oracle rerun harness → Level 1 writer → planner API → coverage widening), with the test gate and the risk table; M1's work list is `04_errors.md` §2.4. M4's design is accepted in `ADR-0097` and `09_planner_api.md`; its implementation and parity tests remain |
 
 ## 4. Positive vectors
 

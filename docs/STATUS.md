@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-08
-Phase: **6 in progress**: Phase 4 is complete (all eight invariants `verified`; `EXP-R3` passes on three CI hosts; `N22` closes INV-04 and `N23a` closes INV-06). Phase 5 froze the contract set for the v0 scope (`ADR-0095`), published `08_final_recommendation.md` (§A–§H plus Q1–Q10) and closed `AC-10` with the Phase 6 roadmap M1–M5. Phase 6 M1 (error-coverage gate) is complete with `N24a`–`N24h`, M2 (oracle rerun harness) is complete with `tools/oracle/rerun.py`, and M3 (Level 1 object writer) is complete with `X86-P71` and `ADR-0096`; M3 also added `N24i` and repointed `N24h`. M4 is next
+Phase: **6 in progress**: Phase 4 is complete (all eight invariants `verified`; `EXP-R3` passes on three CI hosts; `N22` closes INV-04 and `N23a` closes INV-06). Phase 5 froze the contract set for the v0 scope (`ADR-0095`), published `08_final_recommendation.md` (§A–§H plus Q1–Q10) and closed `AC-10` with the Phase 6 roadmap M1–M5. Phase 6 M1 (error-coverage gate) is complete with `N24a`–`N24h`, M2 (oracle rerun harness) is complete with `tools/oracle/rerun.py`, and M3 (Level 1 object writer) is complete with `X86-P71` and `ADR-0096`; M3 also added `N24i` and repointed `N24h`. M4's design is accepted (`ADR-0097`, `09_planner_api.md`); implementation of `fmp-plan` is next
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -17,7 +17,7 @@ this file plus `AGENTS.md` alone.
 | 3 | Three-ISA vertical prototype | **complete** (2026-11-08): eighty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 72 positive and 477 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate; exit criteria below |
 | 4 | Invariants, negative tests, replay | **complete** (2026-11-08): `EXP-R1`–`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs`; `EXP-R3` also passes on Ubuntu 24.04 (`x86_64`), macOS 26.7.2 (`aarch64`) and Windows Server 2025 with the pinned 1.96.0 toolchain (`EXP-0033` §6, run 42402997326); the invariant-to-test map in `01_contract.md` §2 is filled and every row is `verified` (`N22` closes `E-LAYOUT-004`/`006`/`007`, `N23a` closes the expression-shaped-value gap in INV-06) |
 | 5 | Convergence, route evaluation, roadmap | **complete** (2026-11-08): `08_final_recommendation.md` §A–§H and Q1–Q10; `ADR-0095` moves the contract set to `frozen for the v0 scope`; `AC-10` satisfied; Phase 6 order fixed as M1 error-coverage gate → M2 oracle rerun harness → M3 Level 1 object writer → M4 planner boundary → M5 coverage widening |
-| 6 | Implementation roadmap (M1–M5) | **in progress**: M1 error-coverage gate **complete** (2026-11-08) with `N24a`–`N24h`, CI run `42407621760` green on Ubuntu, macOS and Windows; M2 oracle rerun harness **complete** (`tools/oracle/rerun.py`: 67/101 re-derived after `P71`, 29 `input-not-stored`, 5 `manual-derivation`; CI run `42408219370` green); M3 Level 1 object writer **complete** (2026-11-08) with `ADR-0096`, `X86-P71` and `EXP-0100`, plus `N24i` and the repointed `N24h`; CI run `42409630161` green on Ubuntu, macOS and Windows; Level 0 bytes unchanged; M4 planner boundary next; M5 pending |
+| 6 | Implementation roadmap (M1–M5) | **in progress**: M1 error-coverage gate **complete** (2026-11-08) with `N24a`–`N24h`, CI run `42407621760` green on Ubuntu, macOS and Windows; M2 oracle rerun harness **complete** (`tools/oracle/rerun.py`: 67/101 re-derived after `P71`, 29 `input-not-stored`, 5 `manual-derivation`; CI run `42408219370` green); M3 Level 1 object writer **complete** (2026-11-08) with `ADR-0096`, `X86-P71` and `EXP-0100`, plus `N24i` and the repointed `N24h`; CI run `42409630161` green on Ubuntu, macOS and Windows; Level 0 bytes unchanged; M4 planner boundary/API **design accepted** (2026-11-08) in `ADR-0097` and `09_planner_api.md`: `fmp-plan`, a total closed builder over `fmp-model` with no validator and no planner authority, gated by 101 positive and 540 `materialize`-phase negative parity plus from-scratch, closed-key and determinism tests; implementation pending; M5 pending |
 
 ## Gates
 
@@ -156,6 +156,7 @@ on a slice count:
 | ADR-0094 | Seven ambiguous families stay absent in v0: `EC-10` (x86 prefix presence), `EC-16` (AArch64 `mov` alias), `EC-18` (AArch64 conditional transfer), `EC-23` (RV64 jump and call), `EC-24` (RV64 `fence` masks), `EC-25` (RV64 CSR immediate) and `EC-26` (RV64 `aq`/`rl`) are frozen with a decided carrier but no row. `EXP-0096` measures the two or more legitimate encodings in each family: `lock addl (%rax), %ebx` is `f0 03 18` against `03 18`; `mov x0, #1` is `20 00 80 d2` (`MOVZ`) against `00 00 80 92` (`MOVN`) for `#-1`; `jal x0` is `01 a0` (`c.j`) under `.option rvc` against `6f 00 00 00` under `.option norvc`; `fence rw, rw` is `0f 00 30 03` against `0f 00 f0 0f` for `iorw, iorw`; `csrrw` is `f3 10 01 30` (`funct3 = 001`) against `f3 50 01 30` (`funct3 = 101`) for `csrrwi`; `.aq` sets bit 26 and `.rl` bit 25. A decision whose output is a byte, a length or a fixed semantic bit is a `form variant`; `EC-24` is `operand type` because its output is the `imm12` field value. No definition, schema, Rust or fixture change: `0.65.0` stays canonical (509 forms, `sha256:9f5bc421…`) and the corpus stays 100 positive / 530 negative. The rejection path for all seven is `E-FORM-001`, already pinned by `N01` | accepted 2026-11-08 |
 | ADR-0095 | The contract set is `frozen for the v0 scope`: every in-scope field is frozen with a counterexample, all `EC` and `OD` rows are settled, and the remaining `draft` fields are explicitly optional | `01_contract.md`; `04_errors.md` §2.4; `EXP-R3` |
 | ADR-0096 | Level 1 is a JSON description artifact: `artifact: sections` emits `sections[]` in `section_order`, an optional `symbols[]` in `symbol_order`, and the unchanged Level 0 `fixups[]`; no container and no synthesized symbols; Level 0 bytes stay identical | `X86-P71`; `EXP-0100`; `01_contract.md` §11.2 |
+| ADR-0097 | The planner boundary is `fmp-plan`: a total, closed plan builder that depends only on `fmp-model`, has no validator and no planner authority, exposes the frozen v0 surface (`source_ref`, `source_trace`, `symbol.type`, `section_relative` and `symbol.size` excluded), and proves "same codes" by re-reading its own bytes through the shipped reader and validator | `09_planner_api.md`; `ADR-0031`; `ADR-0095`; `ADR-0096` |
 
 ## Settled decisions (contract level)
 
@@ -264,12 +265,16 @@ RV64 inputs were never committed) and `5` are `manual-derivation`
 `artifact: sections` emits `sections[]` in `section_order`, an optional
 `symbols[]` in `symbol_order`, and the unchanged Level 0 records; `X86-P71` and
 `EXP-0100` validate the envelope and the Level 0 image is still the oracle's
-43 bytes. The next action is **M4, the planner boundary/API**: export the plan
-builder as a library boundary with the same closed-object discipline, with API
-tests rejecting illegal plans at the same codes. After M4 comes M5 coverage
-widening (`08_final_recommendation.md` §H). The numbered list below is the
-widening backlog retained for M5 and later; each item still needs its own ADR
-before a table changes.
+43 bytes. M4's **design is accepted** in `ADR-0097` and `09_planner_api.md`: the
+planner boundary is `fmp-plan`, a total closed builder over `fmp-model` with no
+validator and no planner authority, and the exit gate is the six
+`planner_api.rs` tests (101 positive + 540 `materialize`-phase negative parity,
+from-scratch authoring, closed key sets, structural exclusion of the six
+`read`-phase negatives, and determinism). The next action is to **implement
+M4**: add the `fmp-plan` crate and those tests, then record a green CI run.
+After M4 comes M5 coverage widening (`08_final_recommendation.md` §H). The
+numbered list below is the widening backlog retained for M5 and later; each item
+still needs its own ADR before a table changes.
 
 ### Widening backlog
 

@@ -9,6 +9,7 @@ link to them instead of redefining.
 | **Policy** | Any rule that picks among several legal outputs. Policy belongs upstream, never in the materializer. |
 | **Frozen Machine Plan (FMP)** | A serialized set of machine facts, bound to a target identity and a definition identity, sufficient to emit bytes without further choice. |
 | **Planner** | The upstream component that selects instructions, legalizes operands, chooses encoding forms, lays out sections, and plans fixups. Out of scope for this repository. |
+| **Plan builder** | The typed authoring surface for an FMP on the planner side: a total, closed writer that serializes caller facts to the contract document and performs no selection, layout, validation or defaulting (`ADR-0097`, `09_planner_api.md`). |
 | **Materializer** | The component that validates an FMP and executes it deterministically. In scope. |
 | **Definition (target definition)** | A versioned, digestible rule set describing legal forms, operand constraints, field placement, and fixup semantics for one ISA variant. |
 | **Definition identity** | Namespace + version + digest that pins exactly one definition instance. |
