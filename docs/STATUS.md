@@ -1,7 +1,7 @@
 # Status
 
 Updated: 2026-11-08
-Phase: **4 in progress**: Phase 3 is complete (eighty-four definition documents, the materializer and the fixture gate; all 40 `EC` rows frozen; every directive §6.1/§6.2/§6.3 item carried). `EXP-R3` passes on three CI hosts, the invariant-to-test map in `01_contract.md` is filled, and the `N22` fixtures close INV-04; the remaining Phase 4 item is INV-06, which stays `partial` until the data-only grammar has a test of its own
+Phase: **4 complete**: Phase 3 is complete (eighty-four definition documents, the materializer and the fixture gate; all 40 `EC` rows frozen; every directive §6.1/§6.2/§6.3 item carried). `EXP-R3` passes on three CI hosts, the invariant-to-test map in `01_contract.md` is filled, and every row is `verified`: `N22` closes INV-04 and `N23a` closes INV-06 with an expression-shaped scalar rejected at read time
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -14,8 +14,8 @@ this file plus `AGENTS.md` alone.
 | 0 | Environment, evidence baseline, docs skeleton | **complete** |
 | 1 | Encoder boundary audit (XirAsm, LLVM) | **complete** for XirAsm; LLVM internals deferred |
 | 2 | FMP v0 contract, schema, error model | **complete for the x86, AArch64 and RV64 slices**; the last RV64 row's psABI pairing is now part of the contract (ADR-0010) |
-| 3 | Three-ISA vertical prototype | **complete** (2026-11-08): eighty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 71 positive and 467 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate; exit criteria below |
-| 4 | Invariants, negative tests, replay | **in progress**: `EXP-R1`–`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs`; `EXP-R3` also passes on Ubuntu 24.04 (`x86_64`), macOS 26.7.2 (`aarch64`) and Windows Server 2025 with the pinned 1.96.0 toolchain (`EXP-0033` §6, run 42402997326); the invariant-to-test map in `01_contract.md` §2 is filled, and the `N22` fixtures close `E-LAYOUT-004`/`006`/`007`, leaving INV-06 as the only `partial` row |
+| 3 | Three-ISA vertical prototype | **complete** (2026-11-08): eighty-four definition documents frozen (`07_definition_format.md`, `EXP-0004`, `EXP-0008`, `EXP-0010`, `EXP-0012`); `fmp-model`/`fmp-validate`/`fmp-materialize`/`fmp-cli` implemented; x86 has 71 positive and 468 negative fixtures, AArch64 has 20 positive and 57 negative, RV64 has 9 positive and 12 negative, all passing the two-source gate; exit criteria below |
+| 4 | Invariants, negative tests, replay | **complete** (2026-11-08): `EXP-R1`–`R6` pass in `prototype/crates/fmp-cli/tests/determinism.rs`; `EXP-R3` also passes on Ubuntu 24.04 (`x86_64`), macOS 26.7.2 (`aarch64`) and Windows Server 2025 with the pinned 1.96.0 toolchain (`EXP-0033` §6, run 42402997326); the invariant-to-test map in `01_contract.md` §2 is filled and every row is `verified` (`N22` closes `E-LAYOUT-004`/`006`/`007`, `N23a` closes the expression-shaped-value gap in INV-06) |
 | 5 | Convergence, route evaluation, roadmap | not started |
 
 ## Gates
@@ -25,7 +25,7 @@ this file plus `AGENTS.md` alone.
 | G0 | `llvm-mc` available and emits bytes for x86-64, AArch64, RV64 | **passed** 2026-11-03 (LLVM 23.1.2) |
 | G1 | Three questions answered from source: x86 relaxation disable, RISC-V form addressing, AArch64 library entry point | **passed** 2026-11-03 (all three answered; see `90_boundary_audit.md` §4) |
 | G2 | Every `EC-*` row has an observed counterexample and a decided carrier | **passed** 2026-11-08: 40 of 40 rows are frozen. The last seven (`EC-10`, `EC-16`, `EC-18`, `EC-23`, `EC-24`, `EC-25`, `EC-26`) are absent-in-v0 decisions with measured counterexamples in `EXP-0096` and decided carriers in `ADR-0094` |
-| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 71 positive, 467 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 12 negative) |
+| G3 | Each ISA has >= 3 positive and >= 2 negative vectors passing two-source checks | **satisfied for x86, AArch64 and RV64** (x86: 71 positive, 468 negative; AArch64: 20 positive, 57 negative; RV64: 9 positive, 12 negative) |
 
 ### Phase 3 exit criteria
 
@@ -34,7 +34,7 @@ on a slice count:
 
 - **Gate G3** — each ISA carries at least three positive and two negative
   vectors whose bytes and diagnostics match a recorded oracle
-  (`06_validation_matrix.md` §5). x86 has 71/467, AArch64 20/57 and RV64 9/12.
+  (`06_validation_matrix.md` §5). x86 has 71/468, AArch64 20/57 and RV64 9/12.
 - **Directive §6.1** (x86-64) — all nine items are carried by the positive rows
   in `06_validation_matrix.md` §4: register transfer, immediate arithmetic, two
   legal encodings of one operation, displacement widths, prefix rules,
@@ -251,14 +251,15 @@ not cover is caught only by the weaker size check; it is now settled, and
 
 ## Next action
 
-Phase 3 is complete. Phase 4 is in progress: `EXP-R3` passes on the three CI
-hosts (`EXP-0033` §6), the invariant-to-test map in `01_contract.md` §2 is
-filled, and the `N22` fixtures verify the ordering and uniqueness half of INV-04
-(`E-LAYOUT-004`/`006`/`007`). The map's only remaining `partial` row is INV-06:
-decide whether the data-only plan grammar gets an executable test of its own, or
-record why the source-level review is the whole obligation. The numbered list
-below is the widening backlog retained for a later phase; no item is part of the
-Phase 3 close-out, and each still needs its own ADR before a table changes.
+Phase 3 and Phase 4 are complete. `EXP-R3` passes on the three CI hosts
+(`EXP-0033` §6), the invariant-to-test map in `01_contract.md` §2 is filled with
+every row `verified`, `N22` pins the ordering and uniqueness rules of INV-04
+(`E-LAYOUT-004`/`006`/`007`), and `N23a` pins INV-06 by rejecting an
+expression-shaped scalar at read time. The next action is a Phase 5 decision, not
+more Phase 4 work: choose the first convergence/roadmap question and open it as
+an ADR. The numbered list below is the widening backlog retained for a later
+phase; no item is part of the Phase 3 close-out, and each still needs its own ADR
+before a table changes.
 
 ### Widening backlog
 

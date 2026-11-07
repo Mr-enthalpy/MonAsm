@@ -32,7 +32,7 @@ Rules:
 | Code | Trigger | Fixed detail keys | Related test |
 |---|---|---|---|
 | E-PLAN-001 | Unknown or unsupported `format_version` | `found`, `supported` | — |
-| E-PLAN-002 | Value has the wrong type or literal form (a non-integer number, a malformed hex byte string), or lies outside the declared domain for its path | `path_type`, `found_kind` | — |
+| E-PLAN-002 | Value has the wrong type or literal form (a non-integer number, a malformed hex byte string), or lies outside the declared domain for its path | `path_type`, `found_kind` | N23a |
 | E-PLAN-003 | Unknown field in a strict object | `field`, `object` | — |
 | E-PLAN-004 | Document is not parseable, or has duplicate keys | `reason` | — |
 | E-PLAN-005 | Canonical-form violation that changes bytes (e.g. float, BOM, CRLF-dependent content) | `reason` | EXP-R4 |

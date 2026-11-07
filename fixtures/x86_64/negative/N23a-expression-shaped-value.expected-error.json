@@ -1,0 +1,6 @@
+{
+  "errors": [
+    { "code": "E-PLAN-002", "path": "/sections/0/declared_size", "detail_keys": ["found_kind", "path_type"] }
+  ],
+  "phase": "read"
+}

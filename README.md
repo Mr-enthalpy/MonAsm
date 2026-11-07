@@ -12,7 +12,7 @@ The materializer has no planning authority. That is the whole point.
 
 ## Status
 
-**Phase 3 complete on x86-64, AArch64 and RV64; Phase 4 is in progress.** Gate
+**Phases 3 and 4 complete on x86-64, AArch64 and RV64.** Gate
 G0 (oracle toolchain) and G1 (encoder boundary audit) passed. The audit found
 that XirAsm's x86 path makes
 four independent encoding decisions the caller cannot address, that its RISC-V
@@ -392,8 +392,8 @@ Eighty-four definition documents are frozen and oracle-verified; the materialize
 and its fixture gate are implemented. Phase 4 has verified `EXP-R3` on three CI
 hosts (Ubuntu 24.04 `x86_64`, macOS 26 `aarch64`, Windows Server 2025) with the
 pinned 1.96.0 toolchain, filled the invariant-to-test map in `01_contract.md`
-§2, and closed INV-04 with the `N22` ordering fixtures; INV-06 stays `partial`
-until the data-only plan grammar has a test of its own.
+§2, and closed INV-04 (`N22` ordering/uniqueness) and INV-06 (`N23a`
+expression-shaped value) so every row is `verified`.
 
 | Area | State |
 |---|---|
