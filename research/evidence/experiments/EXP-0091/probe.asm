@@ -1,0 +1,13 @@
+movq 8(,%ecx,1), %rax
+movq %rax, 8(,%ecx,1)
+movq 8(,%ecx,1), %r8
+movq %r8, 8(,%ecx,1)
+movq 8(,%r9d,1), %rax
+movq %rax, 8(,%r9d,1)
+movq 8(,%r9d,1), %r8
+movq %r8, 8(,%r9d,1)
+movq 0(,%ecx,1), %rax
+movq -8(,%ecx,1), %rax
+movq 8(,%ecx,4), %rax
+movq 8(,%r12d,1), %rax
+movq 4660(,%r15d,8), %r15
