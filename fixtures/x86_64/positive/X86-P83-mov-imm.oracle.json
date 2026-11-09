@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-mc -disassemble + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj probe.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "manual+disassembly",
+  "input_sha256": "04364e251bd0b46b5f4e4678a8496e85a34e2e469255921b7af1c86e676a36e2",
+  "output_sha256": "3e98bc659fe8805f36f7a07a598c4bc8143eeb7643072a9fc0a38e303c36ddf0",
+  "size": 54,
+  "records": 0,
+  "notes": "Ten instructions, 54 bytes (`EXP-0114` §2). Instructions 1-6 are the assembler's own choice and are measured directly: `66 B8+rw iw` (`66 bb 01 00` / `66 b9 2c 01`), `B8+rd id` (`bb 01 00 00 00` / `b9 2c 01 00 00`) and `REX.W C7 /0 id` (`48 c7 c3 ...` / `49 c7 c0 ...`, the second showing the destination slot's `REX.B` bit). Instructions 7-10 are the same two 16/32-bit operations in the `C7 /0` shape (`66 c7 c3 01 00`, `66 c7 c1 2c 01`, `c7 c3 01 00 00 00`, `c7 c1 2c 01 00 00`); `llvm-mc` never selects that shape for a register destination, so those eight bytes pairs are hand-derived from `ModRM = 11 000 r/m` and confirmed by `llvm-mc -disassemble`, which prints the same instruction as the `B8+rd` bytes. input_sha256 is probe.s, which holds instructions 1-6 plus the excluded `movabsq $300, %rax` (`48 b8` with an eight-byte immediate); output_sha256 is the 54-byte expected image."
+}

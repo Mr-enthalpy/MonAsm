@@ -1,6 +1,6 @@
 # M6 Plan — Coverage Round 2
 
-- Status: accepted (`ADR-0112`); `S1` landed 2026-11-09 (`ADR-0113`); `S2` landed 2026-11-10 (`ADR-0114`)
+- Status: accepted (`ADR-0112`); `S1` landed 2026-11-09 (`ADR-0113`); `S2` landed 2026-11-10 (`ADR-0114`); `S3` landed 2026-11-10 (`ADR-0115`)
 - Date: 2026-11-09
 - Baseline: Phase 6 closed (`ADR-0111`): 759 forms, 121 positive and 586
   negative plans, `fmp/0.1` frozen
@@ -31,18 +31,20 @@ sibling the slice leaves out.
 |---|---|---|---|---|---|
 | `S1` | `ADR-0113` | x86 ALU register/register at three widths | `x86/0.75.0` | 15 | `X86-P81` |
 | `S2` | `ADR-0114` | x86 ALU immediate at three widths | `x86/0.76.0` | 36 | `X86-P82` |
-| `S3` | `ADR-0115` | x86 `mov` immediate at 16/32/64 | `x86/0.77.0` | 6 | `X86-P83` |
+| `S3` | `ADR-0115` | x86 `mov` immediate at 16/32/64 | `x86/0.77.0` | 5 | `X86-P83` |
 | `S4` | `ADR-0116` | x86 `sub` memory directions | `x86/0.78.0` | 12 | `X86-P84` |
 | `S5` | `ADR-0117` | RV64 load/store widths | `rv64/0.6.0` | 9 | `RV-P12` |
 | `S6` | `ADR-0118` | AArch64 `adr` | `aarch64/0.19.0` | 1 | `A64-P23` |
 | `S7` | `ADR-0119` | AArch64 `mul` and `csel` | `aarch64/0.20.0` | 4 | `A64-P24` |
 | — | `ADR-0120` | Closure and metrics | — | — | — |
 
-The round adds 83 forms: x86 564 → 633, AArch64 180 → 185, RV64 15 → 24, for
-842 in total. Positive vectors grow 121 → 128; each slice adds at least three
-negatives and the closure ADR records the exact corpus. The one-row correction
-to `S1` is recorded in `ADR-0113`: `sub` already had all three register/register
-widths, while `add` had none, so the slice is fifteen rows and not sixteen.
+The round adds 82 forms: x86 564 → 632, AArch64 180 → 185, RV64 15 → 24, for
+841 in total. Positive vectors grow 121 → 128; each slice adds at least three
+negatives and the closure ADR records the exact corpus. Two row corrections are
+recorded in their ADRs: `S1` is fifteen rows and not sixteen (`sub` already had
+all three register/register widths, while `add` had none; `ADR-0113`), and `S3`
+is five rows and not six (`REX.W B8+rd id` is not an encoding: that opcode form
+takes `io` and is `movabs`, which stays out; `ADR-0115`).
 
 The standing non-goals stay closed: `moffs`, APX `d5`, EVEX masking and
 broadcast, AArch64 `EC-16` (the `mov` alias) and `EC-18` (`cbz`/`tbz`),
@@ -106,15 +108,20 @@ The `test`/`neg`/`not` group, the 8-bit width, the 32/16-bit `%rax` short
 forms and the memory forms stay out. Negatives: `test` (`E-FORM-001`), the
 signed-8 end, the `imm16` end and the version boundary.
 
-### S3 — x86 `mov` immediate (`ADR-0115`, `0.77.0`, `X86-P83`)
+### S3 — x86 `mov` immediate (`ADR-0115`, `0.77.0`, `X86-P83`, landed)
 
-6 rows:
+5 rows:
 
-- `B8+rd` at 16/32/64 (`66 B8+rw iw`, `B8+rd id`, `REX.W B8+rd id`);
+- `B8+rd` at 16/32 (`66 B8+rw iw`, `B8+rd id`);
 - `C7 /0` at 16/32/64 (`66 C7 /0 iw`, `C7 /0 id`, `REX.W C7 /0 id`).
 
-Both shapes encode `mov r64, imm32`, so the choice is byte-affecting: the
-slice adds one `EC` row and the plan names the row, never a flag.
+There is no `REX.W B8+rd id`: that opcode form takes a 64-bit immediate
+(`io`) and is `movabs`, which stays out. The plan counted six rows; `ADR-0115`
+records the correction to five (82 rows in all).
+
+Both shapes encode the same move at 16/32 bits, so the choice is
+byte-affecting: `EC-04` already names `B8+rd` vs `C7 /0`, and the slice widens
+it in place rather than adding a row.
 
 `movabs` (`REX.W B8+rd io`), the 8-bit `B0`/`C6` windows and the high register
 windows stay out. Negatives: `movabs` (`E-FORM-001`), the signed-32 end and the

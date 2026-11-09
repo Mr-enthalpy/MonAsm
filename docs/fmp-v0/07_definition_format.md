@@ -362,7 +362,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.76.0`
+### 8.1 `x86-64` `0.1.0` … `0.77.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -625,6 +625,11 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:or/rax-imm32/legacy` | `480d00000000` | imm: `x86.imm`/`imm32` → `[16,32]` | 6 | EC-04, `ADR-0114`, `X86-P82` — `0.76.0`+ |
 | `x86:xor/rax-imm32/legacy` | `483500000000` | imm: `x86.imm`/`imm32` → `[16,32]` | 6 | EC-04, `ADR-0114`, `X86-P82` — `0.76.0`+ |
 | `x86:cmp/rax-imm32/legacy` | `483d00000000` | imm: `x86.imm`/`imm32` → `[16,32]` | 6 | EC-04, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:mov/r16-imm16/legacy` | `66b80000` | dest: `x86.gpr16`/`r16` → `[8,3]`; imm: `x86.imm`/`imm16` → `[16,16]` | 4 | EC-04, `ADR-0115`, `X86-P83` — `0.77.0`+ |
+| `x86:mov/r32-imm32/legacy` | `b800000000` | dest: `x86.gpr32`/`r32` → `[0,3]`; imm: `x86.imm`/`imm32` → `[8,32]` | 5 | EC-04, `ADR-0115`, `X86-P83` — `0.77.0`+ |
+| `x86:mov/rm16-imm16/legacy` | `66c7c00000` | dest: `x86.gpr16`/`rm16` → `[16,3]`; imm: `x86.imm`/`imm16` → `[24,16]` | 5 | EC-04, `ADR-0115`, `X86-P83` — `0.77.0`+ |
+| `x86:mov/rm32-imm32/legacy` | `c7c000000000` | dest: `x86.gpr32`/`rm32` → `[8,3]`; imm: `x86.imm`/`imm32` → `[16,32]` | 6 | EC-04, `ADR-0115`, `X86-P83` — `0.77.0`+ |
+| `x86:mov/rm64-imm32/legacy` | `48c7c000000000` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm32` → `[24,32]` | 7 | EC-04, `ADR-0115`, `X86-P83` — `0.77.0`+ |
 | `x86:vmovaps/xmm-rsp-disp8/vex` | `c5f828442400` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; disp: `x86.imm`/`disp8` → `[40,8]` | 6 | EC-02, EC-09, EC-35, EC-38, X86-P24 |
 | `x86:vmovaps/xmm-rsp-disp32/vex` | `c5f828842400000000` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | EC-02, EC-09, EC-35, EC-38, X86-P24 |
 | `x86:vmovaps/xmm-r12-disp8/vex` | `c4c17828442400` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[35,3]`; disp: `x86.imm`/`disp8` → `[48,8]` | 7 | EC-02, EC-06, EC-09, EC-35, EC-38, X86-P24 |
@@ -2312,6 +2317,20 @@ only the immediate slot, because the accumulator is implicit in the form
 has no row (`N01ex`), the `0.75.0` boundary is `E-FORM-001` (`N01ey`),
 `imm8 = 128` is `E-RANGE-001` (`N03zw`) and `imm16 = 32768` is `E-RANGE-001`
 (`N03zx`).
+
+`0.77.0` adds the `mov` immediate family (`ADR-0115`): five rows, because
+`REX.W B8+rd` is `movabs` with a 64-bit immediate and stays out. `66 B8+rw iw`
+and `B8+rd id` put the destination in the opcode's low three bits
+(`movw $1, %bx` is `66 bb 01 00`, `movl $300, %ecx` is `b9 2c 01 00 00`);
+`66 C7 /0 iw`, `C7 /0 id` and `REX.W C7 /0 id` put it in `ModRM.r/m`
+(`66 c7 c3 01 00`, `c7 c3 01 00 00 00`, `48 c7 c3 2c 01 00 00`). Both shapes
+of the same width decode to the same instruction (`EC-04`). The 64-bit row
+reaches `%r8`-`%r15` through `REX.B` in the `REX.W` byte (`49 c7 c0 ...`); the
+16/32-bit rows stay three-bit because `%r8w`/`%r8d` would add a `REX` byte
+(`66 41 b9 2c 01`, `41 b9 2c 01 00 00`). `X86-P83` is the 54-byte vector of ten
+instructions. `movabs` has no row (`N01ez`), the `0.76.0` boundary is
+`E-FORM-001` (`N01fa`) and `imm32 = 2147483648` does not sign-extend into a
+64-bit destination, so it is `E-RANGE-001` (`N03zy`).
 
 ### 8.2 `aarch64` `0.1.0` … `0.18.0`
 
