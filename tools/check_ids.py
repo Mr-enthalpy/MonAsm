@@ -29,6 +29,11 @@ REGISTRY_FILES = {
     "N": "docs/fmp-v0/06_validation_matrix.md",
     "EXP": "docs/fmp-v0/06_validation_matrix.md",
     "AC": "docs/fmp-v0/06_validation_matrix.md",
+    # HE-1 (`ADR-0125`): the design document's §3 and §14 tables are the single
+    # declaration site for the acceptance and test IDs. Registered here from H0
+    # so a reference cannot name an acceptance item that does not exist.
+    "HE-AC": "docs/architecture/he1-horizontal-extension.md",
+    "HE-T": "docs/architecture/he1-horizontal-extension.md",
 }
 
 # ID family -> token pattern.
@@ -40,13 +45,34 @@ PATTERNS = {
     "N": r"N\d{2}",
     "EXP": r"EXP-R\d+",
     "AC": r"AC-\d{2}",
+    "HE-AC": r"HE-AC-\d{2}",
+    "HE-T": r"HE-T\d{2}",
 }
 
 DIRECTIVE = "docs/fmp-v0/00_directive.md"
 SOURCE_INDEX = "research/evidence/source_index.md"
 
 # Catalogue families are allowed to be self-contained in their registry doc.
-CATALOGUE_FAMILIES = {"EC", "E"}
+CATALOGUE_FAMILIES = {"EC", "E", "HE-AC", "HE-T"}
+
+
+def family_of(identifier: str) -> str:
+    """The longest registered family that prefixes `identifier`.
+
+    `HE-T01` has no separator before its number, so the family cannot be derived
+    by splitting on `-`; the registered spellings are authoritative.
+    """
+    best = None
+    for family in REGISTRY_FILES:
+        if not identifier.startswith(family):
+            continue
+        rest = identifier[len(family) :]
+        if rest.isdigit() or (rest.startswith("-") and rest[1:].isdigit()):
+            if best is None or len(family) > len(best):
+                best = family
+    if best is not None:
+        return best
+    return identifier.split("-")[0] if "-" in identifier else identifier.rstrip("0123456789")
 
 
 def rel(path: Path) -> str:
@@ -139,7 +165,7 @@ def main() -> int:
         registry_of[family] = relative
 
     for identifier in sorted(declarations):
-        family = identifier.split("-")[0] if "-" in identifier else identifier.rstrip("0123456789")
+        family = family_of(identifier)
         if family in CATALOGUE_FAMILIES:
             continue
         own = registry_of.get(family)
@@ -153,7 +179,7 @@ def main() -> int:
 
     counts = {}
     for identifier in declarations:
-        family = identifier.split("-")[0] if "-" in identifier else identifier.rstrip("0123456789")
+        family = family_of(identifier)
         counts[family] = counts.get(family, 0) + 1
 
     print("declared:", ", ".join("%s=%d" % (k, counts[k]) for k in sorted(counts)))

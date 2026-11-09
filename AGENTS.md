@@ -17,6 +17,13 @@ with versioned target definitions. XirAsm and LLVM are temporary oracles and
 knowledge sources only. They must never become a runtime dependency of the
 materializer.
 
+The current round is **HE-1 — Horizontal Extension Ready** (`ADR-0125`): target
+packages, an immutable definition bundle, a target-agnostic core and package-level
+conformance, so an ordinary instruction-family extension lands in
+`packages/<target>/<owned-package>/**` without touching the core. `fmp/0.1` and
+every shipped definition stay frozen; the round ends at HE-1 acceptance and does
+not roll into coverage work.
+
 ## The eight invariants (full text: `docs/fmp-v0/00_directive.md` §3)
 
 - INV-01 No implicit instruction selection at materialization time.
@@ -60,12 +67,17 @@ materializer.
 | Path | Purpose |
 |---|---|
 | `docs/fmp-v0/` | Contract set; `00_directive.md` is immutable source text |
+| `docs/fmp-0.2/` | `fmp/0.2` surface (from H3); `docs/fmp-v0/` is never edited for it |
 | `docs/adr/` | Architecture decision records |
+| `docs/architecture/` | HE-1 design and acceptance text; `he1-horizontal-extension.md` declares the `HE-AC`/`HE-T` families |
 | `docs/STATUS.md` | Phase, gate status, next action |
 | `schema/` | Machine-readable FMP schema (draft) |
 | `definitions/` | Pinned encoding definitions (`x86_64/0.1.0.json` is canonical) |
+| `packages/` | Target packages (from H2, `ADR-0127`); an ordinary extension's whole change |
+| `bundles/` | Explicit bundle specs and locks (from H2); never discovered by scanning |
 | `fixtures/` | Per-ISA plans, expected bytes, oracle metadata |
 | `research/` | Evidence index and disposable external snapshots |
+| `research/he1/` | HE-1 baseline and per-phase reports; evidence only, never a build input |
 | `prototype/` | Rust workspace; empty until Phase 3 |
 | `tools/` | Oracles, doc consistency (`check_ids.py`) and definition consistency (`check_definition.py`) |
 
@@ -75,3 +87,10 @@ materializer.
 - `python tools/check_ids.py` passes.
 - `python tools/check_definition.py` passes when `definitions/` changes.
 - New behavior has a negative test, or an explicit "not applicable" reason.
+- An **ordinary extension** (HE-1 class 1, `ADR-0125`) changes only
+  `packages/<target>/<owned-package>/**`; it must not edit the core, the protocol
+  schema, a central form table, `STATUS.md` counts or another package.
+- A change that reverses a family an accepted ADR closed needs its own ADR, even
+  when it ships as a package.
+- The legacy corpus keeps its hand-checked counts; package counts are generated
+  (`ADR-0125` decision 4). Do not introduce a third, hand-maintained count.

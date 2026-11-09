@@ -505,6 +505,21 @@ digest-checked `llvmorg-23.1.2` release asset. The repaired run `42681104791`
 a hosted runner, so the next action is a new scope ADR before any further
 widening.
 
+**HE-1 is the new scope** (`ADR-0125`, 2026-11-10): the target is a horizontal
+extension base — target packages, an immutable definition bundle, a
+target-agnostic core and package-level conformance — not more coverage. H0 is
+**complete**: the baseline is recorded in
+`research/he1/compatibility-results.json` (`artifact_root`
+`sha256:dfd08fee9844058492138b23448073ec47d8eda42383e3f1b3e567db86a86fef`;
+104 definitions, 128 positives, 619 negatives, `122/128` oracle re-derivations
+with the six `manual-derivation` skips), and the six characterization tests in
+`prototype/crates/fmp-cli/tests/he1_identity_characterization.rs` pin the four
+measured concentration points. One probe found a real gap rather than a clean
+result: a 20 000-deep JSON plan ends the `fmp` process with `0xC00000FD` (stack
+overflow), which H4 owes a bounded rejection test. Next: H1, identity closure
+(`ADR-0126`). The phase board above stays the v0 record; HE-1 phases are reported
+in `research/he1/`.
+
 ### Widening backlog
 
 1. Decide the next format question, one ADR each, before widening any table.
