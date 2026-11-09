@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj X86-P75-sse-riprel32.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "60868d0c7ab9fd9f59d35d2f90c528deceb1e798d574d27f165c47376e6890f9",
+  "output_sha256": "32cbce4a1d1a0b312c527fad2d0f7b03596bd2d0e3281c5fd0abd825363f55da",
+  "size": 70,
+  "records": 0,
+  "notes": "Input, one line each (LF, trailing newline): `movaps L1(%rip), %xmm0` / `movaps %xmm0, L1(%rip)` / `vmovaps L1(%rip), %xmm0` / `vmovaps %xmm0, L1(%rip)` / `{evex} vmovaps L1(%rip), %xmm0` / `{evex} vmovaps %xmm0, L1(%rip)` / `.space 16` / `L1:` / `.byte 0xaa, 0xbb, 0xcc, 0xdd`. The six instructions are 7/7/8/8/10/10 bytes, so `L1` at offset 66 gives the displacements 59/52/44/36/26/16. The plan states the same bytes through six `pcrel_end` fixups whose `field_descriptor` is `[24,32]` for the legacy pair, `[32,32]` for the VEX pair and `[48,32]` for the EVEX pair; all use `resolve_in_place`, so no relocation record is emitted and `records` is 0.",
+  "source": "`llvm-mc` 23.1.2 selection plus the `mod = 00`, `r/m = 101` rule already pinned by `EC-34`; the displacement is measured from the end of the instruction (`03_fixup_model.md` §4, `pcrel_end`)"
+}

@@ -529,6 +529,14 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:movaps/rsp-disp32-xmm/legacy` | `0f29842400000000` | src: `x86.xmm`/`xmm` → `[19,3]`; disp: `x86.imm`/`disp32` → `[32,32]` | 8 | EC-02, EC-09, EC-27, EC-35, EC-38, X86-P24 |
 | `x86:movaps/r12-disp8-xmm/legacy` | `410f29442400` | src: `x86.xmm`/`xmm` → `[27,3]`; disp: `x86.imm`/`disp8` → `[40,8]` | 6 | EC-02, EC-06, EC-09, EC-27, EC-35, EC-38, X86-P24 |
 | `x86:movaps/r12-disp32-xmm/legacy` | `410f29842400000000` | src: `x86.xmm`/`xmm` → `[27,3]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | EC-02, EC-06, EC-09, EC-27, EC-35, EC-38, X86-P24 |
+| `x86:movaps/xmm-ext-rsp-disp8/legacy` | `440f28442400` | dest: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `ADR-0106`, `X86-P76` — `0.70.0`+ |
+| `x86:movaps/xmm-ext-rsp-disp32/legacy` | `440f28842400000000` | dest: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `ADR-0106`, `X86-P76` — `0.70.0`+ |
+| `x86:movaps/xmm-ext-r12-disp8/legacy` | `450f28442400` | dest: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `ADR-0106`, `X86-P76` — `0.70.0`+ |
+| `x86:movaps/xmm-ext-r12-disp32/legacy` | `450f28842400000000` | dest: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `ADR-0106`, `X86-P76` — `0.70.0`+ |
+| `x86:movaps/rsp-disp8-xmm-ext/legacy` | `440f29442400` | src: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `ADR-0106`, `X86-P76` — `0.70.0`+ |
+| `x86:movaps/rsp-disp32-xmm-ext/legacy` | `440f29842400000000` | src: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `ADR-0106`, `X86-P76` — `0.70.0`+ |
+| `x86:movaps/r12-disp8-xmm-ext/legacy` | `450f29442400` | src: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); disp: `x86.imm`/`disp8` → `[40,8]` | 6 | `ADR-0106`, `X86-P76` — `0.70.0`+ |
+| `x86:movaps/r12-disp32-xmm-ext/legacy` | `450f29842400000000` | src: `x86.xmm`/`xmm` → `[2,1]`, `[27,3]` (excl 0, 1, 2, 3, 4, 5, 6, 7); disp: `x86.imm`/`disp32` → `[40,32]` | 9 | `ADR-0106`, `X86-P76` — `0.70.0`+ |
 | `x86:vmovaps/xmm-rsp-disp8/vex` | `c5f828442400` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; disp: `x86.imm`/`disp8` → `[40,8]` | 6 | EC-02, EC-09, EC-35, EC-38, X86-P24 |
 | `x86:vmovaps/xmm-rsp-disp32/vex` | `c5f828842400000000` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | EC-02, EC-09, EC-35, EC-38, X86-P24 |
 | `x86:vmovaps/xmm-r12-disp8/vex` | `c4c17828442400` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[35,3]`; disp: `x86.imm`/`disp8` → `[48,8]` | 7 | EC-02, EC-06, EC-09, EC-35, EC-38, X86-P24 |
@@ -879,6 +887,12 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:sub/rm64-imm32/legacy` | `4881e800000000` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm32` → `[24,32]` | 7 | `EC-01`, `EC-04`, `EC-06` — 4-bit dest from `0.6.0`, `0.66.0`+ |
 | `x86:sub/rax-imm32/legacy` | `482d00000000` | imm: `x86.imm`/`imm32` → `[16,32]` | 6 | `EC-04`, `0.66.0`+ |
 | `x86:call/rel32/legacy` | `e800000000` | target: `x86.rel`/`rel32` → `[8,32]` | 5 | `EC-03`, `X86-P73` — `0.67.0`+ |
+| `x86:movaps/xmm-riprel32/legacy` | `0f280500000000` | dest: `x86.xmm`/`xmm` → `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `ADR-0105`, `X86-P75` — `0.69.0`+ |
+| `x86:movaps/riprel32-xmm/legacy` | `0f290500000000` | src: `x86.xmm`/`xmm` → `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `ADR-0105`, `X86-P75` — `0.69.0`+ |
+| `x86:vmovaps/xmm-riprel32/vex` | `c5f8280500000000` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; target: `x86.rel`/`riprel32` → `[32,32]` | 8 | `ADR-0105`, `X86-P75` — `0.69.0`+ |
+| `x86:vmovaps/riprel32-xmm/vex` | `c5f8290500000000` | src: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; target: `x86.rel`/`riprel32` → `[32,32]` | 8 | `ADR-0105`, `X86-P75` — `0.69.0`+ |
+| `x86:vmovaps/xmm-riprel32/evex` | `62f17c08280500000000` | dest: `x86.xmm`/`xmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; target: `x86.rel`/`riprel32` → `[48,32]` | 10 | `ADR-0105`, `X86-P75` — `0.69.0`+ |
+| `x86:vmovaps/riprel32-xmm/evex` | `62f17c08290500000000` | src: `x86.xmm`/`xmm` → `[12,1]` inverted, `[15,1]` inverted, `[43,3]`; target: `x86.rel`/`riprel32` → `[48,32]` | 10 | `ADR-0105`, `X86-P75` — `0.69.0`+ |
 
 Placements are written `[bit_offset, width]`, with ` inverted` appended when the
 chunk is complemented. In the legacy SSE row
@@ -2100,6 +2114,33 @@ three-name set is `E-TARGET-001`. `X86-P74` re-pins the 24 VEX instructions of
 `X86-P20` to this table, `N06b` omits `avx` and `N06c` declares an extension the
 table does not carry.
 
+`0.69.0` adds six `%rip`-relative SSE rows (`ADR-0105`): the `movaps`/`vmovaps`
+xmm load and store at the legacy, VEX and EVEX encodings. Each replaces the base
+and `disp32` slots of the fixed-base row with the one `x86.rel`/`riprel32`
+target slot that `x86:mov/r64-riprel32/legacy` already pins; the template is the
+measured `16(%rip)` encoding with the displacement zeroed (`EXP-0106`). The
+target placement is `[24,32]` for the legacy pair, `[32,32]` for the VEX pair
+and `[48,32]` for the EVEX pair, because the displacement is the last 32 bits of
+every one of these instructions. `X86-P75` resolves one local symbol at all
+three placements through six `pcrel_end` fixups. The absent `ymm`/`zmm`
+siblings are `E-FORM-001` (`N01eo`), a missing target operand is
+`E-OPERAND-002` (`N02cx`), and a literal one past the signed 32-bit range is
+`E-RANGE-002` (`N04i`).
+
+`0.70.0` splits the legacy SSE fixed-base rows on the register's fourth bit
+(`ADR-0106`). The four `%rsp`/`%r12` load/store rows hold only `xmm0`–`xmm7`
+(`ModRM.reg` at `[19,3]`/`[27,3]`), so `movaps 8(%rsp), %xmm8` needs a `REX.R`
+byte that the low row cannot carry: `44 0f 28 44 24 08` is six bytes where
+`0f 28 44 24 08` is five, and emitting the longer byte from the operand value
+would change the length with the register (`INV-04`). Eight `-ext` rows
+therefore append the `xmm8`–`xmm15` window with `REX.R` at `[2,1]` and
+`ModRM.reg` at `[27,3]`; `%r12` keeps the fixed `REX.B` byte (`45`), and the
+displacement moves one byte to `[40,8]`/`[40,32]` behind the `REX` byte.
+`X86-P76` is the 60-byte vector. The low rows keep their `xmm0`–`xmm7` window
+(`N14w`), naming a `0.70.0` row against `0.69.0` is `E-FORM-001` (`N01ep`), a
+missing `disp` is `E-OPERAND-002` (`N02cy`), and `disp8 = 128` is
+`E-RANGE-001` (`N03zt`).
+
 ### 8.2 `aarch64` `0.1.0` … `0.18.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
@@ -2674,6 +2715,29 @@ the node's `definedBy.extension.name` (`Zca`) maps to a plan token through the
 same table that produced §8.4's assertions; `ext/C.yaml` states the relation
 (`C` requires `Zca`). A plan that pins `0.2.0` must declare exactly that set
 (`E-TARGET-001` otherwise), and a plan that pins `0.1.0` never sees the form.
+
+### 8.6 `rv64` `0.5.0`
+
+`0.5.0` contains every row of §8.5 unchanged, plus the five remaining B-type
+mnemonics (`ADR-0104`):
+
+| `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
+|---|---|---|---|---|
+| `riscv:bne/rs1-rs2-imm12` | `63100000` | src: `riscv.xreg`/`xreg` → `[15,5]`; src2: `riscv.xreg`/`xreg` → `[20,5]`; target: `riscv.rel`/`imm12` → `[31,1]`, `[7,1]`, `[25,6]`, `[8,4]` | 4 | `RV-P11` |
+| `riscv:blt/rs1-rs2-imm12` | `63400000` | src: `riscv.xreg`/`xreg` → `[15,5]`; src2: `riscv.xreg`/`xreg` → `[20,5]`; target: `riscv.rel`/`imm12` → `[31,1]`, `[7,1]`, `[25,6]`, `[8,4]` | 4 | `RV-P11` |
+| `riscv:bge/rs1-rs2-imm12` | `63500000` | src: `riscv.xreg`/`xreg` → `[15,5]`; src2: `riscv.xreg`/`xreg` → `[20,5]`; target: `riscv.rel`/`imm12` → `[31,1]`, `[7,1]`, `[25,6]`, `[8,4]` | 4 | `RV-P11` |
+| `riscv:bltu/rs1-rs2-imm12` | `63600000` | src: `riscv.xreg`/`xreg` → `[15,5]`; src2: `riscv.xreg`/`xreg` → `[20,5]`; target: `riscv.rel`/`imm12` → `[31,1]`, `[7,1]`, `[25,6]`, `[8,4]` | 4 | `RV-P11` |
+| `riscv:bgeu/rs1-rs2-imm12` | `63700000` | src: `riscv.xreg`/`xreg` → `[15,5]`; src2: `riscv.xreg`/`xreg` → `[20,5]`; target: `riscv.rel`/`imm12` → `[31,1]`, `[7,1]`, `[25,6]`, `[8,4]` | 4 | `RV-P11` |
+
+The five nodes sit in the same `encoding.match` family as `beq`
+(`1100011`, `funct3 = 001`/`100`/`101`/`110`/`111`), and each carries the same
+`location: "31|7|30-25|11-8"` and `left_shift: 1`. Only template bits 12-14
+change, so the scatter, the signed 12-bit field and the `scale` fixup rule are
+the ones §8.4 already pins for `beq`. The generator reads the five resolved
+nodes and asserts those identities before writing the rows; `RV-P11` is the
+byte vector (`EXP-0105`). A plan that names `bne` against `0.4.0` is
+`E-FORM-001` (`N01en`), and the field boundary is `N04h` (`2048` is one past
+the signed 12-bit content range).
 
 ## 9. Load-time checks
 

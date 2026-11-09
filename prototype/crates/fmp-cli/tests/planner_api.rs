@@ -130,7 +130,7 @@ fn rebuild(path: &Path) -> (fmp_model::Plan, String) {
 fn positives_reproduce_the_oracle_through_the_builder() {
     let registry = registry();
     let paths = positives();
-    assert_eq!(paths.len(), 114, "the positive corpus is 114 plans");
+    assert_eq!(paths.len(), 117, "the positive corpus is 117 plans");
     for path in paths {
         let (plan, name) = rebuild(&path);
         let definition = registry
@@ -206,8 +206,8 @@ fn negatives_reject_at_the_same_code_path_and_detail_keys() {
     let paths = negatives();
     assert_eq!(
         paths.len(),
-        565,
-        "the corpus is 559 materialize-phase plus 6 read-phase negatives"
+        574,
+        "the corpus is 568 materialize-phase plus 6 read-phase negatives"
     );
     let mut materialize_phase = 0usize;
     for path in paths {
@@ -291,7 +291,7 @@ fn negatives_reject_at_the_same_code_path_and_detail_keys() {
         );
     }
     assert_eq!(
-        materialize_phase, 559,
+        materialize_phase, 568,
         "every materialize-phase negative must be rebuildable and compared"
     );
 }

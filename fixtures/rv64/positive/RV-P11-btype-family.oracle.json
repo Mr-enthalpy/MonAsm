@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -filetype=obj RV-P11-btype-family.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "32ea6fb614ee855a4180a646ed6d06139cee9bc2c6bdbad98aa5c126aa12a505",
+  "output_sha256": "1ff019414f397e09250a81f5650c0c2d5f5b35fe128cabc600c5263085dfb581",
+  "size": 20,
+  "records": 0,
+  "notes": "Input, one line each (LF, trailing newline): `bne a0, a1, L1` / `blt a0, a1, L2` / `L1:` / `bge a0, a1, L3` / `L2:` / `bltu a0, a1, L1` / `L3:` / `bgeu a0, a1, L2`. The first three branches take the forward label eight bytes ahead; the last two take the backward label four bytes behind, so the fixture exercises both signs. The plan states the same bytes through five `scale` fixups with `transform_shift: 1` (07_definition_format.md §8.3); all use `resolve_in_place`, so no relocation record is emitted and `records` is 0.",
+  "source": "RISC-V UDB I/{bne,blt,bge,bltu,bgeu}.yaml, each encoding.match 1100011 with funct3 001/100/101/110/111 and the same `location` scatter as beq"
+}

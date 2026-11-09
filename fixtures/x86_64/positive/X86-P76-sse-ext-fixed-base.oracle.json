@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj X86-P76-sse-ext-fixed-base.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "b465ac746967c9ab8ede119518bf950c28b3abe8a585d2276d248d2ae7411c68",
+  "output_sha256": "d2fef597f7b2174b80f8ad83271369932d03582eaca6c70a5e7f0f825f1a7f63",
+  "size": 60,
+  "records": 0,
+  "notes": "Input, one LF-terminated line each (`EXP-0107` §2): `movaps 8(%rsp), %xmm8` / `movaps 8(%r12), %xmm9` / `movaps 128(%rsp), %xmm14` / `movaps 128(%r12), %xmm15` / `movaps %xmm10, 8(%rsp)` / `movaps %xmm11, 8(%r12)` / `movaps %xmm12, 128(%rsp)` / `movaps %xmm13, 128(%r12)`. The eight instructions are 6/6/9/9/6/6/9/9 bytes, 60 in all, and no relocation is emitted because every operand is a register or a literal displacement.",
+  "source": "`llvm-mc` 23.1.2 selection; the fixed-base shape is `EC-35`, the two-byte reach rule that forces a separate `REX.R` row is `EC-38`, and the disp8/disp32 choice is `EC-02`. The measured bytes match the templates the generator appends as `definitions/x86_64/0.70.0.json`."
+}
