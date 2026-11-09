@@ -173,6 +173,12 @@ Controls run after the correction, on this host (`fmp` debug build 0.0.0):
 | `corpus.negatives` 619 → 618 | fail | exit 1 |
 | schema rewritten to `…/0.1` | usage error | exit 2, no comparison |
 
+Hosted replay: `gates` run `42714224361` (job `H0 payload baseline`) built `fmp`
+on Ubuntu 24.04 with Python 3.12 and printed the same `payload_root`; its
+`binary_sha256` differs from this host's, so the envelope was skipped by design.
+That is the first evidence that the 128 payloads are host- and build-independent,
+as opposed to the three envelope digests `determinism.rs` pins.
+
 ## Next
 
 H1 — identity closure (`ADR-0127`): private verified objects, a bound

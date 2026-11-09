@@ -96,18 +96,19 @@ Two further failures were found while fixing that one:
    Three fixtures keep the strictest available cross-host check, including
    `materializer_version`. The consequence is a procedure, recorded here so it is
    not rediscovered as a bug: a change to `materializer_version` moves all three
-   constants and every recorded `envelope_sha256` in the same commit, and
-   `payload_root` must not move. A commit that moves `payload_root` is a payload
-   change and needs its own compatibility statement.
+   constants and every recorded per-entry `envelope.sha256` in the same commit,
+   and `payload_root` must not move. A commit that moves `payload_root` is a
+   payload change and needs its own compatibility statement.
 
 ## Consequences
 
 - `ADR-0125`'s consequence bullet records `artifact_root`. That value is now the
   **envelope** root of the frozen H0 snapshot; the gate value is `payload_root`.
   Nothing in `fmp/0.1`, `definitions/` or `fixtures/` changes.
-- The H1 `artifact_digest` must be the **payload** digest, using the same
-  projection and its own version name. `ADR-0127` inherits that constraint; the
-  H1 plan states it and no longer proposes `canonical_digest(artifact.to_json())`.
+- The H1 artifact identity — `payload_digest` in the plan — must be the
+  **payload** digest, using the same projection and its own version name.
+  `ADR-0127` inherits that constraint; the H1 plan states it and no longer
+  proposes `canonical_digest(artifact.to_json())`.
 - A release bump is now a one-commit operation with a verifiable property: the
   payload root is unchanged, so the bump is provably not an encoding change.
 - `H0-report.md` and the characterization-test module comment are corrected to
@@ -151,9 +152,10 @@ Two further failures were found while fixing that one:
 | The envelope still participates when the receipt matches | tampered `envelope.sha256` with an identical receipt → exit 1 | high (measured) |
 | Skipping the envelope does not skip the payload | `implementation` replaced **and** `payload.bytes_hex` tampered → exit 1 | high (measured) |
 | An unknown schema is refused | schema `…/0.1` → exit 2, no comparison | high (measured) |
-| Portable discovery and probe opt-in work | `--binary` exercised; probe run under `--probes` only | high (Windows); `unverified` on Linux/macOS until the `baseline` job runs |
+| Portable discovery and probe opt-in work | `--binary` exercised on Windows; probes ran under `--probes` only | high on Windows; Linux discovery `unverified` (the CI job passes `--binary` explicitly, so it does not exercise discovery) |
 | `determinism.rs` pins envelope digests | read `tests/determinism.rs:158`, `:163`, `:168`; the test hashes `artifact.to_json()` at `:63` | high |
-| The CI job passes | not yet run | `unverified` |
+| The CI job passes | `gates` run `42714224361`, job `H0 payload baseline`, green on Ubuntu 24.04 / Python 3.12 | high |
+| The payload projection is host- and build-independent | that job printed `payload_root: sha256:3f6d177d…ffefad9` from a Linux debug build whose `binary_sha256` differs from the recorder's, so every payload was compared and matched | high |
 
 The first draft of the split contained its own version of the defect it was
 fixing: when the implementation receipts differed, the comparison filtered diffs

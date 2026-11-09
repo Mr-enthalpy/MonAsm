@@ -122,11 +122,14 @@ should not trigger a known stack overflow or wait on a child that may hang.
 
 ## 5. Limits of this baseline
 
-- Captured on one host. Three hosts run `cargo test --workspace` (hosted run
-  `42698924288`, green), but that is the Rust suite; it pins **three** envelope
-  digests cross-host (`determinism.rs`), not the 128-payload comparison. From
-  `ADR-0126` the 128 payloads are compared on a Linux runner too, by the
-  `baseline` job.
+- Captured on one host, and now replayed on a second one. Hosted `gates` run
+  `42714224361` (job `H0 payload baseline`) built `fmp` on Ubuntu 24.04 and
+  printed the same `payload_root`, so all 128 payloads were compared there and
+  matched. Its `binary_sha256` differs from the recorder's, so the envelope was
+  skipped with a printed reason — which is the designed behaviour, not a silent
+  pass. Three hosts also run `cargo test --workspace` (run `42698924288`), but
+  that is the Rust suite: it pins **three** envelope digests cross-host
+  (`determinism.rs`), not the 128-payload comparison.
 - The binary is a debug build. Release-vs-debug payload equality was not
   measured in H0; `EXP-R1`–`R6` cover repeat-run determinism, not profile
   equality.

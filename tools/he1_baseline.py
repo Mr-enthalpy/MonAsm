@@ -455,6 +455,15 @@ def differences(recorded, fresh, include_envelope):
     return diffs
 
 
+def receipt_label(receipt):
+    """`name/version binary <short sha>` — enough to tell two builds apart."""
+    if not receipt:
+        return "no receipt"
+    binary = receipt.get("binary_sha256") or ""
+    short = binary[7:19] if binary.startswith("sha256:") else binary[:12]
+    return "%s/%s binary %s" % (receipt.get("name"), receipt.get("version"), short or "?")
+
+
 def compare(recorded, fresh):
     if recorded.get("schema") != SCHEMA:
         print(
@@ -480,13 +489,14 @@ def compare(recorded, fresh):
     if same_implementation:
         print("envelope: identical (same implementation receipt)")
     else:
+        # Name the binary digest, not only name/version: two local builds of the
+        # same version differ, and a message that prints "0.0.0 -> 0.0.0" reads
+        # as "nothing changed, yet the check was skipped".
         print(
-            "envelope: not compared, implementation changed (%s/%s -> %s/%s)"
+            "envelope: not compared, implementation receipt differs (%s -> %s)"
             % (
-                recorded.get("implementation", {}).get("name"),
-                recorded.get("implementation", {}).get("version"),
-                fresh["implementation"].get("name"),
-                fresh["implementation"].get("version"),
+                receipt_label(recorded.get("implementation")),
+                receipt_label(fresh["implementation"]),
             )
         )
         print("recorded envelope_root: %s" % recorded["artifacts"].get("envelope_root"))
