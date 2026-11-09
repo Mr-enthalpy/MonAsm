@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj X86-P78-sse-index.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "9c51d4ddf64b68e5e0cf7e223b09f56aee6f0988513bca06433cbd037e0292c4",
+  "output_sha256": "9124dc848eeb6d3581de40523f89ba403871ac20453ec1ea6d598b081ddd7ab6",
+  "size": 116,
+  "records": 0,
+  "notes": "Input, one LF-terminated line each (`EXP-0109` §2): the sixteen `movaps`/`vmovaps` rows over `8/128(%rax,%rcx,4)`, low and high `xmm`, load and store. The sixteen instructions are 5/5/8/8/6/6/9/9/6/6/9/9/6/6/9/9 bytes, 116 in all; every operand is a register or a literal displacement, so no relocation record is emitted.",
+  "source": "`llvm-mc` 23.1.2 selection; the indexed shape is `EC-37`, the per-family register reach is `EC-38`, the disp8/disp32 choice is `EC-02`, and the VEX vs legacy split is `EC-09`. The measured bytes match the templates the generator appends as `definitions/x86_64/0.72.0.json`."
+}
