@@ -422,6 +422,11 @@ indexed byte `mov` rows as `definitions/x86_64/0.73.0.json` (`X86-P79`), and
 `ADR-0110` adds the three `29 /r` register/register `sub` rows as
 `definitions/x86_64/0.74.0.json` (`X86-P80`). `ADR-0111` closes the phase:
 759 forms across the three definitions, 121 positives and 586 negatives.
+Phase 7 M6 is planned under `ADR-0112`: `docs/fmp-v0/10_m6_plan.md` fixes seven
+additive coverage slices (`ADR-0113`-`ADR-0119`) plus a closure (`ADR-0120`) over
+the x86 ALU, x86 `mov` immediate, x86 `sub` memory, RV64 load/store and AArch64
+`adr`/`mul`/`csel` families; `fmp/0.1` is unchanged and the standing non-goals
+stay closed.
 
 | Area | State |
 |---|---|
