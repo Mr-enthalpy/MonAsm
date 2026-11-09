@@ -375,6 +375,12 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:jmp/rel32/legacy` | `e900000000` | target: `x86.rel`/`rel32` → `[8,32]` | 5 | `EC-03` |
 | `x86:mov/r64-riprel32/legacy` | `488b0500000000` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `EC-06`, `EC-34`, `X86-P6` — 4-bit dest from `0.6.0` |
 | `x86:mov/riprel32-r64/legacy` | `48890500000000` | src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `EC-06`, `EC-34`, `X86-P6` — 4-bit src from `0.6.0` |
+| `x86:mov/r32-addr32-riprel32/legacy` | `678b0500000000` | dest: `x86.gpr32`/`r32` → `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `ADR-0107`, `X86-P77` — `0.71.0`+ |
+| `x86:mov/addr32-riprel32-r32/legacy` | `67890500000000` | src: `x86.gpr32`/`r32` → `[19,3]`; target: `x86.rel`/`riprel32` → `[24,32]` | 7 | `ADR-0107`, `X86-P77` — `0.71.0`+ |
+| `x86:mov/r64-addr32-riprel32/legacy` | `67488b0500000000` | dest: `x86.gpr64`/`r64` → `[10,1]`, `[27,3]`; target: `x86.rel`/`riprel32` → `[32,32]` | 8 | `ADR-0107`, `X86-P77` — `0.71.0`+ |
+| `x86:mov/addr32-riprel32-r64/legacy` | `6748890500000000` | src: `x86.gpr64`/`r64` → `[10,1]`, `[27,3]`; target: `x86.rel`/`riprel32` → `[32,32]` | 8 | `ADR-0107`, `X86-P77` — `0.71.0`+ |
+| `x86:mov/r16-addr32-riprel32/legacy` | `67668b0500000000` | dest: `x86.gpr16`/`r16` → `[27,3]`; target: `x86.rel`/`riprel32` → `[32,32]` | 8 | `ADR-0107`, `X86-P77` — `0.71.0`+ |
+| `x86:mov/addr32-riprel32-r16/legacy` | `6766890500000000` | src: `x86.gpr16`/`r16` → `[27,3]`; target: `x86.rel`/`riprel32` → `[32,32]` | 8 | `ADR-0107`, `X86-P77` — `0.71.0`+ |
 | `x86:mov/r64-base-disp8/legacy` | `488b4000` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]` (excl 4, 12); disp: `x86.imm`/`disp8` → `[24,8]` | 4 | `EC-02`, `EC-06`, `EC-35`, `X86-P4` — 4-bit from `0.7.0` |
 | `x86:mov/r64-base-disp32/legacy` | `488b8000000000` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; base: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]` (excl 4, 12); disp: `x86.imm`/`disp32` → `[24,32]` | 7 | `EC-02`, `EC-06`, `EC-35`, `X86-P4` — 4-bit from `0.7.0` |
 | `x86:mov/r64-rsp-disp8/legacy` | `488b442400` | dest: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]`; disp: `x86.imm`/`disp8` → `[32,8]` | 5 | `EC-02`, `EC-06`, `EC-35`, `X86-P4` — 4-bit dest from `0.7.0` |
@@ -2140,6 +2146,17 @@ displacement moves one byte to `[40,8]`/`[40,32]` behind the `REX` byte.
 (`N14w`), naming a `0.70.0` row against `0.69.0` is `E-FORM-001` (`N01ep`), a
 missing `disp` is `E-OPERAND-002` (`N02cy`), and `disp8 = 128` is
 `E-RANGE-001` (`N03zt`).
+
+`0.71.0` puts the `0x67` prefix on the `%rip`-relative rows (`ADR-0107`). With
+no base or index to rename, the prefix selects the 32-bit `%eip` reference, so
+`addr32 movl 16(%rip), %eax` is `67 8b 05 10 00 00 00` and the displacement is
+still the last 32 bits. The plan keeps `address_width: 64`: the prefix is a
+form fact (`EC-08`), not a target-identity field. Six rows cover the three
+value widths × load/store, with the target at `[24,32]` for `r32` and
+`[32,32]` for `r64`/`r16`. `X86-P77` resolves one symbol at offset 62 through
+six `pcrel_end` fixups. The `0.70.0` boundary is `E-FORM-001` (`N01eq`), a
+missing target is `E-OPERAND-002` (`N02cz`), and a literal past the signed
+32-bit range is `E-RANGE-002` (`N04j`).
 
 ### 8.2 `aarch64` `0.1.0` … `0.18.0`
 

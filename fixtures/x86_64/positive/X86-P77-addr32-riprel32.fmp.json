@@ -1,0 +1,187 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "x86",
+    "isa_variant": "x86-64",
+    "execution_mode": "64",
+    "enabled_extensions": [],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.x86",
+    "version": "0.71.0",
+    "digest": "sha256:2858c0f163b1239b37f7be9ba294d8d81748038987a154afac66c2b63b4d2c5b"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [".text"],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": 66,
+      "fragments": [
+        { "offset": 0, "size": 7, "kind": "instruction", "instruction_id": "I0001" },
+        { "offset": 7, "size": 7, "kind": "instruction", "instruction_id": "I0002" },
+        { "offset": 14, "size": 8, "kind": "instruction", "instruction_id": "I0003" },
+        { "offset": 22, "size": 8, "kind": "instruction", "instruction_id": "I0004" },
+        { "offset": 30, "size": 8, "kind": "instruction", "instruction_id": "I0005" },
+        { "offset": 38, "size": 8, "kind": "instruction", "instruction_id": "I0006" },
+        { "offset": 46, "size": 16, "kind": "fill", "fill_byte": 0 },
+        { "offset": 62, "size": 4, "kind": "data", "payload_hex": "aabbccdd" }
+      ]
+    }
+  ],
+  "symbols": [
+    { "symbol_id": "S1", "name": "L1", "kind": "defined", "binding": "local", "section_id": ".text", "offset": 62 }
+  ],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "x86:mov/r32-addr32-riprel32/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr32", "target_type": "r32", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "target", "kind": "x86.rel", "target_type": "riprel32", "payload": { "symbol_id": "S1" }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0002",
+      "section_id": ".text",
+      "offset": 7,
+      "form_id": "x86:mov/addr32-riprel32-r32/legacy",
+      "operands": [
+        { "role": "src", "kind": "x86.gpr32", "target_type": "r32", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "target", "kind": "x86.rel", "target_type": "riprel32", "payload": { "symbol_id": "S1" }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0003",
+      "section_id": ".text",
+      "offset": 14,
+      "form_id": "x86:mov/r64-addr32-riprel32/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr64", "target_type": "r64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "target", "kind": "x86.rel", "target_type": "riprel32", "payload": { "symbol_id": "S1" }, "modifiers": [] }
+      ],
+      "expected_size": 8
+    },
+    {
+      "instruction_id": "I0004",
+      "section_id": ".text",
+      "offset": 22,
+      "form_id": "x86:mov/addr32-riprel32-r64/legacy",
+      "operands": [
+        { "role": "src", "kind": "x86.gpr64", "target_type": "r64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "target", "kind": "x86.rel", "target_type": "riprel32", "payload": { "symbol_id": "S1" }, "modifiers": [] }
+      ],
+      "expected_size": 8
+    },
+    {
+      "instruction_id": "I0005",
+      "section_id": ".text",
+      "offset": 30,
+      "form_id": "x86:mov/r16-addr32-riprel32/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr16", "target_type": "r16", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "target", "kind": "x86.rel", "target_type": "riprel32", "payload": { "symbol_id": "S1" }, "modifiers": [] }
+      ],
+      "expected_size": 8
+    },
+    {
+      "instruction_id": "I0006",
+      "section_id": ".text",
+      "offset": 38,
+      "form_id": "x86:mov/addr32-riprel32-r16/legacy",
+      "operands": [
+        { "role": "src", "kind": "x86.gpr16", "target_type": "r16", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "target", "kind": "x86.rel", "target_type": "riprel32", "payload": { "symbol_id": "S1" }, "modifiers": [] }
+      ],
+      "expected_size": 8
+    }
+  ],
+  "fixups": [
+    {
+      "fixup_id": "F0001",
+      "section_id": ".text",
+      "offset": 0,
+      "field_descriptor": [ { "lsb": 24, "width": 32 } ],
+      "target": { "kind": "symbol", "symbol_id": "S1" },
+      "addend": 0,
+      "pc_reference_rule": "pcrel_end",
+      "value_transform": "identity",
+      "range_constraint": { "signed": true, "bits": 32, "align_bits": 0 },
+      "resolution_mode": "resolve_in_place"
+    },
+    {
+      "fixup_id": "F0002",
+      "section_id": ".text",
+      "offset": 7,
+      "field_descriptor": [ { "lsb": 24, "width": 32 } ],
+      "target": { "kind": "symbol", "symbol_id": "S1" },
+      "addend": 0,
+      "pc_reference_rule": "pcrel_end",
+      "value_transform": "identity",
+      "range_constraint": { "signed": true, "bits": 32, "align_bits": 0 },
+      "resolution_mode": "resolve_in_place"
+    },
+    {
+      "fixup_id": "F0003",
+      "section_id": ".text",
+      "offset": 14,
+      "field_descriptor": [ { "lsb": 32, "width": 32 } ],
+      "target": { "kind": "symbol", "symbol_id": "S1" },
+      "addend": 0,
+      "pc_reference_rule": "pcrel_end",
+      "value_transform": "identity",
+      "range_constraint": { "signed": true, "bits": 32, "align_bits": 0 },
+      "resolution_mode": "resolve_in_place"
+    },
+    {
+      "fixup_id": "F0004",
+      "section_id": ".text",
+      "offset": 22,
+      "field_descriptor": [ { "lsb": 32, "width": 32 } ],
+      "target": { "kind": "symbol", "symbol_id": "S1" },
+      "addend": 0,
+      "pc_reference_rule": "pcrel_end",
+      "value_transform": "identity",
+      "range_constraint": { "signed": true, "bits": 32, "align_bits": 0 },
+      "resolution_mode": "resolve_in_place"
+    },
+    {
+      "fixup_id": "F0005",
+      "section_id": ".text",
+      "offset": 30,
+      "field_descriptor": [ { "lsb": 32, "width": 32 } ],
+      "target": { "kind": "symbol", "symbol_id": "S1" },
+      "addend": 0,
+      "pc_reference_rule": "pcrel_end",
+      "value_transform": "identity",
+      "range_constraint": { "signed": true, "bits": 32, "align_bits": 0 },
+      "resolution_mode": "resolve_in_place"
+    },
+    {
+      "fixup_id": "F0006",
+      "section_id": ".text",
+      "offset": 38,
+      "field_descriptor": [ { "lsb": 32, "width": 32 } ],
+      "target": { "kind": "symbol", "symbol_id": "S1" },
+      "addend": 0,
+      "pc_reference_rule": "pcrel_end",
+      "value_transform": "identity",
+      "range_constraint": { "signed": true, "bits": 32, "align_bits": 0 },
+      "resolution_mode": "resolve_in_place"
+    }
+  ]
+}

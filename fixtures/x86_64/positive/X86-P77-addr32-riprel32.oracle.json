@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj X86-P77-addr32-riprel32.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "f1c995b4acd639b2c577fcf34498c53c965acc55ff10c4c48af83efaf1da7962",
+  "output_sha256": "9bda3dc77fa5b3abec9b6ac4e3e4a742c1f0d127fd13dec1c198c045c0fb2987",
+  "size": 66,
+  "records": 0,
+  "notes": "Input, one LF-terminated line each (`EXP-0108` §2): `addr32 movl L1(%rip), %eax` / `addr32 movl %eax, L1(%rip)` / `addr32 movq L1(%rip), %rax` / `addr32 movq %rax, L1(%rip)` / `addr32 movw L1(%rip), %ax` / `addr32 movw %ax, L1(%rip)` / `.space 16` / `L1:` / `.byte 0xaa, 0xbb, 0xcc, 0xdd`. The six instructions are 7/7/8/8/8/8 bytes and `L1` is at offset 62, so the `pcrel_end` displacements are 55/48/40/32/24/16. The plan states the same bytes through six `pcrel_end` fixups whose `field_descriptor` is `[24,32]` for the `r32` pair and `[32,32]` for the `r64` and `r16` pairs; all use `resolve_in_place`, so no relocation record is emitted and `records` is 0.",
+  "source": "`llvm-mc` 23.1.2 selection; `EC-08` fixes `0x67` as template byte 0 before any `REX`, and `EC-34` fixes `mod = 00`, `r/m = 101` as `%rip` + `disp32`. The displacement is measured from the end of the instruction (`03_fixup_model.md` §4, `pcrel_end`)."
+}
