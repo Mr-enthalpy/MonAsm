@@ -1,0 +1,8 @@
+avx-off	-mattr=-avx	rc=0	vmovaps %ymm1, %ymm0
+	stdout=vmovaps	%ymm1, %ymm0                    # encoding: [0xc5,0xfc,0x28,0xc1]
+avx512f-off	-mattr=-avx512f	rc=0	vmovaps %zmm1, %zmm0
+	stdout=vmovaps	%zmm1, %zmm0                    # encoding: [0x62,0xf1,0x7c,0x48,0x28,0xc1]
+avx512vl-off	-mattr=-avx512vl	rc=0	vmovaps %ymm1, %ymm0
+	stdout=vmovaps	%ymm1, %ymm0                    # encoding: [0xc5,0xfc,0x28,0xc1]
+avx-all-off	-mattr=-avx,-avx512f,-avx512vl	rc=0	vmovaps %zmm1, %zmm0
+	stdout=vmovaps	%zmm1, %zmm0                    # encoding: [0x62,0xf1,0x7c,0x48,0x28,0xc1]

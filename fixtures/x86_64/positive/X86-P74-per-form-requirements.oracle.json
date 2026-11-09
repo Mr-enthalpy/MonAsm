@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0045/P20.asm -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "5d120f3f2ebbc8ef580abababd46700002ece01365dcbaefa8cac969bd2e7eec",
+  "output_sha256": "a42f3ec7d528bcd4ba1f5ac80d20cb876f673a452ee4f7de318592862b708fe6",
+  "size": 144,
+  "records": 0,
+  "notes": "Same measurement as X86-P20 (same input_sha256): 24 VEX.256 memory instructions, 144 bytes. This record supersedes the X86-P20 pin only in the definition: the plan now names 0.68.0 and declares the AVX subset [\"avx\"], which the table's per-form requirements accept. The bytes are unchanged, so the re-pin exercises the fmp-def/0.2 gate rather than a new encoding."
+}

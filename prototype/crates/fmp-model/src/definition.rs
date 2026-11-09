@@ -42,8 +42,18 @@ pub struct DefinitionTarget {
 #[derive(Clone, Debug)]
 pub struct Form {
     pub form_id: String,
+    /// `fmp-def/0.2`: extensions the form needs, strictly increasing, each one
+    /// declared by the table. Empty for `fmp-def/0.1` and for a baseline row.
+    pub requires_extensions: Vec<String>,
     pub template: Vec<u8>,
     pub slots: Vec<Slot>,
+}
+
+/// The two document formats `07_definition_format.md` §2 distinguishes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DefinitionFormat {
+    V0_1,
+    V0_2,
 }
 
 #[derive(Clone, Debug)]
@@ -132,6 +142,7 @@ const TARGET_FIELDS: &[&str] = &[
     "address_width",
 ];
 const FORM_FIELDS: &[&str] = &["form_id", "template", "slots"];
+const FORM_FIELDS_V0_2: &[&str] = &["form_id", "requires_extensions", "template", "slots"];
 const SLOT_FIELDS: &[&str] = &[
     "role",
     "kind",
@@ -173,18 +184,22 @@ fn bind_document(document: &json::Json) -> Result<Definition, Diagnostic> {
         .map_err(|fault| fault.definition())?;
     let definition_format =
         bind::owned_string(format, format_path).map_err(|fault| fault.definition())?;
-    if definition_format != codes::DEFINITION_FORMAT {
-        return Err(Diagnostic::new(codes::E_DEF_001, "")
-            .with("declared", "")
-            .with("actual", "")
-            .with(
-                "reason",
-                format!(
-                    "definition_format {definition_format:?} is not {}",
-                    codes::DEFINITION_FORMAT
-                ),
-            ));
-    }
+    let format = match definition_format.as_str() {
+        codes::DEFINITION_FORMAT_V0_1 => DefinitionFormat::V0_1,
+        codes::DEFINITION_FORMAT_V0_2 => DefinitionFormat::V0_2,
+        other => {
+            return Err(Diagnostic::new(codes::E_DEF_001, "")
+                .with("declared", "")
+                .with("actual", "")
+                .with(
+                    "reason",
+                    format!(
+                        "definition_format {other:?} is not one of {}",
+                        codes::DEFINITION_FORMATS.join(", ")
+                    ),
+                ));
+        }
+    };
 
     let (namespace, namespace_path) = root
         .required("namespace")
@@ -197,7 +212,7 @@ fn bind_document(document: &json::Json) -> Result<Definition, Diagnostic> {
     let version = bind::owned_string(version, version_path).map_err(|fault| fault.definition())?;
 
     let target = bind_target(&root)?;
-    let forms = bind_forms(&root)?;
+    let forms = bind_forms(&root, format, &target.enabled_extensions)?;
 
     let digest = crate::canonical::canonical_digest(document);
     Ok(Definition {
@@ -252,7 +267,11 @@ fn bind_target(root: &Obj) -> Result<DefinitionTarget, Diagnostic> {
     })
 }
 
-fn bind_forms(root: &Obj) -> Result<Vec<Form>, Diagnostic> {
+fn bind_forms(
+    root: &Obj,
+    format: DefinitionFormat,
+    table_extensions: &[String],
+) -> Result<Vec<Form>, Diagnostic> {
     let (value, path) = root.required("forms").map_err(|fault| fault.definition())?;
     let items = bind::array(value, path.clone()).map_err(|fault| fault.definition())?;
     if items.is_empty() {
@@ -263,7 +282,12 @@ fn bind_forms(root: &Obj) -> Result<Vec<Form>, Diagnostic> {
     }
     let mut forms: Vec<Form> = Vec::with_capacity(items.len());
     for (index, item) in items.iter().enumerate() {
-        let form = bind_form(item, bind::pointer_index(&path, index))?;
+        let form = bind_form(
+            item,
+            bind::pointer_index(&path, index),
+            format,
+            table_extensions,
+        )?;
         if forms.iter().any(|other| other.form_id == form.form_id) {
             return Err(load_error(
                 "duplicate form_id",
@@ -275,16 +299,34 @@ fn bind_forms(root: &Obj) -> Result<Vec<Form>, Diagnostic> {
     Ok(forms)
 }
 
-fn bind_form(value: &json::Json, path: String) -> Result<Form, Diagnostic> {
+fn bind_form(
+    value: &json::Json,
+    path: String,
+    format: DefinitionFormat,
+    table_extensions: &[String],
+) -> Result<Form, Diagnostic> {
     let obj = Obj::new(path, "form", value).map_err(|fault| fault.definition())?;
-    obj.closed(FORM_FIELDS)
-        .map_err(|fault| fault.definition())?;
+    let fields = match format {
+        DefinitionFormat::V0_1 => FORM_FIELDS,
+        DefinitionFormat::V0_2 => FORM_FIELDS_V0_2,
+    };
+    obj.closed(fields).map_err(|fault| fault.definition())?;
 
     let (id, id_path) = obj
         .required("form_id")
         .map_err(|fault| fault.definition())?;
     let form_id = bind::owned_string(id, id_path).map_err(|fault| fault.definition())?;
     check_form_id(&form_id)?;
+
+    let requires_extensions = match format {
+        DefinitionFormat::V0_1 => Vec::new(),
+        DefinitionFormat::V0_2 => {
+            let (value, path) = obj
+                .required("requires_extensions")
+                .map_err(|fault| fault.definition())?;
+            bind_requires_extensions(value, path, &form_id, table_extensions)?
+        }
+    };
 
     let (template, template_path) = obj
         .required("template")
@@ -358,9 +400,46 @@ fn bind_form(value: &json::Json, path: String) -> Result<Form, Diagnostic> {
     }
     Ok(Form {
         form_id,
+        requires_extensions,
         template,
         slots,
     })
+}
+
+fn bind_requires_extensions(
+    value: &json::Json,
+    path: String,
+    form_id: &str,
+    table_extensions: &[String],
+) -> Result<Vec<String>, Diagnostic> {
+    let items = bind::array(value, path.clone()).map_err(|fault| fault.definition())?;
+    let mut out: Vec<String> = Vec::with_capacity(items.len());
+    for (index, item) in items.iter().enumerate() {
+        let name = bind::owned_string(item, bind::pointer_index(&path, index))
+            .map_err(|fault| fault.definition())?;
+        if name.is_empty() {
+            return Err(load_error(
+                form_id,
+                "requires_extensions contains an empty name",
+            ));
+        }
+        if let Some(previous) = out.last() {
+            if name <= *previous {
+                return Err(load_error(
+                    form_id,
+                    "requires_extensions must be strictly increasing",
+                ));
+            }
+        }
+        if !table_extensions.iter().any(|extension| extension == &name) {
+            return Err(load_error(
+                form_id,
+                &format!("requires extension {name:?} the table does not declare"),
+            ));
+        }
+        out.push(name);
+    }
+    Ok(out)
 }
 
 fn bind_slot(value: &json::Json, path: String) -> Result<Slot, Diagnostic> {
@@ -780,6 +859,27 @@ mod tests {
         format!(r#"{{"form_id":"{id}","template":"{template}","slots":[{slot}]}}"#)
     }
 
+    fn document_v2(form: &str, extensions: &str) -> String {
+        [
+            r#"{"definition_format":"fmp-def/0.2","namespace":"monasm.isa.x86","version":"test","#,
+            r#""target_identity":{"isa_family":"x86","isa_variant":"x86-64","execution_mode":"64","#,
+            r#""enabled_extensions":"#,
+            extensions,
+            r#","byte_order":"little","address_width":64},"forms":["#,
+            form,
+            "]}",
+        ]
+        .concat()
+    }
+
+    fn form_v2(id: &str, template: &str, requires: &str, slot: &str) -> String {
+        format!(
+            r#"{{"form_id":"{id}","requires_extensions":{requires},"template":"{template}","slots":[{slot}]}}"#
+        )
+    }
+
+    const GPR64_SLOT: &str = r#"{"role":"dest","kind":"x86.gpr64","target_type":"rm64","from":"reg_number","modifiers":[],"placements":[{"bit_offset":16,"width":3}]}"#;
+
     const HIGH_SLOT: &str = r#"{"role":"dest","kind":"x86.gpr8h","target_type":"rm8h","from":"reg_number","modifiers":[],"placements":[{"bit_offset":16,"width":3}]}"#;
     const LOW_SLOT: &str = r#"{"role":"dest","kind":"x86.gpr8","target_type":"rm8","from":"reg_number","modifiers":[],"placements":[{"bit_offset":8,"width":3}]}"#;
 
@@ -834,5 +934,115 @@ mod tests {
         let error = read(text.as_bytes()).expect_err("a REX-less gpr8 slot must exclude 4..=7");
         assert_eq!(error.code(), codes::E_DEF_001);
         assert!(format!("{error:?}").contains("exclude 4..=7"));
+    }
+
+    /// `ADR-0103`: `fmp-def/0.2` makes `requires_extensions` required, so a form
+    /// that omits it cannot silently lose the gate.
+    #[test]
+    fn v0_2_form_requires_an_extension_annotation() {
+        let text = document_v2(
+            &form("x86:mov/rm64/legacy", "4889c0", GPR64_SLOT),
+            r#"["avx"]"#,
+        );
+        let error = read(text.as_bytes()).expect_err("0.2 requires the field on every form");
+        assert_eq!(error.code(), codes::E_DEF_001);
+        assert!(
+            error.message().contains("requires_extensions"),
+            "{}",
+            error.message()
+        );
+    }
+
+    /// A requirement the table does not declare could never be met, so the
+    /// loader rejects it instead of storing a dead gate.
+    #[test]
+    fn v0_2_requirement_must_be_declared_by_the_table() {
+        let text = document_v2(
+            &form_v2("x86:mov/rm64/legacy", "4889c0", r#"["avx2"]"#, GPR64_SLOT),
+            r#"["avx"]"#,
+        );
+        let error = read(text.as_bytes()).expect_err("avx2 is not in the table's set");
+        assert_eq!(error.code(), codes::E_DEF_001);
+        assert!(format!("{error:?}").contains("avx2"), "{}", error.message());
+    }
+
+    /// A repeated name would make the reported "first missing extension" depend
+    /// on the spelling rather than the set.
+    #[test]
+    fn v0_2_requires_extensions_must_be_strictly_increasing() {
+        let duplicate = document_v2(
+            &form_v2(
+                "x86:mov/rm64/legacy",
+                "4889c0",
+                r#"["avx","avx"]"#,
+                GPR64_SLOT,
+            ),
+            r#"["avx"]"#,
+        );
+        let error = read(duplicate.as_bytes()).expect_err("a repeated name is not increasing");
+        assert_eq!(error.code(), codes::E_DEF_001);
+
+        let unsorted = document_v2(
+            &form_v2(
+                "x86:mov/rm64/legacy",
+                "4889c0",
+                r#"["avx512f","avx"]"#,
+                GPR64_SLOT,
+            ),
+            r#"["avx","avx512f"]"#,
+        );
+        let error = read(unsorted.as_bytes()).expect_err("an unsorted list is not canonical");
+        assert_eq!(error.code(), codes::E_DEF_001);
+    }
+
+    /// `fmp-def/0.1` stays closed: an older loader must not read a `0.2` field
+    /// and silently ignore the requirement behind it.
+    #[test]
+    fn v0_1_form_rejects_the_0_2_field() {
+        let text = document(&form_v2(
+            "x86:mov/rm64/legacy",
+            "4889c0",
+            r#"["avx"]"#,
+            GPR64_SLOT,
+        ));
+        let error = read(text.as_bytes()).expect_err("0.1 has no requires_extensions");
+        assert_eq!(error.code(), codes::E_DEF_001);
+        assert!(
+            error.message().contains("requires_extensions"),
+            "{}",
+            error.message()
+        );
+    }
+
+    /// An empty list is the baseline, and it survives loading as an empty list
+    /// rather than being turned into "no gate".
+    #[test]
+    fn v0_2_empty_requirement_is_the_baseline() {
+        let text = document_v2(
+            &form_v2("x86:mov/rm64/legacy", "4889c0", "[]", GPR64_SLOT),
+            r#"["avx"]"#,
+        );
+        let definition = read(text.as_bytes()).expect("an empty list is legal");
+        assert_eq!(definition.definition_format, codes::DEFINITION_FORMAT_V0_2);
+        assert!(definition.forms[0].requires_extensions.is_empty());
+    }
+
+    /// The positive case: the list is kept in order and the format is recorded.
+    #[test]
+    fn v0_2_requirement_is_bindable() {
+        let text = document_v2(
+            &form_v2(
+                "x86:mov/rm64/legacy",
+                "4889c0",
+                r#"["avx","avx512f"]"#,
+                GPR64_SLOT,
+            ),
+            r#"["avx","avx512f"]"#,
+        );
+        let definition = read(text.as_bytes()).expect("a declared requirement loads");
+        assert_eq!(
+            definition.forms[0].requires_extensions,
+            vec!["avx".to_string(), "avx512f".to_string()]
+        );
     }
 }

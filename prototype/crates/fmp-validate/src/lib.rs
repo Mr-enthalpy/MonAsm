@@ -112,11 +112,24 @@ fn check_target(model: &Model, errors: &mut Vec<Diagnostic>) {
                 .with("found", plan.isa_variant.as_str()),
         );
     }
-    let mut plan_extensions = plan.enabled_extensions.clone();
-    plan_extensions.sort();
-    let mut definition_extensions = definition.enabled_extensions.clone();
-    definition_extensions.sort();
-    if plan_extensions != definition_extensions {
+    // `fmp-def/0.1` compares the sets for equality; `fmp-def/0.2` treats the
+    // table's set as the ceiling and requires the plan's set to be a subset
+    // (`07_definition_format.md` §2). A per-form requirement is checked later,
+    // once the plan names a form (`E-TARGET-003`, step 6).
+    let subset_rule = model.definition.definition_format == codes::DEFINITION_FORMAT_V0_2;
+    let plan_extensions: std::collections::BTreeSet<&str> =
+        plan.enabled_extensions.iter().map(String::as_str).collect();
+    let definition_extensions: std::collections::BTreeSet<&str> = definition
+        .enabled_extensions
+        .iter()
+        .map(String::as_str)
+        .collect();
+    let extensions_mismatch = if subset_rule {
+        !plan_extensions.is_subset(&definition_extensions)
+    } else {
+        plan_extensions != definition_extensions
+    };
+    if extensions_mismatch {
         errors.push(
             Diagnostic::new(
                 codes::E_TARGET_001,
@@ -537,6 +550,13 @@ fn check_symbols(model: &Model, errors: &mut Vec<Diagnostic>) {
 // ---------------------------------------------------------------------------
 
 fn check_instructions(model: &Model, errors: &mut Vec<Diagnostic>) {
+    let plan_extensions: std::collections::BTreeSet<&str> = model
+        .plan
+        .target
+        .enabled_extensions
+        .iter()
+        .map(String::as_str)
+        .collect();
     for (index, instruction) in model.plan.instructions.iter().enumerate() {
         // §7: the id is unique within the plan, and §12 orders instructions by
         // `(section_id, offset)`. A repeated id leaves a fragment reference
@@ -586,6 +606,24 @@ fn check_instructions(model: &Model, errors: &mut Vec<Diagnostic>) {
                 continue;
             }
         };
+        // `fmp-def/0.2`: a named form states what it needs, so the plan's set
+        // must cover it. The first missing name in the row's (sorted) order is
+        // reported; the gate skips the operand checks so one instruction yields
+        // one diagnostic (`07_definition_format.md` §2, `ADR-0103`).
+        if model.definition.definition_format == codes::DEFINITION_FORMAT_V0_2 {
+            if let Some(missing) = form
+                .requires_extensions
+                .iter()
+                .find(|extension| !plan_extensions.contains(extension.as_str()))
+            {
+                errors.push(
+                    Diagnostic::new(codes::E_TARGET_003, instruction.path.clone() + "/form_id")
+                        .with("extension", missing.as_str())
+                        .with("form_id", instruction.form_id.as_str()),
+                );
+                continue;
+            }
+        }
         if instruction.operands.len() != form.slots.len() {
             errors.push(
                 Diagnostic::new(codes::E_OPERAND_002, instruction.path.clone() + "/operands")

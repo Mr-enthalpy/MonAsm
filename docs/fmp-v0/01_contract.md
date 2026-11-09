@@ -68,8 +68,12 @@ Rules:
   it (`E-PLAN-003`; the definition loader reports `E-DEF-001`), never ignored or
   carried. There is no `x_*` namespace and no extension object in `fmp/0.1`
   (OD-05, ADR-0031); a new field is a new `format_version` or definition
-  `version`. `target_identity.enabled_extensions` is an equality-checked target
-  set (`E-TARGET-001`), not an extension mechanism.
+  `version`. `target_identity.enabled_extensions` is the target's extension set,
+  not an extension mechanism: with `fmp-def/0.1` it is equal to the table's set
+  (`E-TARGET-001`); with `fmp-def/0.2` the table's set is an upper bound, the
+  plan's set MUST be a subset (`E-TARGET-001`), and each named form's
+  `requires_extensions` MUST be a subset of the plan's set (`E-TARGET-003`,
+  `07_definition_format.md` §2–§3).
 - The plan contains no expressions, variables, includes, or references to
   external files (`INV-06`).
 
@@ -151,7 +155,12 @@ Rules:
 `target_identity` MUST NOT contain ABI, object-format, or host-platform fields.
 Those belong to `output_contract` (§11) or nowhere.
 
-`enabled_extensions` is the only list that changes legality in v0. A named
+`enabled_extensions` is the only list that changes legality in v0, and its
+comparison depends on the definition format the plan pins. Under `fmp-def/0.1`
+the plan's set MUST equal the table's set (`E-TARGET-001`); under `fmp-def/0.2`
+the table's set is the set the table can encode, the plan's set MUST be a subset
+of it (`E-TARGET-001`), and a named form whose `requires_extensions` is not in
+the plan's set is `E-TARGET-003` (`07_definition_format.md` §2–§3). A named
 constraint that alters encoding would have to be expressible by a form or an
 operand; `feature_constraints` therefore stays empty, and an entry is rejected
 rather than compared for equality and then ignored.
@@ -610,12 +619,13 @@ sha256("fmp/0.1\0" || canonical_plan_bytes || "\0" ||
 ## 13. Validation order
 
 1. Parse and schema check (`E-PLAN-*`).
-2. Target identity check (`E-TARGET-*`).
+2. Target identity check (`E-TARGET-001`, `E-TARGET-002`, `E-TARGET-004`).
 3. Definition digest check (`E-DEF-*`).
 4. Section/fragment consistency (`E-LAYOUT-*`, `N09`, `N11`).
 5. Symbol table consistency (`E-SYMBOL-*`, `N08`).
-6. Static instruction checks: form lookup, operand legality, ranges
-   (`E-FORM-*`, `E-OPERAND-*`, `E-RANGE-*`).
+6. Static instruction checks: form lookup, the `fmp-def/0.2` per-form extension
+   gate, operand legality, ranges (`E-FORM-*`, `E-OPERAND-*`, `E-RANGE-*`, and
+   `E-TARGET-003` for a named form whose requirement the plan does not enable).
 7. Fixup compatibility (`E-FIXUP-*`): descriptor bounds, one writer per bit,
    pairing, and mode/target compatibility.
 8. Emission: encode, compare `expected_size`, compare `expected_digest`, then

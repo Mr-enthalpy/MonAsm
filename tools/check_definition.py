@@ -93,13 +93,15 @@ def check_definition(path: Path, errors):
         fail(errors, where, "not parseable: %s" % exc)
         return None
 
-    if document.get("definition_format") != "fmp-def/0.1":
-        fail(errors, where, "definition_format must be 'fmp-def/0.1'")
+    definition_format = document.get("definition_format")
+    if definition_format not in ("fmp-def/0.1", "fmp-def/0.2"):
+        fail(errors, where, "definition_format must be 'fmp-def/0.1' or 'fmp-def/0.2'")
     for key in ("namespace", "version"):
         if not isinstance(document.get(key), str) or not document[key]:
             fail(errors, where, "%s must be a non-empty string" % key)
 
     target = document.get("target_identity")
+    table_extensions = []
     if not isinstance(target, dict):
         fail(errors, where, "target_identity must be an object")
     else:
@@ -119,6 +121,17 @@ def check_definition(path: Path, errors):
             fail(errors, where, "unsupported isa_family %r" % (family,))
         if target.get("byte_order") != "little":
             fail(errors, where, "v0 definitions must declare byte_order 'little'")
+        declared = target.get("enabled_extensions")
+        if isinstance(declared, list) and all(isinstance(name, str) for name in declared):
+            table_extensions = declared
+        else:
+            fail(errors, where, "enabled_extensions must be an array of strings")
+
+    form_keys = (
+        FORM_KEYS
+        if definition_format != "fmp-def/0.2"
+        else FORM_KEYS | {"requires_extensions"}
+    )
 
     forms = document.get("forms")
     if not isinstance(forms, list) or not forms:
@@ -131,8 +144,8 @@ def check_definition(path: Path, errors):
         if not isinstance(form, dict):
             fail(errors, spot, "form must be an object")
             continue
-        if set(form) != FORM_KEYS:
-            fail(errors, spot, "keys must be exactly %s" % sorted(FORM_KEYS))
+        if set(form) != form_keys:
+            fail(errors, spot, "keys must be exactly %s" % sorted(form_keys))
             continue
         form_id = form["form_id"]
         if not isinstance(form_id, str) or not FORM_ID.match(form_id):
@@ -143,6 +156,28 @@ def check_definition(path: Path, errors):
         if form_id in seen:
             fail(errors, spot, "duplicate form_id %s" % form_id)
         seen.add(form_id)
+
+        if definition_format == "fmp-def/0.2":
+            requires = form["requires_extensions"]
+            if not isinstance(requires, list) or not all(
+                isinstance(name, str) for name in requires
+            ):
+                fail(errors, spot, "requires_extensions must be an array of strings")
+            else:
+                if len(set(requires)) != len(requires):
+                    fail(errors, spot, "requires_extensions repeats a name")
+                if list(requires) != sorted(requires):
+                    fail(errors, spot, "requires_extensions must be sorted")
+                for name in requires:
+                    if not name:
+                        fail(errors, spot, "requires_extensions has an empty name")
+                    elif name not in table_extensions:
+                        fail(
+                            errors,
+                            spot,
+                            "requires_extensions names %r, not declared by the table"
+                            % (name,),
+                        )
 
         template = form["template"]
         if not isinstance(template, str) or not HEX.match(template):

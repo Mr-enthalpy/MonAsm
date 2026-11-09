@@ -1,6 +1,6 @@
 # x86-64 fixtures
 
-Vectors: `X86-P1` … `X86-P73` in `docs/fmp-v0/06_validation_matrix.md`.
+Vectors: `X86-P1` … `X86-P74` in `docs/fmp-v0/06_validation_matrix.md`.
 
 ## Positive vectors present
 
@@ -79,6 +79,7 @@ Vectors: `X86-P1` … `X86-P73` in `docs/fmp-v0/06_validation_matrix.md`.
 | X86-P71 | `X86-P71-level-one-sections` | `EXP-0100` (`ADR-0096`: Level 1 `artifact: sections` splits the 43-byte P6 image into `.text` and a virtual `.bss`, lists `symbols[]` in `symbol_order` and keeps the Level 0 `F0003` record; `llvm-readobj` on the same input reports the same sections and symbols) |
 | X86-P72 | `X86-P72-sub-immediates` | `EXP-0102` (`ADR-0101`: `REX.W 83 /5 ib`, `REX.W 81 /5 id` and `REX.W 2D id`; `subq $1, %rax` is `48 83 e8 01`, `subq $1, %r8` is `49 83 e8 01`, `subq $300, %rbx` is `48 81 eb 2c 01 00 00` and `subq $300, %rax` is `48 2d 2c 01 00 00`; ten instructions, 55 bytes) |
 | X86-P73 | `X86-P73-call-rel32` | `EXP-0103` (`ADR-0102`: `E8 cd`; `callq L1` is `e8 05 00 00 00`, `callq ext` is `e8 00 00 00 00` with `R_X86_64_PLT32 ext -4`, `call .+130` is the literal field `e8 7d 00 00 00`; four instructions, 19 bytes) |
+| X86-P74 | `X86-P74-per-form-requirements` | `EXP-0104` (`ADR-0103`: `X86-P20`'s 24 VEX instructions re-pinned to `0.68.0` with `enabled_extensions: ["avx"]`; same 144 bytes as `EXP-0045/P20.asm`, so the vector exercises the `fmp-def/0.2` per-form gate) |
 
 `X86-P6` ships in `definitions/x86_64/0.2.0.json` as two forms with
 `mod = 00`, `r/m = 101` and `disp32` as the last field (`ADR-0027`). `X86-P4`
@@ -780,6 +781,16 @@ target type (`N02cu`), a missing target is `E-OPERAND-002` (`N02cv`), the
 indirect `FF /2` family is absent (`N01el`) and a `0.67.0` row against
 `0.66.0` is `E-FORM-001` (`N01em`).
 
+`X86-P74` is the first `fmp-def/0.2` table (`ADR-0103`). `0.68.0` repeats the
+513 forms of `0.67.0` and adds a required `requires_extensions` to every form:
+the 388 legacy rows `[]`, the 38 VEX rows `["avx"]`, the 29 `zmm` EVEX rows
+`["avx","avx512f"]` and the 58 `xmm`/`ymm` EVEX rows `["avx","avx512f","avx512vl"]`.
+The vector is `X86-P20`'s 24 VEX instructions re-pinned to `0.68.0` with
+`enabled_extensions: ["avx"]`: a strict subset of the table's set, and enough
+for every named row, so the 144 bytes are `EXP-0045/P20.asm`'s bytes unchanged.
+Naming a VEX row with `[]` is `E-TARGET-003` on `extension = avx` (`N06b`);
+declaring `sse4.2` is `E-TARGET-001` with `found = sse4.2` (`N06c`).
+
 ## Negative fixtures present
 
 | Vector | Fixture | Code |
@@ -789,7 +800,7 @@ indirect `FF /2` family is absent (`N01el`) and a `0.67.0` row against
 | N03 | `negative/N03-imm8-out-of-range`, `negative/N03-disp8-out-of-range`, `negative/N03c-scale-is-field-content`, `negative/N03d-evex-disp8-content-out-of-range`, `negative/N03e-disp8x32-content-out-of-range`, `negative/N03f-disp8-content-out-of-range-vex256`, `negative/N03g-disp8-content-out-of-range-mov-memory`, `negative/N03h-disp8-content-out-of-range-mov-memory-sib`, `negative/N03i-disp8-content-out-of-range-sse-mem-sib`, `negative/N03j-disp8x16-content-out-of-range-evex-mem-sib`, `negative/N03k-disp32-past-end-on-evex-mem-sib-nobase-row`, `negative/N03l-disp32-past-end-on-evex-mem-sib-absolute-row`, `negative/N03m-disp32-past-end-on-gpr-mov-abs32-row`, `negative/N03n-disp32-past-end-on-gpr32-mov-abs32-row`, `negative/N03o-disp32-past-end-on-gpr16-mov-abs32-row`, `negative/N03p-disp32-past-end-on-gpr8-mov-abs32-row`, `negative/N03q-disp32-past-end-on-gpr8-ext-mov-mem-row`, `negative/N03r-disp8-out-of-range-on-gpr32-mov-mem-base-row`, `negative/N03s-disp32-out-of-range-on-gpr32-mov-mem-base-row`, `negative/N03t-disp8-out-of-range-on-gpr32-mov-mem-sib-row`, `negative/N03u-disp32-out-of-range-on-gpr32-mov-mem-sib-row`, `negative/N03v-disp8-128-on-gpr16-mov-mem-disp8-rex-r-row`, `negative/N03w-disp32-2147483648-on-gpr16-mov-mem-disp32-rex-r-row`, `negative/N03x-scale4-on-gpr16-mov-index-disp8-rex-rx-row`, `negative/N03y-scale4-on-gpr16-mov-index-disp8-low-row`, `negative/N03z-scale4-on-gpr16-mov-index-base-ext-row`, `negative/N03za-scale4-on-gpr16-mov-index-rex-bx-row`, `negative/N03zb-scale4-on-gpr32-mov-index-row`, `negative/N03zc-scale4-on-gpr32-mov-index-rex-row`, `negative/N03zd-scale4-on-gpr32-mov-index-rex-bx-row`, `negative/N03ze-scale4-on-gpr32-mov-index-rex-rbx-row`, `negative/N03zf-scale4-on-gpr32-mov-index-addr32-row`, `negative/N03zg-scale4-on-addr32-single-rex-row`, `negative/N03zh-scale4-on-addr32-two-rex-row`, `negative/N03zi-scale4-on-addr32-rexw-row`, `negative/N03zj-scale4-on-addr32-16bit-row`, `negative/N03zk-scale4-on-addr32-16bit-rex-row`, `negative/N03zl-scale4-on-addr32-16bit-two-rex-row`, `negative/N03zm-scale4-on-addr32-16bit-no-base-row`, `negative/N03zn-scale4-on-addr32-32bit-no-base-row`, `negative/N03zo-scale4-on-addr32-64bit-no-base-row`, `negative/N03zp-disp-past-signed-end-on-addr32-abs32-row`, `negative/N03zq-disp-past-signed-end-on-addr32-abs32-r64-row`, `negative/N03zr-disp-past-signed-end-on-addr32-abs32-r16-row`, `negative/N03zs-sub-imm8-out-of-range` | `E-RANGE-001` |
 | N04 | `negative/N04a-rel8-out-of-range`, `N04b-rel32-absolute-out-of-range`, `N04e-riprel32-literal-out-of-range`, `negative/N04f-absolute-address-in-imm8-field`, `negative/N04g-call-rel32-out-of-range` | `E-RANGE-002`, `E-FIXUP-003` |
 | N05 | `negative/N05-expected-size-mismatch` | `E-SIZE-001` |
-| N06 | `negative/N06-extension-list-mismatch` | `E-TARGET-001` |
+| N06 | `negative/N06-extension-list-mismatch`, `negative/N06b-per-form-extension-not-enabled`, `negative/N06c-extension-not-declared-by-definition` | `E-TARGET-001` / `E-TARGET-003` |
 | N07 | `negative/N07-fixup-partial-field`, `negative/N07b-riprel-operand-fixup-mismatch`, `negative/N07c-value-and-covering-fixup-on-abs32`, `negative/N07d-partial-disp-descriptor-on-abs32`, `negative/N07e-gpr64-descriptor-on-gpr32-abs32-row` | `E-FIXUP-001`, `E-FIXUP-005`, `E-FIXUP-006` |
 | N08 | `negative/N08-undeclared-symbol`, `N08b-resolve-undefined-symbol`, `N08c-absolute-pcrel-without-base`, `negative/N08d-resolve-abs32-without-section-base` | `E-SYMBOL-001`, `E-FIXUP-002` |
 | N09 | `negative/N09-overlapping-fragments` | `E-LAYOUT-001` |

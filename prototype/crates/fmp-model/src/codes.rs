@@ -143,5 +143,10 @@ pub const ALL: &[&str] = &[
 
 /// The `format_version` this build implements.
 pub const FORMAT_VERSION: &str = "fmp/0.1";
-/// The definition document format this build implements.
-pub const DEFINITION_FORMAT: &str = "fmp-def/0.1";
+/// The definition format with one extension set per table and no per-form
+/// requirement.
+pub const DEFINITION_FORMAT_V0_1: &str = "fmp-def/0.1";
+/// The definition format with a required `requires_extensions` on every form.
+pub const DEFINITION_FORMAT_V0_2: &str = "fmp-def/0.2";
+/// Every definition format this build accepts, oldest first.
+pub const DEFINITION_FORMATS: &[&str] = &[DEFINITION_FORMAT_V0_1, DEFINITION_FORMAT_V0_2];

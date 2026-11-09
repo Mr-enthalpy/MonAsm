@@ -38,9 +38,9 @@ Rules:
 | E-PLAN-004 | Document is not parseable, or has duplicate keys | `reason` | unit `rejects_duplicate_keys` |
 | E-PLAN-005 | Canonical-form violation that changes bytes (e.g. float, BOM, CRLF-dependent content) | `reason` | unit `rejects_a_byte_order_mark` |
 | E-PLAN-006 | Required field absent from a strict object | `field`, `object` | N24b |
-| E-TARGET-001 | Unsupported or mismatched `isa_family`, `isa_variant`, or `enabled_extensions` | `found` | N06 |
+| E-TARGET-001 | Unsupported or mismatched `isa_family`, `isa_variant`, or `enabled_extensions` (under `fmp-def/0.2`, an extension the table does not declare) | `found` | N06, N06c |
 | E-TARGET-002 | Invalid or missing `execution_mode` for the family | `found`, `required` | N24c |
-| E-TARGET-003 | Form requires an extension that is not enabled | `extension`, `form_id` | — |
+| E-TARGET-003 | A named form's `requires_extensions` is not a subset of the plan's `enabled_extensions` (`fmp-def/0.2`) | `extension`, `form_id` | N06b |
 | E-TARGET-004 | Unsupported `byte_order` or `address_width` | `found` | N24d |
 | E-DEF-001 | The definition cannot be loaded (unknown `definition_format`, duplicate form, bad template or placement), or `definition_identity.digest` does not match the loaded definition | `declared`, `actual`, `reason` | N10 |
 | E-DEF-002 | Namespace or version not available in this materializer | `namespace`, `version` | EXP-R5 |
@@ -260,17 +260,10 @@ reused for a different condition.
 
 ### 2.3 Codes with no `fmp/0.1` trigger
 
-Two user-input codes are declared and implemented but no plan can reach them yet.
-They stay in the registry because the condition they name is real in the model, and
+One user-input code is declared and implemented but no plan can reach it yet.
+It stays in the registry because the condition it names is real in the model, and
 a silent omission would make a later slice look like it had always been covered.
 
-- `E-TARGET-003` — a definition has no per-form extension requirement
-  (`07_definition_format.md` §2), so there is no `form_id` to name. Each table
-  declares one `enabled_extensions` set, and a mismatch with the plan is
-  `E-TARGET-001`; `0.5.0` is the first x86 table with an extension-gated form
-  (`EVEX.128` needs AVX-512VL), and `N06` exercises `E-TARGET-001`, not this
-  code. `E-TARGET-003` becomes reachable only if the format gains a per-form
-  extension field, not merely from a table that declares extensions.
 - `E-LAYOUT-005` — no plan field requests alignment: fragments carry no alignment
   attribute, and a `fill` fragment is the only padding. A plan that wants padding
   and omits the fragment produces a gap, which is `E-LAYOUT-002`. The code
@@ -280,23 +273,30 @@ a silent omission would make a later slice look like it had always been covered.
   construction; §4 uses it as the review marker for an error that leaks a pointer,
   timestamp, host name, or address.
 
+`E-TARGET-003` left this list when `fmp-def/0.2` added per-form
+`requires_extensions` (`ADR-0103`). A `0.2` form states its own requirement, so
+a plan that names a VEX row without `avx` is now reachable and `N06b` exercises
+it. `fmp-def/0.1` tables still have no per-form trigger: their one set is
+compared for equality and a mismatch is `E-TARGET-001` (`N06`).
+
 ### 2.4 Coverage gate before widening (M1)
 
 The registry is the declared surface; a code is *covered* only when a test
 asserts its exact code, JSON Pointer and detail-key set (`fixtures/README.md`).
-M1 closed the reachable gap on 2026-11-08: 43 codes are active, 37 are covered by
-a fixture, and the six that are not cannot be reached by a well-formed plan or
+M1 closed the reachable gap on 2026-11-08: 43 codes are active, 38 are covered by
+a fixture, and the five that are not cannot be reached by a well-formed plan or
 do not belong to the plan layer. M3 did not add a code; it repointed `N24h` from
 the now-accepted Level 1 `artifact` to `emit_fixups: false` and added `N24i` for
 a Level 0 symbol-table request, so `E-VERSION-001` keeps two end-to-end
-negatives and the counts are unchanged.
+negatives and the counts are unchanged. `fmp-def/0.2` (`ADR-0103`) makes
+`E-TARGET-003` reachable through `N06b`, so the covered count is 38.
 
 | Group | Codes | Evidence |
 |---|---|---|
-| Fixture-covered | 37 active codes | `fixtures/`; `N24a`–`N24i` are the M1 additions plus the M3 split |
+| Fixture-covered | 38 active codes | `fixtures/`; `N24a`–`N24i` are the M1 additions plus the M3 split; `N06b` adds `E-TARGET-003` |
 | JSON layer, unit only | `E-PLAN-004`, `E-PLAN-005` | `rejects_duplicate_keys`, `rejects_a_byte_order_mark`; no plan-layer fixture can reach them |
 | Non-plan conditions | `E-DEF-002` | `exp_r5_definition_perturbation_is_loud` |
-| Structurally unreachable | `E-TARGET-003`, `E-LAYOUT-005` | §2.3; revisit only if the format gains the trigger |
+| Structurally unreachable | `E-LAYOUT-005` | §2.3; revisit only if the format gains the trigger |
 | Not user-input | `E-INTERNAL-001` | §2.3; the bug marker |
 
 The `N24` family holds the nine coverage fixtures: `N24a` (`E-PLAN-001`),

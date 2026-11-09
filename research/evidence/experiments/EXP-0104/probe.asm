@@ -1,0 +1,4 @@
+.text
+vmovaps %xmm1, %xmm0
+vmovaps %ymm1, %ymm0
+vmovaps %zmm1, %zmm0

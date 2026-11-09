@@ -75,9 +75,10 @@ are backfilled. The summary always prints `<pass>/<total> re-derived,
 
 ### State (2026-11-08, llvm-mc 23.1.2)
 
-`79/113 re-derived, 34 skipped, 0 failed`:
+`80/114 re-derived, 34 skipped, 0 failed`:
 
-- 69 x86-64 records reproduce byte-identically, including the `ld.lld` one.
+- 70 x86-64 records reproduce byte-identically, including the `ld.lld` one and
+  `X86-P74`, which shares its input with `X86-P20`.
 - 6 RV64 records reproduce: the committed `jal`, `pcrel_hi`/`pcrel_lo12`, `lui`
   and `jalr` inputs. 9 RV64 records are `input-not-stored`.
 - 4 AArch64 records reproduce: the committed `A64-P21` (two inputs) and

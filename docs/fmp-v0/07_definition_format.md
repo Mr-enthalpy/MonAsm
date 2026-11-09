@@ -1,8 +1,11 @@
 # Definition Format
 
 Status: **frozen for the v0 scope** (`ADR-0095`): the format and the shipped
-tables (`x86-64` `0.1.0` … `0.67.0`, `aarch64` `0.1.0` … `0.18.0`, `rv64`
-`0.1.0`/`0.2.0`). The format is intended for the other targets, whose tables wait
+tables (`x86-64` `0.1.0` … `0.68.0`, `aarch64` `0.1.0` … `0.18.0`, `rv64`
+`0.1.0`/`0.2.0`). Two document formats are accepted: `fmp-def/0.1` for every
+table through `0.67.0`, and `fmp-def/0.2` from `0.68.0`. They differ only in the
+per-form `requires_extensions` field and the matching subset rule (§2–§3). The
+format is intended for the other targets, whose tables wait
 on source data, not on an open decision (`OD-07` is settled by ADR-0005 and
 pinned by ADR-0006). This document defines the artifact a pinned
 `definition_identity` names. It is the operational form of `OD-10`: the table
@@ -38,6 +41,11 @@ into selection (`INV-01`, `INV-02`).
 }
 ```
 
+Under `fmp-def/0.2` the same object carries
+`"definition_format": "fmp-def/0.2"` and each form is
+`{ "form_id": "...", "requires_extensions": [...], "template": "...",
+"slots": [ ... ] }`; nothing else changes.
+
 | Field | Required | Meaning | Counterexample if absent |
 |---|---|---|---|
 | `definition_format` | yes | Format version of this document | A newer document is read by an older loader with different rules and accepted. |
@@ -47,19 +55,26 @@ into selection (`INV-01`, `INV-02`).
 
 `target_identity` is compared field by field with the plan's, excluding
 `feature_constraints` (which the contract already requires to be empty). A
-difference in `isa_family`, `isa_variant,` or `enabled_extensions` is
+difference in `isa_family`, `isa_variant`, or `enabled_extensions` is
 `E-TARGET-001`, in `execution_mode` `E-TARGET-002`, and in `byte_order` or
-`address_width` `E-TARGET-004`. `E-TARGET-003` has no trigger here because a row
-carries no extension requirement of its own: the table declares one
-`enabled_extensions` set for the whole document. The table is never filtered per
-plan: a definition covers exactly one target.
+`address_width` `E-TARGET-004`.
 
-A table whose forms need an extension above the baseline declares it in
-`enabled_extensions`: `0.5.0` lists `avx`, `avx512f` and `avx512vl` because its
-EVEX row is `EVEX.128`, which AVX-512VL enables. This is still one set for the
-whole table — no row carries a requirement of its own, so `E-TARGET-003` stays
-unreachable (`04_errors.md` §2.3) and the plan/definition equality check is
-`E-TARGET-001`.
+`fmp-def/0.1` and `fmp-def/0.2` differ in how `enabled_extensions` and the
+per-form requirement are read:
+
+| Format | `target_identity.enabled_extensions` | Per-form `requires_extensions` |
+|---|---|---|
+| `fmp-def/0.1` | equality: the plan's set MUST equal the table's set (`E-TARGET-001`) | absent; a row carries no requirement of its own |
+| `fmp-def/0.2` | upper bound: the plan's set MUST be a subset of the table's set (`E-TARGET-001`) | required on every row; a named row is legal only when its set is a subset of the plan's (`E-TARGET-003`) |
+
+The table is never filtered per plan: a definition covers exactly one target. A
+table whose forms need an extension above the baseline declares the full set it
+can encode in `enabled_extensions`: `0.5.0` lists `avx`, `avx512f` and
+`avx512vl` because its EVEX row is `EVEX.128`, which AVX-512VL enables. Under
+`0.1` that set is the plan's set, so no row needs a requirement of its own and
+`E-TARGET-003` is unreachable (`04_errors.md` §2.3). Under `0.2` the same set is
+the ceiling and each row states what it actually needs; `0.68.0` is the first
+such table (§8.1).
 
 There is **no digest field inside the definition**. The digest is computed over
 the document and compared with `definition_identity.digest` (`E-DEF-001`); a
@@ -71,11 +86,23 @@ input, which is the kind of special case that drifts.
 | Field | Required | Meaning | Counterexample if absent |
 |---|---|---|---|
 | `form_id` | yes | The identity a plan must name, exactly | Resolution becomes a search, and a search is a decision. |
+| `requires_extensions` | yes in `fmp-def/0.2`; rejected in `0.1` | Strictly increasing list of extension names the form needs; `[]` is the baseline | A VEX row with no annotation passes a plan that never enabled `avx`, because the table's set is only an upper bound in `0.2`. |
 | `template` | yes | One hex byte string; its length is the form's size, with every operand-owned bit at its base value | Without a base the loader would have to invent zeros for bits no operand writes. |
 | `slots` | yes | Ordered operand signature, one entry per operand | The plan could supply operands in any order and a length check would be the only guard. |
 
 Rules:
 
+- Under `fmp-def/0.2` every form MUST declare `requires_extensions`; an empty
+  array is the baseline (the form needs nothing above the baseline), not an
+  omission. Under `fmp-def/0.1` the key is unknown and therefore `E-DEF-001`
+  (closed object, §9).
+- Each name MUST be non-empty, unique, and strictly increasing. The order is
+  the order the first missing name is reported in (`E-TARGET-003`), so two
+  spellings of one set cannot produce two diagnostics.
+- Every name MUST appear in the table's `target_identity.enabled_extensions`.
+  A form that requires an extension the table does not declare is `E-DEF-001`
+  at load: a plan matching the table could never name that form, and the dead
+  requirement would silently disable the gate.
 - `form_id` MUST follow `01_contract.md` §7. For `x86` it MUST end in
   `/legacy`, `/vex` or `/evex`; v0 carries `/legacy` in `0.1.0`–`0.4.0` and adds
   `/vex` and `/evex` in `0.5.0`.
@@ -309,6 +336,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.65.0.json` | `monasm.isa.x86` | `sha256:9f5bc421a67688426dea259a7f5a9c4c5eb0746db0dd1c5b473a30ba3612b42a` |
 | `definitions/x86_64/0.66.0.json` | `monasm.isa.x86` | `sha256:63b3b3a153aa0b5508f2055496efa1c56ac74e56b03d56f56f5c522b6d2e1904` |
 | `definitions/x86_64/0.67.0.json` | `monasm.isa.x86` | `sha256:367d76ebf89ee9c1cf51f561b4798eeb0a2000ae3688ee9a52a4c4a9eaea5c9e` |
+| `definitions/x86_64/0.68.0.json` | `monasm.isa.x86` | `sha256:4c9ff304b305ceb831fd99e22bf0a7c422cce4104d08de604a6509f58e1501d2` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |
@@ -334,7 +362,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.67.0`
+### 8.1 `x86-64` `0.1.0` … `0.68.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -2059,6 +2087,19 @@ rel8 sibling. `2147483648` on the signed displacement is `E-RANGE-002`
 `E-FORM-001` (`N01em`). Still deferred: the indirect call, the 16/32-bit
 operand sizes, APX `d5` and EVEX masking/broadcast.
 
+`0.68.0` is the first `fmp-def/0.2` table (`ADR-0103`). It repeats the 513 forms
+of `0.67.0` unchanged and adds `requires_extensions` to every form: the 388
+`/legacy` rows `[]`, the 38 `/vex` rows `["avx"]`, the 29 `zmm` EVEX rows
+`["avx","avx512f"]`, and the 58 `xmm`/`ymm` EVEX rows
+`["avx","avx512f","avx512vl"]`. The split is the operand width, not the
+mnemonic: `L'L` selects 128/256-bit EVEX (AVX-512VL) or 512-bit EVEX
+(AVX-512F) (`EXP-0032` §1), and every gated row is a `vmovaps` row. A plan that
+declares `["avx"]` may name a legacy or VEX row, but the first EVEX row it names
+is `E-TARGET-003`; a plan that declares an extension outside the table's
+three-name set is `E-TARGET-001`. `X86-P74` re-pins the 24 VEX instructions of
+`X86-P20` to this table, `N06b` omits `avx` and `N06c` declares an extension the
+table does not carry.
+
 ### 8.2 `aarch64` `0.1.0` … `0.18.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
@@ -2638,8 +2679,10 @@ same table that produced §8.4's assertions; `ext/C.yaml` states the relation
 
 | Check | Code |
 |---|---|
-| `definition_format` unsupported (only `fmp-def/0.1` is accepted) | `E-DEF-001` |
+| `definition_format` unsupported (only `fmp-def/0.1` and `fmp-def/0.2` are accepted) | `E-DEF-001` |
 | `namespace`/`version` not shipped by this materializer | `E-DEF-002` |
+| a `fmp-def/0.2` form without `requires_extensions`, or a name that is empty, repeated, unsorted, or not in the table's `enabled_extensions` | `E-DEF-001` |
+| a `fmp-def/0.1` form that carries `requires_extensions` (unknown field) | `E-DEF-001` |
 | duplicate `form_id` | `E-DEF-001` |
 | `template` empty, odd-length, or non-hex | `E-DEF-001` |
 | placement outside the template, or two placements overlapping | `E-DEF-001` |
@@ -2653,6 +2696,10 @@ A definition that fails a load-time check is unusable, so the namespace/version
 gate is `E-DEF-002` and everything else is `E-DEF-001`, and no plan is read from a
 definition that fails either. This is the one place where `E-DEF-001` is raised
 without a plan error: the input is the definition.
+
+`E-TARGET-003` is not a load-time check. It compares a plan's set with a form
+the plan names, so it is raised by static instruction validation
+(`01_contract.md` §13 step 6) and leaves the table loadable.
 
 ## 10. Open
 
