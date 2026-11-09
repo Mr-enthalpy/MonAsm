@@ -396,16 +396,16 @@ closed INV-04 (`N22` ordering/uniqueness) and INV-06 (`N23a` expression-shaped
 value) so every row is `verified`. Phase 5 froze the contract set for the v0
 scope (`ADR-0095`), published `docs/fmp-v0/08_final_recommendation.md` and closed
 the last acceptance criterion, `AC-10`, with the Phase 6 roadmap M1–M5. Phase 6
-is underway: M1 (error-coverage gate) landed `N24a`–`N24h`, so every reachable
+is complete: M1 (error-coverage gate) landed `N24a`–`N24h`, so every reachable
 error code now has an end-to-end fixture; M2 (oracle rerun harness) landed
-`tools/oracle/rerun.py`, which re-derives 109 of the 114 positive fixtures
+`tools/oracle/rerun.py`, which re-derives 116 of the 121 positive fixtures
 byte-identically and reports the other five as `manual-derivation`; M3 (Level 1
 object writer) landed `artifact: sections` and the optional declared symbol table
 (`ADR-0096`), with `X86-P71`/`EXP-0100` as the positive vector. M4 is
 implemented (`ADR-0097`, `docs/fmp-v0/09_planner_api.md`): a planner-side
 `fmp-plan` crate exposes a total, closed plan builder with no validator and no
 planner authority, and `planner_api.rs` rebuilds the whole corpus through it —
-114 positives and 559 `materialize`-phase negatives — plus from-scratch,
+121 positives and 580 `materialize`-phase negatives — plus from-scratch,
 closed-key, enum-spelling and determinism tests. M5 (coverage widening) has
 landed seven items, the last being `ADR-0103`: `fmp-def/0.2` per-form
 `requires_extensions` in `definitions/x86_64/0.68.0.json`, with `X86-P74`,
@@ -420,7 +420,8 @@ and `ADR-0108` adds the sixteen legacy/VEX SSE indexed rows as
 `definitions/x86_64/0.72.0.json` (`X86-P78`), and `ADR-0109` adds the twelve
 indexed byte `mov` rows as `definitions/x86_64/0.73.0.json` (`X86-P79`), and
 `ADR-0110` adds the three `29 /r` register/register `sub` rows as
-`definitions/x86_64/0.74.0.json` (`X86-P80`).
+`definitions/x86_64/0.74.0.json` (`X86-P80`). `ADR-0111` closes the phase:
+759 forms across the three definitions, 121 positives and 586 negatives.
 
 | Area | State |
 |---|---|

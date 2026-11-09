@@ -112,7 +112,7 @@ surface: a variant that is absent cannot be selected, repaired or approximated,
 and naming it is `E-FORM-001`. There is no feature flag and no partially
 implemented form.
 
-The x86-64 slice is five hundred and thirteen forms covering fifteen frozen `EC` rows:
+The x86-64 slice is five hundred and sixty-four forms covering sixteen frozen `EC` rows:
 
 | `form_id` | Bytes | Operand signature | Covers |
 |---|---|---|---|

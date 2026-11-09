@@ -30,7 +30,7 @@ binary outside a test target.
   at Level 1, the recorded section/symbol envelope); every negative reproduces
   exactly the registered diagnostic set.
 - `fmp-cli/tests/determinism.rs` — `EXP-R1`–`EXP-R6` replay and identity.
-- `fmp-cli/tests/planner_api.rs` — M4 parity gate: 101 positive and 540
+- `fmp-cli/tests/planner_api.rs` — M4 parity gate: 121 positive and 580
   `materialize`-phase negative fixtures rebuilt through `fmp-plan`, plus
   from-scratch, closed-key, optional-member, enum-spelling, structural-exclusion,
   fixed-point and determinism cases.

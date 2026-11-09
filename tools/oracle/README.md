@@ -75,12 +75,13 @@ are backfilled. The summary always prints `<pass>/<total> re-derived,
 
 ### State (2026-11-09, llvm-mc 23.1.2)
 
-`109/114 re-derived, 5 skipped, 0 failed`:
+`116/121 re-derived, 5 skipped, 0 failed`:
 
-- 70 x86-64 records reproduce byte-identically, including the `ld.lld` one and
-  `X86-P74`, which shares its input with `X86-P20`.
+- 76 x86-64 records reproduce byte-identically, including the `ld.lld` one,
+  `X86-P74` (which shares its input with `X86-P20`) and the `X86-P75`-`X86-P80`
+  widening vectors.
 - 24 AArch64 records reproduce: every `A64-P1`–`A64-P22` input now resolves.
-- 15 RV64 records reproduce: every `RV-P1`–`RV-P10` input now resolves.
+- 16 RV64 records reproduce: every `RV-P1`–`RV-P11` input now resolves.
 - 5 x86-64 records are `manual-derivation`: the expected bytes include an
   encoding `llvm-mc` will not select from a mnemonic (documented per record).
 
