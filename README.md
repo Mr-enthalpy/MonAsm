@@ -398,8 +398,8 @@ scope (`ADR-0095`), published `docs/fmp-v0/08_final_recommendation.md` and close
 the last acceptance criterion, `AC-10`, with the Phase 6 roadmap M1–M5. Phase 6
 is underway: M1 (error-coverage gate) landed `N24a`–`N24h`, so every reachable
 error code now has an end-to-end fixture; M2 (oracle rerun harness) landed
-`tools/oracle/rerun.py`, which re-derives 80 of the 114 positive fixtures
-byte-identically and reports the other 34 as skipped with a reason; M3 (Level 1
+`tools/oracle/rerun.py`, which re-derives 109 of the 114 positive fixtures
+byte-identically and reports the other five as `manual-derivation`; M3 (Level 1
 object writer) landed `artifact: sections` and the optional declared symbol table
 (`ADR-0096`), with `X86-P71`/`EXP-0100` as the positive vector. M4 is
 implemented (`ADR-0097`, `docs/fmp-v0/09_planner_api.md`): a planner-side

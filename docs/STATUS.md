@@ -1,7 +1,7 @@
 # Status
 
-Updated: 2026-11-08
-Phase: **6 in progress**: Phase 4 is complete (all eight invariants `verified`; `EXP-R3` passes on three CI hosts; `N22` closes INV-04 and `N23a` closes INV-06). Phase 5 froze the contract set for the v0 scope (`ADR-0095`), published `08_final_recommendation.md` (§A–§H plus Q1–Q10) and closed `AC-10` with the Phase 6 roadmap M1–M5. Phase 6 M1 (error-coverage gate) is complete with `N24a`–`N24h`, M2 (oracle rerun harness) is complete with `tools/oracle/rerun.py`, and M3 (Level 1 object writer) is complete with `X86-P71` and `ADR-0096`; M3 also added `N24i` and repointed `N24h`. M4 (planner boundary) is complete: `fmp-plan` is implemented and the `planner_api.rs` parity gate runs ten tests over the 114 positives, the 559 `materialize`-phase negatives, from-scratch authoring, closed keys, enum spellings and determinism. M5 (coverage widening) is **in progress**: `A64-P20` names the three unused `imm6-asr` rows, `ADR-0098`/`RV-P9` add the RV64 absolute `lui`+`addi` split with `hi20`, and `ADR-0099`/`RV-P10` add `riscv:jalr/rd-rs1-imm12` with the `auipc` + `jalr` call pair. The seven-item first wave is complete after `ADR-0103`, which adds `fmp-def/0.2` per-form `requires_extensions` and the `X86-P74`/`N06b`/`N06c` vectors; the next action is the 29 `input-not-stored` oracle recoveries
+Updated: 2026-11-09
+Phase: **6 in progress**: Phase 4 is complete (all eight invariants `verified`; `EXP-R3` passes on three CI hosts; `N22` closes INV-04 and `N23a` closes INV-06). Phase 5 froze the contract set for the v0 scope (`ADR-0095`), published `08_final_recommendation.md` (§A–§H plus Q1–Q10) and closed `AC-10` with the Phase 6 roadmap M1–M5. Phase 6 M1 (error-coverage gate) is complete with `N24a`–`N24h`, M2 (oracle rerun harness) is complete with `tools/oracle/rerun.py`, and M3 (Level 1 object writer) is complete with `X86-P71` and `ADR-0096`; M3 also added `N24i` and repointed `N24h`. M4 (planner boundary) is complete: `fmp-plan` is implemented and the `planner_api.rs` parity gate runs ten tests over the 114 positives, the 559 `materialize`-phase negatives, from-scratch authoring, closed keys, enum spellings and determinism. M5 (coverage widening) is **in progress**: `A64-P20` names the three unused `imm6-asr` rows, `ADR-0098`/`RV-P9` add the RV64 absolute `lui`+`addi` split with `hi20`, and `ADR-0099`/`RV-P10` add `riscv:jalr/rd-rs1-imm12` with the `auipc` + `jalr` call pair. The seven-item first wave is complete after `ADR-0103`, which adds `fmp-def/0.2` per-form `requires_extensions` and the `X86-P74`/`N06b`/`N06c` vectors. The oracle recovery backlog is closed too: all 29 `input-not-stored` inputs were recovered or rebuilt and `tools/oracle/rerun.py` now reports `109/114` with only the five `manual-derivation` skips; the next action is the next M5 slice under the widening-backlog rule
 Owner: Mr-enthalpy
 
 This file is the recovery point. A new session should be able to resume from
@@ -265,9 +265,11 @@ Phases 3, 4 and 5 are complete, and Phase 6 **M1, M2, M3 and M4 are
 complete**. M1 added `N24a`–`N24i`, so `04_errors.md` §2.4 records 38 of the 43
 active codes as fixture-covered. M2 added `tools/oracle/rerun.py`: it resolves
 each assembler input by `input_sha256` and re-runs the recorded command, so
-`80/114` positives reproduce byte-identically, `29` are `input-not-stored` (all
-20 AArch64 and 9 RV64 inputs were never committed) and `5` are
-`manual-derivation` (`tools/oracle/README.md` §"State"). M3 added the Level 1
+`109/114` positives reproduce byte-identically; the `5` remaining skips are
+`manual-derivation`, and no record is `input-not-stored` any more: the 20
+AArch64 and 9 RV64 inputs were recovered from the experiment listings or rebuilt
+from the recorded spellings, and 20 of them now reproduce the recorded
+`input_sha256` exactly (`tools/oracle/README.md` §"State"). M3 added the Level 1
 writer (`ADR-0096`): `artifact: sections` emits `sections[]` in `section_order`,
 an optional `symbols[]` in `symbol_order`, and the unchanged Level 0 records;
 `X86-P71` and `EXP-0100` validate the envelope and the Level 0 image is still the
@@ -305,9 +307,12 @@ target), `N02cv` (a missing target) and `N04g` (`2147483648`), and
 `ADR-0103`/`X86-P74` add `fmp-def/0.2` per-form `requires_extensions` as
 `definitions/x86_64/0.68.0.json` (513 forms, 125 gated), the subset rule and the
 step-6 `E-TARGET-003` gate, plus `N06b` (a VEX row with `[]`) and `N06c` (an
-extension the table does not declare). The seven-item first wave is complete.
-Next is the oracle recovery backlog: 29 positive records are `input-not-stored`
-(20 AArch64, 9 RV64), so `tools/oracle/rerun.py` cannot re-derive them.
+extension the table does not declare). The seven-item first wave is complete,
+and the oracle recovery backlog that followed it is closed: the 29
+`input-not-stored` positive records (20 AArch64, 9 RV64) now resolve by
+`input_sha256`, so `tools/oracle/rerun.py` reports `109/114` with only the five
+`manual-derivation` skips. The next action is the next M5 coverage slice, chosen
+one format question per ADR under the widening-backlog rule below.
 
 ### Widening backlog
 

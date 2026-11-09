@@ -27,8 +27,10 @@ Both are generated from the pinned UDB resolved spec by
 | `RV-P3-ld-sd-base-offset` | `riscv:ld/rd-base-imm12`, `riscv:sd/rs-base-imm12` | `RV-P3`, four instructions, signed imm12 endpoints |
 
 Oracle: `llvm-mc 23.1.2 -triple=riscv64 -filetype=obj`, then
-`llvm-objcopy -O binary --only-section=.text`. The oracle's `.s` input is not
-shipped, but each `oracle.json` lists its lines and pins them by `input_sha256`.
+`llvm-objcopy -O binary --only-section=.text`. The oracle's `.s` inputs live
+under `research/evidence/experiments/` and are pinned by `input_sha256` in each
+`oracle.json`; `python tools/oracle/rerun.py` re-derives all fifteen RV64
+positives.
 `-mattr=+c` is passed for `RV-P7` only; the base-`I` fixtures are assembled
 without it so `llvm-mc` cannot auto-compress an `addi` on them (`EXP-0012` §2.2).
 

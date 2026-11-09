@@ -3,10 +3,10 @@
   "version": "23.1.2",
   "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P7-movz-lane.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
   "kind": "assembler",
-  "input_sha256": "69d7474bc7c646eb26e5cbef3af53b214edb13a3b1c838276f81cfbd43a645d7",
+  "input_sha256": "683b2d0e636c6d8afc9b53f7b6dbf1697ae1cc499ca3ca3154e41750f37a4f47",
   "output_sha256": "a0a4818ad64c188d184d3d01947ad0370f50bf8625aa9d5643b9969c050d617b",
   "size": 20,
   "records": 0,
-  "notes": "Input (121 B, LF, trailing newline), one instruction per line with two leading spaces: `movz x0, #0x1234` / `movz x0, #0x1234, lsl #16` / `movz x2, #1, lsl #32` / `movz x5, #0xffff, lsl #48` / `movz x0, #0, lsl #0`. Four forms, one per `hw` value: the same `imm16` content (0x1234) appears on `-lsl0` and `-lsl16`, so the two words differ only in bits 22-21. The `-lsl32` line pins a single high bit of the lane, and the `-lsl48` line pins `imm16 = 0xffff` with `Rd = x5`. Every operand is an immediate, so `llvm-readobj -r` prints an empty relocation list and no linker is involved. The plan names the lane in `form_id` (ADR-0014) and states `imm16` as field content, so the `lsl #48` line is `imm16 = 65535`, not `0xffff000000000000`.",
+  "notes": "Input (121 B, LF, trailing newline), one instruction per line with two leading spaces: `movz x0, #0x1234` / `movz x0, #0x1234, lsl #16` / `movz x2, #1, lsl #32` / `movz x5, #0xffff, lsl #48` / `movz x0, #0, lsl #0`. Four forms, one per `hw` value: the same `imm16` content (0x1234) appears on `-lsl0` and `-lsl16`, so the two words differ only in bits 22-21. The `-lsl32` line pins a single high bit of the lane, and the `-lsl48` line pins `imm16 = 0xffff` with `Rd = x5`. Every operand is an immediate, so `llvm-readobj -r` prints an empty relocation list and no linker is involved. The plan names the lane in `form_id` (ADR-0014) and states `imm16` as field content, so the `lsl #48` line is `imm16 = 65535`, not `0xffff000000000000`. Recovered 2026-11-09: the input was not stored; it was rebuilt from the listing in `EXP-0016` section 3, kept at `research/evidence/experiments/EXP-0016/A64-P7-movz-lane.s` and `input_sha256` re-pinned to those bytes. The recorded command still emits the committed 20-byte image.",
   "source": "Arm MRS MOVZ_64_movewide (opc = 10 at 29+2, hw at 21+2, imm16 at 5+16, Rd at 0+5); measured in EXP-0016 §2"
 }

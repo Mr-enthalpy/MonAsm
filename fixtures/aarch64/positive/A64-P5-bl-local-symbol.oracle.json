@@ -3,10 +3,10 @@
   "version": "23.1.2",
   "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P5-bl-local-symbol.s -o out.o && ld.lld --image-base=0 -Ttext=0 -o out.elf out.o && llvm-objcopy -O binary --only-section=.text out.elf out.bin",
   "kind": "assembler + linker",
-  "input_sha256": "f6f89a0a7b655118128292396d7471dbaff2973a579edbe879d4c25b9757cbf7",
+  "input_sha256": "93f184d6271b48f65a14259a11684ff57f8896f88ca2ba189c7b28cdc5dc5ceb",
   "output_sha256": "88c96adc19048608b7c7ddc18e9e27357cf31435a04e4a31fb05c88720202f7a",
   "size": 8,
   "records": 0,
-  "notes": "Input: `start: bl next / next: bl start`, linked at 0. `llvm-mc` alone does not resolve the two branches (it emits a `fixup_aarch64_pcrel_call26` and zero bytes), so the bytes are taken after `ld.lld` has resolved them: +4 -> imm26=1, -4 -> imm26=0x3ffffff. The plan resolves the same displacements itself with `pcrel_begin` + `scale` shift 2.",
+  "notes": "Input: `start: bl next / next: bl start`, linked at 0. `llvm-mc` alone does not resolve the two branches (it emits a `fixup_aarch64_pcrel_call26` and zero bytes), so the bytes are taken after `ld.lld` has resolved them: +4 -> imm26=1, -4 -> imm26=0x3ffffff. The plan resolves the same displacements itself with `pcrel_begin` + `scale` shift 2. Recovered 2026-11-09: the input was not stored; it was rebuilt from the two-line listing recorded in this note, kept at `research/evidence/experiments/EXP-0008/A64-P5-bl-local-symbol.s` and `input_sha256` re-pinned to those bytes. The recorded command still emits the committed 8-byte image.",
   "source": "Arm MRS BL_only_branch_imm, imm26 at 0+26"
 }

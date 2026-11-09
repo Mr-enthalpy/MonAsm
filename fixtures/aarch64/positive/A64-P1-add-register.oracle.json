@@ -3,10 +3,10 @@
   "version": "23.1.2",
   "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P1-add-register.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
   "kind": "assembler",
-  "input_sha256": "83fbe7d7a03ac652bd1d85179d20ae72b552d66ac3d2828f87d70dfcfcfc07d3",
+  "input_sha256": "1efbc3b57c4cd4aa2d2e63083a57696a0917693f19ac3b858c13f5a5fff30e47",
   "output_sha256": "74d14118670f18efa851689cac6fdf3fcee42ecdddb059b2d43b0b9ebf18c891",
   "size": 12,
   "records": 0,
-  "notes": "Input: `add x0, x1, x2` / `add x5, x6, x7` / `add x0, x1, xzr`. The third pair fixes register number 31 in Rm, which is XZR in this form; it is the widest value the 5-bit field holds, not a register-class check.",
+  "notes": "Input: `add x0, x1, x2` / `add x5, x6, x7` / `add x0, x1, xzr`. The third pair fixes register number 31 in Rm, which is XZR in this form; it is the widest value the 5-bit field holds, not a register-class check. Recovered 2026-11-09: the input was not stored; it was rebuilt from the spellings recorded in this note, kept at `research/evidence/experiments/EXP-0008/A64-P1-add-register.s` and `input_sha256` re-pinned to those bytes. The recorded command still emits the committed 12-byte image.",
   "source": "Arm MRS ADD_64_addsub_shift, fields Rd/Rn/Rm at 0+5, 5+5, 16+5"
 }

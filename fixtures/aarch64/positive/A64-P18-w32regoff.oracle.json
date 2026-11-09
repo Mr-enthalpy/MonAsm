@@ -3,10 +3,10 @@
   "version": "23.1.2",
   "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P18-w32regoff.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
   "kind": "assembler",
-  "input_sha256": "14762aed10d0fde0f50061c368591bfd2b26d485d669f265c4a02fb37545a24a",
+  "input_sha256": "42d27c9bbf1fc07132f977c6d8fc346568eb999786fd65c76c080a94bd4bfa84",
   "output_sha256": "8ae39fb0113117ff60296f52398b95630d2349e2a3efd0667c43d7bbc24012ca",
   "size": 80,
   "records": 0,
-  "notes": "Input (470 B, LF, trailing newline). Twenty instructions, one per new 32-bit row plus four register-31 rows: eight `ldr` rows (lsl/uxtw/sxtw/sxtx at #0 and #2) and the same eight `str` rows, then `ldr w0, [sp, x2]`, `ldr w0, [x1, xzr, lsl #2]`, `str w0, [sp, x2, lsl #2]` and `ldr w0, [x1, wzr, uxtw]`. Registers 0-9 keep every field value distinct. The `size = 10` rows scale the index by the 4-byte access size, so the `S = 1` rows spell `#2`; `Rt` is a `w` register while `Rn`/`Rm` stay `x` (ADR-0025 decision 4). `llvm-readobj -r` prints an empty relocation list and the source names no symbols, so no linker is involved.",
+  "notes": "Input (rebuilt 511 B; this note previously stated 470 B; LF, trailing newline). Twenty instructions, one per new 32-bit row plus four register-31 rows: eight `ldr` rows (lsl/uxtw/sxtw/sxtx at #0 and #2) and the same eight `str` rows, then `ldr w0, [sp, x2]`, `ldr w0, [x1, xzr, lsl #2]`, `str w0, [sp, x2, lsl #2]` and `ldr w0, [x1, wzr, uxtw]`. Registers 0-9 keep every field value distinct. The `size = 10` rows scale the index by the 4-byte access size, so the `S = 1` rows spell `#2`; `Rt` is a `w` register while `Rn`/`Rm` stay `x` (ADR-0025 decision 4). `llvm-readobj -r` prints an empty relocation list and the source names no symbols, so no linker is involved. Recovered 2026-11-09: the input was not stored; it was rebuilt from the listing in `EXP-0027` section 4; the rebuilt file is 511 B, not the 470 B this note previously stated, kept at `research/evidence/experiments/EXP-0027/A64-P18-w32regoff.s` and `input_sha256` re-pinned to those bytes. The recorded command still emits the committed 80-byte image.",
   "source": "Arm MRS LDR_32_ldst_regoff / STR_32_ldst_regoff (Rm at 16+5, option at 13+3, S at 12+1, Rn at 5+5, Rt at 0+5, size = 10), measured in EXP-0027 §1-§4"
 }

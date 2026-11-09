@@ -3,10 +3,10 @@
   "version": "23.1.2",
   "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P2-add-imm12.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
   "kind": "assembler",
-  "input_sha256": "f64e9d4938857d28b119a5139bdf7948ee8bdc869e6eef7e9a0422411599767a",
+  "input_sha256": "351eae11c104f7ebbb38e2044b6f54f008dfd6e931741a8adc6c2146ed5fb6d9",
   "output_sha256": "d4e6cbee30dbf649db115e954e34e85f0fe116e2b51354b4264ec72cfb113aa7",
   "size": 8,
   "records": 0,
-  "notes": "Input: `add x0, x1, #0` / `add x2, x3, #4095`, the two ends of the unsigned imm12 range. `sh` is 0 in both; the scaled half of A64-P2 is the separate `A64-P2-add-imm12-lsl12` fixture against `aarch64/0.2.0.json`.",
+  "notes": "Input: `add x0, x1, #0` / `add x2, x3, #4095`, the two ends of the unsigned imm12 range. `sh` is 0 in both; the scaled half of A64-P2 is the separate `A64-P2-add-imm12-lsl12` fixture against `aarch64/0.2.0.json`. Recovered 2026-11-09: the input was not stored; it was rebuilt from the spellings recorded in this note; the `-lsl12` sibling is the vector in `EXP-0013` section 3, kept at `research/evidence/experiments/EXP-0013/A64-P2-add-imm12.s` and `input_sha256` re-pinned to those bytes. The recorded command still emits the committed 8-byte image.",
   "source": "Arm MRS ADD_64_addsub_imm, imm12 at 10+12"
 }

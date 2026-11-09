@@ -3,10 +3,10 @@
   "version": "23.1.2",
   "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P6-adrp-lo12-pair.s -o out.o && ld.lld --image-base=0 -Ttext=0 -o out.elf out.o && llvm-objcopy -O binary --only-section=.text out.elf out.bin",
   "kind": "assembler + linker",
-  "input_sha256": "5b469a375cd0f6c645f22926e0843a29f92b7ec7ea932834a3e75881632eb05d",
+  "input_sha256": "1c322d5248eb61bab048ae67a777220cbea9e7f96121c6000b615d7f41ac6648",
   "output_sha256": "14df995cfa6f46844d7a512367ea9a8a35de20f0d50e3744c0bdb7a4e1c677d5",
   "size": 4104,
   "records": 0,
-  "notes": "Input places the pair at 0xff8 and `blob` at 0x1008 (`adrp x0, blob` / `add x0, x0, :lo12:blob`), so page(blob) - page(adrp) = 0x1000 and the low 12 bits of blob are 8. The bytes are taken after `ld.lld` resolved both relocations; before linking, llvm-mc emits zeros plus `R_AARCH64_ADR_PREL_PG_HI21` at 0xff8 and `R_AARCH64_ADD_ABS_LO12_NC` at 0xffc (verified with `llvm-readobj -r`), which is the same two-site shape the plan's `pair_group` describes. The emitted words are `b0000000` (adrp, imm21 = 1; immlo occupies bits 30:29, so 1 is `0x20000000`, not `0x20`) and `91002000`.",
+  "notes": "Input places the pair at 0xff8 and `blob` at 0x1008 (`adrp x0, blob` / `add x0, x0, :lo12:blob`), so page(blob) - page(adrp) = 0x1000 and the low 12 bits of blob are 8. The bytes are taken after `ld.lld` resolved both relocations; before linking, llvm-mc emits zeros plus `R_AARCH64_ADR_PREL_PG_HI21` at 0xff8 and `R_AARCH64_ADD_ABS_LO12_NC` at 0xffc (verified with `llvm-readobj -r`), which is the same two-site shape the plan's `pair_group` describes. The emitted words are `b0000000` (adrp, imm21 = 1; immlo occupies bits 30:29, so 1 is `0x20000000`, not `0x20`) and `91002000`. Recovered 2026-11-09: the input was not stored; it was rebuilt from the layout recorded in this note (pair at `0xff8`, `blob` at `0x1008`), kept at `research/evidence/experiments/EXP-0008/A64-P6-adrp-lo12-pair.s` and `input_sha256` re-pinned to those bytes. The recorded command still emits the committed 4104-byte image.",
   "source": "Arm MRS ADRP_only_pcreladdr (immhi 5+19, immlo 29+2) and ADD_64_addsub_imm (imm12 10+12)"
 }

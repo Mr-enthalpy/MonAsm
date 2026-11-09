@@ -73,22 +73,38 @@ turns a `SKIP` into a failure; that is the gate to use once the missing inputs
 are backfilled. The summary always prints `<pass>/<total> re-derived,
 <skip> skipped`, so a partial run is never reported as a clean corpus.
 
-### State (2026-11-08, llvm-mc 23.1.2)
+### State (2026-11-09, llvm-mc 23.1.2)
 
-`80/114 re-derived, 34 skipped, 0 failed`:
+`109/114 re-derived, 5 skipped, 0 failed`:
 
 - 70 x86-64 records reproduce byte-identically, including the `ld.lld` one and
   `X86-P74`, which shares its input with `X86-P20`.
-- 6 RV64 records reproduce: the committed `jal`, `pcrel_hi`/`pcrel_lo12`, `lui`
-  and `jalr` inputs. 9 RV64 records are `input-not-stored`.
-- 4 AArch64 records reproduce: the committed `A64-P21` (two inputs) and
-  `A64-P22` inputs; the other 20 are `input-not-stored`.
+- 24 AArch64 records reproduce: every `A64-P1`–`A64-P22` input now resolves.
+- 15 RV64 records reproduce: every `RV-P1`–`RV-P10` input now resolves.
 - 5 x86-64 records are `manual-derivation`: the expected bytes include an
   encoding `llvm-mc` will not select from a mnemonic (documented per record).
 
-The 29 `input-not-stored` records are exactly the 20 AArch64 and 9 RV64 records
-whose inputs were never committed; the recorded `input_sha256` matches no file
-in the evidence tree, so the harness refuses to treat them as verified.
+The 29 records that were `input-not-stored` on 2026-11-08 are resolved:
+
+- Twenty inputs now hash to the value the record already carried, so nothing
+  was re-pinned. Twelve are copied verbatim from fenced source listings in
+  their experiment documents (`A64-P10`–`A64-P13`, `A64-P15`–`A64-P17`,
+  `A64-P19`, `A64-P2-add-imm12-lsl12`, `A64-P3`, `A64-P4`, `RV-P3`); the other
+  eight (`RV-P1`, `RV-P2`, `RV-P4`, `RV-P5`, `RV-P7`, `RV-P8-auipc-imm20`,
+  `RV-P8-pcrel-pair`, `RV-P8-pcrel-pair-resolved`) were rebuilt from the
+  recorded spellings and came out byte-identical.
+- Nine AArch64 inputs (`A64-P1`, `A64-P2-add-imm12`, `A64-P5`, `A64-P6`,
+  `A64-P7`, `A64-P8`, `A64-P9`, `A64-P14`, `A64-P18`) were rebuilt from the
+  spellings in the experiment tables and the `*.oracle.json` notes, kept under
+  `research/evidence/experiments/EXP-XXXX/`, and `input_sha256` was re-pinned to
+  the rebuilt bytes. The original whitespace was not recorded, so those files
+  cannot be byte-identical to what was hashed.
+- In every case the recorded command reproduces the committed `expected.bin`,
+  `output_sha256` and `size`; a rebuilt input therefore cannot be told apart by
+  the bytes it produces. `A64-P14` and `A64-P18` are smaller than the byte
+  counts their notes previously stated; the notes now record the rebuilt size
+  and the recovery. The five `manual-derivation` records are the only reason
+  `--strict` still exits 1.
 
 A corrupted `expected.bin` fails the run (byte offset is printed) and exits `1`;
 this was checked by flipping one byte of `X86-P6` and restoring it.
