@@ -497,10 +497,13 @@ shallow checkout had no `HEAD^` for the whitespace step, and `apt.llvm.org`
 served `llvm-mc 23.1.6` where the records pin `23.1.2`. `ADR-0124` now records
 those measured causes: the workflow installs `rustfmt` explicitly, diffs the
 whitespace range the event names on a full checkout, and installs the
-digest-checked `llvmorg-23.1.2` release asset. The next action is to read the
-next hosted run: a green one records the measured oracle version, and a red one
-re-decides the install recipe before anything else lands. Further widening still
-needs a new scope ADR.
+digest-checked `llvmorg-23.1.2` release asset. The repaired run `42681104791`
+(commit `23ad206`) is **green in all three jobs**: `workspace tests`
+(formatting plus the suite), `oracle rerun` (`toolchain: llvm-mc 23.1.2`,
+`122/128 re-derived, 6 skipped, 0 failed`) and `document and definition gates`
+(`whitespace range: 8057508…daf1..HEAD`). The gate set is measured end to end on
+a hosted runner, so the next action is a new scope ADR before any further
+widening.
 
 ### Widening backlog
 
