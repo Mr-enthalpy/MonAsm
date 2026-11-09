@@ -362,7 +362,7 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
-### 8.1 `x86-64` `0.1.0` … `0.68.0`
+### 8.1 `x86-64` `0.1.0` … `0.76.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -589,6 +589,42 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:cmp/rm64-r64/legacy` | `4839c0` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]` | 3 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
 | `x86:cmp/rm32-r32/legacy` | `39c0` | dest: `x86.gpr32`/`rm32` → `[8,3]`; src: `x86.gpr32`/`r32` → `[11,3]` | 2 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
 | `x86:cmp/rm16-r16/legacy` | `6639c0` | dest: `x86.gpr16`/`rm16` → `[16,3]`; src: `x86.gpr16`/`r16` → `[19,3]` | 3 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
+| `x86:add/rm32-imm8/legacy` | `83c000` | dest: `x86.gpr32`/`rm32` → `[8,3]`; imm: `x86.imm`/`imm8` → `[16,8]` | 3 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:add/rm32-imm32/legacy` | `81c000000000` | dest: `x86.gpr32`/`rm32` → `[8,3]`; imm: `x86.imm`/`imm32` → `[16,32]` | 6 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:add/rm16-imm8/legacy` | `6683c000` | dest: `x86.gpr16`/`rm16` → `[16,3]`; imm: `x86.imm`/`imm8` → `[24,8]` | 4 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:add/rm16-imm16/legacy` | `6681c00000` | dest: `x86.gpr16`/`rm16` → `[16,3]`; imm: `x86.imm`/`imm16` → `[24,16]` | 5 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:sub/rm32-imm8/legacy` | `83e800` | dest: `x86.gpr32`/`rm32` → `[8,3]`; imm: `x86.imm`/`imm8` → `[16,8]` | 3 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:sub/rm32-imm32/legacy` | `81e800000000` | dest: `x86.gpr32`/`rm32` → `[8,3]`; imm: `x86.imm`/`imm32` → `[16,32]` | 6 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:sub/rm16-imm8/legacy` | `6683e800` | dest: `x86.gpr16`/`rm16` → `[16,3]`; imm: `x86.imm`/`imm8` → `[24,8]` | 4 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:sub/rm16-imm16/legacy` | `6681e80000` | dest: `x86.gpr16`/`rm16` → `[16,3]`; imm: `x86.imm`/`imm16` → `[24,16]` | 5 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:and/rm64-imm8/legacy` | `4883e000` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm8` → `[24,8]` | 4 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:and/rm64-imm32/legacy` | `4881e000000000` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm32` → `[24,32]` | 7 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:and/rm32-imm8/legacy` | `83e000` | dest: `x86.gpr32`/`rm32` → `[8,3]`; imm: `x86.imm`/`imm8` → `[16,8]` | 3 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:and/rm32-imm32/legacy` | `81e000000000` | dest: `x86.gpr32`/`rm32` → `[8,3]`; imm: `x86.imm`/`imm32` → `[16,32]` | 6 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:and/rm16-imm8/legacy` | `6683e000` | dest: `x86.gpr16`/`rm16` → `[16,3]`; imm: `x86.imm`/`imm8` → `[24,8]` | 4 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:and/rm16-imm16/legacy` | `6681e00000` | dest: `x86.gpr16`/`rm16` → `[16,3]`; imm: `x86.imm`/`imm16` → `[24,16]` | 5 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:or/rm64-imm8/legacy` | `4883c800` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm8` → `[24,8]` | 4 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:or/rm64-imm32/legacy` | `4881c800000000` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm32` → `[24,32]` | 7 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:or/rm32-imm8/legacy` | `83c800` | dest: `x86.gpr32`/`rm32` → `[8,3]`; imm: `x86.imm`/`imm8` → `[16,8]` | 3 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:or/rm32-imm32/legacy` | `81c800000000` | dest: `x86.gpr32`/`rm32` → `[8,3]`; imm: `x86.imm`/`imm32` → `[16,32]` | 6 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:or/rm16-imm8/legacy` | `6683c800` | dest: `x86.gpr16`/`rm16` → `[16,3]`; imm: `x86.imm`/`imm8` → `[24,8]` | 4 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:or/rm16-imm16/legacy` | `6681c80000` | dest: `x86.gpr16`/`rm16` → `[16,3]`; imm: `x86.imm`/`imm16` → `[24,16]` | 5 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:xor/rm64-imm8/legacy` | `4883f000` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm8` → `[24,8]` | 4 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:xor/rm64-imm32/legacy` | `4881f000000000` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm32` → `[24,32]` | 7 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:xor/rm32-imm8/legacy` | `83f000` | dest: `x86.gpr32`/`rm32` → `[8,3]`; imm: `x86.imm`/`imm8` → `[16,8]` | 3 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:xor/rm32-imm32/legacy` | `81f000000000` | dest: `x86.gpr32`/`rm32` → `[8,3]`; imm: `x86.imm`/`imm32` → `[16,32]` | 6 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:xor/rm16-imm8/legacy` | `6683f000` | dest: `x86.gpr16`/`rm16` → `[16,3]`; imm: `x86.imm`/`imm8` → `[24,8]` | 4 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:xor/rm16-imm16/legacy` | `6681f00000` | dest: `x86.gpr16`/`rm16` → `[16,3]`; imm: `x86.imm`/`imm16` → `[24,16]` | 5 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:cmp/rm64-imm8/legacy` | `4883f800` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm8` → `[24,8]` | 4 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:cmp/rm64-imm32/legacy` | `4881f800000000` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; imm: `x86.imm`/`imm32` → `[24,32]` | 7 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:cmp/rm32-imm8/legacy` | `83f800` | dest: `x86.gpr32`/`rm32` → `[8,3]`; imm: `x86.imm`/`imm8` → `[16,8]` | 3 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:cmp/rm32-imm32/legacy` | `81f800000000` | dest: `x86.gpr32`/`rm32` → `[8,3]`; imm: `x86.imm`/`imm32` → `[16,32]` | 6 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:cmp/rm16-imm8/legacy` | `6683f800` | dest: `x86.gpr16`/`rm16` → `[16,3]`; imm: `x86.imm`/`imm8` → `[24,8]` | 4 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:cmp/rm16-imm16/legacy` | `6681f80000` | dest: `x86.gpr16`/`rm16` → `[16,3]`; imm: `x86.imm`/`imm16` → `[24,16]` | 5 | EC-01, EC-06, EC-07, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:and/rax-imm32/legacy` | `482500000000` | imm: `x86.imm`/`imm32` → `[16,32]` | 6 | EC-04, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:or/rax-imm32/legacy` | `480d00000000` | imm: `x86.imm`/`imm32` → `[16,32]` | 6 | EC-04, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:xor/rax-imm32/legacy` | `483500000000` | imm: `x86.imm`/`imm32` → `[16,32]` | 6 | EC-04, `ADR-0114`, `X86-P82` — `0.76.0`+ |
+| `x86:cmp/rax-imm32/legacy` | `483d00000000` | imm: `x86.imm`/`imm32` → `[16,32]` | 6 | EC-04, `ADR-0114`, `X86-P82` — `0.76.0`+ |
 | `x86:vmovaps/xmm-rsp-disp8/vex` | `c5f828442400` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; disp: `x86.imm`/`disp8` → `[40,8]` | 6 | EC-02, EC-09, EC-35, EC-38, X86-P24 |
 | `x86:vmovaps/xmm-rsp-disp32/vex` | `c5f828842400000000` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | EC-02, EC-09, EC-35, EC-38, X86-P24 |
 | `x86:vmovaps/xmm-r12-disp8/vex` | `c4c17828442400` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[35,3]`; disp: `x86.imm`/`disp8` → `[48,8]` | 7 | EC-02, EC-06, EC-09, EC-35, EC-38, X86-P24 |
@@ -2260,6 +2296,22 @@ thirty instructions. `adc` has no row (`N01eu`), the sibling direction is
 `E-FORM-001` (`N01ev`), the `0.74.0` boundary is `E-FORM-001` (`N01ew`), a
 missing source is `E-OPERAND-002` (`N02dd`) and register `8` on a 32-bit row
 is `E-OPERAND-004` (`N14ch`).
+
+`0.76.0` extends the immediate family (`ADR-0114`): thirty-six rows. `add` and
+`sub` gain 32/16-bit pairs (`83 /r ib` and `81 /r id`/`iw`); `and`, `or`, `xor`
+and `cmp` gain all three widths in both immediate widths; and the four 64-bit
+`%rax` short forms (`25`, `0D`, `35`, `3D`) land. `addl $1, %ebx` is
+`83 c3 01` (3 B), `addl $300, %ecx` is `81 c1 2c 01 00 00` (6 B),
+`addw $1, %bx` is `66 83 c3 01` (4 B) and `addw $300, %cx` is
+`66 81 c1 2c 01` (5 B). The `imm8` rows sign-extend to the operand size; the
+full-width rows carry `imm32` at 32/64 bits and `imm16` at 16 bits. The 64-bit
+`ModRM` rows put the destination in `REX.B` + `ModRM.r/m` and reach
+`%r8`-`%r15`; the 32/16-bit rows are three-bit. The `%rax` short form carries
+only the immediate slot, because the accumulator is implicit in the form
+(`EC-04`). `X86-P82` is the 176-byte vector of thirty-six instructions. `test`
+has no row (`N01ex`), the `0.75.0` boundary is `E-FORM-001` (`N01ey`),
+`imm8 = 128` is `E-RANGE-001` (`N03zw`) and `imm16 = 32768` is `E-RANGE-001`
+(`N03zx`).
 
 ### 8.2 `aarch64` `0.1.0` … `0.18.0`
 

@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj X86-P82-alu-imm.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "0f6416799ee341eb2b1e387b54ef987f084ef7720c99de737f82da5cd2246726",
+  "output_sha256": "5f6ff0fda2c4c39dc4e689a00055de0a4f86a02e0d5f24ec6e63dbd72c38822d",
+  "size": 176,
+  "records": 0,
+  "notes": "Input, one LF-terminated line each (`EXP-0113` §2): the `imm8` row and the full-width row of each ALU mnemonic at its widths, plus the 64-bit `%rax` short forms of `and`/`or`/`xor`/`cmp`. Thirty-six instructions, 176 bytes in all; every operand is a register or an immediate, so no relocation record is emitted. The `%rax` forms carry only the immediate operand because the accumulator is implicit in the form.",
+  "source": "`llvm-mc` 23.1.2 selection; the `imm8` vs full-width choice is `EC-01`, the accumulator vs ModRM choice is `EC-04`, the operand-size prefix is `EC-07`, and the three-bit register window is `EC-01`. The measured bytes match the templates the generator appends as `definitions/x86_64/0.76.0.json`."
+}

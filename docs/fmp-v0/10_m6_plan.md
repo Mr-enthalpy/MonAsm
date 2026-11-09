@@ -1,6 +1,6 @@
 # M6 Plan — Coverage Round 2
 
-- Status: accepted (`ADR-0112`); `S1` landed 2026-11-09 (`ADR-0113`)
+- Status: accepted (`ADR-0112`); `S1` landed 2026-11-09 (`ADR-0113`); `S2` landed 2026-11-10 (`ADR-0114`)
 - Date: 2026-11-09
 - Baseline: Phase 6 closed (`ADR-0111`): 759 forms, 121 positive and 586
   negative plans, `fmp/0.1` frozen
@@ -86,7 +86,7 @@ The slice leaves out `adc`/`sbb`, the 8-bit widths, the high window of the
 (`E-FORM-001`), register `8` past the three-bit field (`E-OPERAND-004`) and a
 missing source (`E-OPERAND-002`).
 
-### S2 — x86 ALU immediate (`ADR-0114`, `0.76.0`, `X86-P82`)
+### S2 — x86 ALU immediate (`ADR-0114`, `0.76.0`, `X86-P82`, landed)
 
 36 rows:
 
@@ -97,9 +97,10 @@ missing source (`E-OPERAND-002`).
 - the `%rax` short form of the four new mnemonics at 64 bits (`25`, `0D`,
   `35`, `3D`), 4 rows.
 
-`EC-04` already carries `imm8` vs `imm32`; the 16-bit `iw` width is the
-existing operand-size prefix (`EC-07`). If the `%rax` short form is not already
-a named decision, the slice adds one `EC` row before the rows land.
+`EC-01` already carries `imm8` vs the full-width immediate and `EC-04` already
+carries the accumulator form, so both are widened in place rather than
+duplicated; the 16-bit `iw` width is the existing operand-size prefix
+(`EC-07`). No new `EC` row is needed, and the count stays 42.
 
 The `test`/`neg`/`not` group, the 8-bit width, the 32/16-bit `%rax` short
 forms and the memory forms stay out. Negatives: `test` (`E-FORM-001`), the
