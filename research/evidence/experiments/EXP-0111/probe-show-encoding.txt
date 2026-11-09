@@ -1,0 +1,6 @@
+	subq	%rcx, %rax                      # encoding: [0x48,0x29,0xc8]
+	subq	%rax, %rcx                      # encoding: [0x48,0x29,0xc1]
+	subl	%ecx, %eax                      # encoding: [0x29,0xc8]
+	subl	%eax, %ecx                      # encoding: [0x29,0xc1]
+	subw	%cx, %ax                        # encoding: [0x66,0x29,0xc8]
+	subw	%ax, %cx                        # encoding: [0x66,0x29,0xc1]

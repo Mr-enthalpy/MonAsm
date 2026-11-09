@@ -4,19 +4,25 @@
     "isa_family": "x86",
     "isa_variant": "x86-64",
     "execution_mode": "64",
-    "enabled_extensions": ["avx", "avx512f", "avx512vl"],
+    "enabled_extensions": [
+      "avx",
+      "avx512f",
+      "avx512vl"
+    ],
     "feature_constraints": [],
     "byte_order": "little",
     "address_width": 64
   },
   "definition_identity": {
     "namespace": "monasm.isa.x86",
-    "version": "0.66.0",
-    "digest": "sha256:63b3b3a153aa0b5508f2055496efa1c56ac74e56b03d56f56f5c522b6d2e1904"
+    "version": "0.74.0",
+    "digest": "sha256:27f337115cffe89c8d7028863e7748783247344ba4d8e622fa9c4345efdead58"
   },
   "output_contract": {
     "artifact": "bytes",
-    "section_order": [".text"],
+    "section_order": [
+      ".text"
+    ],
     "fixup_record_order": "section_id,offset,fixup_id",
     "include_symbol_table": false,
     "emit_fixups": true
@@ -28,7 +34,12 @@
       "image_backed": true,
       "declared_size": 3,
       "fragments": [
-        { "offset": 0, "size": 3, "kind": "instruction", "instruction_id": "I0001" }
+        {
+          "offset": 0,
+          "size": 3,
+          "kind": "instruction",
+          "instruction_id": "I0001"
+        }
       ]
     }
   ],
@@ -38,10 +49,26 @@
       "instruction_id": "I0001",
       "section_id": ".text",
       "offset": 0,
-      "form_id": "x86:sub/rm64-r64/legacy",
+      "form_id": "x86:sub/r64-rm64/legacy",
       "operands": [
-        { "role": "dest", "kind": "x86.gpr64", "target_type": "rm64", "payload": {"reg": 0}, "modifiers": [] },
-        { "role": "src", "kind": "x86.gpr64", "target_type": "r64", "payload": {"reg": 1}, "modifiers": [] }
+        {
+          "role": "dest",
+          "kind": "x86.gpr64",
+          "target_type": "r64",
+          "payload": {
+            "reg": 0
+          },
+          "modifiers": []
+        },
+        {
+          "role": "src",
+          "kind": "x86.gpr64",
+          "target_type": "rm64",
+          "payload": {
+            "reg": 1
+          },
+          "modifiers": []
+        }
       ],
       "expected_size": 3
     }

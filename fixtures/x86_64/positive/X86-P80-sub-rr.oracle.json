@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj X86-P80-sub-rr.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "7a4aa6fd42e25efb54043a8f22bc58e44aed4138e278a741313618ad014d813c",
+  "output_sha256": "6a77edb61cdf1b27a46c014a1f31cf59ab5204e26eb720460e5e9886fcef6ccf",
+  "size": 16,
+  "records": 0,
+  "notes": "Input, one LF-terminated line each (`EXP-0111` §2): the `29 /r` register/register `sub` at 64/32/16 bits, both operand directions. The six instructions are 3/3/2/2/3/3 bytes, 16 in all; every operand is a register, so no relocation record is emitted.",
+  "source": "`llvm-mc` 23.1.2 selection; the register/register shape and the `2B /r` absence are `EC-39`, the per-width prefix order is `EC-06`/`EC-07`, and the three-bit register window is `EC-01`. The measured bytes match the templates the generator appends as `definitions/x86_64/0.74.0.json`."
+}
