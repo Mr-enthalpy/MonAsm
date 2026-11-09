@@ -1,0 +1,24 @@
+fixture bytes 32: 627c041bc57c079b207c1f1b28018a1a8b118d9a20e0829a83f0851a1fc0809a
+mul w2, w3, w4               627c041b
+mul x5, x6, x7               c57c079b
+mul w0, w1, wzr              207c1f1b
+csel w8, w9, w10, eq         28018a1a
+csel x11, x12, x13, ne       8b118d9a
+csel x0, x1, x2, al          20e0829a
+csel w3, w4, w5, nv          83f0851a
+csel xzr, x0, x0, gt         1fc0809a
+
+`mul` fixes bits 14-10 (`Ra`) to 31 and reads Rd/Rn/Rm as
+plain register numbers, so `wzr` is 31 and not an excluded
+value. `csel` fixes `op`/`S` at 30-29 and `o2` at 10 and
+reads bits 12-15 as the condition; all sixteen values are
+defined, including `al` (14) and `nv` (15).
+
+contrast (`EC-44` and the `csel` row):
+  mul   x0, x1, x2      207c029b
+  madd  x0, x1, x2, x3  200c029b   xor 7000 (bits 14-10 only)
+  csel  x0, x1, x2, eq  2000829a
+  csinc x0, x1, x2, eq  2004829a   xor 0400 (bit 10 only)
+The alias is one pinned field over the base node, and the
+`csel` row is the CSEL node with `o2 = 0`, not the CSINC
+shape with a condition.

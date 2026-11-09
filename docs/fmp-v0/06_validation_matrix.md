@@ -1068,10 +1068,11 @@ and all twelve probe strings round-trip through `llvm-mc -disassemble`.
 | A64-P21 | Widening: the direct branch without a link | `b <label>`: `imm26` at 0+25 as field content, bit 31 = 0 and the rest of the word fixed; the target is a `pcrel_begin` fixup with `scale(2)` and `align_bits 2` | llvm-mc | **passing** — `A64-P21-b-imm26` (three field values `0`, `1`, `−1`) and `A64-P21-b-local-symbol` (symbols at 0/4/8 giving the fields `2`, `0`, `−2` from arithmetically resolved displacements) through `aarch64:b/imm26`; `N04e` rejects `imm26 = 33554432` (`E-RANGE-002`), `N19d` rejects a `link` modifier on the target (`E-OPERAND-003`), `N01x` rejects `aarch64:cbz/x64-imm19` (`E-FORM-001`), and `A64-P5` keeps covering `bl` |
 | A64-P22 | Widening: the three register transfers | `br`/`blr`/`ret <Rn>`: `op` at 21–22 fixed to `00`/`01`/`10` by the row, `Rn` at 5+5 as a `src` operand; no displacement field, no `P`, and `ret` carries no implicit `x30` | llvm-mc | **passing** — `A64-P22-register-branch` (six instructions: `br x1`, `br x0`, `blr x2`, `ret x30`, `ret x0`, `ret x19`) through `aarch64:br/rn`, `aarch64:blr/rn` and `aarch64:ret/rn`; `N01y` rejects the no-operand `aarch64:ret` id (`E-FORM-001`) |
 | A64-P23 | Widening: the PC-relative address, the split field that is not scaled | `adr x0, <label>`: `immlo` at 29+2 and `immhi` at 5+19 hold a signed 21-bit **byte** displacement from the instruction address, `Rd` at 0+5, `op = 0` at 31; the fixup is `pcrel_begin` + `identity` with `align_bits 0`, against `adrp`'s `pcrel_page` + `page` over the same two placements | llvm-mc | **passing** — `A64-P23-adr-imm21` (eight instructions, 32 B: five literals `0`, `8`, `−8`, `1048575`, `−1048576`, then three symbol sites giving `0`, `−24` and `−8`) through `aarch64:adr/x64-imm21`; `N04k` rejects `1048576` (`E-RANGE-002`), `N01ff` rejects the absent page variant `aarch64:adr/x64-imm21-page` and `N01fg` rejects the row against `0.18.0` (`E-FORM-001`); the same experiment measures the contrast `adr x0, #0` = `10000000` vs `adrp x0, #0` = `90000000` (`EC-43`) |
-
-Definition anchor for A64-P1/P2/P3/P4/P5/P6/P7/P8/P9/P10/P11/P12/P13/P14/P15/P16/P17/P18/P19/P20/P21/P22/P23,
+| A64-P24 | Widening: the multiply alias and the conditional select | `mul x0, x1, x2` is `MADD` with `Ra` (bits 14–10) pinned to 31: three operands, `Rd`/`Rn`/`Rm` at 0/5/16 and `sf` at 31 picking the width; `csel x0, x1, x2, <cond>` fixes `op`/`S` at 30–29 and `o2` at 10 and reads `cond` at 12–15 as `aarch64.cond`/`cond4` | llvm-mc | **passing** — `A64-P24-mul-csel` (eight instructions, 32 B: three `mul` rows including `wzr` in `Rm`, and five `csel` rows over both widths and `eq`/`ne`/`al`/`nv`/`gt`) through `aarch64:mul/w32-w32-w32` … `csel/x64-x64-x64-cond4`; `N01fh` rejects the four-operand `madd` shape named `mul` and `N01fi` rejects the rows against `0.19.0` (`E-FORM-001`), `N02dd` rejects a two-operand row (`E-OPERAND-002`), `N03a1` rejects `cond = 16` (`E-RANGE-001`); the same experiment measures `mul`/`madd` differing only in bits 14–10 (`EC-44`) and `csel`/`csinc` only in bit 10 |
+Definition anchor for A64-P1/P2/P3/P4/P5/P6/P7/P8/P9/P10/P11/P12/P13/P14/P15/P16/P17/P18/P19/P20/P21/P22/P23/P24,
 measured 2026-11-04 (A64-P18 and A64-P19 measured 2026-11-05; A64-P20,
-A64-P21 and A64-P22 measured 2026-11-08; A64-P23 measured 2026-11-10): the four base
+A64-P21 and A64-P22 measured 2026-11-08; A64-P23 and A64-P24 measured
+2026-11-10): the four base
 forms live in `definitions/aarch64/0.1.0.json` (digest
 `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e`),
 generated from the Arm MRS 2026-06 drop by `EXP-0008`. `0.2.0` adds the fifth,
@@ -1140,8 +1141,12 @@ direct `b` and the three register branches with `Rn` as an operand (`EC-41`,
 ADR-0100); `0.19.0` adds the `adr` row (digest
 `sha256:f299d978b734a295fe111f6e03999d891d08a84e6d02c36ce83ee9a25c961546`),
 `ADR_only_pcreladdr` with `op = 0` and the same `immhi`/`immlo` split as `adrp`,
-but a byte displacement and an `identity` fixup (`EC-43`, ADR-0118);
-`0.1.0`…`0.18.0` are unchanged.
+but a byte displacement and an `identity` fixup (`EC-43`, ADR-0118); `0.20.0`
+adds the four `mul`/`csel` rows (digest
+`sha256:05033c9e1c5ca430d2922312cf7139c9bc4e8cc7c34364e24a455efa9a1df6cd`),
+`MADD_32A_dp_3src`/`MADD_64A_dp_3src` with `Ra = 31` and
+`CSEL_32_condsel`/`CSEL_64_condsel` with `cond` as the fourth operand (`EC-44`,
+ADR-0119); `0.1.0`…`0.19.0` are unchanged.
 `llvm-mc` does not resolve AArch64 branch or `adrp` immediates when
 they name a symbol, so A64-P5/P6 take their bytes after
 `ld.lld --image-base=0 -Ttext=0` has resolved the same `(S, P)` pair; the
@@ -1150,12 +1155,12 @@ relocation kinds were read with `llvm-readobj -r` before linking (see
 are all immediates and A64-P4's three targets are local labels in one section, so
 `llvm-mc` resolves both itself and emits no relocations. A64-P7, A64-P8, A64-P9,
 A64-P10, A64-P11, A64-P12, A64-P13, A64-P14, A64-P15, A64-P16, A64-P17, A64-P18,
-A64-P19, A64-P20, A64-P21, A64-P22 and A64-P23
+A64-P19, A64-P20, A64-P21, A64-P22, A64-P23 and A64-P24
 need no linker either: their operands are registers or immediates, and the symbol
 targets of A64-P16, A64-P21 and A64-P23 are local instruction labels that
 `llvm-mc` resolves itself, leaving `llvm-readobj -r` empty (`EXP-0025` §3,
-`EXP-0101`, `EXP-0117`). The
-sixty-four negative fixtures (`N01` ×26, `N02` ×8, `N03` ×9, `N04` ×4, `N12a`,
+`EXP-0101`, `EXP-0117`, `EXP-0118`). The
+sixty-eight negative fixtures (`N01` ×28, `N02` ×9, `N03` ×10, `N04` ×4, `N12a`,
 `N14`, `N16` ×3, `N18` ×7, `N19` ×4, `N20`) exercise these tables with
 exact diagnostic sets.
 

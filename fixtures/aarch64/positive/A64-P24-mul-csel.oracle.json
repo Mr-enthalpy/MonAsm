@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P24-mul-csel.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "b9e200fc9cdc9751c06fbc0b4239b9373b18cba098d3a89f4e20bc3ac2051410",
+  "output_sha256": "bdae66527cf6d5832b1a157cf74263f04f8f5fd6c89ba8505a222d6477930d44",
+  "size": 32,
+  "records": 0,
+  "notes": "Input (LF, trailing newline) is `research/evidence/experiments/EXP-0118/A64-P24-mul-csel.s`: `mul w2, w3, w4`, `mul x5, x6, x7`, `mul w0, w1, wzr`, `csel w8, w9, w10, eq`, `csel x11, x12, x13, ne`, `csel x0, x1, x2, al`, `csel w3, w4, w5, nv`, `csel xzr, x0, x0, gt`. All eight rows are self-contained, so `llvm-readobj -r` is empty and no linker is involved. Measured words: `627c041b`, `c57c079b`, `207c1f1b`, `28018a1a`, `8b118d9a`, `20e0829a`, `83f0851a`, `1fc0809a`. Row 3 passes register number 31 in `Rm` (`wzr`): the `mul` row reads a plain register number and excludes nothing, so 31 is legal there even though `Ra` is the field the alias pins. Rows 4-7 fix the condition at bits 12-15 as `eq` (0), `ne` (1), `al` (14) and `nv` (15); the ISA defines all sixteen values, so the row has no `excluded` list. `measure.py` derives every word from the MRS nodes before comparing with the assembler, and `llvm-objdump -d` re-reads mnemonic and operands. The companion vector `A64-P24-mul-vs-madd.s` measures the two contrasts the tables rest on: `mul x0, x1, x2` is `9b027c20` and `madd x0, x1, x2, x3` is `9b020c20`, differing only in bits 14-10 (`Ra`, 31 vs 3), which is why the alias is one pinned field of `MADD` and there is no four-operand row (`EC-44`); `csel x0, x1, x2, eq` is `9a820020` and `csinc x0, x1, x2, eq` is `9a820420`, differing only in bit 10 (`o2`), which the `CSEL` node fixes to 0.",
+  "source": "Arm MRS alias `MUL` (`operation_id` `MUL_MADD`, `condition` `Ra == '11111'`, `preferred: true`) over `MADD_32A_dp_3src` / `MADD_64A_dp_3src` (`op54` 29+2, `op1` 28+1, 25+3, 24+1, `op31` 21+3, `o0` 15+1; `Rd` 0+5, `Rn` 5+5, `Rm` 16+5, `Ra` 10+5) and `CSEL_32_condsel` / `CSEL_64_condsel` (`op` 30+1, `S` 29+1, `op1` 28+1, 25+3, 21+4, bit 11 = 0, `o2` 10+1; `cond` 12+4)"
+}

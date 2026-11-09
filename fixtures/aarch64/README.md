@@ -1,6 +1,6 @@
 # AArch64 fixtures
 
-Vectors: `A64-P1` … `A64-P23` in `docs/fmp-v0/06_validation_matrix.md`.
+Vectors: `A64-P1` … `A64-P24` in `docs/fmp-v0/06_validation_matrix.md`.
 
 ## What is here
 
@@ -31,6 +31,7 @@ Vectors: `A64-P1` … `A64-P23` in `docs/fmp-v0/06_validation_matrix.md`.
 | `positive/A64-P21-b-local-symbol` | `aarch64:b/imm26` ×3 against labels at 0/4/8, so the fields are 2, 0 and −2 through the `pcrel_begin` + `scale(2)` path | `llvm-mc` (no linker: resolved labels, no relocations) |
 | `positive/A64-P22-register-branch` | `aarch64:br/rn`, `blr/rn` and `ret/rn` (`0.18.0`): `br x1`, `br x0`, `blr x2`, `ret x30`, `ret x0`, `ret x19`; six instructions, 24 B | `llvm-mc` (no linker: registers only, no relocations) |
 | `positive/A64-P23-adr-imm21` | `aarch64:adr/x64-imm21` ×8 (`0.19.0`): five literal byte displacements (`0`, `8`, `−8`, `1048575`, `−1048576`) and three symbol sites giving `0`, `−24` and `−8` through `pcrel_begin` + `identity`; eight instructions, 32 B, `immlo` at 29+2 and `immhi` at 5+19 | `llvm-mc` (no linker: local instruction labels, no relocations) |
+| `positive/A64-P24-mul-csel` | `aarch64:mul/w32-w32-w32`, `mul/x64-x64-x64` (`0.20.0`, `Ra` pinned to 31) and `csel/w32-w32-w32-cond4`, `csel/x64-x64-x64-cond4`, with `cond` as the fourth operand; eight instructions, 32 B, three `mul` rows (one with `wzr` in `Rm`) and five `csel` rows (`eq`, `ne`, `al`, `nv`, `gt`) | `llvm-mc` (no linker: registers and immediates only, no relocations) |
 | `negative/N01-absent-scaled-form` | `aarch64:add/x64-imm12-lsl12` against `0.1.0`, which lacks it | `E-FORM-001` |
 | `negative/N01b-absent-register-offset-form` | `aarch64:ldr/x64-base-regoff` (`0.4.0` has no such form) | `E-FORM-001` |
 | `negative/N01d-absent-movz-lane` | `aarch64:movz/x64-imm16-lsl8` (`0.5.0` has four lanes, not eight) | `E-FORM-001` |
@@ -57,6 +58,8 @@ Vectors: `A64-P1` … `A64-P23` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N01y-absent-ret-default-operand` | `aarch64:ret` (no operand): the assembler's bare `ret` means `ret x30`, and a hidden default is `INV-05`, so the row is `ret/rn` only | `E-FORM-001` |
 | `negative/N01ff-adr-page-variant-absent` | `aarch64:adr/x64-imm21-page`: the page row is `aarch64:adrp/x64-imm21`, and the page reading is its fixup, not a second `adr` name | `E-FORM-001` |
 | `negative/N01fg-adr-row-on-0.18.0` | `aarch64:adr/x64-imm21` against `0.18.0`, which does not have the row yet | `E-FORM-001` |
+| `negative/N01fh-madd-shape-named-mul` | `aarch64:mul/x64-x64-x64-x64` (four operands, a plan-supplied accumulator): the alias fixes `Ra = 31`, so the `madd` shape has no row (`EC-44`) | `E-FORM-001` |
+| `negative/N01fi-mul-csel-row-on-0.19.0` | `aarch64:csel/x64-x64-x64-cond4` against `0.19.0`, which does not have the new rows yet | `E-FORM-001` |
 | `negative/N02b-w-source-in-shift-form` | a `w32` operand on the `x`-source `-imm6-lsl` row | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02c-x-dest-on-w-row` | an `x64` destination on `aarch64:add/w32-w32-w32-lsl0` | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02d-ext-x-source-on-w-keyword` | an `x64` source on `aarch64:sub/x64-x64-w32-imm3-uxtb` | `E-OPERAND-001` (kind and target_type) |
@@ -65,6 +68,7 @@ Vectors: `A64-P1` … `A64-P23` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N02g-w-index-on-w32-lsl-row` | a `w32` index on `aarch64:ldr/w32-base-regoff-lsl0`, whose `index` is `x64` | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02h-x-dest-on-w32-row` | an `x64` destination on `aarch64:ldr/w32-base-regoff-lsl0`, whose `dest` is `w32` | `E-OPERAND-001` (kind and target_type) |
 | `negative/N02i-w-dest-on-movk-row` | a `w32` destination on `aarch64:movk/x64-imm16-lsl16`, whose `dest` is `x64` | `E-OPERAND-001` (kind and target_type) |
+| `negative/N02dd-mul-missing-src2` | two operands on `aarch64:mul/x64-x64-x64`, whose slots are `dest`, `src` and `src2` | `E-OPERAND-002` (`expected: 3`, `found: 2`) |
 | `negative/N03-imm12-out-of-range` | imm12 = 4096 | `E-RANGE-001` |
 | `negative/N03-imm12-disp-out-of-range` | `disp = 4096` on the load/store `imm12` field | `E-RANGE-001` |
 | `negative/N03-imm9-disp-out-of-range` | `disp = −257` on the `ldur` `imm9` field | `E-RANGE-001` |
@@ -74,6 +78,7 @@ Vectors: `A64-P1` … `A64-P23` in `docs/fmp-v0/06_validation_matrix.md`.
 | `negative/N03-imm6-out-of-range` | `imm6 = 64`, one past the shift amount's 6-bit field | `E-RANGE-001` |
 | `negative/N03-imm3-out-of-range` | `imm3 = 8`, one past the extend amount's 3-bit field | `E-RANGE-001` |
 | `negative/N03-movk-imm16-out-of-range` | `imm16 = 65536`, one past the 16-bit move-wide field | `E-RANGE-001` |
+| `negative/N03a1-csel-cond-out-of-range` | `cond = 16` on `aarch64:csel/w32-w32-w32-cond4`, one past the four-bit condition field | `E-RANGE-001` |
 | `negative/N04c-bcond-imm19-out-of-range` | `imm19 = 262144`, one past the signed 19-bit field | `E-RANGE-002` |
 | `negative/N04d-loadlit-imm19-out-of-range` | `imm19 = 262144` on the literal row, one past the same signed field | `E-RANGE-002` |
 | `negative/N04e-b-imm26-out-of-range` | `imm26 = 33554432` on `aarch64:b/imm26`, one past the signed 26-bit field (`llvm-mc` wraps it to `0x14800000`; v0 rejects) | `E-RANGE-002` |
@@ -112,8 +117,9 @@ literal load (`N01o`), a plan bound to `0.14.0` cannot reach the
 register-offset rows (`N01p`), a plan bound to `0.15.0` cannot reach the
 32-bit register-offset rows (`N01r`), a plan bound to `0.16.0` cannot reach
 the `movk`/`movn` rows (`N01u`), a plan bound to `0.17.0` cannot reach the
-unconditional-transfer rows (`ADR-0100`), and a plan bound to `0.18.0` cannot
-reach the `adr` row (`N01fg`). `N01t` and `N01v` are a different negation: they
+unconditional-transfer rows (`ADR-0100`), a plan bound to `0.18.0` cannot
+reach the `adr` row (`N01fg`), and a plan bound to `0.19.0` cannot reach the
+`mul`/`csel` rows (`N01fi`). `N01t` and `N01v` are a different negation: they
 name a lane no version has (`-lsl8`) and a width no version has (`w32`), and
 `N01w` names the `mov` alias, which no version has because its literal chooses
 the operation and lane. `N01x` and `N01y` are the third shape: a conditional
@@ -330,6 +336,28 @@ sits at 5+5 as a `src`, and the node's register is `Xn`, so 31 is `xzr` and no
 `ret` is `0xd65f03c0`, a hidden default — so a no-operand `ret` is
 `E-FORM-001` (`N01y`), and the conditional siblings stay absent (`N01x`).
 
+The multiply alias is the sixteenth instance, and the second whose decision is a
+shorter operand list. `A64-P24` covers `aarch64:mul/w32-w32-w32` and
+`mul/x64-x64-x64` (`0.20.0`, `ADR-0119`, `EXP-0118` §1): `MUL` is an MRS alias
+node with no `encoding`, whose `operation_id` is `MUL_MADD` and whose condition
+is `Ra == '11111'`, so the row is the `MADD` node with bits 14–10 pinned and the
+slots are `dest`, `src` and `src2` only. `mul x0, x1, x2` is `9b027c20` and
+`madd x0, x1, x2, x3` is `9b020c20`: the words differ in that one field, which is
+why the four-operand shape has no row (`E-FORM-001`, `N01fh`) and a two-operand
+row is `E-OPERAND-002` (`N02dd`). Register 31 stays a plain number in `Rm`, so
+the vector carries `mul w0, w1, wzr` (`207c1f1b`); pinning `Ra` reserves
+nothing else (`EC-44`).
+
+`csel` is the same vector's other half, and the third form whose fourth operand
+is a condition. `CSEL_32_condsel`/`CSEL_64_condsel` fix `op`/`S` at 30–29 and
+`o2` at 10 and leave `cond` at 12–15, so the slot is the frozen
+`aarch64.cond`/`cond4` and all sixteen values are legal (`eq` 0, `ne` 1, `al`
+14, `nv` 15 in the vector). `csel x0, x1, x2, eq` is `9a820020` and
+`csinc x0, x1, x2, eq` is `9a820420`: they differ only in bit 10, so the two are
+separate rows and not one row with a flag. `cond = 16` is the field end and is
+`E-RANGE-001` (`N03a1`), the same code `N03-cond-out-of-range` gives on
+`b.cond`.
+
 **An operand whose bits a fixup owns has an empty payload.** `{"payload": {}}`,
 not a `symbol_id`: `01_contract.md` §8.1 only allows `symbol_id` on a `target`
 role. In `A64-P6` the `add`'s `imm12` is such a slot, and the symbol is named
@@ -352,6 +380,8 @@ The literal load is the exception among the PC-relative rows: `llvm-mc` resolves
 its local instruction labels itself and `llvm-readobj -r` prints no relocations
 for `A64-P16`, so that vector needs no linker (`EXP-0025` §3). `adr` joins it:
 label differences are plain immediate fields, so `A64-P23` assembles to bytes
-without a linker and `llvm-readobj -r` is empty (`EXP-0117`).
+without a linker and `llvm-readobj -r` is empty (`EXP-0117`). `A64-P24` has no
+symbol at all — registers and immediates only — so it needs no linker either
+(`EXP-0118`).
 
 See `../README.md` for naming and oracle rules.

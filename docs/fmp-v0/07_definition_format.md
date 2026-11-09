@@ -355,10 +355,14 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/aarch64/0.16.0.json` | `monasm.isa.aarch64` | `sha256:1e83c6cad91594e8315500f39d0bcffa235edc90c5f47c012555c077a8dbc457` |
 | `definitions/aarch64/0.17.0.json` | `monasm.isa.aarch64` | `sha256:de2c53e1871f5c24f6af73082dcc402729786d2e6e2495f84e3ed553adb4e4ed` |
 | `definitions/aarch64/0.18.0.json` | `monasm.isa.aarch64` | `sha256:c32e3674bf50140276d29fd01891bab20a86b849fa1503d2c9d02ae6aa503824` |
+| `definitions/aarch64/0.19.0.json` | `monasm.isa.aarch64` | `sha256:f299d978b734a295fe111f6e03999d891d08a84e6d02c36ce83ee9a25c961546` |
+| `definitions/aarch64/0.20.0.json` | `monasm.isa.aarch64` | `sha256:05033c9e1c5ca430d2922312cf7139c9bc4e8cc7c34364e24a455efa9a1df6cd` |
 | `definitions/rv64/0.1.0.json` | `monasm.isa.riscv` | `sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083` |
 | `definitions/rv64/0.2.0.json` | `monasm.isa.riscv` | `sha256:8329a38faa964f9c69207a48e3bfb45c13fb0ddbaeb829ddcc0dbd1cffa8de10` |
 | `definitions/rv64/0.3.0.json` | `monasm.isa.riscv` | `sha256:484eae4ba4c80c1ff4d91bc11a6fd9bd36bdc511a8271815d76c0883869ad2af` |
 | `definitions/rv64/0.4.0.json` | `monasm.isa.riscv` | `sha256:e00dee01004ec9d927ac4e5494e8e6dabfcbb4ff0e123980190c9871624afa76` |
+| `definitions/rv64/0.5.0.json` | `monasm.isa.riscv` | `sha256:571ab1ed93f4464d5ec8981df02dd0444005ababdaaf1e175d0ec489bb33a776` |
+| `definitions/rv64/0.6.0.json` | `monasm.isa.riscv` | `sha256:0baf3b34804df12c5e73debf54cf70420ce436bec914258eb5216549972d9585` |
 
 A plan names its `namespace`, `version` and digest in `definition_identity`.
 
@@ -2361,7 +2365,7 @@ instructions. The indexed sibling is absent (`N01fb`, `E-FORM-001`), the
 `0.77.0` boundary is `E-FORM-001` (`N01fc`) and `disp8 = 128` is
 `E-RANGE-001` (`N03zz`).
 
-### 8.2 `aarch64` `0.1.0` … `0.19.0`
+### 8.2 `aarch64` `0.1.0` … `0.20.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -2546,6 +2550,10 @@ instructions. The indexed sibling is absent (`N01fb`, `E-FORM-001`), the
 | `aarch64:blr/rn` | `00003fd6` | src: `aarch64.gpr64`/`x64` → `[5,5]` | 4 | `A64-P22` — `0.18.0` only |
 | `aarch64:ret/rn` | `00005fd6` | src: `aarch64.gpr64`/`x64` → `[5,5]` | 4 | `A64-P22` — `0.18.0` only |
 | `aarch64:adr/x64-imm21` | `00000010` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; target: `aarch64.rel`/`imm21` → `[5,19]`, `[29,2]` | 4 | `EC-43`, `A64-P23` — `0.19.0` only |
+| `aarch64:mul/w32-w32-w32` | `007c001b` | dest: `aarch64.gpr32`/`w32` → `[0,5]`; src: `aarch64.gpr32`/`w32` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]` | 4 | `EC-44`, `A64-P24` — `Ra` pinned to 31, `0.20.0` only |
+| `aarch64:mul/x64-x64-x64` | `007c009b` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]` | 4 | `EC-44`, `A64-P24` — `Ra` pinned to 31, `0.20.0` only |
+| `aarch64:csel/w32-w32-w32-cond4` | `0000801a` | dest: `aarch64.gpr32`/`w32` → `[0,5]`; src: `aarch64.gpr32`/`w32` → `[5,5]`; src2: `aarch64.gpr32`/`w32` → `[16,5]`; imm: `aarch64.cond`/`cond4` → `[12,4]` | 4 | `A64-P24` — `0.20.0` only |
+| `aarch64:csel/x64-x64-x64-cond4` | `0000809a` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; src: `aarch64.gpr64`/`x64` → `[5,5]`; src2: `aarch64.gpr64`/`x64` → `[16,5]`; imm: `aarch64.cond`/`cond4` → `[12,4]` | 4 | `A64-P24` — `0.20.0` only |
 
 `0.1.0` holds the first, second, fourth and fifth rows; `0.2.0` adds
 `aarch64:add/x64-imm12-lsl12` (ADR-0011); `0.3.0` repeats all five and adds
@@ -2567,7 +2575,8 @@ repeats all one hundred and thirty-six and adds the sixteen register-offset rows
 sixty-eight and adds the eight `movk`/`movn` rows (ADR-0026); `0.18.0` repeats
 all one hundred and seventy-six and adds the four unconditional-transfer rows
 (ADR-0100); `0.19.0` repeats all one hundred and eighty and adds the `adr` row
-(ADR-0118).
+(ADR-0118); `0.20.0` repeats all one hundred and eighty-one and adds the two
+`mul` and two `csel` rows (ADR-0119).
 Each document therefore shares its earlier rows
 unchanged and differs only in the rows its version introduced, so a plan bound to
 an older version cannot reach a newer form (`E-FORM-001`, `N01`) even though the
@@ -2579,8 +2588,8 @@ The templates are little-endian file order, so `0000008b` is the word
 bit from the MRS node, requires the MRS node name to exist, and refuses to emit
 unless all 32 bits are covered exactly once by a fixed bit or a slot placement;
 `EXP-0008` §2–§3 records the nodes and the coverage check. The one hundred and
-eighty-one forms come
-from forty-four encode nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
+eighty-five forms come
+from forty-eight encode nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
 pinned to 0 and once per shift keyword, `ADD_64_addsub_ext` eight times, once per
 `option` value, `ADD_64_addsub_imm` twice, once with
 `sh = 0` and once with `sh = 1`, `MOVZ_64_movewide` four times, once per `hw`
@@ -2598,7 +2607,10 @@ fields as operands, `B_only_branch_imm` contributes `b`'s row (its
 `BR_64_branch_reg`, `BLR_64_branch_reg` and `RET_64R_branch_reg` contribute one
 row each with `Rn` as the single operand (`ADR-0100`), `ADR_only_pcreladdr`
 contributes `adr`'s row with `op` fixed to 0 (its `ADRP_only_pcreladdr` sibling
-has been `adrp` since `0.1.0`, `ADR-0118`), and each of the eight
+has been `adrp` since `0.1.0`, `ADR-0118`), `MADD_32A_dp_3src` and
+`MADD_64A_dp_3src` contribute `mul`'s rows with `Ra` pinned to 31, and
+`CSEL_32_condsel`/`CSEL_64_condsel` contribute `csel`'s rows with `cond` as the
+fourth operand (`ADR-0119`), and each of the eight
 load/store rows reads one node whose
 addressing-kind bits are fixed and whose `imm12`/`imm9` is the single variable
 field (`ADR-0022` adds the three store `imm9` nodes); `LDR_64_loadlit` is the one
@@ -2608,8 +2620,10 @@ times, once per `option`/`S` pair (`ADR-0024`), and the 32-bit pair
 `LDR_32_ldst_regoff`/`STR_32_ldst_regoff` eight times each on the same pattern
 (`ADR-0025`); the ten `CMP`/`CMN` alias
 nodes are read for verification only, because
-they carry no `encoding` and the bytes stay the base node's (`ADR-0021`). The
-generator states each pinned value explicitly and asserts that `0.1.0` … `0.18.0`
+they carry no `encoding` and the bytes stay the base node's (`ADR-0021`); the two
+`MUL` alias nodes are read the same way, over the `MADD` base nodes
+(`ADR-0119`). The
+generator states each pinned value explicitly and asserts that `0.1.0` … `0.19.0`
 still hash to their frozen digests.
 
 The literal row's `imm19` follows §8.3's rule, not a slot transform: the slot is
@@ -3042,10 +3056,12 @@ the plan names, so it is raised by static instruction validation
   ADR-0006: the facts come from the Arm MRS 2026-06 OPENSOURCE packaging, and
   the Arm notice ships with the generated table. The format did not need to
   change for it: `adrp`'s split `immhi:immlo` is two placements of one slot, as
-  §4.1 anticipated, and `adr` reuses it unchanged in `0.19.0`.
-  `definitions/aarch64/0.1.0.json` … `0.19.0.json` now exist
+  §4.1 anticipated, and `adr` reuses it unchanged in `0.19.0`; `mul` and
+  `csel` in `0.20.0` add no new slot kind either — the alias pins an existing
+  field and `csel` reuses `cond4`.
+  `definitions/aarch64/0.1.0.json` … `0.20.0.json` now exist
   (§8.2); each is a superset that adds its own rows without a format change
-  (ADR-0011 to ADR-0026, ADR-0100, ADR-0118). What is
+  (ADR-0011 to ADR-0026, ADR-0100, ADR-0118, ADR-0119). What is
   missing is coverage, not design: the `b`/`h` load/store widths, the signed and
   extended load rows (`LDRSW`/`LDRSB`/`LDRSH`), `prfm`, the 32-bit
   extended `add`/`sub` nodes and their aliases, and the `mov` alias and the

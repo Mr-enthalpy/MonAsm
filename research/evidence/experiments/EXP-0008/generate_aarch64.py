@@ -45,6 +45,7 @@ Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.17.0.json
         definitions/aarch64/0.18.0.json
         definitions/aarch64/0.19.0.json
+        definitions/aarch64/0.20.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -54,7 +55,6 @@ import hashlib
 import io
 import json
 import os
-import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
@@ -65,7 +65,8 @@ OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
 VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0",
             "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0",
-            "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0"]
+            "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0",
+            "0.20.0"]
 
 # Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
@@ -87,6 +88,7 @@ FROZEN_DIGESTS = {
     "0.16.0": "sha256:1e83c6cad91594e8315500f39d0bcffa235edc90c5f47c012555c077a8dbc457",
     "0.17.0": "sha256:de2c53e1871f5c24f6af73082dcc402729786d2e6e2495f84e3ed553adb4e4ed",
     "0.18.0": "sha256:c32e3674bf50140276d29fd01891bab20a86b849fa1503d2c9d02ae6aa503824",
+    "0.19.0": "sha256:f299d978b734a295fe111f6e03999d891d08a84e6d02c36ce83ee9a25c961546",
 }
 
 WIDTH = 32
@@ -1942,11 +1944,65 @@ def _pcrel_address_forms():
 FORMS.extend(_pcrel_address_forms())
 
 
-def _alias_stem(base):
-    stem = re.sub(r"_(32S?|64S?)_", "_", base)
-    if stem == base:
-        raise SystemExit("{0}: no width component to strip".format(base))
-    return stem
+def _mul_csel_forms():
+    """`mul` (the `MADD` alias) and `csel` (`ADR-0119`).
+
+    `MUL` has no encoding of its own: it is `MADD` with `Ra` (bits 14-10)
+    fixed to 31, which the alias node states as `condition: Ra == '11111'`
+    and `preferred: true`. The three operands are `Rd`, `Rn` and `Rm`; the
+    plan never states an accumulator, so the four-operand `madd` shape has
+    no row and is `E-FORM-001` (`EC-44`).
+
+    `CSEL_32_condsel`/`CSEL_64_condsel` fix `op`/`S` at 30-29 and `o2` at
+    10, and leave `cond` at 12-15 as the fourth operand, exactly as
+    `B_only_condbranch` leaves it. Every four-bit value is a condition the
+    ISA defines, `al`/`nv` included, so there is no `excluded` list.
+    """
+    rows = []
+    for width, kind in [("w32", "aarch64.gpr32"), ("x64", "aarch64.gpr64")]:
+        operand_node = "MADD_" + ("32A" if width == "w32" else "64A") + "_dp_3src"
+        rows.append({
+            "form_id": "aarch64:mul/{0}-{0}-{0}".format(width),
+            "mrs": operand_node,
+            "decision": "Ra = 31 (the alias drops the accumulator); "
+            "sf, op54, op31 and o0 are the node's",
+            "pinned": {"Ra": 31},
+            "since": "0.20.0",
+            "alias": "MUL",
+            "alias_width": width,
+            "alias_condition_field": "Ra",
+            "slots": [
+                {"mrs": ["Rd"], "role": "dest", "kind": kind,
+                 "from": "reg_number", "target_type": width},
+                {"mrs": ["Rn"], "role": "src", "kind": kind,
+                 "from": "reg_number", "target_type": width},
+                {"mrs": ["Rm"], "role": "src2", "kind": kind,
+                 "from": "reg_number", "target_type": width},
+            ],
+        })
+        rows.append({
+            "form_id": "aarch64:csel/{0}-{0}-{0}-cond4".format(width),
+            "mrs": "CSEL_" + ("32" if width == "w32" else "64") + "_condsel",
+            "decision": "op = 0 and S = 0 at 30-29 and o2 = 0 at 10, "
+            "fixed by the node; cond is the fourth operand",
+            "pinned": {},
+            "since": "0.20.0",
+            "slots": [
+                {"mrs": ["Rd"], "role": "dest", "kind": kind,
+                 "from": "reg_number", "target_type": width},
+                {"mrs": ["Rn"], "role": "src", "kind": kind,
+                 "from": "reg_number", "target_type": width},
+                {"mrs": ["Rm"], "role": "src2", "kind": kind,
+                 "from": "reg_number", "target_type": width},
+                {"mrs": ["cond"], "role": "imm", "kind": "aarch64.cond",
+                 "from": "operand_value", "target_type": "cond4",
+                 "range": {"signed": False, "bits": 4, "align_bits": 0}},
+            ],
+        })
+    return rows
+
+
+FORMS.extend(_mul_csel_forms())
 
 
 def _alias_width(node):
@@ -1977,7 +2033,7 @@ def load_alias_nodes(document):
 
 def verify_alias(spec, node, index):
     name = spec["alias"]
-    operation_id = "{0}_{1}".format(name, _alias_stem(spec["mrs"]))
+    operation_id = "{0}_{1}".format(name, node.get("operation_id"))
     candidates = index.get((name, operation_id), [])
     if len(candidates) != 2:
         raise SystemExit(
@@ -1999,13 +2055,14 @@ def verify_alias(spec, node, index):
         raise SystemExit(
             "{0}: the alias node is not preferred".format(spec["form_id"]))
     condition = alias.get("condition") or {}
+    alias_field = spec.get("alias_condition_field", "Rd")
     if (str(condition.get("_type")) != "AST.BinaryOp"
-            or (condition.get("left") or {}).get("value") != "Rd"
+            or (condition.get("left") or {}).get("value") != alias_field
             or condition.get("op") != "=="
             or (condition.get("right") or {}).get("value") != "'11111'"):
         raise SystemExit(
-            "{0}: the alias condition is not Rd == '11111': {1}".format(
-                spec["form_id"], json.dumps(condition)))
+            "{0}: the alias condition is not {1} == '11111': {2}".format(
+                spec["form_id"], alias_field, json.dumps(condition)))
     sf = None
     for field in encode_fields(node):
         if field["name"] == "sf":

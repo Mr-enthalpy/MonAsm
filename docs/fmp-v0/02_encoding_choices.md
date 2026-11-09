@@ -1,6 +1,6 @@
 # Encoding Decisions and Their Carriers
 
-Status: **frozen for the v0 scope** (`ADR-0095`); all 42 registry rows are
+Status: **frozen for the v0 scope** (`ADR-0095`); all 44 registry rows are
 frozen. This is the operational form of INV-02, under ADR-0004.
 
 ## The rule
@@ -104,6 +104,7 @@ not be moved to `frozen` on the strength of an argument alone.
 | EC-41 | AArch64 | `b` vs `bl` for a direct transfer: the link bit at 31 is the only difference in the word | One bit and one relocation kind; same length and same `imm26` operand | `form variant` (`b/imm26` / `bl/imm26`) | `llvm-mc` 23.1.2: `b ext` is `00 00 00 14` under `R_AARCH64_JUMP26` at `0x0`, while `bl ext` is `00 00 00 94` under `R_AARCH64_CALL26` at `0x4`. Both name the same target and both are 4 bytes, so a plan that states only "branch to `ext`" has not decided whether `x30` is written, and the consumer sees a different relocation either way. The bit cannot be a modifier: `{ "name": "link", "value": true }` on the `b` target is `E-OPERAND-003` (`N19d`), because a modifier describes an operand and must not write a template bit. The two measured literals repeat it: `b #0` is `0x14000000` and `bl #0` is `0x94000000` (`ADR-0100`, `EXP-0101`). | frozen |
 | EC-42 | x86-64 | Integer ALU direction: for each `opcode`/`opcode+1` pair (`01`/`03`, `09`/`0B`, `21`/`23`, `29`/`2B`, `31`/`33`, `39`/`3B`), the `opcode` row writes `ModRM.r/m` as the destination and the `opcode+1` row writes `ModRM.reg` | One opcode byte; the same two registers produce `48 01 c1` vs `48 03 c8`, and analogously for every pair. For a memory operand the same split decides which side is memory: `29` keeps the memory destination in `ModRM.r/m` (`48 29 48 08`) and `2B` keeps the memory source in `ModRM.r/m` (`48 2b 48 08`) with the register in `ModRM.reg` in both | `form variant` (`rm64-r64` / `r64-rm64`, `base-disp8-r64` / `r64-base-disp8`) | `llvm-mc` 23.1.2: `addq %rax, %rcx` is `48 01 c1`, and `48 03 c8` decodes to the same instruction; the other direction is a different opcode (`addq (%rax), %rcx` is `48 03 08`). Both operands are registers, so a plan that states only "add `%rax` to `%rcx`" has not chosen the byte: the row must be named. v0 ships the `opcode` direction for register/register and leaves `opcode+1` absent, including its register/register spelling; naming it is `E-FORM-001` (`N01ev`). The `2B` memory rows land in `0.78.0`, and the `2B` register/register spelling stays absent. Measured pairs: `48 09 c1`/`48 0b c8`, `48 21 c1`/`48 23 c8`, `48 29 c1`/`48 2b c8`, `48 31 c1`/`48 33 c8`, `48 39 c1`/`48 3b c8` (`EXP-0112`, `ADR-0113`). `0.78.0` adds the `sub` memory rows for both directions at 64/32/16 bits: `subq %rcx, 8(%rax)` is `48 29 48 08` and `subq 8(%rax), %rcx` is `48 2b 48 08`, differing only in the opcode byte while the `ModRM` byte is identical, so the plan names the direction (`EXP-0115`, `ADR-0116`). | frozen |
 | EC-43 | AArch64 | `adr` vs `adrp`: bit 31 selects a byte displacement from the instruction (`adr`) or a 4 KiB page delta from the instruction's page (`adrp`), over the same `immhi`/`immlo` split | One template bit; the same two fields and the same `imm21` operand mean bytes on one row and pages on the other | `form variant` (`adr/x64-imm21` / `adrp/x64-imm21`) | `llvm-mc` 23.1.2 with `llvm-objdump -d`: `adr x0, #0` is `00 00 00 10` and `adrp x0, #0` is `00 00 00 90` — the same field content, one bit apart. The split is shared, so the difference cannot be an operand: `adr x1, #8` is `41 00 00 10` (field content 8, a byte count) while `adrp x1, #4096` is `01 00 00 b0` (field content 1, a page count, so the low bit lands in `immlo`). A single row would have to read the number to decide whether it means bytes or pages, and would then also have to choose the transform — the same `INV-02` split as `b`/`bl` (`EC-41`). The fixup carries the difference, not the slot: `pcrel_begin` + `identity` for `adr` (`align_bits: 0`, byte content) versus `pcrel_page` + `page` for `adrp` (`03_fixup_model.md` §6). The absent page variant of the row is `E-FORM-001` (`N01ff`), and `adr x0, #1048576` is one past the range (`E-RANGE-002`, `N04k`). The materializer does not compare the transform with the mnemonic, so the record is the guard: a plan that keeps `page` on this row is accepted and states two facts that disagree — a wrong program, not a silent repair (`EXP-0117/probe_transform.py`). | frozen |
+| EC-44 | AArch64 | `mul` vs `madd`: the `MUL` alias is the `MADD` node with `Ra` (bits 14–10) pinned to 31, so the mnemonic names three operands and the base node still encodes four | One five-bit field; the same word otherwise, and the same three register operands | `form variant` (`mul/w32-w32-w32` and `mul/x64-x64-x64`; the four-operand `madd` shape is absent) | `llvm-mc` 23.1.2 with `llvm-objdump -d`: `mul x0, x1, x2` is `9b027c20` and `madd x0, x1, x2, x3` is `9b020c20` — the same word except bits 14–10, which hold 31 and 3. A single row with a free `Ra` would emit `mul`'s word or `madd`'s depending on whether the plan states a fourth register, and the plan would spell a register the mnemonic cannot name; that is `EC-33`'s rejected device for `cmp`/`cmn`. Pin 31 does not reserve 31 elsewhere on the row: `mul w0, w1, wzr` is `207c1f1b`, because `Rm` reads a plain register number and the row excludes no value. The four-operand shape has no row, so naming `aarch64:mul/x64-x64-x64-x64` is `E-FORM-001` (`N01fh`), and the `0.19.0` boundary is the same code (`N01fi`). `EXP-0118`, `ADR-0119`. | frozen |
 
 
 ## v0 surface (OD-10)
@@ -540,8 +541,8 @@ is what makes the two `mov` forms and the two `add` immediate forms distinct
 without an extra choice field. A plan that names `x86:mov/r64-r64` or
 `x86:add/rm64-imm` is rejected: those ids are not in the v0 definition.
 
-The AArch64 slice is one hundred and eighty-one forms across nineteen documents,
-covering fourteen frozen `EC` rows:
+The AArch64 slice is one hundred and eighty-five forms across twenty documents,
+covering fifteen frozen `EC` rows:
 
 | `form_id` | Encoding | Operand signature | Table | Covers |
 |---|---|---|---|---|
@@ -726,6 +727,10 @@ covering fourteen frozen `EC` rows:
 | `aarch64:blr/rn` | `BLR`, `op=01` | src `x64` (`Rn`) | `0.18.0`+ | EC-41, A64-P22 |
 | `aarch64:ret/rn` | `RET`, `op=10` | src `x64` (`Rn`, no default) | `0.18.0`+ | EC-41, A64-P22 |
 | `aarch64:adr/x64-imm21` | `ADR immlo:immhi`, `op=0` | dest `x64`, `imm21` target (bytes) | `0.19.0`+ | EC-43, A64-P23 |
+| `aarch64:mul/w32-w32-w32` | `MADD`, `sf=0`, `Ra=31` | dest `w32`, src `w32`, src2 `w32` | `0.20.0`+ | EC-44, A64-P24 |
+| `aarch64:mul/x64-x64-x64` | `MADD`, `sf=1`, `Ra=31` | dest `x64`, src `x64`, src2 `x64` | `0.20.0`+ | EC-44, A64-P24 |
+| `aarch64:csel/w32-w32-w32-cond4` | `CSEL`, `sf=0`, `o2=0` | dest `w32`, src `w32`, src2 `w32`, cond `cond4` | `0.20.0`+ | A64-P24 |
+| `aarch64:csel/x64-x64-x64-cond4` | `CSEL`, `sf=1`, `o2=0` | dest `x64`, src `x64`, src2 `x64`, cond `cond4` | `0.20.0`+ | A64-P24 |
 
 The `-lsl0`/`-lsl12` suffix is part of the id because the MRS node leaves
 `shift`, `imm6` and `sh` variable; the table pins them and the name says so
