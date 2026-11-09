@@ -1,0 +1,12 @@
+movb 8(%rax,%rcx,4), %al
+movb %bl, 8(%rax,%rcx,4)
+movb 128(%rax,%rcx,4), %cl
+movb %dl, 128(%rax,%rcx,4)
+movb 8(%rax,%rcx,4), %ah
+movb %bh, 8(%rax,%rcx,4)
+movb 128(%rax,%rcx,4), %ch
+movb %dh, 128(%rax,%rcx,4)
+movb 8(%rax,%rcx,4), %spl
+movb %bpl, 8(%rax,%rcx,4)
+movb 128(%rax,%rcx,4), %sil
+movb %dil, 128(%rax,%rcx,4)

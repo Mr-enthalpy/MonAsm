@@ -1,0 +1,218 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "x86",
+    "isa_variant": "x86-64",
+    "execution_mode": "64",
+    "enabled_extensions": [],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.x86",
+    "version": "0.73.0",
+    "digest": "sha256:dfe7c9385b5a6a8636d8a54252ba72e3630aee3573b7e71062c4d7f8777d4237"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [".text"],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": 70,
+      "fragments": [
+        { "offset": 0, "size": 4, "kind": "instruction", "instruction_id": "I0001" },
+        { "offset": 4, "size": 4, "kind": "instruction", "instruction_id": "I0002" },
+        { "offset": 8, "size": 7, "kind": "instruction", "instruction_id": "I0003" },
+        { "offset": 15, "size": 7, "kind": "instruction", "instruction_id": "I0004" },
+        { "offset": 22, "size": 4, "kind": "instruction", "instruction_id": "I0005" },
+        { "offset": 26, "size": 4, "kind": "instruction", "instruction_id": "I0006" },
+        { "offset": 30, "size": 7, "kind": "instruction", "instruction_id": "I0007" },
+        { "offset": 37, "size": 7, "kind": "instruction", "instruction_id": "I0008" },
+        { "offset": 44, "size": 5, "kind": "instruction", "instruction_id": "I0009" },
+        { "offset": 49, "size": 5, "kind": "instruction", "instruction_id": "I0010" },
+        { "offset": 54, "size": 8, "kind": "instruction", "instruction_id": "I0011" },
+        { "offset": 62, "size": 8, "kind": "instruction", "instruction_id": "I0012" }
+      ]
+    }
+  ],
+  "symbols": [],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "x86:mov/r8-base-index-disp8/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr8", "target_type": "r8", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "index", "kind": "x86.gpr64", "target_type": "sib_index", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "imm", "kind": "x86.scale", "target_type": "scale2", "payload": { "value": 2 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8", "payload": { "value": 8 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0002",
+      "section_id": ".text",
+      "offset": 4,
+      "form_id": "x86:mov/base-index-disp8-r8/legacy",
+      "operands": [
+        { "role": "src", "kind": "x86.gpr8", "target_type": "r8", "payload": { "reg": 3 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "index", "kind": "x86.gpr64", "target_type": "sib_index", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "imm", "kind": "x86.scale", "target_type": "scale2", "payload": { "value": 2 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8", "payload": { "value": 8 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0003",
+      "section_id": ".text",
+      "offset": 8,
+      "form_id": "x86:mov/r8-base-index-disp32/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr8", "target_type": "r8", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "index", "kind": "x86.gpr64", "target_type": "sib_index", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "imm", "kind": "x86.scale", "target_type": "scale2", "payload": { "value": 2 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp32", "payload": { "value": 128 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0004",
+      "section_id": ".text",
+      "offset": 15,
+      "form_id": "x86:mov/base-index-disp32-r8/legacy",
+      "operands": [
+        { "role": "src", "kind": "x86.gpr8", "target_type": "r8", "payload": { "reg": 2 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "index", "kind": "x86.gpr64", "target_type": "sib_index", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "imm", "kind": "x86.scale", "target_type": "scale2", "payload": { "value": 2 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp32", "payload": { "value": 128 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0005",
+      "section_id": ".text",
+      "offset": 22,
+      "form_id": "x86:mov/r8h-base-index-disp8/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr8h", "target_type": "r8h", "payload": { "reg": 4 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "index", "kind": "x86.gpr64", "target_type": "sib_index", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "imm", "kind": "x86.scale", "target_type": "scale2", "payload": { "value": 2 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8", "payload": { "value": 8 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0006",
+      "section_id": ".text",
+      "offset": 26,
+      "form_id": "x86:mov/base-index-disp8-r8h/legacy",
+      "operands": [
+        { "role": "src", "kind": "x86.gpr8h", "target_type": "r8h", "payload": { "reg": 7 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "index", "kind": "x86.gpr64", "target_type": "sib_index", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "imm", "kind": "x86.scale", "target_type": "scale2", "payload": { "value": 2 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8", "payload": { "value": 8 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0007",
+      "section_id": ".text",
+      "offset": 30,
+      "form_id": "x86:mov/r8h-base-index-disp32/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr8h", "target_type": "r8h", "payload": { "reg": 5 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "index", "kind": "x86.gpr64", "target_type": "sib_index", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "imm", "kind": "x86.scale", "target_type": "scale2", "payload": { "value": 2 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp32", "payload": { "value": 128 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0008",
+      "section_id": ".text",
+      "offset": 37,
+      "form_id": "x86:mov/base-index-disp32-r8h/legacy",
+      "operands": [
+        { "role": "src", "kind": "x86.gpr8h", "target_type": "r8h", "payload": { "reg": 6 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "index", "kind": "x86.gpr64", "target_type": "sib_index", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "imm", "kind": "x86.scale", "target_type": "scale2", "payload": { "value": 2 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp32", "payload": { "value": 128 }, "modifiers": [] }
+      ],
+      "expected_size": 7
+    },
+    {
+      "instruction_id": "I0009",
+      "section_id": ".text",
+      "offset": 44,
+      "form_id": "x86:mov/r8-base-index-disp8-rex/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr8", "target_type": "r8", "payload": { "reg": 4 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "index", "kind": "x86.gpr64", "target_type": "sib_index", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "imm", "kind": "x86.scale", "target_type": "scale2", "payload": { "value": 2 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8", "payload": { "value": 8 }, "modifiers": [] }
+      ],
+      "expected_size": 5
+    },
+    {
+      "instruction_id": "I0010",
+      "section_id": ".text",
+      "offset": 49,
+      "form_id": "x86:mov/base-index-disp8-r8-rex/legacy",
+      "operands": [
+        { "role": "src", "kind": "x86.gpr8", "target_type": "r8", "payload": { "reg": 5 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "index", "kind": "x86.gpr64", "target_type": "sib_index", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "imm", "kind": "x86.scale", "target_type": "scale2", "payload": { "value": 2 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp8", "payload": { "value": 8 }, "modifiers": [] }
+      ],
+      "expected_size": 5
+    },
+    {
+      "instruction_id": "I0011",
+      "section_id": ".text",
+      "offset": 54,
+      "form_id": "x86:mov/r8-base-index-disp32-rex/legacy",
+      "operands": [
+        { "role": "dest", "kind": "x86.gpr8", "target_type": "r8", "payload": { "reg": 6 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "index", "kind": "x86.gpr64", "target_type": "sib_index", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "imm", "kind": "x86.scale", "target_type": "scale2", "payload": { "value": 2 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp32", "payload": { "value": 128 }, "modifiers": [] }
+      ],
+      "expected_size": 8
+    },
+    {
+      "instruction_id": "I0012",
+      "section_id": ".text",
+      "offset": 62,
+      "form_id": "x86:mov/base-index-disp32-r8-rex/legacy",
+      "operands": [
+        { "role": "src", "kind": "x86.gpr8", "target_type": "r8", "payload": { "reg": 7 }, "modifiers": [] },
+        { "role": "base", "kind": "x86.gpr64", "target_type": "rm64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "index", "kind": "x86.gpr64", "target_type": "sib_index", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "imm", "kind": "x86.scale", "target_type": "scale2", "payload": { "value": 2 }, "modifiers": [] },
+        { "role": "disp", "kind": "x86.imm", "target_type": "disp32", "payload": { "value": 128 }, "modifiers": [] }
+      ],
+      "expected_size": 8
+    }
+  ],
+  "fixups": []
+}

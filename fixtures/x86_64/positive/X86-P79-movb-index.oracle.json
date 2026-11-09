@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj X86-P79-movb-index.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "815efc78474aef7e5e37dd5bdcb2604b89ebb6effa4066cfc2eb70e47a8fffb1",
+  "output_sha256": "59a618ac3881b25cded5814481662c5b8bc11af250f1d3ac6cb245cb4afe2678",
+  "size": 70,
+  "records": 0,
+  "notes": "Input, one LF-terminated line each (`EXP-0110` §2): the twelve `movb` rows over `8/128(%rax,%rcx,4)`, in the `%al`/`%ah`/`%spl` windows, load and store. The twelve instructions are 4/4/7/7/4/4/7/7/5/5/8/8 bytes, 70 in all; every operand is a register or a literal displacement, so no relocation record is emitted.",
+  "source": "`llvm-mc` 23.1.2 selection; the indexed shape is `EC-37`, the byte-register windows are `EC-36`, the disp8/disp32 choice is `EC-02`, and the high-byte/REX rule is `EC-06`. The measured bytes match the templates the generator appends as `definitions/x86_64/0.73.0.json`."
+}
