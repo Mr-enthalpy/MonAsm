@@ -10,6 +10,11 @@ name: gates
 # `check_mrs.py` and `check_rv64_source.py` stay local: both read
 # `research/external/`, which is gitignored, so a hosted runner cannot have it.
 # See ADR-0124 for why that is not a hole in the gate.
+#
+# Two failures of the first hosted run (`42677800026`) shape the steps below:
+# `--profile minimal` does not install `rustfmt`, and a shallow checkout has no
+# `HEAD^` to diff against. The oracle install names the exact release asset
+# because `apt.llvm.org` tracks the newest 23.x (it served 23.1.6 on that run).
 
 on:
   push:
@@ -22,8 +27,10 @@ permissions:
 
 env:
   RUST_TOOLCHAIN: "1.96.0"
-  LLVM_MAJOR: "23"
   LLVM_VERSION: "23.1.2"
+  # sha256 of `LLVM-23.1.2-Linux-X64.tar.zst`, read from the release's signed
+  # attestation asset `LLVM-23.1.2-Linux-X64.tar.zst.jsonl` (llvmorg-23.1.2).
+  LLVM_SHA256: "6382de1c1a210ce5a5cc49d18bc8444d137742e7cbf9b19f4ae602bb1ab52534"
 
 jobs:
   documents:
@@ -31,6 +38,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The whitespace gate diffs the range the event names, which needs the
+          # commits behind `github.event.before`; a shallow clone has none.
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -43,7 +54,25 @@ jobs:
         run: python tools/check_definition.py
 
       - name: Whitespace and line endings
-        run: git diff --check HEAD^ HEAD
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+          PULL_REQUEST_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "${PULL_REQUEST_BASE}" ] \
+             && git rev-parse --verify --quiet "${PULL_REQUEST_BASE}^{commit}" > /dev/null; then
+            base="$(git merge-base "${PULL_REQUEST_BASE}" HEAD)"
+          elif [ -n "${PUSH_BEFORE}" ] \
+             && git rev-parse --verify --quiet "${PUSH_BEFORE}^{commit}" > /dev/null; then
+            base="${PUSH_BEFORE}"
+          elif git rev-parse --verify --quiet "HEAD^" > /dev/null; then
+            base="HEAD^"
+          else
+            # Root commit: nothing earlier to compare against.
+            base="HEAD"
+          fi
+          echo "whitespace range: ${base}..HEAD"
+          git diff --check "${base}" HEAD
 
   workspace:
     name: workspace tests
@@ -52,7 +81,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install the pinned toolchain
-        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
+          rustup component add rustfmt --toolchain "$RUST_TOOLCHAIN"
 
       - name: Formatting
         working-directory: prototype
@@ -68,25 +99,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The records name `llvm-mc 23.1.2`. This installs that major and the
-      # next step refuses to continue if the minor differs, because a version
-      # mismatch would turn every record into a `toolchain-version` skip.
-      - name: Install LLVM ${{ env.LLVM_MAJOR }}
+      # The records name `llvm-mc 23.1.2`. The release asset is installed and
+      # checked against the digest in its signed attestation, because the
+      # `apt.llvm.org` channel moves to the newest 23.x (23.1.6 on the first
+      # hosted run) and a version mismatch would turn every record into a
+      # `toolchain-version` skip. The next step refuses a different version.
+      - name: Install LLVM ${{ env.LLVM_VERSION }}
         run: |
-          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
-            | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc > /dev/null
-          sudo add-apt-repository -y "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-${LLVM_MAJOR} main"
-          sudo apt-get update
-          sudo apt-get install -y "llvm-${LLVM_MAJOR}"
-          echo "/usr/lib/llvm-${LLVM_MAJOR}/bin" >> "$GITHUB_PATH"
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends zstd
+          asset="LLVM-${LLVM_VERSION}-Linux-X64.tar.zst"
+          root="LLVM-${LLVM_VERSION}-Linux-X64"
+          curl -fsSL --retry 3 --retry-delay 2 \
+            -o "/tmp/${asset}" \
+            "https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VERSION}/${asset}"
+          echo "${LLVM_SHA256}  /tmp/${asset}" | sha256sum -c -
+          # The asset is a zstd frame with a 1 GiB window, above the 128 MiB
+          # decompression default, so `--long` is required. The tools are
+          # statically linked; only these five members are extracted (`ld.lld`
+          # is a symlink to `lld`).
+          zstd --decompress --long=31 -f -o "/tmp/llvm.tar" "/tmp/${asset}"
+          mkdir -p "$HOME/llvm"
+          tar -xf "/tmp/llvm.tar" -C "$HOME/llvm" --strip-components=1 \
+            "${root}/bin/llvm-mc" \
+            "${root}/bin/llvm-objcopy" \
+            "${root}/bin/llvm-readobj" \
+            "${root}/bin/lld" \
+            "${root}/bin/ld.lld"
+          rm -f "/tmp/llvm.tar" "/tmp/${asset}"
+          echo "$HOME/llvm/bin" >> "$GITHUB_PATH"
 
       - name: Pin the toolchain the records name
         run: |
-          llvm-mc --version
-          llvm-mc --version | grep -q "LLVM version ${LLVM_VERSION}" || {
+          version_output="$(llvm-mc --version)"
+          printf '%s\n' "${version_output}"
+          printf '%s\n' "${version_output}" | grep -q "LLVM version ${LLVM_VERSION}$" || {
             echo "::error::llvm-mc is not ${LLVM_VERSION}; the oracle records would all skip"
             exit 1
           }
+          command -v llvm-objcopy
+          command -v llvm-readobj
+          command -v ld.lld
 
       # `manual-derivation` is the only skip reason the corpus has: six records
       # whose expected bytes contain a spelling the assembler will not select.

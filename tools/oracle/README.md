@@ -94,7 +94,9 @@ never reported as a clean corpus.
 
 `.github/workflows/gates.yml` (`oracle` job) runs
 `python tools/oracle/rerun.py --allow-skip-reason manual-derivation` against
-LLVM 23.1.2 and fails if `llvm-mc --version` reports another version, because a
+LLVM 23.1.2. The job installs the `LLVM-23.1.2-Linux-X64.tar.zst` release asset
+(after checking the digest its attestation names) instead of a distribution
+channel, then fails if `llvm-mc --version` reports another version, because a
 version mismatch would turn every record into a skip. `check_mrs.py` and
 `check_rv64_source.py` are deliberately not in CI: they verify a local drop
 under the gitignored `research/external/` (`ADR-0124`).

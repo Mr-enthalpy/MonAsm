@@ -185,7 +185,7 @@ on a slice count:
 | ADR-0121 | A fixup's covered bits belong to exactly one slot, and that slot is `from: operand_value`: a `reg_number` bit or an inverted placement is the operand path writing the same bits (`E-FIXUP-006`, `first = operand`), while zero slots, two slots, a range across a placement boundary or the right ranges in the wrong order are `E-FIXUP-001`. The descriptor order is the value order, so it must match the slot's placement order. `N07` gains the `E-FIXUP-006` diagnostic beside its existing `E-FIXUP-001`: the measured `x86:mov/rm-r64/legacy` descriptor rewrote `ModRM` after both operands; `N07g` (RV64 `beq`, had emitted `63 00 b5 00`) and `N07h` (AArch64 `b.cond`, had emitted `00 00 00 54`) pin the accepted-and-wrong encodings | `03_fixup_model.md` §3; `01_contract.md` §10; `04_errors.md` §2.1; `N07`; `N07g`; `N07h` |
 | ADR-0122 | Numeric domains and the image resource are checked before the arithmetic they protect: `field_descriptor.width` and `range_constraint.bits` are at least 1 (`E-PLAN-002`, read phase), the loader's template and placement arithmetic is checked (`E-DEF-001`), `expected_size` equals `form.size()` (`E-SIZE-001`) and the descriptor bound is `form.size() * 8` (`E-FIXUP-005`), and the `u128` sum of `declared_size` over `section_order` is at most 67,108,864 bytes (`E-LIMIT-001`). The three measured panics were a subtract overflow at `constraint.bits - 1` in `fmp-materialize`, a multiply overflow in `fmp-validate`, and `capacity overflow` in `raw_vec` on a 2^63 `fill` | `04_errors.md` §2.1/§2.4; `01_contract.md` §6/§7/§13; `N05b`; `N24l`; `N25a`; `N25b` |
 | ADR-0123 | The v0 surface is closed: `target.kind: section_relative` is refused `E-VERSION-001` at `/fixups/<i>/target/kind` with `feature = target.kind:section_relative`, and a defined symbol's `offset` must be `<= declared_size` (`E-SYMBOL-003`; equality is the one-past-the-end label). `fmp-plan` keeps both as `Unrepresentable`, and `planner_api.rs` cross-checks the refusal pointer through `rebuild_negative` instead of skipping the plans | `01_contract.md` §9/§10; `03_fixup_model.md` §2.1/§10; `N24j`; `N24k`; `09_planner_api.md` §7 |
-| ADR-0124 | The contract gates run in CI (`.github/workflows/gates.yml`): `check_ids.py`, `check_definition.py`, the whitespace check, `cargo fmt --all -- --check`, `cargo test --workspace`, and `rerun.py --allow-skip-reason manual-derivation` against `llvm-mc 23.1.2` with a version mismatch treated as a failure. `rerun.py` runs each `&&` stage as argv with `shell=False`, resolves the executable through `PATH`, allows only `llvm-mc`/`llvm-objcopy`/`llvm-readobj`/`ld.lld`, and refuses a token containing a shell metacharacter; an unnamed skip fails. `check_mrs.py`/`check_rv64_source.py` stay local because they read the gitignored `research/external/` | `.github/workflows/gates.yml`; `tools/oracle/README.md`; `04_errors.md` §2.4 |
+| ADR-0124 | The contract gates run in CI (`.github/workflows/gates.yml`): `check_ids.py`, `check_definition.py`, the whitespace check over the range the event names on a full checkout, `cargo fmt --all -- --check` with `rustfmt` installed for the pinned toolchain, `cargo test --workspace`, and `rerun.py --allow-skip-reason manual-derivation` against `llvm-mc 23.1.2` installed from the digest-checked `llvmorg-23.1.2` release asset, with a version mismatch treated as a failure. `rerun.py` runs each `&&` stage as argv with `shell=False`, resolves the executable through `PATH`, allows only `llvm-mc`/`llvm-objcopy`/`llvm-readobj`/`ld.lld`, and refuses a token containing a shell metacharacter; an unnamed skip fails. `check_mrs.py`/`check_rv64_source.py` stay local because they read the gitignored `research/external/` | `.github/workflows/gates.yml`; `tools/oracle/README.md`; `04_errors.md` §2.4 |
 
 ## Settled decisions (contract level)
 
@@ -491,11 +491,16 @@ closed the v0 surface (`ADR-0123`: `N24j`, `N24k`) and put the gates and the
 shell-free oracle rerun in `.github/workflows/gates.yml` (`ADR-0124`). The
 living corpus is 128 positives and 619 negatives (611 `materialize`-phase plus 8
 `read`-phase), and `04_errors.md` §2.4 records 39 of the 44 active codes. The
-next action is to land this change and read the first hosted run: the `oracle`
-job's `apt.llvm.org` install recipe is the only `unverified` row in `ADR-0124`,
-so a green job replaces it with a measured result and a failure re-decides the
-install recipe or the pinned version before anything else lands. Further
-widening still needs a new scope ADR.
+first hosted run of those gates (`42677800026`) failed in all three jobs on
+setup, not on the contract: the minimal 1.96.0 toolchain had no `cargo-fmt`, the
+shallow checkout had no `HEAD^` for the whitespace step, and `apt.llvm.org`
+served `llvm-mc 23.1.6` where the records pin `23.1.2`. `ADR-0124` now records
+those measured causes: the workflow installs `rustfmt` explicitly, diffs the
+whitespace range the event names on a full checkout, and installs the
+digest-checked `llvmorg-23.1.2` release asset. The next action is to read the
+next hosted run: a green one records the measured oracle version, and a red one
+re-decides the install recipe before anything else lands. Further widening still
+needs a new scope ADR.
 
 ### Widening backlog
 
