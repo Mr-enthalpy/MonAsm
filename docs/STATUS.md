@@ -521,8 +521,8 @@ One probe found a real gap rather than a clean result: a 20 000-deep JSON plan
 ends the `fmp` process with `0xC00000FD` (stack overflow), which H4 owes a
 bounded rejection test. Next: H1, identity closure
 (`ADR-0127`). The implementation plan draft is
-`docs/architecture/he1-h1-plan.md`; its seven open decisions (D1–D7) need review
-before the ADR is written. The phase board above
+`docs/architecture/he1-h1-plan.md`; its ten decisions (D1–D10) are recorded and
+four of them (D3, D4, D5, D7) were revised after review. The phase board above
 stays the v0 record; HE-1 phases
 are reported in `research/he1/`.
 

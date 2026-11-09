@@ -181,5 +181,5 @@ implementation identities, and the legacy facade that cannot bypass the checks.
 Exit: no supported API can make execution facts and a verified identity
 disagree. H1 flips two of the four gap tests (the definition re-encode and the
 stable fingerprint); the other two close in H3 (unselected file, ISA allowlist),
-and the deep-JSON probe finding is H4. The implementation plan, with its seven
-open decisions (D1–D7), is `docs/architecture/he1-h1-plan.md`.
+and the deep-JSON probe finding is H4. The implementation plan, with its ten
+decisions (D1–D10), is `docs/architecture/he1-h1-plan.md`.
