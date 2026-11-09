@@ -34,6 +34,13 @@ baseline exists to answer — or to stop checking. `research/he1/baseline.md`
 already claimed that build metadata is not part of the frozen content, so the
 tool contradicted its own document.
 
+The design document made the same point first.
+`docs/architecture/he1-horizontal-extension.md` §7.2 names `artifact_digest` as
+the "normalized result payload: bytes, sections, symbols, fixup" and gives the
+materializer's build its own separate row, `implementation_id`. So the layering
+below is not a new design; it is the design's own layering applied to H0's tool
+and to the H1 plan, both of which had collapsed two rows into one digest.
+
 Two further failures were found while fixing that one:
 
 1. **The planned implementation identity could not distinguish builds.** The H1

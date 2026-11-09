@@ -317,7 +317,7 @@ H1 只把「值级」保证加到 3 条**编码后失败**的负例上（`E-SIZE
 | D5 | 旧入口的兼容承诺 | **保留一个阶段的过渡函数**，`#[deprecated]`，内部走 `bind`；同时**明确声明**不承诺 Rust 源码兼容，只承诺 FMP 文档面与产物兼容 | 需要修订 → 已修订 | 真要源码兼容就得重新设计命名/参数/生命周期，成本高于本阶段收益 |
 | D6 | 旧 `fingerprint` 是否改算法 | **不改**，标注 legacy，新身份不复用它 | 接受 | 改算法会移动 128 个产物 → 违反 `HE-AC-10` |
 | D7 | `plan_facts` 手写还是复用 `fmp-plan` 序列化 | **手写**在 `fmp-model`，并加**编译期穷尽性约束**（不用 `..`、枚举无 `_ =>`）与算法版本名 | 有条件接受 → 已修订 | 复用 `fmp-plan` 的第二套 DTO（`fmp-plan/src/lib.rs:155-280`）会把第二个权威来源带进执行路径 |
-| D8 | 身份是否分层 | **三层**：`payload`（比较）、`envelope`（同收据才比较）、`implementation`（只记录），各自带版本名。`payload_digest` 必须去掉 `materializer_version` | 新增 | 单一摘要：构建版本一改就误报载荷漂移，`ADR-0126` 已实测 |
+| D8 | 身份是否分层 | **三层**：`payload`（比较）、`envelope`（同收据才比较）、`implementation`（只记录），各自带版本名。`payload_digest` 必须去掉 `materializer_version` | 新增（设计 §7.2 本就如此分层） | 单一摘要：构建版本一改就误报载荷漂移，`ADR-0126` 已实测 |
 | D9 | `ImplementationIdentity` 从哪来 | 由**物化器构建层**提供 `{name, version, build}`，`build` 取 `option_env!("FMP_BUILD_ID")`；取不到记 `None`，且不宣称满足 `HE-T20` | 新增 | 用 `fmp-model` 的 `CARGO_PKG_*`：名字与版本都不指向物化器 |
 | D10 | 负例门禁的声明范围 | 619 条只保证 **code + Pointer + detail-key 集合**；额外对 3 条编码后失败加**值级**快照 | 新增 | 619 条全量值级快照：把合法的措辞调整变成门禁失败，维护成本不成比例 |
 

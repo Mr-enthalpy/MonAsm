@@ -77,7 +77,7 @@ The recorded `head` stays `d0082f9` — the commit the snapshot was measured at.
 The three pinned digests in `prototype/crates/fmp-cli/tests/determinism.rs` are
 **envelope** digests and stay that way (`ADR-0126` decision 7): they are the
 narrow, cross-host, strict pin. A change to `materializer_version` moves those
-three constants and every recorded `envelope_sha256` in one commit;
+three constants and every recorded per-entry `envelope.sha256` in one commit;
 `payload_root` must not move.
 
 ## 3. How to reproduce
