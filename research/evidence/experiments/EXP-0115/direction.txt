@@ -1,0 +1,8 @@
+shapes outside the vector, measured with -show-encoding
+subq %rcx, 8(%rsp)  48294c2408  subq	%rcx, 8(%rsp)
+subq %rcx, 8(%r8)  49294808  subq	%rcx, 8(%r8)
+subq %rcx, (%rax)  482908  subq	%rcx, (%rax)
+
+29 /r writes the memory destination, 2B /r the register
+subq %rcx, 8(%rax)  48294808  subq	%rcx, 8(%rax)
+subq 8(%rax), %rcx  482b4808  subq	8(%rax), %rcx

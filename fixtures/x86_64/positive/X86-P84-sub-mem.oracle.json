@@ -1,0 +1,11 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj research/evidence/experiments/EXP-0115/X86-P84-sub-mem.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "021f2357172bb9ca3c338d326444dce9feef322281995f8787866110b5cf0000",
+  "output_sha256": "c5835c0f6f00d2f84ad8c201c215bf108abb53011f1e4e173f289a7253a03c10",
+  "size": 62,
+  "records": 0,
+  "notes": "Twelve instructions, 62 bytes (`EXP-0115`). `29 /r` is the store direction -- the memory operand is `ModRM.r/m` and the register is `ModRM.reg` (`subq %rcx, 8(%rax)` is `48 29 48 08`) -- and `2B /r` is the load direction -- the register is `ModRM.reg` (`subq 8(%rax), %rcx` is `48 2b 48 08`) -- at 64/32/16 bits with `base + disp8` and `base + disp32`. The same operands differ only in the opcode byte and the mod bits; every field is operand-owned. The three shapes outside the vector are recorded in `probe.s` and `direction.txt`: `%rsp` as the base needs `SIB` (`48 29 4c 24 08`), `%r8` as the base sets `REX.B` (`49 29 48 08`, reachable at 64 bits because it shares the `REX.W` byte but not exercised here), and a zero displacement uses `mod = 00` (`48 29 08`, a different template). All twelve fixture instructions are selectable from a mnemonic, so the whole image is the assembler's own output."
+}

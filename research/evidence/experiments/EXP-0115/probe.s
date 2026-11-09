@@ -1,0 +1,15 @@
+subq %rcx, 8(%rax)
+subq %rdx, 300(%rbx)
+subq 8(%rax), %rcx
+subq 300(%rbx), %rdx
+subl %ecx, 8(%rax)
+subl %edx, 300(%rbx)
+subl 8(%rax), %ecx
+subl 300(%rbx), %edx
+subw %cx, 8(%rax)
+subw %dx, 300(%rbx)
+subw 8(%rax), %cx
+subw 300(%rbx), %dx
+subq %rcx, 8(%rsp)
+subq %rcx, 8(%r8)
+subq %rcx, (%rax)

@@ -1,6 +1,6 @@
 # x86-64 fixtures
 
-Vectors: `X86-P1` … `X86-P83` in `docs/fmp-v0/06_validation_matrix.md`.
+Vectors: `X86-P1` … `X86-P84` in `docs/fmp-v0/06_validation_matrix.md`.
 
 ## Positive vectors present
 
@@ -89,6 +89,7 @@ Vectors: `X86-P1` … `X86-P83` in `docs/fmp-v0/06_validation_matrix.md`.
 | X86-P81 | `X86-P81-alu-rr` | `EXP-0112` (`ADR-0113`: the fifteen ALU register/register rows at `0.75.0` in the `opcode` direction -- `add` plus `and`/`or`/`xor`/`cmp` at 64/32/16 bits; `addq %rcx, %rax` is `48 01 c8`, `addl` `01 c8` and `addw` `66 01 c8`, both operand orders; the `opcode+1` sibling is `E-FORM-001`, `N01ev`; 80 bytes) |
 | X86-P82 | `X86-P82-alu-imm` | `EXP-0113` (`ADR-0114`: the thirty-six ALU immediate rows at `0.76.0` -- `add`/`sub` at 32/16 bits, `and`/`or`/`xor`/`cmp` at 64/32/16 bits in both immediate widths, plus the four 64-bit `%rax` short forms; `addl $1, %ebx` is `83 c3 01`, `addw $300, %cx` is `66 81 c1 2c 01` and `andq $300, %rax` is `48 25 2c 01 00 00`; `test` is `E-FORM-001`, `N01ex`; 176 bytes) |
 | X86-P83 | `X86-P83-mov-imm` | `EXP-0114` (`ADR-0115`: the five `mov` immediate rows at `0.77.0` -- `B8+rd` at 16/32 bits and `C7 /0` at 16/32/64 bits; `movw $1, %bx` is `66 bb 01 00` or `66 c7 c3 01 00`, `movq $300, %r8` is `49 c7 c0 2c 01 00 00`; `movabs` is `E-FORM-001`, `N01ez`; 54 bytes, `manual+disassembly` for the `C7` 16/32-bit shapes) |
+| X86-P84 | `X86-P84-sub-mem` | `EXP-0115` (`ADR-0116`: the twelve `sub` memory rows at `0.78.0` -- `29 /r` store and `2B /r` load at 64/32/16 bits with `base + disp8`/`disp32`; `subq %rcx, 8(%rax)` is `48 29 48 08` and `subq 8(%rax), %rcx` is `48 2b 48 08`; the indexed sibling is `E-FORM-001`, `N01fb`; 62 bytes) |
 
 `X86-P6` ships in `definitions/x86_64/0.2.0.json` as two forms with
 `mod = 00`, `r/m = 101` and `disp32` as the last field (`ADR-0027`). `X86-P4`

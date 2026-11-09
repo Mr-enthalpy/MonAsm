@@ -1,6 +1,6 @@
 # M6 Plan — Coverage Round 2
 
-- Status: accepted (`ADR-0112`); `S1` landed 2026-11-09 (`ADR-0113`); `S2` landed 2026-11-10 (`ADR-0114`); `S3` landed 2026-11-10 (`ADR-0115`)
+- Status: accepted (`ADR-0112`); `S1` landed 2026-11-09 (`ADR-0113`); `S2` landed 2026-11-10 (`ADR-0114`); `S3` landed 2026-11-10 (`ADR-0115`); `S4` landed 2026-11-10 (`ADR-0116`)
 - Date: 2026-11-09
 - Baseline: Phase 6 closed (`ADR-0111`): 759 forms, 121 positive and 586
   negative plans, `fmp/0.1` frozen
@@ -127,7 +127,7 @@ it in place rather than adding a row.
 windows stay out. Negatives: `movabs` (`E-FORM-001`), the signed-32 end and the
 version boundary.
 
-### S4 — x86 `sub` memory directions (`ADR-0116`, `0.78.0`, `X86-P84`)
+### S4 — x86 `sub` memory directions (`ADR-0116`, `0.78.0`, `X86-P84`, landed)
 
 12 rows: `29 /r` (store direction) and `2B /r` (load direction) at 64, 32 and
 16 bits, each with `base + disp8` and `base + disp32`, low base window.
@@ -136,9 +136,11 @@ version boundary.
 destination in `ModRM.r/m`, `2B` in `ModRM.reg`. The register/register `2B`
 spelling stays absent (`N01ej`).
 
-`%rsp`/`%r12` need a SIB base, the zero-displacement shape needs `mod = 00`, and
-the high base window needs `REX.B`; all three stay out. Negatives: an absent
-indexed sibling (`E-FORM-001`), the signed-8 end and the version boundary.
+`%rsp`/`%r12` need a SIB base and the zero-displacement shape needs `mod = 00`;
+both stay out. The 64-bit rows reach `%r8`-`%r15` through `REX.B`, which shares
+the `REX.W` byte; the 32/16-bit rows stay three-bit because a `REX` byte would
+change the length. Negatives: an absent indexed sibling (`E-FORM-001`), the
+signed-8 end and the version boundary.
 
 ### S5 — RV64 load/store widths (`ADR-0117`, `0.6.0`, `RV-P12`)
 
