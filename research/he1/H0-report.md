@@ -91,17 +91,30 @@ count from the records, so a seventh cannot appear silently.
   superseded.
 - **Build:** unchanged; no crate was added in H0.
 
-## 5. Unverified
+## 5. Status of the open claims
 
-1. **Cross-host determinism.** Not re-run. The claim rests on CI run
-   `42681104791` and `EXP-R3`; H0 ran on one Windows host.
+Two rows were `unverified` when H0 was written and became measurable once the
+branch was pushed; they are kept in place, with the upgrade named, rather than
+deleted.
+
+1. **Cross-host determinism — verified after the H0 commit.** Hosted run
+   `42698924288` (workflow `determinism`) ran `cargo test --workspace`, including
+   the 128-artifact digest comparisons and the six characterization tests, on
+   `ubuntu-latest`, `macos-latest` and `windows-latest`: three jobs, all green.
+   This upgrades the earlier statement, which rested on run `42681104791` and
+   `EXP-R3` alone.
 2. **Debug vs release payload equality.** The snapshot used a debug binary.
    `EXP-R1`–`R6` cover repeat runs, not build-profile equality.
-3. **Hosted CI on these commits.** H0 has not been pushed. The local gate set is
-   green; the hosted result is `unverified`.
-4. **Python parity.** Local Python is 3.8.10, CI uses 3.12. `tools/he1_baseline.py`
-   avoids 3.9+ syntax, but it is not yet part of any CI job (that lands with
-   `ADR-0129`).
+3. **Hosted CI on these commits — verified after the H0 commit.** Run
+   `42698924814` (`gates`) is green: `check_ids.py`, `check_definition.py`, the
+   whitespace range `d0082f9..HEAD`, `cargo fmt --check`,
+   `cargo test --workspace` and `oracle/rerun.py --allow-skip-reason
+   manual-derivation` on Python 3.12 and `llvm-mc 23.1.2`. `check_mrs.py` and
+   `check_rv64_source.py` remain local-only by `ADR-0124`, because the hosted
+   runner has no `research/external/`.
+4. **Python parity for the new tool.** `check_ids.py` and `check_definition.py`
+   run on 3.12 in CI, so they are covered. `tools/he1_baseline.py` is still in no
+   CI job, so its 3.12 behaviour is `unverified` (that lands with `ADR-0129`).
 5. **Fixup pairing and numeric limits.** Two audit risks stayed unreproduced and
    one was only partially probed, as listed in §3. They are H4 work, not H0
    findings.
@@ -113,5 +126,8 @@ count from the records, so a seventh cannot appear silently.
 H1 — identity closure (`ADR-0126`): private verified objects, a bound
 `ValidatedPlan`, one fact source per identity, four separate identities, and the
 legacy facade that cannot bypass the checks. Exit: no supported API can make
-execution facts and a verified identity disagree, with the six characterization
-tests replaced by rejection tests.
+execution facts and a verified identity disagree. H1 flips two of the six
+characterization tests (the definition re-encode and the stable fingerprint); the
+other three close in H3 (unselected file, ISA allowlist) and H4 (deep JSON). The
+implementation plan, with its seven open decisions, is
+`docs/architecture/he1-h1-plan.md`.

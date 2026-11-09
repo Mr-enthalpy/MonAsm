@@ -86,10 +86,15 @@ finding to report, not a compatibility break.
 
 ## 5. Limits of this baseline
 
-- Captured on one host. Cross-host determinism is `EXP-R3`'s claim and CI run
-  `42681104791`; H0 did not re-run it. Marked `unverified` in the H0 report.
+- Captured on one host, but re-checked on three: hosted run `42698924288` ran
+  `cargo test --workspace`, including the 128-artifact digest comparisons, on
+  `ubuntu-latest`, `macos-latest` and `windows-latest`, all green. That is the
+  `EXP-R3` second-host observation for this commit.
 - The binary is a debug build. Release-vs-debug payload equality was not
   measured in H0; `EXP-R1`–`R6` cover repeat-run determinism, not profile
   equality.
 - The snapshot proves the legacy payloads did not move. It does not prove they
   are correct; correctness remains with the two-source oracle gate.
+- `tools/he1_baseline.py` is not in a CI job, so it has only been run under
+  Python 3.8.10 (the CI interpreters run `check_ids.py` and
+  `check_definition.py` on 3.12).
