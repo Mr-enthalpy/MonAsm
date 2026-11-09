@@ -1,6 +1,6 @@
 # M6 Plan — Coverage Round 2
 
-- Status: accepted (`ADR-0112`)
+- Status: accepted (`ADR-0112`); `S1` landed 2026-11-09 (`ADR-0113`)
 - Date: 2026-11-09
 - Baseline: Phase 6 closed (`ADR-0111`): 759 forms, 121 positive and 586
   negative plans, `fmp/0.1` frozen
@@ -15,7 +15,7 @@ absent from the pinned tables, so a plan that names it is `E-FORM-001` today.
 
 | Missing surface | Evidence |
 |---|---|
-| x86 `add`/`sub` exist only at 64 bits; no `and`/`or`/`xor`/`cmp` at any width | `definitions/x86_64/0.74.0.json` family scan: `add` 3, `sub` 6, no other ALU mnemonic |
+| x86 ALU rows are partial: `add` has only the three 64-bit immediate rows, `sub` has those plus `29 /r` at three widths, and `and`/`or`/`xor`/`cmp` have no rows | `definitions/x86_64/0.74.0.json` family scan: `add` 3, `sub` 6, no other ALU mnemonic |
 | no x86 `mov` immediate row; `movl $ext, %eax` is a recorded gap | `ADR-0093` review triggers; `0.74.0` has no `mov` row with an immediate slot |
 | `sub` has no memory direction; `2B /r` and the `29 /r` memory shapes are deferred | `ADR-0110` decision 4 and review triggers |
 | RV64 has only `ld`/`sd`; no other load/store width | `definitions/rv64/0.5.0.json`: 15 forms |
@@ -29,7 +29,7 @@ sibling the slice leaves out.
 
 | # | ADR | Slice | Definition | New rows | Vector |
 |---|---|---|---|---|---|
-| `S1` | `ADR-0113` | x86 ALU register/register at three widths | `x86/0.75.0` | 16 | `X86-P81` |
+| `S1` | `ADR-0113` | x86 ALU register/register at three widths | `x86/0.75.0` | 15 | `X86-P81` |
 | `S2` | `ADR-0114` | x86 ALU immediate at three widths | `x86/0.76.0` | 36 | `X86-P82` |
 | `S3` | `ADR-0115` | x86 `mov` immediate at 16/32/64 | `x86/0.77.0` | 6 | `X86-P83` |
 | `S4` | `ADR-0116` | x86 `sub` memory directions | `x86/0.78.0` | 12 | `X86-P84` |
@@ -38,9 +38,11 @@ sibling the slice leaves out.
 | `S7` | `ADR-0119` | AArch64 `mul` and `csel` | `aarch64/0.20.0` | 4 | `A64-P24` |
 | — | `ADR-0120` | Closure and metrics | — | — | — |
 
-The round adds 84 forms: x86 564 → 634, AArch64 180 → 185, RV64 15 → 24, for
-843 in total. Positive vectors grow 121 → 128; each slice adds at least three
-negatives and the closure ADR records the exact corpus.
+The round adds 83 forms: x86 564 → 633, AArch64 180 → 185, RV64 15 → 24, for
+842 in total. Positive vectors grow 121 → 128; each slice adds at least three
+negatives and the closure ADR records the exact corpus. The one-row correction
+to `S1` is recorded in `ADR-0113`: `sub` already had all three register/register
+widths, while `add` had none, so the slice is fifteen rows and not sixteen.
 
 The standing non-goals stay closed: `moffs`, APX `d5`, EVEX masking and
 broadcast, AArch64 `EC-16` (the `mov` alias) and `EC-18` (`cbz`/`tbz`),
@@ -49,8 +51,9 @@ RV64 `c.j`/`c.jalr`, and FP/SIMD beyond SSE. Level 2 containers stay out of
 
 The round also defers, and each slice names it in its review triggers:
 
-- the high register windows (`%r8`-`%r15`) and SIB/index and zero-displacement
-  memory shapes;
+- the high register windows (`%r8`-`%r15`) of the 32/16-bit rows and of the
+  memory bases, plus SIB/index and zero-displacement memory shapes (the 64-bit
+  register rows already reach `%r8`-`%r15` through `REX.R`/`REX.B`);
 - the 8-bit ALU and `mov` immediate windows (the three byte-register sets);
 - `movabs` (`REX.W B8+rd io`, a 64-bit immediate), `adc`/`sbb`, `test`,
   `neg`/`not`, and the memory forms of the new ALU mnemonics;
@@ -60,23 +63,28 @@ The round also defers, and each slice names it in its review triggers:
 
 ## 3. Slice detail
 
-### S1 — x86 ALU register/register (`ADR-0113`, `0.75.0`, `X86-P81`)
+### S1 — x86 ALU register/register (`ADR-0113`, `0.75.0`, `X86-P81`, landed)
 
-16 rows, one low-register window, the `r/m`-destination direction:
+15 rows, the `opcode` direction, the low register window at 32/16 bits:
 
-- `add`/`sub` at 32 and 16 bits (4 rows), completing the 64-bit rows that
-  already exist;
-- `and`/`or`/`xor`/`cmp` at 64, 32 and 16 bits (12 rows).
+- `add` at 64, 32 and 16 bits (3 rows), because the family previously had only
+  the three 64-bit immediate rows;
+- `and`/`or`/`xor`/`cmp` at 64, 32 and 16 bits (12 rows), because they had no
+  rows at all. `sub` already had its three register/register rows in `0.74.0`.
+
+The 64-bit rows carry `REX.B`/`REX.R`, so they reach `%r8`-`%r15`; the 32/16-bit
+rows are three-bit and keep the high window deferred.
 
 `EC-42` is revised in place: the whole `opcode`/`opcode+1` pair
 (`01`/`03`, `09`/`0B`, `21`/`23`, `29`/`2B`, `31`/`33`, `39`/`3B`) has the
 same direction choice, and the register-destination sibling of every pair
 stays absent. No new `EC` row is needed.
 
-The slice leaves out `adc`/`sbb`, the 8-bit widths, the high register window
-and memory shapes. Negatives: `adc` (`E-FORM-001`), the previous-version
-boundary, register `8` past the three-bit field (`E-OPERAND-004`) and a missing
-source (`E-OPERAND-002`).
+The slice leaves out `adc`/`sbb`, the 8-bit widths, the high window of the
+32/16-bit rows and memory shapes. Negatives: `adc` (`E-FORM-001`), the absent
+`opcode+1` sibling (`E-FORM-001`), the previous-version boundary
+(`E-FORM-001`), register `8` past the three-bit field (`E-OPERAND-004`) and a
+missing source (`E-OPERAND-002`).
 
 ### S2 — x86 ALU immediate (`ADR-0114`, `0.76.0`, `X86-P82`)
 

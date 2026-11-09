@@ -574,6 +574,21 @@ A plan names its `namespace`, `version` and digest in `definition_identity`.
 | `x86:sub/rm64-r64/legacy` | `4829c8` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]` | 3 | EC-01, EC-06, EC-07, EC-42, `ADR-0110`, `X86-P80` — `0.74.0`+ |
 | `x86:sub/rm32-r32/legacy` | `29c8` | dest: `x86.gpr32`/`rm32` → `[8,3]`; src: `x86.gpr32`/`r32` → `[11,3]` | 2 | EC-01, EC-06, EC-07, EC-42, `ADR-0110`, `X86-P80` — `0.74.0`+ |
 | `x86:sub/rm16-r16/legacy` | `6629c8` | dest: `x86.gpr16`/`rm16` → `[16,3]`; src: `x86.gpr16`/`r16` → `[19,3]` | 3 | EC-01, EC-06, EC-07, EC-42, `ADR-0110`, `X86-P80` — `0.74.0`+ |
+| `x86:add/rm64-r64/legacy` | `4801c0` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]` | 3 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
+| `x86:add/rm32-r32/legacy` | `01c0` | dest: `x86.gpr32`/`rm32` → `[8,3]`; src: `x86.gpr32`/`r32` → `[11,3]` | 2 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
+| `x86:add/rm16-r16/legacy` | `6601c0` | dest: `x86.gpr16`/`rm16` → `[16,3]`; src: `x86.gpr16`/`r16` → `[19,3]` | 3 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
+| `x86:and/rm64-r64/legacy` | `4821c0` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]` | 3 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
+| `x86:and/rm32-r32/legacy` | `21c0` | dest: `x86.gpr32`/`rm32` → `[8,3]`; src: `x86.gpr32`/`r32` → `[11,3]` | 2 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
+| `x86:and/rm16-r16/legacy` | `6621c0` | dest: `x86.gpr16`/`rm16` → `[16,3]`; src: `x86.gpr16`/`r16` → `[19,3]` | 3 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
+| `x86:or/rm64-r64/legacy` | `4809c0` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]` | 3 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
+| `x86:or/rm32-r32/legacy` | `09c0` | dest: `x86.gpr32`/`rm32` → `[8,3]`; src: `x86.gpr32`/`r32` → `[11,3]` | 2 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
+| `x86:or/rm16-r16/legacy` | `6609c0` | dest: `x86.gpr16`/`rm16` → `[16,3]`; src: `x86.gpr16`/`r16` → `[19,3]` | 3 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
+| `x86:xor/rm64-r64/legacy` | `4831c0` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]` | 3 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
+| `x86:xor/rm32-r32/legacy` | `31c0` | dest: `x86.gpr32`/`rm32` → `[8,3]`; src: `x86.gpr32`/`r32` → `[11,3]` | 2 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
+| `x86:xor/rm16-r16/legacy` | `6631c0` | dest: `x86.gpr16`/`rm16` → `[16,3]`; src: `x86.gpr16`/`r16` → `[19,3]` | 3 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
+| `x86:cmp/rm64-r64/legacy` | `4839c0` | dest: `x86.gpr64`/`rm64` → `[0,1]`, `[16,3]`; src: `x86.gpr64`/`r64` → `[2,1]`, `[19,3]` | 3 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
+| `x86:cmp/rm32-r32/legacy` | `39c0` | dest: `x86.gpr32`/`rm32` → `[8,3]`; src: `x86.gpr32`/`r32` → `[11,3]` | 2 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
+| `x86:cmp/rm16-r16/legacy` | `6639c0` | dest: `x86.gpr16`/`rm16` → `[16,3]`; src: `x86.gpr16`/`r16` → `[19,3]` | 3 | EC-01, EC-06, EC-07, EC-42, `ADR-0113`, `X86-P81` — `0.75.0`+ |
 | `x86:vmovaps/xmm-rsp-disp8/vex` | `c5f828442400` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; disp: `x86.imm`/`disp8` → `[40,8]` | 6 | EC-02, EC-09, EC-35, EC-38, X86-P24 |
 | `x86:vmovaps/xmm-rsp-disp32/vex` | `c5f828842400000000` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[27,3]`; disp: `x86.imm`/`disp32` → `[40,32]` | 9 | EC-02, EC-09, EC-35, EC-38, X86-P24 |
 | `x86:vmovaps/xmm-r12-disp8/vex` | `c4c17828442400` | dest: `x86.xmm`/`xmm` → `[15,1]` inverted, `[35,3]`; disp: `x86.imm`/`disp8` → `[48,8]` | 7 | EC-02, EC-06, EC-09, EC-35, EC-38, X86-P24 |
@@ -2227,6 +2242,24 @@ stays deferred. The memory-destination direction `2B /r` stays absent.
 (`N01et`), the absent `2B` direction is `E-FORM-001` (`N01ej`), a missing
 source is `E-OPERAND-002` (`N02dc`, `expected: 2`, `found: 1`) and `%r8` on a
 three-bit field is `E-OPERAND-004` (`N14cg`).
+
+`0.75.0` extends that direction to the rest of the integer ALU family
+(`ADR-0113`): fifteen rows, one per mnemonic and width. `add` gains
+`rm64-r64`, `rm32-r32` and `rm16-r16` (it had only the three 64-bit immediate
+rows); `and`, `or`, `xor` and `cmp` gain all three widths (they had no rows).
+`addq %rcx, %rax` is `48 01 c8` (3 B), `addl %ecx, %eax` is `01 c8` (2 B) and
+`addw %cx, %ax` is `66 01 c8` (3 B); `and`, `or`, `xor` and `cmp` use
+`21`/`09`/`31`/`39` with the same geometry. The destination is `REX.B` +
+`ModRM.r/m` on the 64-bit row (just `ModRM.r/m` at 32/16 bits), the source is
+`REX.R` + `ModRM.reg`, and both fields are independent: the vector measures
+both operand orders. The 64-bit rows therefore reach `%r8`-`%r15`; the 32/16
+bit rows are three-bit and the high window stays deferred. The `opcode+1`
+sibling (`03`/`0B`/`23`/`2B`/`33`/`3B`) stays absent, including its
+register/register spelling (`EC-42`). `X86-P81` is the 80-byte vector of
+thirty instructions. `adc` has no row (`N01eu`), the sibling direction is
+`E-FORM-001` (`N01ev`), the `0.74.0` boundary is `E-FORM-001` (`N01ew`), a
+missing source is `E-OPERAND-002` (`N02dd`) and register `8` on a 32-bit row
+is `E-OPERAND-004` (`N14ch`).
 
 ### 8.2 `aarch64` `0.1.0` … `0.18.0`
 

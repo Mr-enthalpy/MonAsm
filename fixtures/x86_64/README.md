@@ -1,6 +1,6 @@
 # x86-64 fixtures
 
-Vectors: `X86-P1` … `X86-P74` in `docs/fmp-v0/06_validation_matrix.md`.
+Vectors: `X86-P1` … `X86-P81` in `docs/fmp-v0/06_validation_matrix.md`.
 
 ## Positive vectors present
 
@@ -80,6 +80,13 @@ Vectors: `X86-P1` … `X86-P74` in `docs/fmp-v0/06_validation_matrix.md`.
 | X86-P72 | `X86-P72-sub-immediates` | `EXP-0102` (`ADR-0101`: `REX.W 83 /5 ib`, `REX.W 81 /5 id` and `REX.W 2D id`; `subq $1, %rax` is `48 83 e8 01`, `subq $1, %r8` is `49 83 e8 01`, `subq $300, %rbx` is `48 81 eb 2c 01 00 00` and `subq $300, %rax` is `48 2d 2c 01 00 00`; ten instructions, 55 bytes) |
 | X86-P73 | `X86-P73-call-rel32` | `EXP-0103` (`ADR-0102`: `E8 cd`; `callq L1` is `e8 05 00 00 00`, `callq ext` is `e8 00 00 00 00` with `R_X86_64_PLT32 ext -4`, `call .+130` is the literal field `e8 7d 00 00 00`; four instructions, 19 bytes) |
 | X86-P74 | `X86-P74-per-form-requirements` | `EXP-0104` (`ADR-0103`: `X86-P20`'s 24 VEX instructions re-pinned to `0.68.0` with `enabled_extensions: ["avx"]`; same 144 bytes as `EXP-0045/P20.asm`, so the vector exercises the `fmp-def/0.2` per-form gate) |
+| X86-P75 | `X86-P75-sse-riprel32` | `EXP-0106` (`ADR-0105`: the six SSE `%rip`-relative rows at `0.69.0`; `movaps L1(%rip), %xmm0` is 7 bytes, the VEX pair 8 and the EVEX pair 10, with six `pcrel_end` `[24,32]`/`[32,32]`/`[48,32]` fields; 70 bytes) |
+| X86-P76 | `X86-P76-sse-ext-fixed-base` | `EXP-0107` (`ADR-0106`: the eight `xmm8`-`xmm15` fixed-base legacy SSE rows at `0.70.0`; `movaps 8(%rsp), %xmm8` is 6 bytes and `128(%r12)` is 9, load and store; 60 bytes) |
+| X86-P77 | `X86-P77-addr32-riprel32` | `EXP-0108` (`ADR-0107`: the six `0x67` `%rip`-relative `mov` rows at `0.71.0`; `addr32 movl L1(%rip), %eax` is 7 bytes and the `r64`/`r16` pairs 8, six `pcrel_end` fields; 66 bytes) |
+| X86-P78 | `X86-P78-sse-index` | `EXP-0109` (`ADR-0108`: the sixteen legacy/VEX SSE indexed rows at `0.72.0` over `8/128(%rax,%rcx,4)`, low and high `xmm`, load and store; 116 bytes) |
+| X86-P79 | `X86-P79-movb-index` | `EXP-0110` (`ADR-0109`: the twelve indexed byte `mov` rows at `0.73.0` over `8/128(%rax,%rcx,4)` in the `%al`/`%ah`/`%spl` windows; 70 bytes) |
+| X86-P80 | `X86-P80-sub-rr` | `EXP-0111` (`ADR-0110`: the three `29 /r` register/register `sub` rows at `0.74.0`; `subq %rcx, %rax` is `48 29 c8` (3 bytes), `subl` 2 and `subw` 3, both operand orders; 16 bytes) |
+| X86-P81 | `X86-P81-alu-rr` | `EXP-0112` (`ADR-0113`: the fifteen ALU register/register rows at `0.75.0` in the `opcode` direction -- `add` plus `and`/`or`/`xor`/`cmp` at 64/32/16 bits; `addq %rcx, %rax` is `48 01 c8`, `addl` `01 c8` and `addw` `66 01 c8`, both operand orders; the `opcode+1` sibling is `E-FORM-001`, `N01ev`; 80 bytes) |
 
 `X86-P6` ships in `definitions/x86_64/0.2.0.json` as two forms with
 `mod = 00`, `r/m = 101` and `disp32` as the last field (`ADR-0027`). `X86-P4`

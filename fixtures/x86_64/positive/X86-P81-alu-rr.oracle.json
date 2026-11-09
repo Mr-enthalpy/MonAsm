@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=x86_64 -filetype=obj X86-P81-alu-rr.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "0ec1ea126c3eff49533f940e0fa1b913ff5c75a256fa4fa3fee86f00544a0c38",
+  "output_sha256": "7a657f089b0d339001105fb9678ad64d298624751c291c3bda0861e34e62f34e",
+  "size": 80,
+  "records": 0,
+  "notes": "Input, one LF-terminated line each (`EXP-0112` §2): the shipped `opcode` direction (`01`, `21`, `09`, `31`, `39`) at 64/32/16 bits, both operand orders, for `add`, `and`, `or`, `xor` and `cmp`. Thirty instructions, 80 bytes in all; every operand is a register, so no relocation record is emitted. The absent sibling opcodes (`03`, `23`, `0B`, `33`, `3B`) are decoded by `measure.py` and produce the same instruction text.",
+  "source": "`llvm-mc` 23.1.2 selection; the direction pair and the absent sibling are `EC-42`, the three-bit register window is `EC-01`, and the per-width opcode/prefix order is `EC-06`/`EC-07`. The measured bytes match the templates the generator appends as `definitions/x86_64/0.75.0.json`."
+}
