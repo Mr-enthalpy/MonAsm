@@ -227,6 +227,13 @@ Fragment rules:
   from offsets alone: `S - P` is translation-invariant. It is required in effect
   when the plan has `target.kind: absolute`, or a cross-section
   `resolve_in_place` fixup. A missing base is never read as `0` (`E-FIXUP-002`).
+- The sum of `declared_size` over `output_contract.section_order` MUST NOT exceed
+  67,108,864 bytes (64 MiB). The ceiling is a format property, not a host limit:
+  it is compared in `u128` before any allocation, and exceeding it is
+  `E-LIMIT-001` (`ADR-0122`). Without it the plan would choose the allocation,
+  so acceptance would depend on the machine's memory (`INV-05`) and an
+  over-sized image would abort the process instead of returning a diagnostic
+  (`INV-08`).
 
 ## 7. `instructions`
 
@@ -237,7 +244,7 @@ Fragment rules:
 | `offset` | yes | Byte offset within the section | Must match the owning fragment | A mismatch silently shifts every following fragment. | frozen |
 | `form_id` | yes | Definition-bound encoding form identifier | This is INV-01's whole mechanism | A mnemonic alone admits several encodings with different sizes. | frozen |
 | `operands` | yes | Ordered typed operands (§8) | Determines field values and legality | Untyped operands force the encoder to guess operand kind. | frozen |
-| `expected_size` | yes | Bytes this instruction MUST emit | Detects definition drift and forces rejection | A definition update changing size corrupts layout silently (`N05`). | frozen |
+| `expected_size` | yes | Bytes this instruction MUST emit; MUST equal the named form's encoded size | Detects definition drift and forces rejection | A definition update changing size corrupts layout silently (`N05`). It is compared with `form.size()` during validation, before any fixup bounds arithmetic uses it (`E-SIZE-001`, `ADR-0122`). | frozen |
 | `expected_digest` | no | `sha256:<hex>` over the exact bytes this instruction MUST emit, derived independently of the materializer (OD-01) | Detects a same-length encoder defect that `expected_size` cannot see | A materializer whose `REX.B` comes from the wrong operand bit emits `49 89 d8` (`mov r8, rbx`) where the plan meant `48 89 d8` (`mov rax, rbx`). Both are 3 bytes, both legal, and no other field contradicts the output. `EXP-0002` W2. | frozen |
 | `source_trace` | no | Planner-side origin (file, line, node) | Audit only | Must never affect output; if it does, replay breaks (INV-05). | draft |
 
@@ -429,7 +436,7 @@ shape is checked against the slot and not against the operand alone.
 | `name` | yes | Emitted name | Symbol table level only | — | frozen |
 | `kind` | yes | `defined` \| `undefined` \| `external` | Determines resolution obligations | Treating `external` as `undefined` silently changes relocation policy. | frozen |
 | `binding` | yes | `local` \| `global` \| `weak` | Object symbol semantics | Absent, an emitter defaults to `global`, so a weak symbol becomes strong and a later definition can no longer override it. `binding` MUST NOT change Level 0 bytes; two plans differing only here emit identical code (INV-05). | frozen |
-| `section_id`, `offset` | defined only | Location | Required for resolution | A defined symbol without a location is unresolvable but looks valid. | frozen |
+| `section_id`, `offset` | defined only | Location | Required for resolution | A defined symbol without a location is unresolvable but looks valid. `offset` MUST be `<=` the named section's `declared_size`: equality is the one-past-the-end label, and a larger offset names a byte that the section does not contain (`E-SYMBOL-003`, `ADR-0123`). Without the bound, `offset: 4096` in a 5-byte section resolves to an address outside it, and with `section_relative` refused there is no other field that could have meant "inside this section". | frozen |
 | `type` | no | `func` \| `object` \| `notype` | Object metadata | None at Level 0/1. | draft |
 
 Symbol identity is separate from symbol reference, fixup site, fixup kind,
@@ -443,7 +450,7 @@ non-contiguous), a target reference, an explicit addend, a `pc_reference_rule`, 
 value transform, a range constraint, and a resolution mode. No field may be
 defaulted by the materializer.
 
-Two rules make a fixup unambiguous (OD-02):
+These rules make a fixup unambiguous (`OD-02`, `ADR-0121`):
 
 - `resolution_mode` is exactly `resolve_in_place` or `emit_relocation`. The
   first writes the checked value and emits no record; the second zeroes the
@@ -451,6 +458,17 @@ Two rules make a fixup unambiguous (OD-02):
 - One writer per bit. A fixup-covered field is not also set by an operand
   (`E-FIXUP-006`). A fixup whose target disagrees with a `target` operand on the
   same instruction is `E-FIXUP-001`.
+- The bits a fixup covers MUST belong to exactly one slot, and that slot MUST be
+  `from: operand_value`. A covered bit that belongs to a `reg_number` slot, or to
+  an inverted placement, is a second writer (`E-FIXUP-006`); covering zero slots
+  or more than one is `E-FIXUP-001`.
+- Each `field_descriptor` range MUST be contained in one placement of that slot,
+  and the ranges MUST appear in the slot's placement order, which is the value
+  order. A range across a boundary, or the right ranges in another order, is
+  `E-FIXUP-001` (`03_fixup_model.md` §3).
+- `target.kind: section_relative` is refused (`E-VERSION-001`, `ADR-0123`). The
+  schema names the kind, but `fmp/0.1` has no measured meaning for "a section's
+  address", so the plan must name a `symbol` or an `absolute` address instead.
 
 ## 11. `output_contract`
 
@@ -618,16 +636,25 @@ sha256("fmp/0.1\0" || canonical_plan_bytes || "\0" ||
 
 ## 13. Validation order
 
-1. Parse and schema check (`E-PLAN-*`).
+1. Parse and schema check (`E-PLAN-*`), including the numeric domains: a
+   descriptor width or `range_constraint.bits` below 1 is `E-PLAN-002` here, not
+   later (`ADR-0122`).
 2. Target identity check (`E-TARGET-001`, `E-TARGET-002`, `E-TARGET-004`).
-3. Definition digest check (`E-DEF-*`).
-4. Section/fragment consistency (`E-LAYOUT-*`, `N09`, `N11`).
-5. Symbol table consistency (`E-SYMBOL-*`, `N08`).
+3. Definition digest check (`E-DEF-*`), including the loader's own arithmetic
+   limits: a template wider than `u32::MAX` bits or a placement end beyond `u64`
+   is `E-DEF-001`.
+4. Section/fragment consistency (`E-LAYOUT-*`, `N09`, `N11`), including the
+   `E-LIMIT-001` total over `section_order` (64 MiB).
+5. Symbol table consistency (`E-SYMBOL-*`, `N08`), including
+   `offset <= declared_size` (`ADR-0123`).
 6. Static instruction checks: form lookup, the `fmp-def/0.2` per-form extension
-   gate, operand legality, ranges (`E-FORM-*`, `E-OPERAND-*`, `E-RANGE-*`, and
-   `E-TARGET-003` for a named form whose requirement the plan does not enable).
-7. Fixup compatibility (`E-FIXUP-*`): descriptor bounds, one writer per bit,
-   pairing, and mode/target compatibility.
+   gate, operand legality, ranges, and `expected_size == form.size()`
+   (`E-SIZE-001`) before any fixup bound uses the size (`E-FORM-*`,
+   `E-OPERAND-*`, `E-RANGE-*`, and `E-TARGET-003` for a named form whose
+   requirement the plan does not enable).
+7. Fixup compatibility (`E-FIXUP-*`): descriptor bounds against `form.size() * 8`,
+   field ownership (exactly one `operand_value` slot, in that slot's placement
+   order), one writer per bit, pairing, and mode/target compatibility.
 8. Emission: encode, compare `expected_size`, compare `expected_digest`, then
    apply each fixup exactly once — `resolve_in_place` computes and writes,
    `emit_relocation` zeroes and records (`E-SIZE-*`, `E-BYTE-*`, `E-FIXUP-*`).

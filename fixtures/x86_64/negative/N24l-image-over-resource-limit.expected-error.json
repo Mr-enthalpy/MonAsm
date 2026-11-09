@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-LIMIT-001", "path": "/output_contract/section_order", "detail_keys": ["actual", "limit"] }
+  ]
+}

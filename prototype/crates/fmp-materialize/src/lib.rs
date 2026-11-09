@@ -387,7 +387,21 @@ fn emit(plan: &Plan, definition: &Definition) -> Result<Artifact, Vec<Diagnostic
         };
         let mut bytes: Vec<u8> = Vec::new();
         if section.image_backed {
-            bytes.resize(section.declared_size as usize, 0);
+            let size = match usize::try_from(section.declared_size) {
+                Ok(size) => size,
+                Err(_) => {
+                    errors.push(internal("validated image size does not fit the host"));
+                    continue;
+                }
+            };
+            // The validator capped the total at `MAX_IMAGE_BYTES`, so a failed
+            // reservation here is a host limit, not a plan property. Report it
+            // instead of letting `resize` abort the process.
+            if bytes.try_reserve_exact(size).is_err() {
+                errors.push(internal("image reservation failed"));
+                continue;
+            }
+            bytes.resize(size, 0);
             for fragment in &section.fragments {
                 let at = fragment.offset as usize;
                 match &fragment.body {
@@ -784,21 +798,9 @@ fn paired_hi_offset(fixup: &Fixup, plan: &Plan) -> Option<i128> {
 fn source(fixup: &Fixup, plan: &Plan, site: &Section) -> Result<(i128, bool), Diagnostic> {
     match &fixup.target {
         FixupTarget::Absolute(address) => Ok((*address as i128, true)),
-        FixupTarget::SectionRelative(section_id) => {
-            let section = plan
-                .sections
-                .iter()
-                .find(|section| &section.section_id == section_id)
-                .ok_or_else(|| internal("validated target section disappeared"))?;
-            match section.base_address {
-                Some(base) => Ok((base as i128, true)),
-                None => Err(
-                    Diagnostic::new(codes::E_FIXUP_002, fixup.path.clone() + "/target")
-                        .with("fixup_id", fixup.fixup_id.as_str())
-                        .with("target", section_id.as_str()),
-                ),
-            }
-        }
+        // `section_relative` is rejected statically (`E-VERSION-001`), so
+        // reaching this arm means the validator did not run.
+        FixupTarget::SectionRelative(_) => Err(internal("validated target kind disappeared")),
         FixupTarget::Symbol(symbol_id) => {
             let symbol = plan
                 .symbols

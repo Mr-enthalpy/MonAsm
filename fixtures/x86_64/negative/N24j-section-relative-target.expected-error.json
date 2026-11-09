@@ -1,0 +1,5 @@
+{
+  "errors": [
+    { "code": "E-VERSION-001", "path": "/fixups/0/target/kind", "detail_keys": ["feature", "format_version"] }
+  ]
+}

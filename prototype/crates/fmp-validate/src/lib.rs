@@ -13,6 +13,10 @@ use fmp_model::plan::{
     SectionKind, Symbol, SymbolKind, Transform,
 };
 
+/// The largest image `fmp/0.1` will build. The plan states a size; it does not
+/// get to make the materializer allocate an arbitrary amount of memory.
+const MAX_IMAGE_BYTES: u64 = 64 * 1024 * 1024;
+
 /// A plan plus the definition it names, with ordered lookups.
 ///
 /// Lookups are linear scans over `Vec`. A plan is small and a `HashMap` on a
@@ -269,6 +273,26 @@ fn check_layout(model: &Model, errors: &mut Vec<Diagnostic>) {
         );
     }
 
+    // The declared image is the sum over `section_order`. A plan cannot ask the
+    // materializer to allocate an unbounded amount of memory; the limit is a
+    // fixed property of this format version, not an environment input.
+    let mut total: u128 = 0;
+    for section_id in &plan.output.section_order {
+        if let Some(section) = model.section(section_id) {
+            total = total.saturating_add(u128::from(section.declared_size));
+        }
+    }
+    if total > u128::from(MAX_IMAGE_BYTES) {
+        errors.push(
+            Diagnostic::new(
+                codes::E_LIMIT_001,
+                plan.output.path.clone() + "/section_order",
+            )
+            .with("limit", MAX_IMAGE_BYTES)
+            .with("actual", total.to_string()),
+        );
+    }
+
     // Duplicate section ids make every reference to them ambiguous.
     for (index, section) in plan.sections.iter().enumerate() {
         if plan.sections[..index]
@@ -507,8 +531,12 @@ fn check_symbols(model: &Model, errors: &mut Vec<Diagnostic>) {
         }
         match symbol.kind {
             SymbolKind::Defined => {
+                // Equality is legal: a symbol at `declared_size` is the
+                // one-past-the-end label the v0 vectors already use.
                 let located = match (&symbol.section_id, symbol.offset) {
-                    (Some(section_id), Some(_)) => model.section(section_id).is_some(),
+                    (Some(section_id), Some(offset)) => model
+                        .section(section_id)
+                        .is_some_and(|section| offset <= section.declared_size),
                     _ => false,
                 };
                 if !located {
@@ -623,6 +651,20 @@ fn check_instructions(model: &Model, errors: &mut Vec<Diagnostic>) {
                 );
                 continue;
             }
+        }
+        // The size is a property of the form; a plan that states a different
+        // number is asking the materializer to reserve bytes the encoder cannot
+        // fill. Check it before any `expected_size * 8` arithmetic.
+        if instruction.expected_size != form.size() {
+            errors.push(
+                Diagnostic::new(
+                    codes::E_SIZE_001,
+                    instruction.path.clone() + "/expected_size",
+                )
+                .with("instruction_id", instruction.instruction_id.as_str())
+                .with("expected", instruction.expected_size)
+                .with("actual", form.size()),
+            );
         }
         if instruction.operands.len() != form.slots.len() {
             errors.push(
@@ -968,6 +1010,7 @@ fn check_fixups(model: &Model, errors: &mut Vec<Diagnostic>) {
     check_fixup_overlap(model, errors);
     check_fixup_pairs(model, errors);
     check_one_writer(model, errors);
+    check_fixup_ownership(model, errors);
 }
 
 fn check_fixup_site(model: &Model, fixup: &Fixup, errors: &mut Vec<Diagnostic>) {
@@ -1048,19 +1091,16 @@ fn check_fixup_target(model: &Model, fixup: &Fixup, errors: &mut Vec<Diagnostic>
                 }
             }
         }
-        FixupTarget::SectionRelative(section_id) => {
-            if matches!(fixup.resolution_mode, Mode::ResolveInPlace) {
-                let bound = model
-                    .section(section_id)
-                    .and_then(|section| section.base_address);
-                if bound.is_none() {
-                    errors.push(
-                        Diagnostic::new(codes::E_FIXUP_002, fixup.path.clone() + "/target")
-                            .with("fixup_id", fixup.fixup_id.as_str())
-                            .with("target", section_id.as_str()),
-                    );
-                }
-            }
+        FixupTarget::SectionRelative(_) => {
+            // `03_fixup_model.md` §2.1: the kind is named by the schema but no
+            // v0 fixture uses it, so `fmp/0.1` cannot honour it. Returning a
+            // section's base address would invent semantics; the plan must name
+            // a symbol instead.
+            errors.push(
+                Diagnostic::new(codes::E_VERSION_001, fixup.path.clone() + "/target/kind")
+                    .with("feature", "target.kind:section_relative")
+                    .with("format_version", codes::FORMAT_VERSION),
+            );
         }
         FixupTarget::Absolute(address) => {
             // An absolute `S` shares a number line with `P`, and `P` is an
@@ -1210,20 +1250,23 @@ fn check_fixup_descriptor(model: &Model, fixup: &Fixup, errors: &mut Vec<Diagnos
         Some(instruction) => instruction,
         None => return,
     };
-    let limit = instruction.expected_size * 8;
+    // The form, not `expected_size`, is the authority on how many bits exist.
+    // §13 step 6 already rejected a plan whose `expected_size` disagrees.
+    let form = match model.form(&instruction.form_id) {
+        Some(form) => form,
+        None => return,
+    };
+    let limit = form.size() * 8;
     let mut bits: Vec<(u32, u32)> = Vec::new();
     for field in &fixup.field_descriptor {
-        if u64::from(field.lsb) + u64::from(field.width) > limit {
+        let end = u64::from(field.lsb) + u64::from(field.width);
+        if end > limit {
             errors.push(
                 Diagnostic::new(codes::E_FIXUP_005, fixup.path.clone() + "/field_descriptor")
                     .with("fixup_id", fixup.fixup_id.as_str())
                     .with(
                         "descriptor",
-                        format!(
-                            "[{}..{}] exceeds {limit} bits",
-                            field.lsb,
-                            field.lsb + field.width
-                        ),
+                        format!("[{}..{}] exceeds {limit} bits", field.lsb, end),
                     ),
             );
         }
@@ -1364,7 +1407,8 @@ fn same_target(a: FixupTarget, b: FixupTarget) -> bool {
 
 /// A fixup-covered field must not also carry a base value in the template, and
 /// two fixups must not share a bit. The operand half of this rule lives in
-/// [`check_operand`], which is the only place that knows the slot layout.
+/// [`check_operand`] and [`check_fixup_ownership`], which are the places that
+/// know the slot layout.
 fn check_one_writer(model: &Model, errors: &mut Vec<Diagnostic>) {
     for fixup in &model.plan.fixups {
         let instruction = match model.instruction(&fixup.section_id, fixup.offset) {
@@ -1375,7 +1419,10 @@ fn check_one_writer(model: &Model, errors: &mut Vec<Diagnostic>) {
             Some(form) => form,
             None => continue,
         };
-        for field in &fixup.field_descriptor {
+        // One diagnostic per fixup, not one per set template bit: the failure is
+        // "this fixup writes over a template value", and the bit count is an
+        // artefact of how wide the field is.
+        'fields: for field in &fixup.field_descriptor {
             for bit in u64::from(field.lsb)..u64::from(field.lsb) + u64::from(field.width) {
                 let byte = (bit / 8) as usize;
                 if byte >= form.template.len() {
@@ -1388,8 +1435,136 @@ fn check_one_writer(model: &Model, errors: &mut Vec<Diagnostic>) {
                             .with("first", "template")
                             .with("second", fixup.fixup_id.as_str()),
                     );
+                    break 'fields;
                 }
             }
+        }
+    }
+}
+
+/// Every fixup must write exactly one operand-value field, and must write it in
+/// the value order the slot declared.
+///
+/// The template check above sees static bits; this check sees the slot layout.
+/// Without it a fixup could cover a `reg_number` slot (overwriting the register
+/// the operand selected) or take bits from an opcode/modifier placement, and the
+/// plan would be accepted while one of its statements is silently ignored.
+fn check_fixup_ownership(model: &Model, errors: &mut Vec<Diagnostic>) {
+    for fixup in &model.plan.fixups {
+        let instruction = match model.instruction(&fixup.section_id, fixup.offset) {
+            Some(instruction) => instruction,
+            None => continue,
+        };
+        let form = match model.form(&instruction.form_id) {
+            Some(form) => form,
+            None => continue,
+        };
+
+        // A descriptor outside the instruction is `E-FIXUP-005`; do not add a
+        // second diagnostic for the same bytes. Everything inside the
+        // instruction must still be accounted for below.
+        let limit = form.size() * 8;
+        let mut outside_form = false;
+        let mut covered: Vec<bool> = vec![false; form.bits() as usize];
+        for field in &fixup.field_descriptor {
+            let end = u64::from(field.lsb) + u64::from(field.width);
+            if end > limit {
+                outside_form = true;
+                continue;
+            }
+            for bit in field.lsb..field.lsb + field.width {
+                covered[bit as usize] = true;
+            }
+        }
+        if outside_form {
+            continue;
+        }
+
+        // Slots that own at least one of the covered bits.
+        let owners: Vec<&Slot> = form
+            .slots
+            .iter()
+            .filter(|slot| {
+                slot.placements.iter().any(|placement| {
+                    (placement.bit_offset..placement.bit_offset + placement.width)
+                        .any(|bit| covered.get(bit as usize).copied().unwrap_or(false))
+                })
+            })
+            .collect();
+
+        // A register slot (or an inverted placement) is written by the operand
+        // path. A fixup on the same bits is the two-writer case, not a field
+        // patch.
+        if owners.iter().any(|slot| {
+            slot.from == SlotFrom::RegNumber
+                || slot.placements.iter().any(|placement| placement.inverted)
+        }) {
+            errors.push(
+                Diagnostic::new(codes::E_FIXUP_006, fixup.path.clone())
+                    .with("first", "operand")
+                    .with("second", fixup.fixup_id.as_str()),
+            );
+            continue;
+        }
+
+        if owners.len() != 1 || owners[0].from != SlotFrom::OperandValue {
+            errors.push(
+                Diagnostic::new(codes::E_FIXUP_001, fixup.path.clone() + "/field_descriptor")
+                    .with("kind", "field_descriptor")
+                    .with("form_id", form.form_id.as_str())
+                    .with(
+                        "field",
+                        "descriptor does not cover exactly one operand_value slot",
+                    ),
+            );
+            continue;
+        }
+
+        // Within the slot, each range must sit in exactly one placement, and the
+        // placements must appear in the slot's declared order. That order is the
+        // value order: swapping two of them silently reassigns the value bits.
+        let placements = &owners[0].placements;
+        let mut seen: Vec<usize> = Vec::new();
+        let mut outside_placement = false;
+        let mut out_of_order = false;
+        for field in &fixup.field_descriptor {
+            let start = field.lsb;
+            let end = start + field.width;
+            let hit = placements.iter().position(|placement| {
+                start >= placement.bit_offset && end <= placement.bit_offset + placement.width
+            });
+            match hit {
+                Some(index) => {
+                    if seen.last().is_some_and(|previous| index < *previous) {
+                        out_of_order = true;
+                    }
+                    if !seen.contains(&index) {
+                        seen.push(index);
+                    }
+                }
+                None => outside_placement = true,
+            }
+        }
+        if outside_placement {
+            errors.push(
+                Diagnostic::new(codes::E_FIXUP_001, fixup.path.clone() + "/field_descriptor")
+                    .with("kind", "field_descriptor")
+                    .with("form_id", form.form_id.as_str())
+                    .with(
+                        "field",
+                        "descriptor range is not contained in one placement of the slot",
+                    ),
+            );
+        } else if out_of_order {
+            errors.push(
+                Diagnostic::new(codes::E_FIXUP_001, fixup.path.clone() + "/field_descriptor")
+                    .with("kind", "field_descriptor")
+                    .with("form_id", form.form_id.as_str())
+                    .with(
+                        "field",
+                        "descriptor order does not match the slot's placement order",
+                    ),
+            );
         }
     }
 }

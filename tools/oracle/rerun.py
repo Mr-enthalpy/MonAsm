@@ -6,21 +6,25 @@ This tool re-runs that oracle instead of trusting the recorded file:
 
 1. hash every `*.s`/`*.asm` under `research/evidence/experiments/`;
 2. match each `*.oracle.json` by `input_sha256` (content, never file name);
-3. stage the input under the basename the recorded command names, run the
-   recorded command verbatim in a temporary directory, and compare the produced
-   image with `*.expected.bin`, `output_sha256` and `size`.
+3. stage the input under the basename the recorded command names, split the
+   recorded command into `&&` stages, run each stage as an argv list (never
+   through a shell, and only for executables on `ALLOWED_EXECUTABLES`), and
+   compare the produced image with `*.expected.bin`, `output_sha256` and `size`.
 
 A record whose input is no longer in the tree is reported as `SKIP:
 input-not-stored`; it is never counted as verified. `kind = manual+disassembly`
 is skipped too, because part of its bytes is a hand-checked encoding that the
-assembler does not select.
+assembler does not select. A skip reason must be named with
+`--allow-skip-reason` to stay a skip: any other skip is a failure, so a gate
+cannot pass by quietly skipping the records it was meant to reproduce.
 
 Usage:
     python tools/oracle/rerun.py [--root DIR] [--only SUBSTRING] [--strict]
-                                 [--verbose]
+                                 [--allow-skip-reason REASON]... [--verbose]
 
-Exit codes: 0 every resolved record passes, 1 a resolved record differs,
-2 the environment is unusable (missing tool, unreadable record).
+Exit codes: 0 every resolved record passes, 1 a resolved record differs or was
+skipped for a reason that was not allowed, 2 the environment is unusable
+(missing tool, unreadable record, no record matched).
 """
 
 import argparse
@@ -29,14 +33,34 @@ import io
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
 
-INPUT = re.compile(r"[^\s\"']+\.(?:asm|s)(?=\s|$)")
+INPUT = re.compile(r"[^\s\"']+\.(?:asm|s)")
 VERSION = re.compile(r"LLVM version (\d+\.\d+\.\d+)")
 PRODUCED = "out.bin"
+
+# The only programs an oracle record may name. The records are data files in the
+# tree, so this is an allowlist rather than a convention: a record cannot ask the
+# rerun to execute an arbitrary binary.
+ALLOWED_EXECUTABLES = frozenset({"llvm-mc", "llvm-objcopy", "llvm-readobj", "ld.lld"})
+
+# Characters that only mean something to a shell. A record that uses one was
+# written for `shell=True`; running the same text as an argv list would change
+# its meaning, so it is refused rather than reinterpreted.
+SHELL_METACHARACTERS = set(";|&<>$`")
+
+
+class RecordError(Exception):
+    """A record that cannot be run as written."""
+
+    def __init__(self, reason, detail=""):
+        super().__init__(detail or reason)
+        self.reason = reason
+        self.detail = detail
 
 
 def sha256(data):
@@ -76,35 +100,84 @@ def tool_version():
     return match.group(1) if match else None
 
 
+def parse_command(record):
+    """Split a recorded command into argv stages and locate the input token.
+
+    Returns `(stages, stage_index, token_index)`. Raises `RecordError` when the
+    record is malformed: an empty stage, an unbalanced quote, an executable off
+    the allowlist, or a number of assembler inputs other than one.
+    """
+    command = record.get("command", "")
+    stages = []
+    for raw in command.split("&&"):
+        try:
+            argv = shlex.split(raw)
+        except ValueError as error:
+            raise RecordError("command-shape", "unbalanced quotes: %s" % error)
+        if not argv:
+            raise RecordError("command-shape", "empty && stage")
+        executable = os.path.basename(argv[0])
+        if executable not in ALLOWED_EXECUTABLES:
+            raise RecordError("executable-not-allowed", executable)
+        for token in argv:
+            if SHELL_METACHARACTERS.intersection(token):
+                raise RecordError("command-shape", "shell metacharacter in %r" % token)
+        stages.append(argv)
+
+    hits = [
+        (stage, index)
+        for stage, argv in enumerate(stages)
+        for index, token in enumerate(argv)
+        if INPUT.fullmatch(token)
+    ]
+    if len(hits) != 1:
+        raise RecordError(
+            "command-shape",
+            "expected exactly one assembler input, found %d" % len(hits),
+        )
+    return stages, hits[0][0], hits[0][1]
+
+
 def run_record(record, source, workdir):
     """Run the recorded command over `source`; return (status, reason, note)."""
-    command = record.get("command", "")
-    matches = INPUT.findall(command)
-    if len(matches) != 1:
-        return "FAIL", "command-shape", "expected exactly one assembler input"
-    token = matches[0]
+    try:
+        stages, stage, index = parse_command(record)
+    except RecordError as error:
+        return "FAIL", error.reason, error.detail
+
+    token = stages[stage][index]
     staged = os.path.basename(token.replace("\\", "/"))
     shutil.copyfile(source, os.path.join(workdir, staged))
-    start = command.index(token)
-    executable = command[:start] + staged + command[start + len(token):]
+    stages[stage][index] = staged
 
-    if "ld.lld" in executable and shutil.which("ld.lld") is None:
-        return "SKIP", "tool-missing", "ld.lld not on PATH"
+    # Resolve each executable through PATH and run the resolved path. Windows
+    # `CreateProcess` only appends `.exe` to a name with no dot, so `ld.lld`
+    # (a real file name with a dot) is not found unless it is resolved first.
+    missing = []
+    for argv in stages:
+        resolved = shutil.which(argv[0])
+        if resolved is None:
+            missing.append(os.path.basename(argv[0]))
+        else:
+            argv[0] = resolved
+    if missing:
+        return "SKIP", "tool-missing", "%s not on PATH" % missing[0]
 
-    try:
-        result = subprocess.run(
-            executable,
-            shell=True,
-            cwd=workdir,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-    except subprocess.SubprocessError as error:
-        return "FAIL", "command-failed", str(error)
-    if result.returncode != 0:
-        message = (result.stderr or result.stdout).strip().splitlines()
-        return "FAIL", "command-failed", message[0] if message else "no output"
+    for argv in stages:
+        try:
+            result = subprocess.run(
+                argv,
+                shell=False,
+                cwd=workdir,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            return "FAIL", "command-failed", str(error)
+        if result.returncode != 0:
+            message = (result.stderr or result.stdout).strip().splitlines()
+            return "FAIL", "command-failed", message[0] if message else "no output"
 
     produced_path = os.path.join(workdir, PRODUCED)
     if not os.path.isfile(produced_path):
@@ -119,6 +192,13 @@ def main():
     parser.add_argument("--root", default=None, help="repository root (default: two levels up)")
     parser.add_argument("--only", default=None, help="run only fixtures whose path contains this text")
     parser.add_argument("--strict", action="store_true", help="fail when any record is skipped")
+    parser.add_argument(
+        "--allow-skip-reason",
+        action="append",
+        default=[],
+        metavar="REASON",
+        help="keep this skip reason a skip (repeatable); every other skip fails",
+    )
     parser.add_argument("--verbose", action="store_true", help="print the resolved input for every pass")
     arguments = parser.parse_args()
 
@@ -148,9 +228,21 @@ def main():
     print("%d positive records, %d distinct inputs in the evidence tree" % (len(paths), len(index)))
     print()
 
+    allowed_skips = set(arguments.allow_skip_reason)
     passes = 0
     skips = []
     failures = []
+
+    def record_skip(name, reason, detail=""):
+        """Keep an allowed skip; turn any other skip into a failure."""
+        allowed = reason in allowed_skips
+        suffix = "  %s" % reason if not detail else "  %s: %s" % (reason, detail)
+        print("%s  %s%s" % ("SKIP" if allowed else "FAIL", name, suffix))
+        if allowed:
+            skips.append((name, reason))
+        else:
+            failures.append((name, "skip-not-allowed:" + reason, detail))
+
     with tempfile.TemporaryDirectory(prefix="fmp-oracle-") as scratch:
         for path in paths:
             name = rel(root, path)
@@ -168,17 +260,18 @@ def main():
                 continue
 
             if kind == "manual+disassembly":
-                print("SKIP  %s  manual-derivation" % name)
-                skips.append((name, "manual-derivation"))
+                record_skip(name, "manual-derivation")
                 continue
             if installed != version:
-                print("SKIP  %s  toolchain-version: record %s, installed %s" % (name, version, installed))
-                skips.append((name, "toolchain-version"))
+                record_skip(
+                    name,
+                    "toolchain-version",
+                    "record %s, installed %s" % (version, installed),
+                )
                 continue
             candidates = index.get(digest, [])
             if not candidates:
-                print("SKIP  %s  input-not-stored: %s" % (name, digest[:16]))
-                skips.append((name, "input-not-stored"))
+                record_skip(name, "input-not-stored", digest[:16])
                 continue
 
             source = candidates[0]
@@ -187,12 +280,12 @@ def main():
             os.makedirs(workdir)
 
             status, reason, detail = run_record(record, source, workdir)
+            if status == "SKIP":
+                record_skip(name, reason, detail)
+                continue
             if status != "OK":
                 print("%-4s  %s  %s: %s" % (status, name, reason, detail))
-                if status == "SKIP":
-                    skips.append((name, reason))
-                else:
-                    failures.append((name, reason, detail))
+                failures.append((name, reason, detail))
                 continue
 
             produced = detail
@@ -234,6 +327,7 @@ def main():
         for _, reason in skips:
             reasons[reason] = reasons.get(reason, 0) + 1
         print("skip reasons: " + ", ".join("%s=%d" % item for item in sorted(reasons.items())))
+        print("allowed skip reasons: " + ", ".join(sorted(allowed_skips)))
 
     if failures:
         return 1

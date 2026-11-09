@@ -1,0 +1,43 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "x86",
+    "isa_variant": "x86-64",
+    "execution_mode": "64",
+    "enabled_extensions": ["avx", "avx512f", "avx512vl"],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.x86",
+    "version": "0.67.0",
+    "digest": "sha256:367d76ebf89ee9c1cf51f561b4798eeb0a2000ae3688ee9a52a4c4a9eaea5c9e"
+  },
+  "output_contract": {
+    "artifact": "sections",
+    "section_order": [".text", ".bss"],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": 0,
+      "fragments": []
+    },
+    {
+      "section_id": ".bss",
+      "section_kind": "bss",
+      "image_backed": false,
+      "declared_size": 67108865,
+      "fragments": []
+    }
+  ],
+  "symbols": [],
+  "instructions": [],
+  "fixups": []
+}

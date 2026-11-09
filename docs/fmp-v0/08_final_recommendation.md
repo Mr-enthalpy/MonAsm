@@ -48,8 +48,9 @@ container file. The boundary is:
 - **Out of scope, rejected, not silently accepted.** `emit_fixups: false`, a
   non-default `fixup_record_order`, non-empty `feature_constraints`, and
   `section_relative` fixup targets. The first three are `E-VERSION-001`; the last
-  is `inference`/`unverified` and no v0 fixture exercises it
-  (`03_fixup_model.md` §2.1). A Level 0 plan that asks for a symbol table is also
+  was `inference`/`unverified` with no v0 fixture, and the `47a383b` audit now
+  refuses it `E-VERSION-001` as well (`N24j`, `ADR-0123`,
+  `03_fixup_model.md` §2.1). A Level 0 plan that asks for a symbol table is also
   `E-VERSION-001` (`N24i`); Level 2 containers are out of `fmp/0.1`.
 - **Not frozen, explicitly optional.** Three plan fields stay `draft`:
   `source_ref`, `source_trace`, `symbol.type` (`01_contract.md` §7, §9). They
@@ -76,7 +77,7 @@ change the decision; §F records the evidence.
 | Evidence | Source | What it proves |
 |---|---|---|
 | Three ISA vertical loops close byte-exactly | `06_validation_matrix.md` §4; `fixtures/` | 128 positive plans reproduce independently derived bytes; x86 85, AArch64 26, RV64 17 |
-| Strict rejection is exercised, not asserted | `06_validation_matrix.md` §1; `04_errors.md` §2 | 611 negative plans, each pinned to a code, JSON Pointer and detail-key set |
+| Strict rejection is exercised, not asserted | `06_validation_matrix.md` §1; `04_errors.md` §2 | 619 negative plans, each pinned to a code, JSON Pointer and detail-key set |
 | Determinism replays on three hosts | `EXP-0033` §6; CI runs on Ubuntu, macOS, Windows | Identical artifacts and diagnostics across hosts and processes |
 | Every invariant has an executable test | `01_contract.md` §2 | INV-01 through INV-08 are `verified` |
 | Encoding ambiguity has counterexamples | `02_encoding_choices.md`; `EXP-0096` | 44 `EC` rows frozen; the seven absent families are rejected `E-FORM-001` |
@@ -96,13 +97,16 @@ here so they cannot be mistaken for coverage:
    §11.2, `ADR-0096`): `artifact: sections` splits the same image into sections
    and optionally emits the declared symbol table. Level 2 containers and
    symbol synthesis remain out of `fmp/0.1`.
-2. **`section_relative` fixups** are named by the contract but unexercised
-   (`03_fixup_model.md` §2.1).
+2. **`section_relative` fixups** are named by the contract but had no measured
+   meaning (`03_fixup_model.md` §2.1). Since the `47a383b` audit they are
+   refused `E-VERSION-001` (`ADR-0123`, `N24j`) instead of being resolved from a
+   base address, and a later slice re-opens the kind only after measuring it.
 3. **Eight reachable error codes had no fixture when this report was written.**
    M1 closed that gap on 2026-11-08 with `N24a`–`N24h`; M3 repointed `N24h` to
-   `emit_fixups: false` and added `N24i` for the Level 0 symbol-table gate.
-   `04_errors.md` §2.4 now records 37 of the 43 active codes as fixture-covered,
-   and the six remaining are the JSON-layer, non-plan, structurally unreachable
+   `emit_fixups: false` and added `N24i` for the Level 0 symbol-table gate; the
+   `47a383b` audit added `N24j`–`N24l` and `E-LIMIT-001`.
+   `04_errors.md` §2.4 now records 39 of the 44 active codes as fixture-covered,
+   and the five remaining are the JSON-layer, non-plan, structurally unreachable
    and internal groups listed there.
 4. **LLVM internals remain unverified** (`90_boundary_audit.md` §8). LLVM was used
    only as an oracle; no LLVM source path was traced, so no LLVM-internal claim is
@@ -227,7 +231,7 @@ A fixup carries `field_descriptor`, `target`, `addend`, `pc_reference_rule`,
 `value_transform`, `range_constraint`, `resolution_mode`, and optional pairing
 (`03_fixup_model.md` §2–§8). Target kinds are `symbol`, `absolute`, and
 `section_relative`; only the first two are exercised, and `section_relative` is
-`inference`/`unverified` (§2.1). `resolve_in_place` computes and writes;
+refused `E-VERSION-001` (`§2.1`, `ADR-0123`). `resolve_in_place` computes and writes;
 `emit_relocation` zeroes and records. One writer per bit is enforced
 (`E-FIXUP-006`). The Level 0 record is the uniform cross-ISA shape: one record
 shape carries every `emit_relocation` case, which is why `E-FIXUP-004` was retired
@@ -239,15 +243,15 @@ shape carries every `emit_relocation` case, which is why `E-FIXUP-004` was retir
 `namespace + version + digest`; an unshipped pair is `E-DEF-002`, a digest
 mismatch is `E-DEF-001` (`N10`, `EXP-R5`). Errors have stable identity
 `(code, plan_path, sorted detail keys)` and are sorted by `(plan_path, code)`;
-prose is not identity (`04_errors.md` §1, `EXP-R6`). The registry has 43 active
+prose is not identity (`04_errors.md` §1, `EXP-R6`). The registry has 44 active
 codes; the retired and unreachable sets are stated explicitly in `04_errors.md`
 §2.2–§2.3 so a later slice cannot mistake absence for coverage.
 
 ### C.8 What is not frozen
 
 `source_ref`, `source_trace`, `symbol.type` remain `draft`
-(`01_contract.md` §7, §9). `section_relative` remains `unverified`
-(`03_fixup_model.md` §2.1). `symbol_order` is frozen because Level 1 emits the
+(`01_contract.md` §7, §9). `section_relative` is refused `E-VERSION-001` rather
+than left `unverified` (`03_fixup_model.md` §2.1, `ADR-0123`). `symbol_order` is frozen because Level 1 emits the
 table in that order (`ADR-0096`). Level 1 itself is implemented; Level 2
 containers and synthetic symbols remain out of v0 scope. These are recorded as
 out of v0 scope, not as frozen facts.
@@ -262,7 +266,7 @@ out of v0 scope, not as frozen facts.
   table has **632 forms** (measured from
   `definitions/x86_64/0.78.0.json`). Twenty `EC` rows are carried by this
   architecture (`02_encoding_choices.md` §"v0 surface").
-- **Fixtures.** 85 positive plans and 521 negative plans. The positive set covers
+- **Fixtures.** 85 positive plans and 527 negative plans. The positive set covers
   the `mov`/`add`/`and`/`or`/`xor`/`cmp`/`sub` integer families in both
   directions and at 64/32/16 bits (register/register, immediate, and for `sub`
   the memory directions), `imm8`/`imm32`, `rel8`/`rel32`, register
@@ -283,7 +287,7 @@ out of v0 scope, not as frozen facts.
 - **Surface.** 20 definition documents, `0.1.0` … `0.20.0`; **185 forms**
   (measured from `definitions/aarch64/0.20.0.json`, distinct across all
   versions). Sixteen `EC` rows are carried by this architecture.
-- **Fixtures.** 26 positive and 68 negative plans. The positive set covers
+- **Fixtures.** 26 positive and 69 negative plans. The positive set covers
   `add`/`sub`/`adds`/`subs` across immediate, shifted-register and
   extended-register variants; `cmp`/`cmn`; `movz`/`movn`/`movk`; `ldr`/`str`/
   `ldur`/`stur` across unsigned-offset, pre/post-index, register-offset and
@@ -306,7 +310,7 @@ out of v0 scope, not as frozen facts.
   has **24 forms** (measured from `definitions/rv64/0.6.0.json`), including
   `lui` (`hi20`), `jalr`, the six B-type mnemonics, `c.addi` and the nine
   further load/store widths. The compressed slice is `rv64c`; base is `rv64i`.
-- **Fixtures.** 17 positive and 22 negative plans. Positives cover `add`, `addi`,
+- **Fixtures.** 17 positive and 23 negative plans. Positives cover `add`, `addi`,
   `ld`/`sd`, `lb`/`lh`/`lw`/`lbu`/`lhu`/`lwu`/`sb`/`sh`/`sw`,
   `beq`/`bne`/`blt`/`bge`/`bltu`/`bgeu`, `jal`, `auipc`, `lui`,
   `jalr`, `c.addi`, and the `pcrel_hi`/`lo12` pair. The `jal`/`c.j`/`jalr`
@@ -357,7 +361,7 @@ Each invariant has an executable test and a recorded result (`01_contract.md`
 with identical artifact digests. CI runs `42402997326`, `42403439382`,
 `42403938259`, `42404376743` are green on all three hosts.
 
-The negative side is not a gesture: 611 negative plans are compared by exact code,
+The negative side is not a gesture: 619 negative plans are compared by exact code,
 JSON Pointer, and detail-key set (`fixtures/README.md`; `fixtures.rs` requires
 equality, not containment). That is the executable form of "does not secretly
 plan": a plan that asks the materializer to choose gets a rejection, not a
@@ -434,7 +438,7 @@ trust; Route C places it in the plan, where a test can reject it.
 | Symbols | id, name, kind, binding, section/offset | `01_contract.md` §9 |
 | Fixups | descriptor, target, addend, PC rule, transform, range, mode, pair | `03_fixup_model.md`; `AC-05` |
 | Output | Level 0 bytes + normalized fixup records + fingerprint; opt-in Level 1 sections + declared symbols with the same records | `01_contract.md` §11.1–§11.2 |
-| Errors | 43 active codes, stable identity, sorted reporting | `04_errors.md` §1–§2 |
+| Errors | 44 active codes, stable identity, sorted reporting | `04_errors.md` §1–§2 |
 | Determinism | replay across repetition, process, serialization, host, definition drift | `EXP-0033` |
 
 ### G.2 v0 explicitly does not support
@@ -446,7 +450,7 @@ trust; Route C places it in the plan, where a test can reject it.
 | `emit_fixups: false` | rejected | `E-VERSION-001` |
 | Non-default `fixup_record_order` | rejected | `E-VERSION-001` |
 | Non-empty `feature_constraints` | rejected | `E-VERSION-001` |
-| `section_relative` fixup target | unverified, unexercised | `03_fixup_model.md` §2.1 |
+| `section_relative` fixup target | rejected `E-VERSION-001`; no measured meaning in v0 | `03_fixup_model.md` §2.1; `N24j`; `ADR-0123` |
 | `lock`/`rep`/segment prefixes | absent; multiple encodings | `ADR-0094`, `EC-10` |
 | AArch64 `mov` alias | absent | `ADR-0094`, `EC-16` |
 | AArch64 `cbz`/`cbnz`/`tbz`/`tbnz` | absent | `ADR-0094`, `EC-18` |
@@ -484,9 +488,9 @@ The order is fixed: close the evidence gate before adding surface.
 | M1 | Error-coverage gate | Add end-to-end fixtures for the eight reachable uncovered codes; keep the two JSON-layer-only codes as unit tests | **closed 2026-11-08**: `N24a`–`N24h` land, `04_errors.md` §2.4 has no "reachable, no fixture" group, and `cargo test -p fmp-cli --test fixtures` is green |
 | M2 | Oracle rerun harness | One command that re-derives every `*.expected.bin` from `llvm-mc` (or records a manual derivation) and diffs | **closed 2026-11-08; the recovery backlog closed 2026-11-09**: `tools/oracle/rerun.py` resolves each input by `input_sha256`, re-runs the recorded command and compares bytes. The 29 `input-not-stored` records (20 AArch64 + 9 RV64) were recovered by content and experiment listings and re-pinned by `input_sha256`, so the harness now re-derives `122/128` positive records with `6` `manual-derivation` skips, `0` `input-not-stored` and `0` failed; `--strict` still fails on those six intended skips (`tools/oracle/README.md`) |
 | M3 | Level 1 object writer | `artifact: sections` + `include_symbol_table`; sections, symbols and relocation records from the plan, no relaxation and no container format (Level 2) | **closed 2026-11-08**: `X86-P71` and `EXP-0100` validate the §11.2 envelope; Level 0 bytes are unchanged (`.text` is the same 43-byte oracle image); `N24h`/`N24i` keep `E-VERSION-001` reachable |
-| M4 | Planner boundary/API | Export the plan builder as a library boundary, with the same closed-object discipline | **closed 2026-11-08**: `ADR-0097` and `09_planner_api.md` define `fmp-plan`, a total closed builder over `fmp-model` with no validator and no planner authority. `prototype/crates/fmp-plan` is implemented and `cargo tree -p fmp-plan` shows `fmp-model` as its only workspace dependency; `fmp-validate`, `fmp-materialize` and the `fmp` binary have no path to it outside the `fmp-cli` test target. The gate is `planner_api.rs` (ten tests): 128 positive and 605 `materialize`-phase negative parity, from-scratch authoring for `X86-P1`/`A64-P2`/`RV-P1`/`X86-P71`, closed key sets, optional-member and enum-spelling round trips, fixed-point re-emission, structural exclusion of the six `read`-phase negatives, determinism and typed `Unrepresentable` failures. A mutation check (removing `expected_digest`) fails the gate |
+| M4 | Planner boundary/API | Export the plan builder as a library boundary, with the same closed-object discipline | **closed 2026-11-08**: `ADR-0097` and `09_planner_api.md` define `fmp-plan`, a total closed builder over `fmp-model` with no validator and no planner authority. `prototype/crates/fmp-plan` is implemented and `cargo tree -p fmp-plan` shows `fmp-model` as its only workspace dependency; `fmp-validate`, `fmp-materialize` and the `fmp` binary have no path to it outside the `fmp-cli` test target. The gate is `planner_api.rs` (ten tests): 128 positive and 605 `materialize`-phase negative parity at the M4 close, from-scratch authoring for `X86-P1`/`A64-P2`/`RV-P1`/`X86-P71`, closed key sets, optional-member and enum-spelling round trips, fixed-point re-emission, structural exclusion of the then-six `read`-phase negatives, determinism and typed `Unrepresentable` failures. A mutation check (removing `expected_digest`) fails the gate |
 | M5 | Coverage widening | One ISA family per ADR, each with a rejection fixture for its absent variant | **closed 2026-11-09**: seven slices under `ADR-0104`-`ADR-0110`, plus the scope reconciliation `ADR-0111`. `ADR-0104` adds the RV64 B-type mnemonics (`definitions/rv64/0.5.0.json`, 15 forms); `ADR-0105`/`ADR-0106` add the SSE `%rip` rows and the `xmm8`-`xmm15` fixed-base rows (`0.69.0`, `0.70.0`); `ADR-0107` adds the `addr32` `%rip` rows (`0.71.0`); `ADR-0108` the legacy/VEX SSE indexed rows (`0.72.0`); `ADR-0109` the indexed byte `mov` (`0.73.0`); `ADR-0110` the `29 /r` register/register `sub` (`0.74.0`). Every slice has a positive fixture with an independent oracle and an `E-FORM-001` fixture for the row or sibling it leaves out; the x86 table ends at 564 forms and the corpus is 121 positives and 586 negatives |
-| M6 | Coverage round 2 | Seven additive integer-surface slices, one ADR each, plus a closure; no contract change | **closed 2026-11-10**: seven slices under `ADR-0113`-`ADR-0119`, plus the closure `ADR-0120`. `ADR-0113` adds the x86 ALU register/register rows (`0.75.0`), `ADR-0114` the ALU immediate rows (`0.76.0`), `ADR-0115` the `mov` immediate rows (`0.77.0`), `ADR-0116` the `sub` memory directions (`0.78.0`), `ADR-0117` the RV64 load/store widths (`rv64/0.6.0`), `ADR-0118` AArch64 `adr` (`aarch64/0.19.0`) and `ADR-0119` `mul`/`csel` (`0.20.0`). The round lands 82 rows and 841 forms (x86 632, AArch64 185, RV64 24) across 104 documents, with 128 positives and 611 negatives; the two differences from the plan (`S1` 15 not 16, `S3` 5 not 6) are measured corrections recorded in their ADRs |
+| M6 | Coverage round 2 | Seven additive integer-surface slices, one ADR each, plus a closure; no contract change | **closed 2026-11-10**: seven slices under `ADR-0113`-`ADR-0119`, plus the closure `ADR-0120`. `ADR-0113` adds the x86 ALU register/register rows (`0.75.0`), `ADR-0114` the ALU immediate rows (`0.76.0`), `ADR-0115` the `mov` immediate rows (`0.77.0`), `ADR-0116` the `sub` memory directions (`0.78.0`), `ADR-0117` the RV64 load/store widths (`rv64/0.6.0`), `ADR-0118` AArch64 `adr` (`aarch64/0.19.0`) and `ADR-0119` `mul`/`csel` (`0.20.0`). The round lands 82 rows and 841 forms (x86 632, AArch64 185, RV64 24) across 104 documents, with 128 positives and 611 negatives at the M6 close; the two differences from the plan (`S1` 15 not 16, `S3` 5 not 6) are measured corrections recorded in their ADRs |
 
 ### H.2 Test gates
 
@@ -581,7 +585,7 @@ because it carries the target-specific pieces as data.
 ### Q8. How is "does not secretly plan" proven?
 
 By executable evidence, not a diagram: `form_id` exact lookup, no fallback paths,
-611 negative plans compared by exact diagnostic, replay tests across three hosts,
+619 negative plans compared by exact diagnostic, replay tests across three hosts,
 and a definition-drift test that is loud. A plan that asks for a decision gets a
 rejection; a byte that would require a choice cannot be produced.
 

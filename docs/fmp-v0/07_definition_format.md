@@ -3042,6 +3042,7 @@ version (`N01fd`, `E-FORM-001`), naming a `0.6.0` row against `0.5.0` is
 | a `fmp-def/0.1` form that carries `requires_extensions` (unknown field) | `E-DEF-001` |
 | duplicate `form_id` | `E-DEF-001` |
 | `template` empty, odd-length, or non-hex | `E-DEF-001` |
+| `template` wider than `u32::MAX` bits, or a placement end beyond `u64` (checked arithmetic; `ADR-0122`) | `E-DEF-001` |
 | placement outside the template, or two placements overlapping | `E-DEF-001` |
 | placement key outside `bit_offset`/`width`/`invert`, or a non-boolean `invert` | `E-DEF-001` |
 | slot with no placement | `E-DEF-001` |

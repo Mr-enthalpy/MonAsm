@@ -1,5 +1,6 @@
 {
   "errors": [
+    { "code": "E-FIXUP-006", "path": "/fixups/0", "detail_keys": ["first", "second"] },
     { "code": "E-FIXUP-001", "path": "/instructions/0/operands/0", "detail_keys": ["kind", "form_id", "field"] }
   ]
 }

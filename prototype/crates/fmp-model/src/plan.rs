@@ -926,7 +926,7 @@ fn bind_field_range(value: &json::Json, path: String) -> Result<FieldRange, Diag
     let (width, width_path) = obj.required("width")?;
     Ok(FieldRange {
         lsb: bind::bounded_u32(lsb, lsb_path, 127, "u7")?,
-        width: bind::bounded_u32(width, width_path, 64, "u7")?,
+        width: bind::bounded_u32_range(width, width_path, 1, 64, "u7")?,
     })
 }
 
@@ -938,7 +938,7 @@ fn bind_range_constraint(value: &json::Json, path: String) -> Result<RangeConstr
     let (align, align_path) = obj.required("align_bits")?;
     Ok(RangeConstraint {
         signed: bind::boolean(signed, signed_path)?,
-        bits: bind::bounded_u32(bits, bits_path, 64, "u7")?,
+        bits: bind::bounded_u32_range(bits, bits_path, 1, 64, "u7")?,
         align_bits: bind::bounded_u32(align, align_path, 12, "u4")?,
     })
 }

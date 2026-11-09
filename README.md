@@ -404,8 +404,8 @@ object writer) landed `artifact: sections` and the optional declared symbol tabl
 (`ADR-0096`), with `X86-P71`/`EXP-0100` as the positive vector. M4 is
 implemented (`ADR-0097`, `docs/fmp-v0/09_planner_api.md`): a planner-side
 `fmp-plan` crate exposes a total, closed plan builder with no validator and no
-planner authority, and `planner_api.rs` rebuilds the whole corpus through it —
-128 positives and 605 `materialize`-phase negatives — plus from-scratch,
+planner authority, and `planner_api.rs` rebuilds the corpus as it stood at M4
+through it — 128 positives and 605 `materialize`-phase negatives — plus from-scratch,
 closed-key, enum-spelling and determinism tests. M5 (coverage widening) has
 landed seven items, the last being `ADR-0103`: `fmp-def/0.2` per-form
 `requires_extensions` in `definitions/x86_64/0.68.0.json`, with `X86-P74`,
@@ -450,19 +450,29 @@ lands `S7`: `mul` as the `MADD` alias with `Ra = 31` and `csel` at both widths
 as `definitions/aarch64/0.20.0.json` (185 forms), with `A64-P24` as the 32-byte
 vector; `EC-44` records the accumulator field the alias pins. `ADR-0120` closes the
 round at **841 forms across 104 documents** (x86 632, AArch64 185, RV64 24),
-**128 positives and 611 negatives**, with `tools/oracle/rerun.py` re-deriving
+**128 positives and 611 negatives at the M6 close**, with `tools/oracle/rerun.py` re-deriving
 `122/128` records and the six `manual-derivation` skips; the two rows the plan
 expected but the opcode tables do not have (`sub`'s third register/register row
 and `REX.W B8+rd`) are recorded as measured corrections in `ADR-0113` and
-`ADR-0115`, so the round lands 82 rows and not 84.
+`ADR-0115`, so the round lands 82 rows and not 84. An audit of `47a383b` then
+lands `ADR-0121`-`ADR-0124`: a fixup's bits are owned by exactly one
+`operand_value` slot in that slot's placement order (`ADR-0121`), the numeric
+domains and a 64 MiB image ceiling are checked before the arithmetic they protect
+(`E-LIMIT-001`, `ADR-0122`), `section_relative` and an out-of-section symbol
+offset are refused (`ADR-0123`), and the document, definition, formatting,
+workspace and oracle gates run in `.github/workflows/gates.yml` with a shell-free
+`rerun.py` (`ADR-0124`). Eight negatives land (`N05b`, `N07g`, `N07h`,
+`N24j`-`N24l`, `N25a`, `N25b`), so the living corpus is **128 positives and 619
+negatives** (611 `materialize`-phase plus 8 `read`-phase), and 39 of the 44
+active error codes are fixture-covered.
 
 | Area | State |
 |---|---|
-| Contract (`docs/fmp-v0/01_contract.md`) | frozen for the v0 scope (`ADR-0095`); three optional draft fields and `section_relative` are out of scope; Level 1 is implemented (`ADR-0096`) |
+| Contract (`docs/fmp-v0/01_contract.md`) | frozen for the v0 scope (`ADR-0095`); three optional draft fields are out of scope, `section_relative` is refused `E-VERSION-001` (`ADR-0123`) and a defined symbol's `offset` is bounded by `declared_size`; Level 1 is implemented (`ADR-0096`) |
 | Schema (`schema/fmp-v0.schema.json`) | machine-readable projection of the frozen contract; examples are illustrative, and the AArch64 example is the accepted Level 1 shape (`artifact: sections`) |
 | Definitions (`definitions/`) | x86-64 `0.1.0` (7 forms), `0.2.0` (9 forms), `0.3.0` (17 forms), `0.4.0` (22 forms), `0.5.0` (25 forms), `0.6.0` (25 forms), `0.7.0` (29 forms), `0.8.0` (33 forms), `0.9.0` (45 forms), `0.10.0` (53 forms), `0.11.0` (62 forms), `0.12.0` (74 forms), `0.13.0` (74 forms), `0.14.0` (79 forms), `0.15.0` (91 forms), `0.16.0` (103 forms), `0.17.0` (119 forms), `0.18.0` (127 forms), `0.19.0` (155 forms), `0.20.0` (171 forms), `0.21.0` (195 forms) and `0.22.0` (207 forms) and `0.23.0` (225 forms) and `0.24.0` (231 forms) and `0.25.0` (237 forms) and `0.26.0` (239 forms) and `0.27.0` (243 forms) and `0.28.0` (247 forms) and `0.29.0` (255 forms) and `0.30.0` (267 forms) and `0.31.0` (275 forms) and `0.32.0` (289 forms) and `0.33.0` (291 forms) and `0.34.0` (295 forms) and `0.35.0` (301 forms) and `0.36.0` (309 forms) and `0.37.0` (315 forms) and `0.38.0` (321 forms) and `0.39.0` (329 forms) and `0.40.0` (337 forms) and `0.41.0` (345 forms) and `0.42.0` (353 forms) and `0.43.0` (361 forms) and `0.44.0` (369 forms) and `0.45.0` (373 forms) and `0.46.0` (377 forms) and `0.47.0` (385 forms) and `0.48.0` (389 forms) and `0.49.0` (393 forms) and `0.50.0` (405 forms) and `0.51.0` (409 forms) and `0.52.0` (413 forms) and `0.53.0` (417 forms) and `0.54.0` (429 forms) and `0.55.0` (445 forms) and `0.56.0` (449 forms) and `0.57.0` (453 forms) and `0.58.0` (465 forms) and `0.59.0` (481 forms) and `0.60.0` (489 forms) and `0.61.0` (497 forms) and `0.62.0` (499 forms) and `0.63.0` (503 forms) and `0.64.0` (505 forms) and `0.65.0` (509 forms) and `0.66.0` (512 forms) and `0.67.0` (513 forms), `0.68.0` (513 forms, the first `fmp-def/0.2` table), `0.69.0` (519 forms), `0.70.0` (527 forms), `0.71.0` (533 forms), `0.72.0` (549 forms), `0.73.0` (561 forms) and `0.74.0` (564 forms) and `0.75.0` (579 forms) and `0.76.0` (615 forms) and `0.77.0` (620 forms) and `0.78.0` (632 forms), aarch64 `0.1.0` (4 forms), `0.2.0` (5 forms), `0.3.0` (6 forms), `0.4.0` (11 forms), `0.5.0` (15 forms), `0.6.0` (18 forms), `0.7.0` (26 forms), `0.8.0` (32 forms), `0.9.0` (44 forms), `0.10.0` (68 forms), `0.11.0` (92 forms), `0.12.0` (132 forms), `0.13.0` (135 forms), `0.14.0` (136 forms), `0.15.0` (152 forms), `0.16.0` (168 forms), `0.17.0` (176 forms) and `0.18.0` (180 forms) and `0.19.0` (181 forms) and `0.20.0` (185 forms), rv64 `0.1.0` (7 forms), `0.2.0` (8 forms), `0.3.0` (9 forms), `0.4.0` (10 forms), `0.5.0` (15 forms) and `0.6.0` (24 forms) frozen, digests pinned |
-| Prototype (`prototype/`) | workspace compiled; all three slices materialize from the plan; the M4 planner-side `fmp-plan` builder is implemented (`ADR-0097`, `09_planner_api.md`) with its parity gate in `fmp-cli/tests/planner_api.rs`; CI runs the suite on Linux, macOS and Windows |
-| Oracles (`tools/oracle/`) | `llvm-mc` 23.1.2 is the oracle of record; `rerun.py` re-derives every stored input and reports the rest as skipped |
+| Prototype (`prototype/`) | workspace compiled; all three slices materialize from the plan; the M4 planner-side `fmp-plan` builder is implemented (`ADR-0097`, `09_planner_api.md`) with its parity gate in `fmp-cli/tests/planner_api.rs`; CI runs the suite on Linux, macOS and Windows and `gates.yml` runs the document, definition, formatting, workspace and oracle gates |
+| Oracles (`tools/oracle/`) | `llvm-mc` 23.1.2 is the oracle of record; `rerun.py` re-derives every stored input with `--allow-skip-reason manual-derivation` and reports the rest as skipped (CI gate, `ADR-0124`) |
 | Evidence (`research/evidence/`) | index, XirAsm snapshot, EXP-0001…EXP-0118 |
 
 Read `docs/STATUS.md` for the current phase, gate status, and next action.
@@ -478,6 +488,7 @@ Read `docs/STATUS.md` for the current phase, gate status, and next action.
 
 ```text
 .github/workflows/determinism.yml  EXP-R3 on Linux, macOS and Windows
+.github/workflows/gates.yml        document, definition, format and oracle gates
 docs/
   STATUS.md                  phase, gates, next action, open decisions
   glossary.md                terms used across the contract set

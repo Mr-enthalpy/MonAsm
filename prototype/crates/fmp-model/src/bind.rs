@@ -304,8 +304,20 @@ pub fn bounded_u32(
     max: u32,
     domain: &'static str,
 ) -> Result<u32, Fault> {
+    bounded_u32_range(value, path, 0, max, domain)
+}
+
+/// The same check with an explicit inclusive lower bound. A zero is a valid
+/// integer, so "must be at least 1" is a domain rule, not a type rule.
+pub fn bounded_u32_range(
+    value: &Json,
+    path: String,
+    min: u32,
+    max: u32,
+    domain: &'static str,
+) -> Result<u32, Fault> {
     let number = integer(value, path.clone())?;
-    if (0..=max as i128).contains(&number) {
+    if (min as i128..=max as i128).contains(&number) {
         Ok(number as u32)
     } else {
         Err(Fault::Domain {

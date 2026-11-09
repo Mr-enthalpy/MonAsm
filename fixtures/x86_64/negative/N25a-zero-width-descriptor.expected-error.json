@@ -1,0 +1,6 @@
+{
+  "phase": "read",
+  "errors": [
+    { "code": "E-PLAN-002", "path": "/fixups/0/field_descriptor/0/width", "detail_keys": ["found_kind", "path_type"] }
+  ]
+}

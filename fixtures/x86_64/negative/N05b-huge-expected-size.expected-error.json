@@ -1,0 +1,6 @@
+{
+  "errors": [
+    { "code": "E-LAYOUT-003", "path": "/instructions/0", "detail_keys": ["fragment", "instruction_id"] },
+    { "code": "E-SIZE-001", "path": "/instructions/0/expected_size", "detail_keys": ["actual", "expected", "instruction_id"] }
+  ]
+}

@@ -60,6 +60,8 @@ pub const E_LAYOUT_005: &str = "E-LAYOUT-005";
 pub const E_LAYOUT_006: &str = "E-LAYOUT-006";
 /// Duplicate `instruction_id`, or two instructions at the same site.
 pub const E_LAYOUT_007: &str = "E-LAYOUT-007";
+/// The declared image is larger than the 64 MiB resource limit.
+pub const E_LIMIT_001: &str = "E-LIMIT-001";
 /// A reference names a `symbol_id` that `symbols[]` does not declare.
 pub const E_SYMBOL_001: &str = "E-SYMBOL-001";
 /// Duplicate `symbol_id`, or duplicate emitted name with conflicting binding.
@@ -124,6 +126,7 @@ pub const ALL: &[&str] = &[
     E_LAYOUT_005,
     E_LAYOUT_006,
     E_LAYOUT_007,
+    E_LIMIT_001,
     E_SYMBOL_001,
     E_SYMBOL_002,
     E_SYMBOL_003,

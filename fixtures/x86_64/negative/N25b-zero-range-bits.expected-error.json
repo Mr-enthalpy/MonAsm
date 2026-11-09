@@ -1,0 +1,6 @@
+{
+  "phase": "read",
+  "errors": [
+    { "code": "E-PLAN-002", "path": "/fixups/0/range_constraint/bits", "detail_keys": ["found_kind", "path_type"] }
+  ]
+}

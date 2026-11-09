@@ -7,13 +7,13 @@
 //!
 //! Covered here:
 //!
-//! - all 114 positive fixtures, via `from_model`, including the Level 1
+//! - all 128 positive fixtures, via `from_model`, including the Level 1
 //!   envelope and the fingerprint;
-//! - all 559 `materialize`-phase negative fixtures, via `from_model`, comparing
+//! - all 611 `materialize`-phase negative fixtures, via `from_model`, comparing
 //!   code, JSON Pointer and detail-key set;
 //! - from-scratch authoring for one positive per ISA plus `X86-P71`;
 //! - the exact closed key set of every emitted object;
-//! - the six `read`-phase negatives that never produce a bound `Plan`;
+//! - the eight `read`-phase negatives that never produce a bound `Plan`;
 //! - determinism and the typed `Unrepresentable` failures.
 
 use std::path::{Path, PathBuf};
@@ -122,6 +122,49 @@ fn rebuild(path: &Path) -> (fmp_model::Plan, String) {
     (plan, name)
 }
 
+/// Rebuild a negative fixture through the builder, tolerating the closed
+/// writer's refusal.
+///
+/// `fmp-plan` is a closed typed writer, so a plan that names a value the v0
+/// surface cannot honour — `section_relative` — has no slot; `from_model`
+/// reports the refusal at the same pointer the materializer rejects
+/// (`09_planner_api.md` §6). That case falls back to the reader-bound plan and
+/// requires the expected set to name the same pointer with `E-VERSION-001`, so
+/// the fallback cannot hide an unrelated builder failure.
+fn rebuild_negative(path: &Path, expected: &Json) -> (fmp_model::Plan, String) {
+    let name = stem(path);
+    let bound = read_plan(path);
+    let rebuilt = match PlanBuilder::from_model(&bound) {
+        Ok(builder) => builder,
+        Err(refusal) => {
+            let listed = expected
+                .get("errors")
+                .and_then(Json::as_array)
+                .is_some_and(|entries| {
+                    entries.iter().any(|entry| {
+                        entry.get("path").and_then(Json::as_str) == Some(refusal.path.as_str())
+                            && entry.get("code").and_then(Json::as_str)
+                                == Some(fmp_model::codes::E_VERSION_001)
+                    })
+                });
+            assert!(
+                listed,
+                "{name}: the builder refused `{}` at {} and no expected diagnostic names that pointer",
+                refusal.value, refusal.path
+            );
+            return (bound, name);
+        }
+    };
+    let bytes = rebuilt.build_canonical();
+    let plan = fmp_model::plan::read(&bytes).unwrap_or_else(|error| {
+        panic!(
+            "{name}: the builder's own bytes did not read: {}",
+            error.message()
+        )
+    });
+    (plan, name)
+}
+
 // ---------------------------------------------------------------------------
 // Positive parity
 // ---------------------------------------------------------------------------
@@ -206,8 +249,8 @@ fn negatives_reject_at_the_same_code_path_and_detail_keys() {
     let paths = negatives();
     assert_eq!(
         paths.len(),
-        611,
-        "the corpus is 605 materialize-phase plus 6 read-phase negatives"
+        619,
+        "the corpus is 611 materialize-phase plus 8 read-phase negatives"
     );
     let mut materialize_phase = 0usize;
     for path in paths {
@@ -221,7 +264,7 @@ fn negatives_reject_at_the_same_code_path_and_detail_keys() {
         }
         materialize_phase += 1;
 
-        let (plan, name) = rebuild(&path);
+        let (plan, name) = rebuild_negative(&path, &expected);
         let definition = registry
             .find(&plan.definition.namespace, &plan.definition.version)
             .unwrap_or_else(|error| panic!("{name}: {}", error.message()));
@@ -291,7 +334,7 @@ fn negatives_reject_at_the_same_code_path_and_detail_keys() {
         );
     }
     assert_eq!(
-        materialize_phase, 605,
+        materialize_phase, 611,
         "every materialize-phase negative must be rebuildable and compared"
     );
 }
@@ -1476,6 +1519,8 @@ fn read_phase_negatives_never_produce_a_bound_plan() {
             "N23a-expression-shaped-value",
             "N24a-unsupported-format-version",
             "N24b-missing-required-field",
+            "N25a-zero-width-descriptor",
+            "N25b-zero-range-bits",
         ]
     );
 }

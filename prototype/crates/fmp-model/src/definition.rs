@@ -342,13 +342,23 @@ fn bind_form(
             "a form must declare at least one slot",
         ));
     }
-    let bits = (template.len() as u32) * 8;
+    let bits = (template.len() as u64) * 8;
+    if bits > u64::from(u32::MAX) {
+        // `Placement::bit_offset` is a `u32`; a template with more bits than
+        // that cannot be addressed by the model at all.
+        return Err(load_error(
+            &form_id,
+            "template has more bits than the slot model can address",
+        ));
+    }
+    let bits = bits as u32;
     let mut slots: Vec<Slot> = Vec::with_capacity(items.len());
     let mut occupied: Vec<Option<usize>> = vec![None; bits as usize];
     for (index, item) in items.iter().enumerate() {
         let slot = bind_slot(item, bind::pointer_index(&slots_path, index))?;
         for (offset, width) in slot.owned_bits() {
-            if offset + width > bits {
+            let end = u64::from(offset) + u64::from(width);
+            if end > u64::from(bits) {
                 return Err(load_error(
                     &form_id,
                     &format!(

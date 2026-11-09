@@ -51,10 +51,22 @@ share a hash (identical copies) the lexicographically first relative path wins,
 so the run is deterministic (`INV-05`).
 
 For a resolved record the harness copies the input into a temporary directory
-under the basename the recorded command names, runs that command verbatim, and
-compares the produced image with `*.expected.bin`, `output_sha256` and `size`.
-The `records` field (relocation count) is not re-checked; the byte image and the
-lookup hash are.
+under the basename the recorded command names, splits the recorded command on
+`&&` into stages, runs each stage as an argv list, and compares the produced
+image with `*.expected.bin`, `output_sha256` and `size`. The `records` field
+(relocation count) is not re-checked; the byte image and the lookup hash are.
+
+**No shell is involved.** A stage is parsed with `shlex.split` and executed with
+`shell=False`, so the record cannot expand variables, redirect output or chain
+anything the harness did not split itself. Two rules follow from that
+(`ADR-0124`):
+
+- `argv[0]` must be one of `llvm-mc`, `llvm-objcopy`, `llvm-readobj` or
+  `ld.lld`; anything else fails with `executable-not-allowed`. The resolved
+  `PATH` entry is what runs, so a name containing a dot (`ld.lld`) still works.
+- A stage token containing `;`, `|`, `&`, `<`, `>`, `$` or a backtick fails with
+  `command-shape` instead of being reinterpreted as a literal argument.
+
 
 | Status | Meaning |
 |---|---|
@@ -67,11 +79,25 @@ not the assembler output), `input-not-stored` (no file in the evidence tree
 hashes to `input_sha256`), `toolchain-version` (installed `llvm-mc` differs from
 the pinned `version`), `tool-missing` (e.g. `ld.lld` absent).
 
-Exit codes: `0` when every resolved record passes, `1` on any `FAIL`, `2` when
-`llvm-mc`/`llvm-objcopy` is unavailable or a record cannot be parsed. `--strict`
-turns a `SKIP` into a failure; that is the gate to use once the missing inputs
-are backfilled. The summary always prints `<pass>/<total> re-derived,
-<skip> skipped`, so a partial run is never reported as a clean corpus.
+**A skip must be named.** `--allow-skip-reason REASON` (repeatable) keeps that
+reason a skip; every other skip is printed as `FAIL` with a
+`skip-not-allowed:<reason>` entry and exits 1. `--strict` goes further and fails
+on *every* skip, including allowed ones.
+
+Exit codes: `0` when every resolved record passes and every skip was allowed,
+`1` on any `FAIL` or any skip that was not allowed, `2` when
+`llvm-mc`/`llvm-objcopy` is unavailable or a record cannot be parsed. The summary
+always prints `<pass>/<total> re-derived, <skip> skipped`, so a partial run is
+never reported as a clean corpus.
+
+### CI gate
+
+`.github/workflows/gates.yml` (`oracle` job) runs
+`python tools/oracle/rerun.py --allow-skip-reason manual-derivation` against
+LLVM 23.1.2 and fails if `llvm-mc --version` reports another version, because a
+version mismatch would turn every record into a skip. `check_mrs.py` and
+`check_rv64_source.py` are deliberately not in CI: they verify a local drop
+under the gitignored `research/external/` (`ADR-0124`).
 
 ### State (2026-11-10, llvm-mc 23.1.2)
 
@@ -105,8 +131,8 @@ The 29 records that were `input-not-stored` on 2026-11-08 are resolved:
   `output_sha256` and `size`; a rebuilt input therefore cannot be told apart by
   the bytes it produces. `A64-P14` and `A64-P18` are smaller than the byte
   counts their notes previously stated; the notes now record the rebuilt size
-  and the recovery. The six `manual-derivation` records are the only reason
-  `--strict` still exits 1.
+  and the recovery. The six `manual-derivation` records are the only reason the
+  run needs `--allow-skip-reason manual-derivation` to exit 0.
 
 A corrupted `expected.bin` fails the run (byte offset is printed) and exits `1`;
 this was checked by flipping one byte of `X86-P6` and restoring it.

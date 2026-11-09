@@ -33,7 +33,7 @@ Rules:
 | Code | Trigger | Fixed detail keys | Related test |
 |---|---|---|---|
 | E-PLAN-001 | Unknown or unsupported `format_version` | `found`, `supported` | N24a |
-| E-PLAN-002 | Value has the wrong type or literal form (a non-integer number, a malformed hex byte string), or lies outside the declared domain for its path | `path_type`, `found_kind` | N23a |
+| E-PLAN-002 | Value has the wrong type or literal form (a non-integer number, a malformed hex byte string), or lies outside the declared domain for its path (a zero-width `field_descriptor` range, a zero-bit `range_constraint`) | `path_type`, `found_kind` | N23a, N25a, N25b |
 | E-PLAN-003 | Unknown field in a strict object | `field`, `object` | N21a, N21b |
 | E-PLAN-004 | Document is not parseable, or has duplicate keys | `reason` | unit `rejects_duplicate_keys` |
 | E-PLAN-005 | Canonical-form violation that changes bytes (e.g. float, BOM, CRLF-dependent content) | `reason` | unit `rejects_a_byte_order_mark` |
@@ -42,7 +42,7 @@ Rules:
 | E-TARGET-002 | Invalid or missing `execution_mode` for the family | `found`, `required` | N24c |
 | E-TARGET-003 | A named form's `requires_extensions` is not a subset of the plan's `enabled_extensions` (`fmp-def/0.2`) | `extension`, `form_id` | N06b |
 | E-TARGET-004 | Unsupported `byte_order` or `address_width` | `found` | N24d |
-| E-DEF-001 | The definition cannot be loaded (unknown `definition_format`, duplicate form, bad template or placement), or `definition_identity.digest` does not match the loaded definition | `declared`, `actual`, `reason` | N10 |
+| E-DEF-001 | The definition cannot be loaded (unknown `definition_format`, duplicate form, bad template or placement, a template with more than `u32::MAX` bits, a placement end beyond `u64`), or `definition_identity.digest` does not match the loaded definition | `declared`, `actual`, `reason` | N10 |
 | E-DEF-002 | Namespace or version not available in this materializer | `namespace`, `version` | EXP-R5 |
 | E-FORM-001 | `form_id` is not present in the pinned definition | `form_id`, `namespace`, `version` | N01 |
 | E-OPERAND-001 | Operand kind or register class does not match the form | `expected`, `found` | N02 |
@@ -60,20 +60,21 @@ Rules:
 | E-LAYOUT-005 | Layout requires the materializer to compute padding or alignment | `section_id`, `offset`, `required_align` | — (unreachable, §2.3) |
 | E-LAYOUT-006 | Duplicate `section_id`, or `section_order` is not a permutation of `sections[]` | `section_id`, `problem` | N22b, N22c |
 | E-LAYOUT-007 | Duplicate `instruction_id`, or two instructions at the same `(section_id, offset)` | `instruction_id`, `section_id`, `offset` | N22d, N22e |
+| E-LIMIT-001 | The sum of `declared_size` over `section_order` exceeds the 64 MiB image ceiling | `limit`, `actual` | N24l |
 | E-SYMBOL-001 | A reference names a `symbol_id` that `symbols[]` does not declare | `symbol_id`, `mode` | N08 |
 | E-SYMBOL-002 | Duplicate `symbol_id`, or duplicate emitted name with conflicting binding | `symbol_id` | N24e |
-| E-SYMBOL-003 | Defined symbol without a resolvable location: `section_id`/`offset` missing, or `section_id` names no section | `symbol_id` | N24f |
-| E-FIXUP-001 | Fixup is incompatible with the form, the descriptor, or the instruction's operands: the fixup kind does not fit the form (including a `hi20` transform whose `pc_reference_rule` is not `none`); the descriptor widths do not sum to `range_constraint.bits`; a target operand and `fixup.target` disagree | `kind`, `form_id`, `field` | N07, N07f |
-| E-FIXUP-002 | Target has no address in a `resolve_in_place` fixup: an undefined or external symbol; a symbol or `section_relative` target whose section has no `base_address`, including a same-section symbol under `pc_reference_rule = none` (only `pcrel_begin`/`pcrel_end`/`pcrel_hi` may use offsets alone); or an `absolute` target under a PC rule whose site section has no `base_address` | `fixup_id`, `target` | N08 |
+| E-SYMBOL-003 | Defined symbol without a resolvable location: `section_id`/`offset` missing, `section_id` names no section, or `offset > declared_size` (equality is the legal one-past-the-end label) | `symbol_id` | N24f, N24k |
+| E-FIXUP-001 | Fixup is incompatible with the form, the descriptor, or the instruction's operands: the fixup kind does not fit the form (including a `hi20` transform whose `pc_reference_rule` is not `none`); the descriptor widths do not sum to `range_constraint.bits`; the descriptor covers no `operand_value` slot or more than one, a range is not contained in one placement of its slot, or the ranges are not in the slot's placement order; a target operand and `fixup.target` disagree | `kind`, `form_id`, `field` | N07, N07f, N07g, N07h |
+| E-FIXUP-002 | Target has no address in a `resolve_in_place` fixup: an undefined or external symbol; a symbol target whose section has no `base_address`, including a same-section symbol under `pc_reference_rule = none` (only `pcrel_begin`/`pcrel_end`/`pcrel_hi` may use offsets alone); or an `absolute` target under a PC rule whose site section has no `base_address` | `fixup_id`, `target` | N08 |
 | E-FIXUP-003 | Computed fixup value outside `range_constraint` | `fixup_id`, `min`, `max`, `value` | N04 |
 | E-FIXUP-005 | Field descriptor out of bounds or self-overlapping, or the site is not the first byte of a planned instruction | `fixup_id`, `descriptor` | N07 |
-| E-FIXUP-006 | Two writers patch overlapping bits — two fixups, or an operand-supplied field and a fixup | `first`, `second` | N07 |
+| E-FIXUP-006 | Two writers patch overlapping bits — two fixups, a fixup and a non-zero template bit, or an operand-supplied field (a `reg_number` slot, or any inverted placement) and a fixup | `first`, `second` | N07, N07c |
 | E-FIXUP-007 | Pair group incomplete or inconsistent: no `hi`, more than one `hi`, no `lo`, a target mismatch, a `pcrel_hi` member whose `hi` is in another section, or `pair_role` without `pair_group` | `pair_group`, `problem` | N12, N17b, N17c |
 | E-FIXUP-008 | Duplicate `fixup_id` | `fixup_id`, `offset` | N24g |
 | E-FIXUP-009 | Fixup addend not allowed by its kind: an RV64 `pcrel_lo12` low half with a non-zero `addend` | `fixup_id`, `addend`, `value_transform` | N17a |
-| E-SIZE-001 | Encoded length != `expected_size` | `instruction_id`, `expected`, `actual` | N05 |
+| E-SIZE-001 | Encoded length != `expected_size`, or `expected_size` != the named form's size at validation time | `instruction_id`, `expected`, `actual` | N05, N05b |
 | E-BYTE-001 | Emitted bytes do not match `expected_digest` | `instruction_id`, `declared`, `actual` | N13 |
-| E-VERSION-001 | Materializer cannot honor a declared plan feature | `feature`, `format_version` | N24h, N24i |
+| E-VERSION-001 | Materializer cannot honor a declared plan feature (`emit_fixups: false`, a Level 0 symbol-table request, `target.kind: section_relative`) | `feature`, `format_version` | N24h, N24i, N24j |
 | E-INTERNAL-001 | Internal invariant violated (bug); never used for user input | `invariant` | — (not user-reachable) |
 
 `E-PLAN-002`'s two detail keys describe one fault from two sides: `path_type` is
@@ -192,7 +193,12 @@ rejection; `derived` means it follows from a measured byte sequence.
 - `E-FIXUP-006` — derived, OD-02 (`03_fixup_model.md` §3): an `add` fixup covers
   `imm12` and the same instruction's `lo12` operand also carries `value: 5`. Two
   writers, one field; whichever wins, the plan contained a number that was
-  discarded without a diagnostic.
+  discarded without a diagnostic. The measured counterexample is a descriptor
+  over a `reg_number` slot: on `x86:mov/rm-r64/legacy` the encoder writes `ModRM`
+  bits 0-2 and 19-21 from the two operands, and a fixup over those bits wrote them
+  again after the operands, so one of the plan's two statements was silently
+  dropped (`N07`, before `ADR-0121`). The same rule covers an inverted placement,
+  because inversion is the operand path's polarity, not a value the fixup owns.
 - `E-VERSION-001` — derived, OD-02 (`03_fixup_model.md` §10): a plan writes
   `value_transform: "got_pcrel"`. `fmp/0.1` has no such member, so the plan
   declares a feature the format version cannot honour; treating it as a plain
@@ -246,6 +252,16 @@ rejection; `derived` means it follows from a measured byte sequence.
   plan would have stated the same addend twice with no way to tell which one the
   author meant.
 
+- `E-LIMIT-001` — measured, `ADR-0122`: a plan with a single `fill` fragment of
+  2^63 bytes panicked in `raw_vec` (`capacity overflow`) on `47a383b`, because
+  `emit` passed `declared_size` straight to `resize`. Without a stated ceiling the
+  plan chooses the allocation, so whether a plan is accepted depends on the host's
+  memory rather than on the plan (`INV-05`), and the failure mode is a process
+  death with no diagnostic (`INV-08`). A smaller over-sized plan is worse: it is
+  accepted on a large host and refused on a small one. `N24l` is the fixture: a
+  non-image-backed `.bss` of 67,108,865 bytes, one byte over the ceiling, so no
+  fragment can explain the total away.
+
 ### 2.2 Retired codes
 
 A mechanism that is removed takes its codes with it. Retired codes are never
@@ -289,26 +305,34 @@ do not belong to the plan layer. M3 did not add a code; it repointed `N24h` from
 the now-accepted Level 1 `artifact` to `emit_fixups: false` and added `N24i` for
 a Level 0 symbol-table request, so `E-VERSION-001` keeps two end-to-end
 negatives and the counts are unchanged. `fmp-def/0.2` (`ADR-0103`) makes
-`E-TARGET-003` reachable through `N06b`, so the covered count is 38.
+`E-TARGET-003` reachable through `N06b`.
+
+The audit of `47a383b` added one code, `E-LIMIT-001` (`ADR-0122`), reachable
+through `N24l`, so the counts are now 44 active and 39 covered; the five
+uncovered codes are unchanged.
 
 | Group | Codes | Evidence |
 |---|---|---|
-| Fixture-covered | 38 active codes | `fixtures/`; `N24a`–`N24i` are the M1 additions plus the M3 split; `N06b` adds `E-TARGET-003` |
+| Fixture-covered | 39 active codes | `fixtures/`; `N24a`–`N24i` are the M1 additions plus the M3 split; `N06b` adds `E-TARGET-003`; `N24j`–`N24l` add `E-VERSION-001` (`section_relative`), `E-SYMBOL-003` (offset bound) and `E-LIMIT-001` |
 | JSON layer, unit only | `E-PLAN-004`, `E-PLAN-005` | `rejects_duplicate_keys`, `rejects_a_byte_order_mark`; no plan-layer fixture can reach them |
 | Non-plan conditions | `E-DEF-002` | `exp_r5_definition_perturbation_is_loud` |
 | Structurally unreachable | `E-LAYOUT-005` | §2.3; revisit only if the format gains the trigger |
 | Not user-input | `E-INTERNAL-001` | §2.3; the bug marker |
 
-The `N24` family holds the nine coverage fixtures: `N24a` (`E-PLAN-001`),
+The `N24` family holds the twelve coverage fixtures: `N24a` (`E-PLAN-001`),
 `N24b` (`E-PLAN-006`), `N24c` (`E-TARGET-002`), `N24d` (`E-TARGET-004`), `N24e`
 (`E-SYMBOL-002`), `N24f` (`E-SYMBOL-003`), `N24g` (`E-FIXUP-008`), `N24h`
-(`E-VERSION-001` for `emit_fixups: false`) and `N24i` (`E-VERSION-001` for
-`include_symbol_table: true` at Level 0). Each one is an otherwise valid plan
+(`E-VERSION-001` for `emit_fixups: false`), `N24i` (`E-VERSION-001` for
+`include_symbol_table: true` at Level 0), `N24j` (`E-VERSION-001` for
+`target.kind: section_relative`), `N24k` (`E-SYMBOL-003` for an offset past the
+section) and `N24l` (`E-LIMIT-001`). Each one is an otherwise valid plan
 with exactly the named fault, so the fixture asserts a single diagnostic rather
 than a cascade.
 
-`E-PLAN-002` is covered twice: `N23a` (expression-shaped scalar) and the JSON unit
-tests `rejects_floats_and_exponents` / `rejects_a_negative_zero_fraction`.
+`E-PLAN-002` is covered three times: `N23a` (expression-shaped scalar),
+`N25a`/`N25b` (zero descriptor width and zero range bits, both `read` phase) and
+the JSON unit tests `rejects_floats_and_exponents` /
+`rejects_a_negative_zero_fraction`.
 
 ## 3. Rules
 

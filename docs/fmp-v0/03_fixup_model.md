@@ -54,16 +54,21 @@ the difference matters because only two of them need a bound section:
 |---|---|---|
 | `symbol` | the symbol's address: `base_address(section) + offset` when the rule needs an absolute address, or `offset` alone for a same-section PC-relative rule | in effect only |
 | `absolute` | `target.address`, used exactly as written | no |
-| `section_relative` | `base_address` of `target.section_id` | yes |
+| `section_relative` | refused | — |
 
 For `symbol` the location comes from `symbols[]`, never from a name lookup in
 `sections[]`. `absolute` is the only kind that does not consult the layout at
-all. `section_relative` is `inference`: `01_contract.md` names the kind, no v0
-fixture exercises it, and §5.1's five cases do not need it. It is implemented as
-"the named section's base address, plus the addend", refused `E-FIXUP-002` when
-that section has no `base_address`, and stays `unverified` until a slice uses it.
-A plan that wants an address *inside* a section names a `symbol`, because that is
-the only form that carries an offset.
+all. A plan that wants an address *inside* a section names a `symbol`, because
+that is the only form that carries an offset.
+
+`section_relative` is refused in `fmp/0.1` (`E-VERSION-001` at
+`/fixups/<i>/target/kind`, `ADR-0123`). It was `inference` before this: the kind
+was implemented as "the named section's base address, plus the addend" and
+refused `E-FIXUP-002` when the section had no `base_address`, but no fixture, no
+oracle run and none of §5.1's five cases ever measured that meaning. A kind whose
+bytes depend on an unmeasured rule is exactly what `INV-07` forbids, so the
+schema keeps the name while the materializer refuses it. A later slice that needs
+a section base address measures the semantics first and supersedes `ADR-0123`.
 
 ## 3. Field descriptors
 
@@ -92,14 +97,41 @@ Rules:
   and is rejected `E-FIXUP-005`. For x86 `rel32` the site is the instruction
   start and the descriptor is `[{ "lsb": 8, "width": 32 }]`; the displacement
   starts one byte in, and the descriptor says so.
-- `width` is in bits; bits MUST lie inside the instruction's `expected_size`.
+- `width` is in bits, MUST be at least 1, and the bits MUST lie inside the
+  instruction's form (`E-PLAN-002` for `0`, `E-FIXUP-005` for a range past
+  `form.size() * 8`, `ADR-0122`).
 - Overlapping descriptors within one fixup are rejected (`E-FIXUP-005`).
 - Overlapping fixups in the same byte are rejected (`E-FIXUP-006`).
 - The sum of the `width`s MUST equal `range_constraint.bits` (`E-FIXUP-001`).
   Otherwise a plan could declare a narrower range than the field it writes, and
-  the range check would never fire.
+  the range check would never fire. `range_constraint.bits` is also at least 1
+  (`E-PLAN-002`): a zero-bit constraint has no bounds to check against, and its
+  bounds expression (`1 << -1`) is an overflow rather than a range.
 - Bits not covered by any descriptor are left untouched; the encoder, not the
   fixup, produced them.
+
+Ownership (`ADR-0121`). The bits a fixup covers are the bits of one operand
+value, so the descriptor MUST name exactly that:
+
+- The covered bits MUST belong to exactly one slot of the form, and that slot
+  MUST be `from: operand_value`. Zero slots means the descriptor names no field;
+  more than one means it spans two fields; either is `E-FIXUP-001` with
+  `field = descriptor does not cover exactly one operand_value slot`.
+- A covered bit that belongs to a `reg_number` slot, or to a placement with
+  `invert: true`, is shared with the operand path: the encoder writes it from the
+  operand and the fixup would write it again. That is `E-FIXUP-006` with
+  `first = operand`.
+- Each descriptor range MUST be contained in exactly one placement of that slot
+  (`E-FIXUP-001`, `field = descriptor range is not contained in one placement of
+  the slot`). A range that crosses a placement boundary would write bits the slot
+  does not own.
+- The descriptor entries MUST appear in the slot's placement order, because the
+  list order is the value order (`E-FIXUP-001`, `field = descriptor order does
+  not match the slot's placement order`). The same bits in another order write a
+  different value for the same operand.
+- A descriptor that leaves the form is `E-FIXUP-005` and is not additionally
+  reported as an ownership fault: the bytes are already named by one diagnostic.
+
 
 One writer per bit (OD-02). A field covered by a fixup is written by that fixup
 and by nothing else:
@@ -469,6 +501,10 @@ and `emit_relocation` writes only zeroes to its own.
   `value_transform` has no `got`-like member. A plan that invents one declares a
   feature this format version cannot honour; it is not silently turned into a
   PC-relative record.
+- `target.kind: section_relative` → `E-VERSION-001` at
+  `/fixups/<i>/target/kind` (ADR-0123). The kind is in the schema, but the format
+  never fixed what "this section's address" means, so the materializer refuses it
+  instead of resolving it to a base address. `N24j` is the fixture.
 - Relaxation of any kind, including "convert `jal` to `c.j` to fit".
 - Implicit addend extraction from existing bytes.
 - Symbol preemption or visibility policy.

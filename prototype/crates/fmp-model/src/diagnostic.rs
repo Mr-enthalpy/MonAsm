@@ -204,6 +204,7 @@ fn describe(code: &str) -> &'static str {
         crate::codes::E_LAYOUT_005 => "layout needs computed padding",
         crate::codes::E_LAYOUT_006 => "section set is inconsistent",
         crate::codes::E_LAYOUT_007 => "instruction identity collides",
+        crate::codes::E_LIMIT_001 => "declared image exceeds the resource limit",
         crate::codes::E_SYMBOL_001 => "symbol reference is undeclared",
         crate::codes::E_SYMBOL_002 => "symbol identity collides",
         crate::codes::E_SYMBOL_003 => "defined symbol has no resolvable location",

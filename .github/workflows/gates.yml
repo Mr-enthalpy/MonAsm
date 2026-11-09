@@ -1,0 +1,95 @@
+name: gates
+
+# The contract gates a change must pass before it lands (ADR-0124):
+# `check_ids.py` (every ID declared once and referenced), `check_definition.py`
+# (definition shape, form coverage and canonical digests), `cargo fmt --check`,
+# `cargo test --workspace` (fixtures, planner parity, determinism), the
+# whitespace gate, and `tools/oracle/rerun.py` against the LLVM version the
+# oracle records pin.
+#
+# `check_mrs.py` and `check_rv64_source.py` stay local: both read
+# `research/external/`, which is gitignored, so a hosted runner cannot have it.
+# See ADR-0124 for why that is not a hole in the gate.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  RUST_TOOLCHAIN: "1.96.0"
+  LLVM_MAJOR: "23"
+  LLVM_VERSION: "23.1.2"
+
+jobs:
+  documents:
+    name: document and definition gates
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Every ID is declared once and referenced
+        run: python tools/check_ids.py
+
+      - name: Definitions match the shipped tables
+        run: python tools/check_definition.py
+
+      - name: Whitespace and line endings
+        run: git diff --check HEAD^ HEAD
+
+  workspace:
+    name: workspace tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned toolchain
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
+
+      - name: Formatting
+        working-directory: prototype
+        run: cargo +"$RUST_TOOLCHAIN" fmt --all -- --check
+
+      - name: Test the workspace
+        working-directory: prototype
+        run: cargo +"$RUST_TOOLCHAIN" test --workspace
+
+  oracle:
+    name: oracle rerun
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # The records name `llvm-mc 23.1.2`. This installs that major and the
+      # next step refuses to continue if the minor differs, because a version
+      # mismatch would turn every record into a `toolchain-version` skip.
+      - name: Install LLVM ${{ env.LLVM_MAJOR }}
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc > /dev/null
+          sudo add-apt-repository -y "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-${LLVM_MAJOR} main"
+          sudo apt-get update
+          sudo apt-get install -y "llvm-${LLVM_MAJOR}"
+          echo "/usr/lib/llvm-${LLVM_MAJOR}/bin" >> "$GITHUB_PATH"
+
+      - name: Pin the toolchain the records name
+        run: |
+          llvm-mc --version
+          llvm-mc --version | grep -q "LLVM version ${LLVM_VERSION}" || {
+            echo "::error::llvm-mc is not ${LLVM_VERSION}; the oracle records would all skip"
+            exit 1
+          }
+
+      # `manual-derivation` is the only skip reason the corpus has: six records
+      # whose expected bytes contain a spelling the assembler will not select.
+      # Any other skip (missing input, missing tool, version drift) fails.
+      - name: Re-derive the oracle bytes
+        run: python tools/oracle/rerun.py --allow-skip-reason manual-derivation
