@@ -73,17 +73,18 @@ turns a `SKIP` into a failure; that is the gate to use once the missing inputs
 are backfilled. The summary always prints `<pass>/<total> re-derived,
 <skip> skipped`, so a partial run is never reported as a clean corpus.
 
-### State (2026-11-09, llvm-mc 23.1.2)
+### State (2026-11-10, llvm-mc 23.1.2)
 
-`116/121 re-derived, 5 skipped, 0 failed`:
+`122/128 re-derived, 6 skipped, 0 failed`:
 
-- 76 x86-64 records reproduce byte-identically, including the `ld.lld` one,
-  `X86-P74` (which shares its input with `X86-P20`) and the `X86-P75`-`X86-P80`
-  widening vectors.
-- 24 AArch64 records reproduce: every `A64-P1`–`A64-P22` input now resolves.
-- 16 RV64 records reproduce: every `RV-P1`–`RV-P11` input now resolves.
-- 5 x86-64 records are `manual-derivation`: the expected bytes include an
-  encoding `llvm-mc` will not select from a mnemonic (documented per record).
+- 79 x86-64 records reproduce byte-identically, including the `ld.lld` one,
+  `X86-P74` (which shares its input with `X86-P20`), the `X86-P75`-`X86-P80`
+  widening vectors and the M6 vectors `X86-P81`-`X86-P84`.
+- 26 AArch64 records reproduce: every `A64-P1`–`A64-P24` input resolves.
+- 17 RV64 records reproduce: every `RV-P1`–`RV-P12` input resolves.
+- 6 x86-64 records are `manual-derivation`: `X86-P1`, `X86-P4`, `X86-P5`,
+  `X86-P9`, `X86-P10` and `X86-P83`. The expected bytes include an encoding
+  `llvm-mc` will not select from a mnemonic (documented per record).
 
 The 29 records that were `input-not-stored` on 2026-11-08 are resolved:
 
@@ -104,7 +105,7 @@ The 29 records that were `input-not-stored` on 2026-11-08 are resolved:
   `output_sha256` and `size`; a rebuilt input therefore cannot be told apart by
   the bytes it produces. `A64-P14` and `A64-P18` are smaller than the byte
   counts their notes previously stated; the notes now record the rebuilt size
-  and the recovery. The five `manual-derivation` records are the only reason
+  and the recovery. The six `manual-derivation` records are the only reason
   `--strict` still exits 1.
 
 A corrupted `expected.bin` fails the run (byte offset is printed) and exits `1`;

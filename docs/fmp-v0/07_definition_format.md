@@ -337,6 +337,16 @@ canonical, and `tools/check_definition.py` fails if a row and the JSON disagree.
 | `definitions/x86_64/0.66.0.json` | `monasm.isa.x86` | `sha256:63b3b3a153aa0b5508f2055496efa1c56ac74e56b03d56f56f5c522b6d2e1904` |
 | `definitions/x86_64/0.67.0.json` | `monasm.isa.x86` | `sha256:367d76ebf89ee9c1cf51f561b4798eeb0a2000ae3688ee9a52a4c4a9eaea5c9e` |
 | `definitions/x86_64/0.68.0.json` | `monasm.isa.x86` | `sha256:4c9ff304b305ceb831fd99e22bf0a7c422cce4104d08de604a6509f58e1501d2` |
+| `definitions/x86_64/0.69.0.json` | `monasm.isa.x86` | `sha256:94dee360550537cbefed798bcc4e7d790b9a879391e0b6a47ecf24a819a6b596` |
+| `definitions/x86_64/0.70.0.json` | `monasm.isa.x86` | `sha256:02cbd866ce04b7584456bccf177c1aef7395a6b503240ddd1617be8e73f9eb2e` |
+| `definitions/x86_64/0.71.0.json` | `monasm.isa.x86` | `sha256:2858c0f163b1239b37f7be9ba294d8d81748038987a154afac66c2b63b4d2c5b` |
+| `definitions/x86_64/0.72.0.json` | `monasm.isa.x86` | `sha256:15fbacc2e014b9c135762f53a8b55b8c7d5dc21e9ff665ee5a0259437d70bf11` |
+| `definitions/x86_64/0.73.0.json` | `monasm.isa.x86` | `sha256:dfe7c9385b5a6a8636d8a54252ba72e3630aee3573b7e71062c4d7f8777d4237` |
+| `definitions/x86_64/0.74.0.json` | `monasm.isa.x86` | `sha256:27f337115cffe89c8d7028863e7748783247344ba4d8e622fa9c4345efdead58` |
+| `definitions/x86_64/0.75.0.json` | `monasm.isa.x86` | `sha256:5b13b6b96a4061f354e7d0a371175936cb66c71dbfa80a7eabbf74bfe7eef40d` |
+| `definitions/x86_64/0.76.0.json` | `monasm.isa.x86` | `sha256:7535ae0641806b1785096bd286ac62f90f7f02023fd5d47a92b4d4df6371e39a` |
+| `definitions/x86_64/0.77.0.json` | `monasm.isa.x86` | `sha256:093d8f3c0abefc04b9c9b4ed421412a1f9a1fe54bf430951653fac0955d4c68b` |
+| `definitions/x86_64/0.78.0.json` | `monasm.isa.x86` | `sha256:30cb9f13047ff742d8f53a20f93218a601302bd52814ad26364347cb85576a21` |
 | `definitions/aarch64/0.1.0.json` | `monasm.isa.aarch64` | `sha256:96f87aa2fbac9f27261b99a0ed2d72a4f3e8b8c9be3bc1e11ba72201a9afc15e` |
 | `definitions/aarch64/0.2.0.json` | `monasm.isa.aarch64` | `sha256:169e4bf6d45d83a74be3d185d7394b9ed042dbf52f27ec58d975ca5a1be354ed` |
 | `definitions/aarch64/0.3.0.json` | `monasm.isa.aarch64` | `sha256:71af93c0a1b91d67cb97af1d27dda249c3ce7bb2b6c8ca13a10154891b7728cb` |

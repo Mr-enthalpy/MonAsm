@@ -114,7 +114,10 @@ surface: a variant that is absent cannot be selected, repaired or approximated,
 and naming it is `E-FORM-001`. There is no feature flag and no partially
 implemented form.
 
-The x86-64 slice is five hundred and sixty-four forms covering sixteen frozen `EC` rows:
+The x86-64 surface is six hundred and thirty-two forms across seventy-eight
+documents, covering twenty frozen `EC` rows. The table below is an excerpt of
+417 rows whose own citations stop at `X86-P56`; `07_definition_format.md` §8.1
+is the complete, checker-verified table:
 
 | `form_id` | Bytes | Operand signature | Covers |
 |---|---|---|---|
@@ -1018,8 +1021,11 @@ word operand on a byte row is two `E-OPERAND-001` (`N02u`), content `128` on a
 (`N14v`), number `0` on a `40` row is `E-RANGE-004` (`N16y`), and the absent
 high-byte `%r12` row is `E-FORM-001` (`N01aq`, `EXP-0048`).
 
-The RV64 slice is ten forms across four documents, generated from the pinned UDB
-nodes (ADR-0007, ADR-0009). Seven base-`I` forms are in `0.1.0`; `c.addi` joins
+The RV64 table below lists the ten forms of `0.1.0`–`0.4.0`, generated from the
+pinned UDB nodes (ADR-0007, ADR-0009); `0.5.0` adds the five B-type mnemonics
+(`RV-P11`) and `0.6.0` the nine further load/store widths (`RV-P12`), for
+twenty-four forms across six documents (`07_definition_format.md` §8.6/§8.7).
+Seven base-`I` forms are in `0.1.0`; `c.addi` joins
 them in `0.2.0`, because it needs `rv64c` and the document's extension set is part
 of its identity; `lui` joins them in `0.3.0` as the absolute half of `EC-21`
 (`ADR-0098`); and `jalr` joins them in `0.4.0` as the call half of `EC-23`

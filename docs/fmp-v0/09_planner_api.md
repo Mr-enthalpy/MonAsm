@@ -152,8 +152,8 @@ retains `Unknown(String)` so the *validator* can report `E-VERSION-001`), a
 `section_relative` fixup target, or a non-default `fixup_record_order` (the
 other order strings are `E-VERSION-001` at `/output_contract/fixup_record_order`,
 so they are outside the frozen surface). The error names the path and the value.
-Corpus plans contain none of these, which is why the parity gate is 580/580
-rather than "580 minus exceptions". The two fields the reader accepts but does
+Corpus plans contain none of these, which is why the parity gate is 605/605
+rather than "605 minus exceptions". The two fields the reader accepts but does
 not retain (`source_trace`, `symbol.type`) and the schema-only `symbol.size` are
 dropped without error, because `Plan` does not carry them.
 
@@ -185,8 +185,8 @@ tests, all green.
 
 | Test | Corpus | Assertion |
 |---|---|---|
-| Positive parity | all 121 positives | `from_model` -> `build_canonical` -> `read` -> `materialize` gives the same bytes, the same record count and, where recorded, the same Level 1 section/symbol envelope; the plan fingerprint is unchanged |
-| Negative parity | all 580 `materialize`-phase negatives | the same code, JSON Pointer and detail-key set as the fixture's `expected-error.json` |
+| Positive parity | all 128 positives | `from_model` -> `build_canonical` -> `read` -> `materialize` gives the same bytes, the same record count and, where recorded, the same Level 1 section/symbol envelope; the plan fingerprint is unchanged |
+| Negative parity | all 605 `materialize`-phase negatives | the same code, JSON Pointer and detail-key set as the fixture's `expected-error.json` |
 | From scratch | one positive per ISA (`X86-P1`, `A64-P2`, `RV-P1`), plus `X86-P71` | the document built only from constructors materializes to the oracle bytes; this proves the API is usable without `from_model` |
 | Closed sets | `x86_p71`, a maximal document, and a full-enum document | each emitted object's key set equals the contract's closed set; no unknown key and no missing required key |
 | Optional members | one document that sets every optional member | `provenance`, `symbol_order`, `base_address`, `expected_digest`, `transform_shift`, `pair_group`, `pair_role` and the empty payload are written under the reader's names and read back unchanged |

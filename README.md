@@ -398,14 +398,14 @@ scope (`ADR-0095`), published `docs/fmp-v0/08_final_recommendation.md` and close
 the last acceptance criterion, `AC-10`, with the Phase 6 roadmap M1–M5. Phase 6
 is complete: M1 (error-coverage gate) landed `N24a`–`N24h`, so every reachable
 error code now has an end-to-end fixture; M2 (oracle rerun harness) landed
-`tools/oracle/rerun.py`, which re-derives 116 of the 121 positive fixtures
-byte-identically and reports the other five as `manual-derivation`; M3 (Level 1
+`tools/oracle/rerun.py`, which re-derives the positive corpus byte-identically
+and reports the `manual-derivation` records as skipped; M3 (Level 1
 object writer) landed `artifact: sections` and the optional declared symbol table
 (`ADR-0096`), with `X86-P71`/`EXP-0100` as the positive vector. M4 is
 implemented (`ADR-0097`, `docs/fmp-v0/09_planner_api.md`): a planner-side
 `fmp-plan` crate exposes a total, closed plan builder with no validator and no
 planner authority, and `planner_api.rs` rebuilds the whole corpus through it —
-121 positives and 580 `materialize`-phase negatives — plus from-scratch,
+128 positives and 605 `materialize`-phase negatives — plus from-scratch,
 closed-key, enum-spelling and determinism tests. M5 (coverage widening) has
 landed seven items, the last being `ADR-0103`: `fmp-def/0.2` per-form
 `requires_extensions` in `definitions/x86_64/0.68.0.json`, with `X86-P74`,
@@ -422,7 +422,7 @@ indexed byte `mov` rows as `definitions/x86_64/0.73.0.json` (`X86-P79`), and
 `ADR-0110` adds the three `29 /r` register/register `sub` rows as
 `definitions/x86_64/0.74.0.json` (`X86-P80`). `ADR-0111` closes the phase:
 759 forms across the three definitions, 121 positives and 586 negatives.
-Phase 7 M6 is in progress under `ADR-0112`: `docs/fmp-v0/10_m6_plan.md` fixes
+Phase 7 M6 is complete under `ADR-0112`: `docs/fmp-v0/10_m6_plan.md` fixed
 seven additive coverage slices (`ADR-0113`-`ADR-0119`) plus a closure
 (`ADR-0120`) over the x86 ALU, x86 `mov` immediate, x86 `sub` memory, RV64
 load/store and AArch64 `adr`/`mul`/`csel` families; `fmp/0.1` is unchanged and
@@ -448,7 +448,13 @@ address as `definitions/aarch64/0.19.0.json` (181 forms), with `A64-P23` as the
 template bit that separates a byte displacement from a page delta. `ADR-0119`
 lands `S7`: `mul` as the `MADD` alias with `Ra = 31` and `csel` at both widths
 as `definitions/aarch64/0.20.0.json` (185 forms), with `A64-P24` as the 32-byte
-vector; `EC-44` records the accumulator field the alias pins.
+vector; `EC-44` records the accumulator field the alias pins. `ADR-0120` closes the
+round at **841 forms across 104 documents** (x86 632, AArch64 185, RV64 24),
+**128 positives and 611 negatives**, with `tools/oracle/rerun.py` re-deriving
+`122/128` records and the six `manual-derivation` skips; the two rows the plan
+expected but the opcode tables do not have (`sub`'s third register/register row
+and `REX.W B8+rd`) are recorded as measured corrections in `ADR-0113` and
+`ADR-0115`, so the round lands 82 rows and not 84.
 
 | Area | State |
 |---|---|

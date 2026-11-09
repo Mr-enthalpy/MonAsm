@@ -75,12 +75,12 @@ change the decision; §F records the evidence.
 
 | Evidence | Source | What it proves |
 |---|---|---|
-| Three ISA vertical loops close byte-exactly | `06_validation_matrix.md` §4; `fixtures/` | 121 positive plans reproduce independently derived bytes; x86 81, AArch64 24, RV64 16 |
-| Strict rejection is exercised, not asserted | `06_validation_matrix.md` §1; `04_errors.md` §2 | 586 negative plans, each pinned to a code, JSON Pointer and detail-key set |
+| Three ISA vertical loops close byte-exactly | `06_validation_matrix.md` §4; `fixtures/` | 128 positive plans reproduce independently derived bytes; x86 85, AArch64 26, RV64 17 |
+| Strict rejection is exercised, not asserted | `06_validation_matrix.md` §1; `04_errors.md` §2 | 611 negative plans, each pinned to a code, JSON Pointer and detail-key set |
 | Determinism replays on three hosts | `EXP-0033` §6; CI runs on Ubuntu, macOS, Windows | Identical artifacts and diagnostics across hosts and processes |
 | Every invariant has an executable test | `01_contract.md` §2 | INV-01 through INV-08 are `verified` |
-| Encoding ambiguity has counterexamples | `02_encoding_choices.md`; `EXP-0096` | 42 `EC` rows frozen; the seven absent families are rejected `E-FORM-001` |
-| Definitions are versioned and digest-pinned | `07_definition_format.md` §6, §8 | 97 documents: x86 74, AArch64 18, RV64 5; canonical digests recorded |
+| Encoding ambiguity has counterexamples | `02_encoding_choices.md`; `EXP-0096` | 44 `EC` rows frozen; the seven absent families are rejected `E-FORM-001` |
+| Definitions are versioned and digest-pinned | `07_definition_format.md` §6, §8 | 104 documents: x86 78, AArch64 20, RV64 6; canonical digests recorded |
 | Route A/B are evidence-backed rejections | `90_boundary_audit.md` §3; `91_reuse_matrix.md` | x86 paths class D, RV64 narrow class B, AArch64 knowledge only |
 
 ### A.4 Open blockers
@@ -258,12 +258,14 @@ out of v0 scope, not as frozen facts.
 
 ### D.1 x86-64
 
-- **Surface.** 74 definition documents, `0.1.0` … `0.74.0`; the canonical latest
-  table has **564 forms** (measured from
-  `definitions/x86_64/0.74.0.json`). Sixteen `EC` rows are carried by this slice
-  (`02_encoding_choices.md` §"v0 surface").
-- **Fixtures.** 81 positive plans and 506 negative plans. The positive set covers
-  `mov`/`add` in both directions, `imm8`/`imm32`, `rel8`/`rel32`, register
+- **Surface.** 78 definition documents, `0.1.0` … `0.78.0`; the canonical latest
+  table has **632 forms** (measured from
+  `definitions/x86_64/0.78.0.json`). Twenty `EC` rows are carried by this
+  architecture (`02_encoding_choices.md` §"v0 surface").
+- **Fixtures.** 85 positive plans and 521 negative plans. The positive set covers
+  the `mov`/`add`/`and`/`or`/`xor`/`cmp`/`sub` integer families in both
+  directions and at 64/32/16 bits (register/register, immediate, and for `sub`
+  the memory directions), `imm8`/`imm32`, `rel8`/`rel32`, register
   extension through `REX`, base/index/scale, absolute and RIP-relative
   addressing, SSE/VEX/EVEX register and memory shapes, the byte-register
   high/low split, and the Level 1 section/symbol envelope (`X86-P71`).
@@ -278,14 +280,15 @@ out of v0 scope, not as frozen facts.
 
 ### D.2 AArch64
 
-- **Surface.** 18 definition documents, `0.1.0` … `0.18.0`; **180 forms**
-  (measured from `definitions/aarch64/0.18.0.json`, distinct across all
-  versions). Fourteen `EC` rows are carried by this slice.
-- **Fixtures.** 24 positive and 61 negative plans. The positive set covers
+- **Surface.** 20 definition documents, `0.1.0` … `0.20.0`; **185 forms**
+  (measured from `definitions/aarch64/0.20.0.json`, distinct across all
+  versions). Sixteen `EC` rows are carried by this architecture.
+- **Fixtures.** 26 positive and 68 negative plans. The positive set covers
   `add`/`sub`/`adds`/`subs` across immediate, shifted-register and
   extended-register variants; `cmp`/`cmn`; `movz`/`movn`/`movk`; `ldr`/`str`/
   `ldur`/`stur` across unsigned-offset, pre/post-index, register-offset and
-  literal forms; `b.cond`, `bl` and `adrp`; and the `adrp`+`:lo12:` pair. The
+  literal forms; `b.cond`, `bl`, `br`/`blr`/`ret`, `adrp` and the
+  `adrp`+`:lo12:` pair; `adr`; and `mul`/`csel`. The
   `cbz`/`cbnz`/`tbz`/`tbnz` families and the `mov` alias are exercised as absent
   families, not as positives.
 - **Key counterexamples.** `add` immediate variants `-lsl0`/`-lsl12` are separate
@@ -299,12 +302,13 @@ out of v0 scope, not as frozen facts.
 
 ### D.3 RV64
 
-- **Surface.** Five definition documents, `0.1.0` … `0.5.0`; the latest table
-  has **15 forms** (measured from `definitions/rv64/0.5.0.json`), including
-  `lui` (`hi20`), `jalr`, the six B-type mnemonics and `c.addi`. The compressed
-  slice is `rv64c`; base is `rv64i`.
-- **Fixtures.** 16 positive and 19 negative plans. Positives cover `add`, `addi`,
-  `ld`/`sd`, `beq`/`bne`/`blt`/`bge`/`bltu`/`bgeu`, `jal`, `auipc`, `lui`,
+- **Surface.** Six definition documents, `0.1.0` … `0.6.0`; the latest table
+  has **24 forms** (measured from `definitions/rv64/0.6.0.json`), including
+  `lui` (`hi20`), `jalr`, the six B-type mnemonics, `c.addi` and the nine
+  further load/store widths. The compressed slice is `rv64c`; base is `rv64i`.
+- **Fixtures.** 17 positive and 22 negative plans. Positives cover `add`, `addi`,
+  `ld`/`sd`, `lb`/`lh`/`lw`/`lbu`/`lhu`/`lwu`/`sb`/`sh`/`sw`,
+  `beq`/`bne`/`blt`/`bge`/`bltu`/`bgeu`, `jal`, `auipc`, `lui`,
   `jalr`, `c.addi`, and the `pcrel_hi`/`lo12` pair. The `jal`/`c.j`/`jalr`
   pseudo-alias family is exercised as absent (negative), not as a positive.
 - **Key counterexamples.** `c.addi`'s `xd` is a 5-bit field that accepts every
@@ -353,7 +357,7 @@ Each invariant has an executable test and a recorded result (`01_contract.md`
 with identical artifact digests. CI runs `42402997326`, `42403439382`,
 `42403938259`, `42404376743` are green on all three hosts.
 
-The negative side is not a gesture: 586 negative plans are compared by exact code,
+The negative side is not a gesture: 611 negative plans are compared by exact code,
 JSON Pointer, and detail-key set (`fixtures/README.md`; `fixtures.rs` requires
 equality, not containment). That is the executable form of "does not secretly
 plan": a plan that asks the materializer to choose gets a rejection, not a
@@ -395,7 +399,7 @@ plausible byte string.
 
 - **Decision boundary.** Every byte-affecting choice is `form_id` or a typed
   operand; the kernel only looks up, checks, and writes (`01_contract.md` §7).
-- **Cost.** Reimplementation is real but bounded: 564 + 180 + 15 forms, 42 `EC`
+- **Cost.** Reimplementation is real but bounded: 632 + 185 + 24 forms, 44 `EC`
   rows, one fixup model. The audit already names where to get the knowledge
   (RV64 spec table, Arm MRS).
 - **Verifiability.** Two independent sources per positive vector (`AGENTS.md`
@@ -478,11 +482,11 @@ The order is fixed: close the evidence gate before adding surface.
 | Step | Module | Scope | Exit gate |
 |---|---|---|---|
 | M1 | Error-coverage gate | Add end-to-end fixtures for the eight reachable uncovered codes; keep the two JSON-layer-only codes as unit tests | **closed 2026-11-08**: `N24a`–`N24h` land, `04_errors.md` §2.4 has no "reachable, no fixture" group, and `cargo test -p fmp-cli --test fixtures` is green |
-| M2 | Oracle rerun harness | One command that re-derives every `*.expected.bin` from `llvm-mc` (or records a manual derivation) and diffs | **closed 2026-11-08; the recovery backlog closed 2026-11-09**: `tools/oracle/rerun.py` resolves each input by `input_sha256`, re-runs the recorded command and compares bytes. The 29 `input-not-stored` records (20 AArch64 + 9 RV64) were recovered by content and experiment listings and re-pinned by `input_sha256`, so the harness now re-derives `116/121` positive records with `5` `manual-derivation` skips, `0` `input-not-stored` and `0` failed; `--strict` still fails on those five intended skips (`tools/oracle/README.md`) |
+| M2 | Oracle rerun harness | One command that re-derives every `*.expected.bin` from `llvm-mc` (or records a manual derivation) and diffs | **closed 2026-11-08; the recovery backlog closed 2026-11-09**: `tools/oracle/rerun.py` resolves each input by `input_sha256`, re-runs the recorded command and compares bytes. The 29 `input-not-stored` records (20 AArch64 + 9 RV64) were recovered by content and experiment listings and re-pinned by `input_sha256`, so the harness now re-derives `122/128` positive records with `6` `manual-derivation` skips, `0` `input-not-stored` and `0` failed; `--strict` still fails on those six intended skips (`tools/oracle/README.md`) |
 | M3 | Level 1 object writer | `artifact: sections` + `include_symbol_table`; sections, symbols and relocation records from the plan, no relaxation and no container format (Level 2) | **closed 2026-11-08**: `X86-P71` and `EXP-0100` validate the §11.2 envelope; Level 0 bytes are unchanged (`.text` is the same 43-byte oracle image); `N24h`/`N24i` keep `E-VERSION-001` reachable |
-| M4 | Planner boundary/API | Export the plan builder as a library boundary, with the same closed-object discipline | **closed 2026-11-08**: `ADR-0097` and `09_planner_api.md` define `fmp-plan`, a total closed builder over `fmp-model` with no validator and no planner authority. `prototype/crates/fmp-plan` is implemented and `cargo tree -p fmp-plan` shows `fmp-model` as its only workspace dependency; `fmp-validate`, `fmp-materialize` and the `fmp` binary have no path to it outside the `fmp-cli` test target. The gate is `planner_api.rs` (ten tests): 121 positive and 580 `materialize`-phase negative parity, from-scratch authoring for `X86-P1`/`A64-P2`/`RV-P1`/`X86-P71`, closed key sets, optional-member and enum-spelling round trips, fixed-point re-emission, structural exclusion of the six `read`-phase negatives, determinism and typed `Unrepresentable` failures. A mutation check (removing `expected_digest`) fails the gate |
+| M4 | Planner boundary/API | Export the plan builder as a library boundary, with the same closed-object discipline | **closed 2026-11-08**: `ADR-0097` and `09_planner_api.md` define `fmp-plan`, a total closed builder over `fmp-model` with no validator and no planner authority. `prototype/crates/fmp-plan` is implemented and `cargo tree -p fmp-plan` shows `fmp-model` as its only workspace dependency; `fmp-validate`, `fmp-materialize` and the `fmp` binary have no path to it outside the `fmp-cli` test target. The gate is `planner_api.rs` (ten tests): 128 positive and 605 `materialize`-phase negative parity, from-scratch authoring for `X86-P1`/`A64-P2`/`RV-P1`/`X86-P71`, closed key sets, optional-member and enum-spelling round trips, fixed-point re-emission, structural exclusion of the six `read`-phase negatives, determinism and typed `Unrepresentable` failures. A mutation check (removing `expected_digest`) fails the gate |
 | M5 | Coverage widening | One ISA family per ADR, each with a rejection fixture for its absent variant | **closed 2026-11-09**: seven slices under `ADR-0104`-`ADR-0110`, plus the scope reconciliation `ADR-0111`. `ADR-0104` adds the RV64 B-type mnemonics (`definitions/rv64/0.5.0.json`, 15 forms); `ADR-0105`/`ADR-0106` add the SSE `%rip` rows and the `xmm8`-`xmm15` fixed-base rows (`0.69.0`, `0.70.0`); `ADR-0107` adds the `addr32` `%rip` rows (`0.71.0`); `ADR-0108` the legacy/VEX SSE indexed rows (`0.72.0`); `ADR-0109` the indexed byte `mov` (`0.73.0`); `ADR-0110` the `29 /r` register/register `sub` (`0.74.0`). Every slice has a positive fixture with an independent oracle and an `E-FORM-001` fixture for the row or sibling it leaves out; the x86 table ends at 564 forms and the corpus is 121 positives and 586 negatives |
-| M6 | Coverage round 2 | Seven additive integer-surface slices, one ADR each, plus a closure; no contract change | **planned** (`ADR-0112`, `docs/fmp-v0/10_m6_plan.md`): `S1` x86 ALU register/register (`ADR-0113`, `x86/0.75.0`), `S2` x86 ALU immediate (`ADR-0114`, `0.76.0`), `S3` x86 `mov` immediate (`ADR-0115`, `0.77.0`), `S4` x86 `sub` memory directions (`ADR-0116`, `0.78.0`), `S5` RV64 load/store widths (`ADR-0117`, `rv64/0.6.0`), `S6` AArch64 `adr` (`ADR-0118`, `aarch64/0.19.0`), `S7` AArch64 `mul`+`csel` (`ADR-0119`, `0.20.0`), closure `ADR-0120`. Planned total 84 rows and 7 positives (843 forms); each slice keeps the M5 evidence gate and adds an `E-FORM-001` fixture for its absent sibling |
+| M6 | Coverage round 2 | Seven additive integer-surface slices, one ADR each, plus a closure; no contract change | **closed 2026-11-10**: seven slices under `ADR-0113`-`ADR-0119`, plus the closure `ADR-0120`. `ADR-0113` adds the x86 ALU register/register rows (`0.75.0`), `ADR-0114` the ALU immediate rows (`0.76.0`), `ADR-0115` the `mov` immediate rows (`0.77.0`), `ADR-0116` the `sub` memory directions (`0.78.0`), `ADR-0117` the RV64 load/store widths (`rv64/0.6.0`), `ADR-0118` AArch64 `adr` (`aarch64/0.19.0`) and `ADR-0119` `mul`/`csel` (`0.20.0`). The round lands 82 rows and 841 forms (x86 632, AArch64 185, RV64 24) across 104 documents, with 128 positives and 611 negatives; the two differences from the plan (`S1` 15 not 16, `S3` 5 not 6) are measured corrections recorded in their ADRs |
 
 ### H.2 Test gates
 
@@ -577,7 +581,7 @@ because it carries the target-specific pieces as data.
 ### Q8. How is "does not secretly plan" proven?
 
 By executable evidence, not a diagram: `form_id` exact lookup, no fallback paths,
-586 negative plans compared by exact diagnostic, replay tests across three hosts,
+611 negative plans compared by exact diagnostic, replay tests across three hosts,
 and a definition-drift test that is loud. A plan that asks for a decision gets a
 rejection; a byte that would require a choice cannot be produced.
 

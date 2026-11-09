@@ -305,9 +305,9 @@ Rules:
 only what the plan names — `definition_identity` = `namespace` + `version` +
 `digest` — and delegates the artifact itself to `07_definition_format.md`, which
 fixes its shape, its load-time checks, its digest coverage and the shipped v0
-tables: `definitions/x86_64/0.1.0.json` … `0.74.0.json`,
-`definitions/aarch64/0.1.0.json` … `0.18.0.json`, and
-`definitions/rv64/0.1.0.json` … `0.5.0.json`.
+tables: `definitions/x86_64/0.1.0.json` … `0.78.0.json`,
+`definitions/aarch64/0.1.0.json` … `0.20.0.json`, and
+`definitions/rv64/0.1.0.json` … `0.6.0.json`.
 
 - A definition that fails a load-time check is `E-DEF-001`; the process stops
   before any plan is read from it.

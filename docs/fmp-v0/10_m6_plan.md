@@ -1,6 +1,6 @@
 # M6 Plan — Coverage Round 2
 
-- Status: accepted (`ADR-0112`); `S1` landed 2026-11-09 (`ADR-0113`); `S2` landed 2026-11-10 (`ADR-0114`); `S3` landed 2026-11-10 (`ADR-0115`); `S4` landed 2026-11-10 (`ADR-0116`); `S5` landed 2026-11-10 (`ADR-0117`); `S6` landed 2026-11-10 (`ADR-0118`); `S7` landed 2026-11-10 (`ADR-0119`)
+- Status: accepted (`ADR-0112`); `S1` landed 2026-11-09 (`ADR-0113`); `S2` landed 2026-11-10 (`ADR-0114`); `S3` landed 2026-11-10 (`ADR-0115`); `S4` landed 2026-11-10 (`ADR-0116`); `S5` landed 2026-11-10 (`ADR-0117`); `S6` landed 2026-11-10 (`ADR-0118`); `S7` landed 2026-11-10 (`ADR-0119`); closure landed 2026-11-10 (`ADR-0120`)
 - Date: 2026-11-09
 - Baseline: Phase 6 closed (`ADR-0111`): 759 forms, 121 positive and 586
   negative plans, `fmp/0.1` frozen
@@ -40,7 +40,7 @@ sibling the slice leaves out.
 | `S5` | `ADR-0117` | RV64 load/store widths | `rv64/0.6.0` | 9 | `RV-P12` |
 | `S6` | `ADR-0118` | AArch64 `adr` | `aarch64/0.19.0` | 1 | `A64-P23` |
 | `S7` | `ADR-0119` | AArch64 `mul` and `csel` | `aarch64/0.20.0` | 4 | `A64-P24` |
-| — | `ADR-0120` | Closure and metrics | — | — | — |
+| — | `ADR-0120` | Closure and metrics (landed 2026-11-10) | 841 forms across 104 documents | 82 (measured) | 128 positives / 611 negatives |
 
 The round adds 82 forms: x86 564 → 632, AArch64 180 → 185, RV64 15 → 24, for
 841 in total. Positive vectors grow 121 → 128; each slice adds at least three
@@ -228,3 +228,27 @@ updates `STATUS.md`, `08_final_recommendation.md` §H and the per-slice docs.
 `S1` → `S2` → `S3` → `S4` → `S5` → `S6` → `S7` → closure. The x86 ALU slices
 come first because they share the direction and immediate rules; the RV64 and
 AArch64 slices are independent and can move without changing the contract.
+
+## 8. Closure (`ADR-0120`)
+
+| Metric | Plan (`ADR-0112`) | Measured | Difference |
+|---|---|---|---|
+| New rows | 84 | 82 | `S1` 15 not 16; `S3` 5 not 6 |
+| Forms | 843 (x86 634 / AArch64 185 / RV64 24) | 841 (x86 632 / AArch64 185 / RV64 24) | −2 x86 |
+| Definition documents | — | 104 (x86 78 / AArch64 20 / RV64 6) | — |
+| Positives | 128 | 128 | none |
+| Negatives | at least 607 | 611 (605 `materialize` + 6 `read`) | +4 over the floor |
+| `EC` rows | 42 + the slice additions | 44, all frozen | `EC-43`, `EC-44`; `EC-42` revised twice |
+| `rerun.py` | — | 122/128 re-derived, 6 `manual-derivation` skips, 0 failed | — |
+
+`S1` is fifteen rows because `sub` already had all three register/register
+widths in `0.74.0` and `add`/`and`/`or`/`xor`/`cmp` had none (`ADR-0113`); `S3`
+is five because `REX.W B8+rd` takes an `io` immediate and is `movabs`
+(`ADR-0115`). `S7` also corrected the planned `cond = 16` code from
+`E-OPERAND-004` to `E-RANGE-001` (`ADR-0119`).
+
+The concrete evidence for the run is `X86-P81`-`X86-P84`, `RV-P12`,
+`A64-P23`, `A64-P24`, `EXP-0112`-`EXP-0118`, the 611 negative fixtures and
+`tools/check_definition.py`'s form-coverage check, which names every one of the
+841 forms through a positive fixture. CI for the closure commit is
+`unverified`; the local gate set in §5 passed.
