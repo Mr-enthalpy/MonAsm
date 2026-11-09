@@ -1,6 +1,6 @@
 # M6 Plan — Coverage Round 2
 
-- Status: accepted (`ADR-0112`); `S1` landed 2026-11-09 (`ADR-0113`); `S2` landed 2026-11-10 (`ADR-0114`); `S3` landed 2026-11-10 (`ADR-0115`); `S4` landed 2026-11-10 (`ADR-0116`); `S5` landed 2026-11-10 (`ADR-0117`)
+- Status: accepted (`ADR-0112`); `S1` landed 2026-11-09 (`ADR-0113`); `S2` landed 2026-11-10 (`ADR-0114`); `S3` landed 2026-11-10 (`ADR-0115`); `S4` landed 2026-11-10 (`ADR-0116`); `S5` landed 2026-11-10 (`ADR-0117`); `S6` landed 2026-11-10 (`ADR-0118`)
 - Date: 2026-11-09
 - Baseline: Phase 6 closed (`ADR-0111`): 759 forms, 121 positive and 586
   negative plans, `fmp/0.1` frozen
@@ -12,6 +12,10 @@ M5 added seven vertical slices, but the integer surface is still a set of
 strips rather than families. The gaps are not open format questions: each is
 the same form/operand split the existing rows already use, and each is already
 absent from the pinned tables, so a plan that names it is `E-FORM-001` today.
+
+The gaps below are the planning-time snapshot: the pinned tables were
+`x86_64/0.74.0`, `aarch64/0.18.0` and `rv64/0.5.0`, and each row names what
+that table could not express.
 
 | Missing surface | Evidence |
 |---|---|
@@ -152,15 +156,16 @@ unchanged.
 out. Negatives: `fence` (`E-FORM-001`), the `imm12` end and the version
 boundary.
 
-### S6 — AArch64 `adr` (`ADR-0118`, `0.19.0`, `A64-P23`)
+### S6 — AArch64 `adr` (`ADR-0118`, `0.19.0`, `A64-P23`, landed)
 
 1 row: `aarch64:adr/x64-imm21`. The immediate is split between `immlo`
 (bits 30–29) and `immhi` (bits 23–5), and `P` is the instruction address, which
 is the existing `pcrel_begin` rule — no new fixup rule is needed. The slice
 adds one `EC` row for `adr` vs `adrp`: byte offset (±1 MiB) vs page.
 
-`tbz`/`tbnz` (`EC-18`) and the `mov` alias (`EC-16`) stay closed. Negatives:
-`adrp` named as `adr` (`E-FORM-001`), the `imm21` end and the version boundary.
+`tbz`/`tbnz` (`EC-18`) and the `mov` alias (`EC-16`) stay closed. Negatives: the
+absent page variant `aarch64:adr/x64-imm21-page` and the `0.18.0` boundary
+(`E-FORM-001`), and the `imm21` end (`E-RANGE-002`).
 
 ### S7 — AArch64 `mul` and `csel` (`ADR-0119`, `0.20.0`, `A64-P24`)
 

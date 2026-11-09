@@ -44,6 +44,7 @@ Writes: definitions/aarch64/0.1.0.json
         definitions/aarch64/0.16.0.json
         definitions/aarch64/0.17.0.json
         definitions/aarch64/0.18.0.json
+        definitions/aarch64/0.19.0.json
 
 Usage:
     python research/evidence/experiments/EXP-0008/generate_aarch64.py
@@ -64,7 +65,7 @@ OUT_DIR = os.path.join(ROOT, "definitions", "aarch64")
 
 VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0",
             "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0",
-            "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0"]
+            "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "0.19.0"]
 
 # Frozen digests. Fixtures name them, so they may not move.
 FROZEN_DIGESTS = {
@@ -85,6 +86,7 @@ FROZEN_DIGESTS = {
     "0.15.0": "sha256:422ebb83b897b18e010da37539796b0b97cfc9018a47209fc4a6ddc5b14af5d3",
     "0.16.0": "sha256:1e83c6cad91594e8315500f39d0bcffa235edc90c5f47c012555c077a8dbc457",
     "0.17.0": "sha256:de2c53e1871f5c24f6af73082dcc402729786d2e6e2495f84e3ed553adb4e4ed",
+    "0.18.0": "sha256:c32e3674bf50140276d29fd01891bab20a86b849fa1503d2c9d02ae6aa503824",
 }
 
 WIDTH = 32
@@ -1901,6 +1903,43 @@ def _transfer_forms():
 
 
 FORMS.extend(_transfer_forms())
+
+
+def _pcrel_address_forms():
+    """`adr` (ADR-0118).
+
+    `ADR_only_pcreladdr` is `ADRP_only_pcreladdr` with bit 31 = 0 instead of
+    1: the same 21-bit value split over `immhi` (bits 23-5) and `immlo`
+    (bits 30-29), and the same `Rd`. The difference is what the value means.
+    `adrp` counts 4 KiB pages from the page base, so its fixup is
+    `pcrel_page` + `page`; `adr` counts bytes from the instruction, so a byte
+    displacement is `pcrel_begin` + `identity`, with no shift and no
+    alignment beyond the slot's `align_bits: 0`.
+
+    The row still only owns the bit: which transform a plan states is the
+    plan's choice (`03_fixup_model.md` §6), and naming `adr` never reaches
+    `adrp`.
+    """
+    return [
+        {
+            "form_id": "aarch64:adr/x64-imm21",
+            "mrs": "ADR_only_pcreladdr",
+            "decision": "op = 0 at bit 31, fixed by the node (byte offset, not a page)",
+            "pinned": {},
+            "since": "0.19.0",
+            "slots": [
+                {"mrs": ["Rd"], "role": "dest", "kind": "aarch64.gpr64",
+                 "from": "reg_number", "target_type": "x64"},
+                {"mrs": ["immhi", "immlo"], "role": "target",
+                 "kind": "aarch64.rel", "from": "operand_value",
+                 "target_type": "imm21",
+                 "range": {"signed": True, "bits": 21, "align_bits": 0}},
+            ],
+        },
+    ]
+
+
+FORMS.extend(_pcrel_address_forms())
 
 
 def _alias_stem(base):

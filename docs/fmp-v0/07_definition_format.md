@@ -2361,7 +2361,7 @@ instructions. The indexed sibling is absent (`N01fb`, `E-FORM-001`), the
 `0.77.0` boundary is `E-FORM-001` (`N01fc`) and `disp8 = 128` is
 `E-RANGE-001` (`N03zz`).
 
-### 8.2 `aarch64` `0.1.0` … `0.18.0`
+### 8.2 `aarch64` `0.1.0` … `0.19.0`
 
 | `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
 |---|---|---|---|---|
@@ -2545,6 +2545,7 @@ instructions. The indexed sibling is absent (`N01fb`, `E-FORM-001`), the
 | `aarch64:br/rn` | `00001fd6` | src: `aarch64.gpr64`/`x64` → `[5,5]` | 4 | `A64-P22` — `0.18.0` only |
 | `aarch64:blr/rn` | `00003fd6` | src: `aarch64.gpr64`/`x64` → `[5,5]` | 4 | `A64-P22` — `0.18.0` only |
 | `aarch64:ret/rn` | `00005fd6` | src: `aarch64.gpr64`/`x64` → `[5,5]` | 4 | `A64-P22` — `0.18.0` only |
+| `aarch64:adr/x64-imm21` | `00000010` | dest: `aarch64.gpr64`/`x64` → `[0,5]`; target: `aarch64.rel`/`imm21` → `[5,19]`, `[29,2]` | 4 | `EC-43`, `A64-P23` — `0.19.0` only |
 
 `0.1.0` holds the first, second, fourth and fifth rows; `0.2.0` adds
 `aarch64:add/x64-imm12-lsl12` (ADR-0011); `0.3.0` repeats all five and adds
@@ -2565,7 +2566,8 @@ repeats all one hundred and thirty-six and adds the sixteen register-offset rows
 32-bit register-offset rows (ADR-0025); `0.17.0` repeats all one hundred and
 sixty-eight and adds the eight `movk`/`movn` rows (ADR-0026); `0.18.0` repeats
 all one hundred and seventy-six and adds the four unconditional-transfer rows
-(ADR-0100).
+(ADR-0100); `0.19.0` repeats all one hundred and eighty and adds the `adr` row
+(ADR-0118).
 Each document therefore shares its earlier rows
 unchanged and differs only in the rows its version introduced, so a plan bound to
 an older version cannot reach a newer form (`E-FORM-001`, `N01`) even though the
@@ -2577,8 +2579,8 @@ The templates are little-endian file order, so `0000008b` is the word
 bit from the MRS node, requires the MRS node name to exist, and refuses to emit
 unless all 32 bits are covered exactly once by a fixed bit or a slot placement;
 `EXP-0008` §2–§3 records the nodes and the coverage check. The one hundred and
-eighty forms come
-from forty-three encode nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
+eighty-one forms come
+from forty-four encode nodes: `ADD_64_addsub_shift` is read four times, once with `imm6`
 pinned to 0 and once per shift keyword, `ADD_64_addsub_ext` eight times, once per
 `option` value, `ADD_64_addsub_imm` twice, once with
 `sh = 0` and once with `sh = 1`, `MOVZ_64_movewide` four times, once per `hw`
@@ -2594,7 +2596,9 @@ each, once per `option` value (`ADR-0020`),
 fields as operands, `B_only_branch_imm` contributes `b`'s row (its
 `BL_only_branch_imm` sibling has been `bl` since `0.1.0`), and
 `BR_64_branch_reg`, `BLR_64_branch_reg` and `RET_64R_branch_reg` contribute one
-row each with `Rn` as the single operand (`ADR-0100`), and each of the eight
+row each with `Rn` as the single operand (`ADR-0100`), `ADR_only_pcreladdr`
+contributes `adr`'s row with `op` fixed to 0 (its `ADRP_only_pcreladdr` sibling
+has been `adrp` since `0.1.0`, `ADR-0118`), and each of the eight
 load/store rows reads one node whose
 addressing-kind bits are fixed and whose `imm12`/`imm9` is the single variable
 field (`ADR-0022` adds the three store `imm9` nodes); `LDR_64_loadlit` is the one
@@ -2605,7 +2609,7 @@ times, once per `option`/`S` pair (`ADR-0024`), and the 32-bit pair
 (`ADR-0025`); the ten `CMP`/`CMN` alias
 nodes are read for verification only, because
 they carry no `encoding` and the bytes stay the base node's (`ADR-0021`). The
-generator states each pinned value explicitly and asserts that `0.1.0` … `0.17.0`
+generator states each pinned value explicitly and asserts that `0.1.0` … `0.18.0`
 still hash to their frozen digests.
 
 The literal row's `imm19` follows §8.3's rule, not a slot transform: the slot is
@@ -2784,10 +2788,13 @@ the rows.
 
 `adrp`'s immediate is one value over two fields: `immhi` holds bits `[20:2]` and
 `immlo` holds `[1:0]`, which is why the slot has two placements in that order
-(§4.1: first placement, most significant bits).
+(§4.1: first placement, most significant bits). `adr` is the same value over the
+same two fields, and only bit 31 separates the two rows (`EC-43`).
 
 `bl` and `adrp` are the two rows whose field is not a plain integer, and the
-next subsection is the rule that follows from it.
+next subsection is the rule that follows from it. `adr` is the split without the
+scaling: its 21-bit content is a byte displacement, so a plan states bytes and
+the fixup is `pcrel_begin` + `identity` with `align_bits: 0`.
 
 ### 8.3 Scaled branch fields: the slot is the field
 
@@ -2815,6 +2822,12 @@ This keeps `INV-04` intact: nothing is relaxed, and a plan that omits the
 transform emits the field value it stated, which is a wrong program rather than a
 repaired one. The alternative — a slot that silently scales — was rejected
 because the same number would then mean different things on `add` and `bl`.
+
+`adr` and `adrp` are that argument at its sharpest: the two rows have identical
+placements and differ in one template bit, so a slot-level transform could not
+tell a byte displacement from a page count at all. The byte reading is the plan's
+`identity`, the page reading is its `page`, and a plan that names `adr` and asks
+for the page transform has named a form that does not exist (`N01ff`, `EC-43`).
 
 `aarch64:add/x64-imm12-lsl12` is the same rule on an immediate: the slot holds
 `imm12`, and the `sh = 1` the form fixes is what multiplies it by 4096. A
@@ -3029,9 +3042,10 @@ the plan names, so it is raised by static instruction validation
   ADR-0006: the facts come from the Arm MRS 2026-06 OPENSOURCE packaging, and
   the Arm notice ships with the generated table. The format did not need to
   change for it: `adrp`'s split `immhi:immlo` is two placements of one slot, as
-  §4.1 anticipated. `definitions/aarch64/0.1.0.json` … `0.18.0.json` now exist
+  §4.1 anticipated, and `adr` reuses it unchanged in `0.19.0`.
+  `definitions/aarch64/0.1.0.json` … `0.19.0.json` now exist
   (§8.2); each is a superset that adds its own rows without a format change
-  (ADR-0011 to ADR-0026, ADR-0100). What is
+  (ADR-0011 to ADR-0026, ADR-0100, ADR-0118). What is
   missing is coverage, not design: the `b`/`h` load/store widths, the signed and
   extended load rows (`LDRSW`/`LDRSB`/`LDRSH`), `prfm`, the 32-bit
   extended `add`/`sub` nodes and their aliases, and the `mov` alias and the

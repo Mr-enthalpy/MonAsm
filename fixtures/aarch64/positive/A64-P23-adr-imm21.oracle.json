@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=aarch64 -filetype=obj A64-P23-adr-imm21.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "532e93eecb57465e734b6705e924d04d51c0d24a5e763e4bb7ca5ef2f9cbf5f9",
+  "output_sha256": "7a179c052ac4ca977991a96f362210b61e3377d6e3035381e411a8c1a049a01c",
+  "size": 32,
+  "records": 0,
+  "notes": "Input (LF, trailing newline) is `research/evidence/experiments/EXP-0117/A64-P23-adr-imm21.s`: label `back` at 0, five literal displacements (`#0`, `#8`, `#-8`, `#1048575`, `#-1048576`), label `ahead` at 20, then `adr x5, ahead` at 20, `adr x6, back` at 24 and `adr x7, ahead` at 28. The last three rows are symbol sites that this assembler resolves itself, so `llvm-readobj -r` is empty and no linker is involved; the plan states the same three displacements through `pcrel_begin` + `identity`. Measured words: `10000000`, `10000041`, `10ffffc2`, `707fffe3`, `10800004`, `10000005`, `10ffff46`, `10ffffc7`. Bit 31 is 0 (`adr`; `adrp` sets it), `immlo` holds the low two bits of the signed 21-bit byte displacement at 29-30 and `immhi` bits 2-20 at 5-23. `llvm-objdump -d` prints the target as `P + v` and wraps at 64 bits, so `adr x4, #-1048576` disassembles as `0xfffffffffff00010` while `adr x3, #1048575` is `0x10000b`; both readings agree with the derivation in `measure.py`. `adr x0, #1048576` is one past the range and `llvm-mc` rejects it (`expected label or encodable integer pc offset`).",
+  "source": "Arm MRS `ADR_only_pcreladdr` (`op` 31+1 = 0, `immlo` 29+2, `immhi` 5+19, `Rd` 0+5)"
+}

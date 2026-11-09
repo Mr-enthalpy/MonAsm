@@ -1,0 +1,174 @@
+{
+  "format_version": "fmp/0.1",
+  "target_identity": {
+    "isa_family": "aarch64",
+    "isa_variant": "aarch64",
+    "execution_mode": "n/a",
+    "enabled_extensions": [],
+    "feature_constraints": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "definition_identity": {
+    "namespace": "monasm.isa.aarch64",
+    "version": "0.19.0",
+    "digest": "sha256:f299d978b734a295fe111f6e03999d891d08a84e6d02c36ce83ee9a25c961546"
+  },
+  "output_contract": {
+    "artifact": "bytes",
+    "section_order": [".text"],
+    "fixup_record_order": "section_id,offset,fixup_id",
+    "include_symbol_table": false,
+    "emit_fixups": true
+  },
+  "sections": [
+    {
+      "section_id": ".text",
+      "section_kind": "code",
+      "image_backed": true,
+      "declared_size": 32,
+      "fragments": [
+        { "offset": 0, "size": 4, "kind": "instruction", "instruction_id": "I0001" },
+        { "offset": 4, "size": 4, "kind": "instruction", "instruction_id": "I0002" },
+        { "offset": 8, "size": 4, "kind": "instruction", "instruction_id": "I0003" },
+        { "offset": 12, "size": 4, "kind": "instruction", "instruction_id": "I0004" },
+        { "offset": 16, "size": 4, "kind": "instruction", "instruction_id": "I0005" },
+        { "offset": 20, "size": 4, "kind": "instruction", "instruction_id": "I0006" },
+        { "offset": 24, "size": 4, "kind": "instruction", "instruction_id": "I0007" },
+        { "offset": 28, "size": 4, "kind": "instruction", "instruction_id": "I0008" }
+      ]
+    }
+  ],
+  "symbols": [
+    { "symbol_id": "S1", "name": "ahead", "kind": "defined", "binding": "local", "section_id": ".text", "offset": 20 },
+    { "symbol_id": "S2", "name": "back", "kind": "defined", "binding": "local", "section_id": ".text", "offset": 0 }
+  ],
+  "instructions": [
+    {
+      "instruction_id": "I0001",
+      "section_id": ".text",
+      "offset": 0,
+      "form_id": "aarch64:adr/x64-imm21",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 0 }, "modifiers": [] },
+        { "role": "target", "kind": "aarch64.rel", "target_type": "imm21", "payload": { "value": 0 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0002",
+      "section_id": ".text",
+      "offset": 4,
+      "form_id": "aarch64:adr/x64-imm21",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 1 }, "modifiers": [] },
+        { "role": "target", "kind": "aarch64.rel", "target_type": "imm21", "payload": { "value": 8 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0003",
+      "section_id": ".text",
+      "offset": 8,
+      "form_id": "aarch64:adr/x64-imm21",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 2 }, "modifiers": [] },
+        { "role": "target", "kind": "aarch64.rel", "target_type": "imm21", "payload": { "value": -8 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0004",
+      "section_id": ".text",
+      "offset": 12,
+      "form_id": "aarch64:adr/x64-imm21",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 3 }, "modifiers": [] },
+        { "role": "target", "kind": "aarch64.rel", "target_type": "imm21", "payload": { "value": 1048575 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0005",
+      "section_id": ".text",
+      "offset": 16,
+      "form_id": "aarch64:adr/x64-imm21",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 4 }, "modifiers": [] },
+        { "role": "target", "kind": "aarch64.rel", "target_type": "imm21", "payload": { "value": -1048576 }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0006",
+      "section_id": ".text",
+      "offset": 20,
+      "form_id": "aarch64:adr/x64-imm21",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 5 }, "modifiers": [] },
+        { "role": "target", "kind": "aarch64.rel", "target_type": "imm21", "payload": { "symbol_id": "S1" }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0007",
+      "section_id": ".text",
+      "offset": 24,
+      "form_id": "aarch64:adr/x64-imm21",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 6 }, "modifiers": [] },
+        { "role": "target", "kind": "aarch64.rel", "target_type": "imm21", "payload": { "symbol_id": "S2" }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    },
+    {
+      "instruction_id": "I0008",
+      "section_id": ".text",
+      "offset": 28,
+      "form_id": "aarch64:adr/x64-imm21",
+      "operands": [
+        { "role": "dest", "kind": "aarch64.gpr64", "target_type": "x64", "payload": { "reg": 7 }, "modifiers": [] },
+        { "role": "target", "kind": "aarch64.rel", "target_type": "imm21", "payload": { "symbol_id": "S1" }, "modifiers": [] }
+      ],
+      "expected_size": 4
+    }
+  ],
+  "fixups": [
+    {
+      "fixup_id": "F0001",
+      "section_id": ".text",
+      "offset": 20,
+      "field_descriptor": [ { "lsb": 5, "width": 19 }, { "lsb": 29, "width": 2 } ],
+      "target": { "kind": "symbol", "symbol_id": "S1" },
+      "addend": 0,
+      "pc_reference_rule": "pcrel_begin",
+      "value_transform": "identity",
+      "range_constraint": { "signed": true, "bits": 21, "align_bits": 0 },
+      "resolution_mode": "resolve_in_place"
+    },
+    {
+      "fixup_id": "F0002",
+      "section_id": ".text",
+      "offset": 24,
+      "field_descriptor": [ { "lsb": 5, "width": 19 }, { "lsb": 29, "width": 2 } ],
+      "target": { "kind": "symbol", "symbol_id": "S2" },
+      "addend": 0,
+      "pc_reference_rule": "pcrel_begin",
+      "value_transform": "identity",
+      "range_constraint": { "signed": true, "bits": 21, "align_bits": 0 },
+      "resolution_mode": "resolve_in_place"
+    },
+    {
+      "fixup_id": "F0003",
+      "section_id": ".text",
+      "offset": 28,
+      "field_descriptor": [ { "lsb": 5, "width": 19 }, { "lsb": 29, "width": 2 } ],
+      "target": { "kind": "symbol", "symbol_id": "S1" },
+      "addend": 0,
+      "pc_reference_rule": "pcrel_begin",
+      "value_transform": "identity",
+      "range_constraint": { "signed": true, "bits": 21, "align_bits": 0 },
+      "resolution_mode": "resolve_in_place"
+    }
+  ]
+}

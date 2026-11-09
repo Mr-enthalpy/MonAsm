@@ -1,0 +1,15 @@
+{
+  "errors": [
+    {
+      "code": "E-RANGE-002",
+      "path": "/instructions/0/operands/1/payload/value",
+      "detail_keys": [
+        "min",
+        "max",
+        "value",
+        "bits",
+        "align_bits"
+      ]
+    }
+  ]
+}
