@@ -1,16 +1,23 @@
 # RV64 fixtures
 
-Vectors: `RV-P1` … `RV-P8` in `docs/fmp-v0/06_validation_matrix.md`. Two
-documents are pinned, because the extension set is part of a document's identity
-(`07_definition_format.md` §2):
+Vectors: `RV-P1` … `RV-P12` in `docs/fmp-v0/06_validation_matrix.md`. Every
+document is pinned, because the extension set and the rows are part of its
+identity (`07_definition_format.md` §2):
 
 | Document | Forms | Digest |
 |---|---|---|
 | `definitions/rv64/0.1.0.json` | seven base-`I` forms | `sha256:6afb2bf48c3c8b7c8878868eb9afce9c10c219ff12b297b7e68843dbba7f7083` |
 | `definitions/rv64/0.2.0.json` | the same seven plus `riscv:c.addi/rd-imm6` | `sha256:8329a38faa964f9c69207a48e3bfb45c13fb0ddbaeb829ddcc0dbd1cffa8de10` |
+| `definitions/rv64/0.3.0.json` | plus `riscv:lui/rd-imm20` | `sha256:484eae4ba4c80c1ff4d91bc11a6fd9bd36bdc511a8271815d76c0883869ad2af` |
+| `definitions/rv64/0.4.0.json` | plus `riscv:jalr/rd-rs1-imm12` | `sha256:e00dee01004ec9d927ac4e5494e8e6dabfcbb4ff0e123980190c9871624afa76` |
+| `definitions/rv64/0.5.0.json` | plus the five B-type mnemonics | `sha256:571ab1ed93f4464d5ec8981df02dd0444005ababdaaf1e175d0ec489bb33a776` |
+| `definitions/rv64/0.6.0.json` | plus the nine load/store widths | `sha256:0baf3b34804df12c5e73debf54cf70420ce436bec914258eb5216549972d9585` |
 
-Both are generated from the pinned UDB resolved spec by
-`research/evidence/experiments/EXP-0010/generate_rv64.py`.
+`0.1.0`/`0.2.0` are generated from the pinned UDB resolved spec by
+`research/evidence/experiments/EXP-0010/generate_rv64.py`; `0.5.0` and `0.6.0`
+are generated from their predecessors by `EXP-0105/generate_0500.py` and
+`EXP-0116/generate_0600.py`, which assert the source forms are reproduced before
+they append.
 
 ## Positive
 
@@ -25,11 +32,12 @@ Both are generated from the pinned UDB resolved spec by
 | `RV-P8-pcrel-pair` | `riscv:auipc/rd-imm20`, `riscv:addi/rd-rs1-imm12`, `riscv:sd/rs-base-imm12` | `RV-P8` pair half: one `hi`, two `lo`, three records, unlinked |
 | `RV-P8-pcrel-pair-resolved` | `riscv:auipc/rd-imm20`, `riscv:addi/rd-rs1-imm12` | `RV-P8` pair arithmetic against a linked binary |
 | `RV-P3-ld-sd-base-offset` | `riscv:ld/rd-base-imm12`, `riscv:sd/rs-base-imm12` | `RV-P3`, four instructions, signed imm12 endpoints |
+| `RV-P12-load-store-widths` | `riscv:lb/lh/lw/lbu/lhu/lwu` (`rd-base-imm12`), `riscv:sb/sh/sw` (`rs-base-imm12`) | `RV-P12`, nine rows at `8(a1)` plus the signed-12 ends (`-2048`, `2047`) |
 
 Oracle: `llvm-mc 23.1.2 -triple=riscv64 -filetype=obj`, then
 `llvm-objcopy -O binary --only-section=.text`. The oracle's `.s` inputs live
 under `research/evidence/experiments/` and are pinned by `input_sha256` in each
-`oracle.json`; `python tools/oracle/rerun.py` re-derives all fifteen RV64
+`oracle.json`; `python tools/oracle/rerun.py` re-derives all eighteen RV64
 positives.
 `-mattr=+c` is passed for `RV-P7` only; the base-`I` fixtures are assembled
 without it so `llvm-mc` cannot auto-compress an `addi` on them (`EXP-0012` §2.2).
@@ -92,6 +100,9 @@ encoded: both are inside the declared ranges and produce reserved HINTs
 | `N01c-caddi-against-0.1.0` | `E-FORM-001` | `riscv:c.addi/rd-imm6` is not in `0.1.0`; the lookup is per version, never repaired to `addi` |
 | `N02-operand-kind-mismatch` | `E-OPERAND-001` | an operand's `kind` is not the slot's storage class |
 | `N03-imm12-out-of-range` | `E-RANGE-001` | `addi` rejects `2048`, it does not truncate to `-2048` |
+| `N01fd-absent-fence-form` | `E-FORM-001` | `riscv:fence/fm-pred-succ-imm12` has no row in any version (`EC-24`); the materializer does not synthesize it |
+| `N01fe-load-store-row-on-0.5.0` | `E-FORM-001` | `riscv:lw/rd-base-imm12` is not in `0.5.0`; the lookup is per version and never falls back to `ld` |
+| `N03a0-sw-imm12-past-signed-12` | `E-RANGE-001` | `sw` rejects `2048`, the signed 12-bit end, even though the field is scattered over 7+5 bits |
 | `N04-branch-out-of-range` | `E-RANGE-002` | `beq` rejects a 12-bit field value of `2048` |
 | `N15-composite-memory-payload` | `E-OPERAND-003` | a `{"mem": {base, disp}}` payload is not one of the four `fmp/0.1` shapes, so the reader rejects it before the definition is looked up |
 | `N16a-caddi-imm-zero` | `E-RANGE-004` | `c.addi` with `imm = 0` is inside `[-32, 31]` but excluded: the bytes would mean a HINT |

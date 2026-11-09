@@ -1,6 +1,6 @@
 # M6 Plan — Coverage Round 2
 
-- Status: accepted (`ADR-0112`); `S1` landed 2026-11-09 (`ADR-0113`); `S2` landed 2026-11-10 (`ADR-0114`); `S3` landed 2026-11-10 (`ADR-0115`); `S4` landed 2026-11-10 (`ADR-0116`)
+- Status: accepted (`ADR-0112`); `S1` landed 2026-11-09 (`ADR-0113`); `S2` landed 2026-11-10 (`ADR-0114`); `S3` landed 2026-11-10 (`ADR-0115`); `S4` landed 2026-11-10 (`ADR-0116`); `S5` landed 2026-11-10 (`ADR-0117`)
 - Date: 2026-11-09
 - Baseline: Phase 6 closed (`ADR-0111`): 759 forms, 121 positive and 586
   negative plans, `fmp/0.1` frozen
@@ -142,7 +142,7 @@ the `REX.W` byte; the 32/16-bit rows stay three-bit because a `REX` byte would
 change the length. Negatives: an absent indexed sibling (`E-FORM-001`), the
 signed-8 end and the version boundary.
 
-### S5 — RV64 load/store widths (`ADR-0117`, `0.6.0`, `RV-P12`)
+### S5 — RV64 load/store widths (`ADR-0117`, `0.6.0`, `RV-P12`, landed)
 
 9 rows: `lb`, `lh`, `lw`, `lbu`, `lhu`, `lwu`, `sb`, `sh`, `sw`. Each is one
 form: `rs1` base, `rd` or `rs2` value, `imm12` field content. `ld`/`sd` are

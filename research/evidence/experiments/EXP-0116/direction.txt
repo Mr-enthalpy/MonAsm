@@ -1,0 +1,17 @@
+fixture bytes 44: 038585000395850003a5850003c5850003d5850003e585002384c5002394c50023a4c50003850580a3afc57e
+lb   a0, 8(a1)    03858500  funct3=000 imm=8 rs1=11 rd=10  lb	a0, 0x8(a1)
+lh   a0, 8(a1)    03958500  funct3=001 imm=8 rs1=11 rd=10  lh	a0, 0x8(a1)
+lw   a0, 8(a1)    03a58500  funct3=010 imm=8 rs1=11 rd=10  lw	a0, 0x8(a1)
+lbu  a0, 8(a1)    03c58500  funct3=100 imm=8 rs1=11 rd=10  lbu	a0, 0x8(a1)
+lhu  a0, 8(a1)    03d58500  funct3=101 imm=8 rs1=11 rd=10  lhu	a0, 0x8(a1)
+lwu  a0, 8(a1)    03e58500  funct3=110 imm=8 rs1=11 rd=10  lwu	a0, 0x8(a1)
+sb   a2, 8(a1)    2384c500  funct3=000 imm=8 rs1=11 rs2=12  sb	a2, 0x8(a1)
+sh   a2, 8(a1)    2394c500  funct3=001 imm=8 rs1=11 rs2=12  sh	a2, 0x8(a1)
+sw   a2, 8(a1)    23a4c500  funct3=010 imm=8 rs1=11 rs2=12  sw	a2, 0x8(a1)
+lb   a0, -2048(a1) 03850580  funct3=000 imm=-2048 rs1=11 rd=10  lb	a0, -0x800(a1)
+sw   a2, 2047(a1) a3afc57e  funct3=010 imm=2047 rs1=11 rs2=12  sw	a2, 0x7ff(a1)
+
+Every row is one `funct3` away from the `ld`/`sd` geometry:
+the load field is contiguous at 31-20, the store field is the
+S-type scatter 31-25|11-7. The last two rows are the signed
+12-bit ends (-2048 and 2047).

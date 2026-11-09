@@ -1,0 +1,12 @@
+{
+  "tool": "llvm-mc 23.1.2 + llvm-objcopy",
+  "version": "23.1.2",
+  "command": "llvm-mc -triple=riscv64 -filetype=obj RV-P12-load-store-widths.s -o out.o && llvm-objcopy -O binary --only-section=.text out.o out.bin",
+  "kind": "assembler",
+  "input_sha256": "301eb7d4ecf93528940a184510427a51cb97f62b8cd7a09bfc9cc77cb7172b6d",
+  "output_sha256": "4cac900aeda50e5169475d4077e1819e8daa0c1e2353d36e530fbc46685fbfd0",
+  "size": 44,
+  "records": 0,
+  "notes": "Input, one line each (LF, trailing newline): `lb`/`lh`/`lw`/`lbu`/`lhu`/`lwu a0, 8(a1)`, `sb`/`sh`/`sw a2, 8(a1)`, then `lb a0, -2048(a1)` and `sw a2, 2047(a1)`. Each row differs from the `ld`/`sd` geometry only in `funct3` (bits 12-14): the loads keep the contiguous 12-bit field at 31-20, the stores the S-type scatter 31-25|11-7, and RV64 does not scale the immediate. The last two lines are the signed 12-bit endpoints. No relocation record is involved, so `records` is 0.",
+  "source": "RISC-V UDB I/{lb,lh,lw,lbu,lhu,lwu}.yaml, each `encoding.match` `...FUNCT3...0000011` with `imm` at 31-20 `sign_extend: true`, `xs1` 19-15, `xd` 11-7, defined by the base I extension (`lwu` additionally under `xlen: 64`); I/{sb,sh,sw}.yaml, each `...FUNCT3...0100011` with `imm` at \"31-25|11-7\" `sign_extend: true`, `xs2` 24-20, `xs1` 19-15"
+}

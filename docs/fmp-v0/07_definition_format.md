@@ -2959,6 +2959,42 @@ byte vector (`EXP-0105`). A plan that names `bne` against `0.4.0` is
 `E-FORM-001` (`N01en`), and the field boundary is `N04h` (`2048` is one past
 the signed 12-bit content range).
 
+### 8.7 `rv64` `0.6.0`
+
+`0.6.0` contains every row of §8.6 unchanged, plus the other load/store widths
+(`ADR-0117`):
+
+| `form_id` | template | slots (role: kind/target_type → placements) | Bytes | Covers |
+|---|---|---|---|---|
+| `riscv:lb/rd-base-imm12` | `03000000` | dest: `riscv.xreg`/`xreg` → `[7,5]`; base: `riscv.xreg`/`xreg` → `[15,5]`; disp: `riscv.imm`/`imm12` → `[20,12]` | 4 | `RV-P12` |
+| `riscv:lh/rd-base-imm12` | `03100000` | dest: `riscv.xreg`/`xreg` → `[7,5]`; base: `riscv.xreg`/`xreg` → `[15,5]`; disp: `riscv.imm`/`imm12` → `[20,12]` | 4 | `RV-P12` |
+| `riscv:lw/rd-base-imm12` | `03200000` | dest: `riscv.xreg`/`xreg` → `[7,5]`; base: `riscv.xreg`/`xreg` → `[15,5]`; disp: `riscv.imm`/`imm12` → `[20,12]` | 4 | `RV-P12` |
+| `riscv:lbu/rd-base-imm12` | `03400000` | dest: `riscv.xreg`/`xreg` → `[7,5]`; base: `riscv.xreg`/`xreg` → `[15,5]`; disp: `riscv.imm`/`imm12` → `[20,12]` | 4 | `RV-P12` |
+| `riscv:lhu/rd-base-imm12` | `03500000` | dest: `riscv.xreg`/`xreg` → `[7,5]`; base: `riscv.xreg`/`xreg` → `[15,5]`; disp: `riscv.imm`/`imm12` → `[20,12]` | 4 | `RV-P12` |
+| `riscv:lwu/rd-base-imm12` | `03600000` | dest: `riscv.xreg`/`xreg` → `[7,5]`; base: `riscv.xreg`/`xreg` → `[15,5]`; disp: `riscv.imm`/`imm12` → `[20,12]` | 4 | `RV-P12` |
+| `riscv:sb/rs-base-imm12` | `23000000` | src: `riscv.xreg`/`xreg` → `[20,5]`; base: `riscv.xreg`/`xreg` → `[15,5]`; disp: `riscv.imm`/`imm12` → `[25,7]`, `[7,5]` | 4 | `RV-P12` |
+| `riscv:sh/rs-base-imm12` | `23100000` | src: `riscv.xreg`/`xreg` → `[20,5]`; base: `riscv.xreg`/`xreg` → `[15,5]`; disp: `riscv.imm`/`imm12` → `[25,7]`, `[7,5]` | 4 | `RV-P12` |
+| `riscv:sw/rs-base-imm12` | `23200000` | src: `riscv.xreg`/`xreg` → `[20,5]`; base: `riscv.xreg`/`xreg` → `[15,5]`; disp: `riscv.imm`/`imm12` → `[25,7]`, `[7,5]` | 4 | `RV-P12` |
+
+Each row reuses its `ld`/`sd` sibling's geometry and changes only `funct3`
+(bits 12-14): the loads keep the contiguous 12-bit immediate at 31-20, the
+stores the S-type scatter 31-25|11-7, and `xs1` stays at 19-15 with `xd` at
+11-7 or `xs2` at 24-20. The nine nodes are `inst/I/{lb,lh,lw,lbu,lhu,lwu}.yaml`
+(`0000011`) and `inst/I/{sb,sh,sw}.yaml` (`0100011`); the generator reads each
+one and asserts its `encoding.match`, the `imm` scatter, `sign_extend: true`
+and the base `I` extension before writing the row. `lwu` is additionally
+restricted to `xlen: 64` in its node, which the generator asserts. RV64 does
+not scale the immediate, so `disp` is the byte displacement and no transform is
+involved.
+
+No `EC` row is added: the width is chosen by the mnemonic, so it is a form
+variant rather than a field whose value the materializer could pick (`INV-01`,
+`INV-02`). `fence` (`EC-24`), `ecall`/`ebreak`, the atomics (`EC-26`) and the
+compressed load/store family (`EC-19`, `EC-23`) stay out. `RV-P12` is the
+44-byte vector of eleven instructions (`EXP-0116`). `fence` has no row in any
+version (`N01fd`, `E-FORM-001`), naming a `0.6.0` row against `0.5.0` is
+`E-FORM-001` (`N01fe`), and `disp = 2048` is `E-RANGE-001` (`N03a0`).
+
 ## 9. Load-time checks
 
 | Check | Code |
