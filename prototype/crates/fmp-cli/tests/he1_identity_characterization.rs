@@ -1,15 +1,23 @@
 //! H0 characterization tests: the gaps HE-1 has to close, measured rather than
 //! asserted from source reading.
 //!
-//! Every test in this file **passes on the current code by documenting a hole**,
-//! not by requiring correct behaviour. They exist so that:
+//! Four of these tests **pass on the current code by documenting a hole**, not by
+//! requiring correct behaviour: a definition can be re-encoded under its original
+//! digest, a parsed operand can change under a stable fingerprint, one unselected
+//! `*.json` breaks the whole load, and a synthetic namespace is rejected by the
+//! loader. The other two are controls — a plan naming another definition's digest,
+//! and a plan whose top level is not an object — and assert the rejection that
+//! already happens. They exist so that:
 //!
 //! - H0 can report "reproduced" for the audit risks instead of "inferred"; and
-//! - H1/H3 can flip each one into a rejection test, at which point the test name
-//!   and body change and this file shrinks.
+//! - H1/H3 can flip each gap test into a rejection test, at which point the test
+//!   name and body change and this file shrinks.
 //!
-//! Do not read a green run here as a property of the system. The property is the
-//! opposite of what most of these assert.
+//! Do not read a green run here as a property of the system. For the four gap
+//! tests the property is the opposite of what they assert. The deep-JSON finding
+//! is **not** in this file: it is the `deep-json` probe in
+//! `tools/he1_baseline.py`, because the crash is inside the parser and cannot be
+//! observed safely in-process.
 
 use std::path::PathBuf;
 

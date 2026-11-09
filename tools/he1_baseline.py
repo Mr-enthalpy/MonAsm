@@ -6,31 +6,41 @@ materializer actually emits, so every later HE-1 phase can prove that the old
 payloads did not move. It never writes to `definitions/`, `fixtures/` or the
 `prototype/` tree; its only output is the JSON file named by `--out`.
 
-What the snapshot contains:
+Identity is split into three layers, because they answer different questions:
 
-1. Definition inventory: file SHA-256 plus the canonical digest the plans name.
-2. Positive artifacts: for every `fixtures/*/positive/*.fmp.json`, the artifact
-   the `fmp` binary prints, normalized and hashed. The bytes, sections, symbols
-   and fixup records are kept verbatim, not just summarized.
-3. A single `artifact_root` digest over `(fixture path, artifact sha256)` so one
-   comparison answers "did any payload change?".
-4. Corpus and oracle counts, computed from the tree rather than copied from a
-   document.
-5. Robustness probes that must not crash the process. A probe records the
-   observed behaviour; it does not claim the behaviour is correct.
+1. `payload/0.1` — the artifact with `materializer_version` removed. This is the
+   machine payload: bytes or sections, symbols, fixup records, `fingerprint`,
+   `level`, `size`, `format_version`. A changed payload means the materializer
+   computes something different. `--check` compares this.
+2. `envelope/0.1` — the whole artifact object, `materializer_version` included.
+   Recorded, and compared only when the implementation receipt is identical, so
+   a genuine version bump does not masquerade as a payload change.
+3. `implementation` — the build receipt (`name`, `version`, binary SHA-256).
+   Recorded, never compared.
+
+The snapshot holds, per positive fixture, the payload object verbatim plus both
+digests, and a `payload_root` / `envelope_root` over `(fixture path, digest)` so
+one comparison answers "did any payload change?".
+
+Also recorded: the definition inventory (file SHA-256 plus canonical digest),
+corpus and oracle counts computed from the tree rather than copied from a
+document, and — when `--probes` is passed — robustness observations.
 
 Usage:
 
-    python tools/he1_baseline.py
+    python tools/he1_baseline.py --probes
     python tools/he1_baseline.py --out research/he1/compatibility-results.json
     python tools/he1_baseline.py --check research/he1/compatibility-results.json
 
-`--check` compares a fresh snapshot against a recorded one and exits 1 on any
-difference in a payload, a digest or a count. `head` and `toolchain` are receipts
-and are not compared: later phases run at a different commit and a different
-binary by design. Probes are also not compared — a changed probe is a finding to
-report, not a compatibility break. `--no-probes` skips the subprocess probes
-(useful when no binary is built).
+`--check` exits 1 on any difference in a payload, a digest or a count, and
+refuses a snapshot whose `schema` it does not know rather than silently
+comparing fewer fields. `head`, `toolchain`, `implementation` and `probes` are
+receipts/observations and are not compared; `envelope_root` is compared only
+when both sides name the same implementation.
+
+Probes are off by default: one of them feeds a 20 000-deep JSON document to a
+reader that currently overflows its stack. Every subprocess has a timeout, and a
+timeout is recorded as an outcome instead of raising.
 
 Exit codes: 0 recorded or identical, 1 mismatch, 2 usage or I/O fault.
 """
@@ -48,10 +58,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DEFINITIONS = ROOT / "definitions"
 FIXTURES = ROOT / "fixtures"
-DEFAULT_BINARY = ROOT / "prototype/target/debug/fmp.exe"
+DEBUG_BUILD = ROOT / "prototype" / "target" / "debug"
 DEFAULT_OUT = ROOT / "research/he1/compatibility-results.json"
 
-SCHEMA = "monasm.he1.baseline/0.1"
+# `payload/0.1` and `envelope/0.1` are the two projections; the schema name is
+# what `--check` uses to refuse an older snapshot instead of comparing less.
+SCHEMA = "monasm.he1.baseline/0.2"
+PAYLOAD_PROJECTION = "payload/0.1"
+ENVELOPE_PROJECTION = "envelope/0.1"
+
+# The build receipt. `binary_sha256` is the exact build identifier available
+# today; `version` is the crate version and is expected to change.
+IMPLEMENTATION = ROOT / "prototype/crates/fmp-materialize/Cargo.toml"
+
+MATERIALIZE_TIMEOUT = 120
+PROBE_TIMEOUT = 60
 
 # The deep-input probe. Big enough to overflow a recursive descent parser that
 # has no depth limit, small enough to stay far from the process memory limit.
@@ -81,6 +102,17 @@ def canonical_digest(document) -> str:
 
 def version_key(path: Path):
     return [int(part) for part in path.stem.split(".")]
+
+
+def payload_of(artifact):
+    """The artifact without the build receipt member.
+
+    A second projection rather than a second artifact: the payload is the
+    envelope minus exactly one key, and the tests below pin that.
+    """
+    if not isinstance(artifact, dict):
+        raise SystemExit("artifact is not a JSON object")
+    return {key: value for key, value in artifact.items() if key != "materializer_version"}
 
 
 def definition_inventory():
@@ -137,11 +169,19 @@ def oracle_state(positives):
 
 
 def run_materialize(binary: Path, plan_path: Path, definitions: Path):
-    completed = subprocess.run(
-        [str(binary), "materialize", str(plan_path), "--definitions", str(definitions)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    """Run one materialization with a timeout; a hang is a finding, not a lock."""
+    try:
+        completed = subprocess.run(
+            [str(binary), "materialize", str(plan_path), "--definitions", str(definitions)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=MATERIALIZE_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        raise SystemExit(
+            "%s: the materializer did not finish within %d s"
+            % (rel(plan_path), MATERIALIZE_TIMEOUT)
+        )
     stdout = completed.stdout.decode("utf-8", "replace")
     stderr = completed.stderr.decode("utf-8", "replace")
     return completed.returncode, stdout, stderr
@@ -157,27 +197,33 @@ def artifact_entry(binary: Path, plan_path: Path, definitions: Path):
             % (rel(plan_path), returncode, stderr.strip()[:400])
         )
     artifact = json.loads(stdout)
-    fixups = artifact.get("fixups", [])
-    entry = {
+    payload = payload_of(artifact)
+    fixups = payload.get("fixups", [])
+    return {
         "fixture": rel(plan_path),
         "plan_sha256": sha256_file(plan_path),
         "definition": plan.get("definition_identity", {}),
-        "level": artifact.get("level"),
-        "artifact_sha256": canonical_digest(artifact),
-        "fingerprint": artifact.get("fingerprint"),
-        "materializer_version": artifact.get("materializer_version"),
-        "size": artifact.get("size"),
-        "sections": len(artifact.get("sections", [])),
-        "symbols": len(artifact.get("symbols", []) or []),
+        "level": payload.get("level"),
+        "size": payload.get("size"),
+        "sections": len(payload.get("sections", [])),
+        "symbols": len(payload.get("symbols", []) or []),
         "fixup_records": len(fixups),
-        "artifact": artifact,
+        "fingerprint": payload.get("fingerprint"),
+        "payload_sha256": canonical_digest(payload),
+        # One object, so the comparison can drop the whole envelope in one
+        # place when the implementation receipt differs. `materializer_version`
+        # is the envelope's copy of the build identity; it is not payload.
+        "envelope": {
+            "sha256": canonical_digest(artifact),
+            "materializer_version": artifact.get("materializer_version"),
+        },
+        "payload": payload,
     }
-    return entry
 
 
-def artifact_root(entries):
+def root_of(entries, digest_of):
     material = "\n".join(
-        "%s\0%s" % (entry["fixture"], entry["artifact_sha256"]) for entry in entries
+        "%s\0%s" % (entry["fixture"], digest_of(entry)) for entry in entries
     )
     return "sha256:" + hashlib.sha256(material.encode("utf-8")).hexdigest()
 
@@ -186,11 +232,22 @@ def probe_deep_json(binary: Path, definitions: Path, scratch: Path):
     body = "[" * DEEP_DEPTH + "]" * DEEP_DEPTH
     plan = scratch / "deep.fmp.json"
     plan.write_text(body, encoding="utf-8")
-    completed = subprocess.run(
-        [str(binary), "materialize", str(plan), "--definitions", str(definitions)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    try:
+        completed = subprocess.run(
+            [str(binary), "materialize", str(plan), "--definitions", str(definitions)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=PROBE_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "probe": "deep-json",
+            "input": "%d nested arrays" % DEEP_DEPTH,
+            "returncode": None,
+            "outcome": "timeout",
+            "stderr_head": "",
+            "note": "A hang inside %d s is also an unbounded-reader finding." % PROBE_TIMEOUT,
+        }
     stderr = completed.stderr.decode("utf-8", "replace")
     if completed.returncode == 0:
         outcome = "accepted"
@@ -219,11 +276,21 @@ def probe_oversized_field(binary: Path, definitions: Path, scratch: Path):
     plan["x_he1_probe"] = "a" * (1 << 20)
     path = scratch / "oversized.fmp.json"
     path.write_text(json.dumps(plan), encoding="utf-8")
-    completed = subprocess.run(
-        [str(binary), "materialize", str(path), "--definitions", str(definitions)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    try:
+        completed = subprocess.run(
+            [str(binary), "materialize", str(path), "--definitions", str(definitions)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=PROBE_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "probe": "unknown-field-1mib",
+            "input": "a valid positive with one 1 MiB unknown member",
+            "returncode": None,
+            "outcome": "timeout",
+            "stderr_head": "",
+        }
     return {
         "probe": "unknown-field-1mib",
         "input": "a valid positive with one 1 MiB unknown member",
@@ -233,18 +300,46 @@ def probe_oversized_field(binary: Path, definitions: Path, scratch: Path):
     }
 
 
-def toolchain(binary: Path):
+def implementation_of(binary: Path):
+    """The build receipt: crate identity plus the exact binary digest."""
+    name, version = None, None
+    if IMPLEMENTATION.is_file():
+        for line in IMPLEMENTATION.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped.startswith("name = ") and name is None:
+                name = stripped.split("=", 1)[1].strip().strip('"')
+            elif stripped.startswith("version.workspace"):
+                version = workspace_version()
+    if name is None:
+        name, version = "fmp-materialize", workspace_version()
+    return {"name": name, "version": version, "binary_sha256": sha256_file(binary)}
+
+
+def workspace_version():
+    manifest = ROOT / "prototype/Cargo.toml"
+    for line in manifest.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("version = "):
+            return stripped.split("=", 1)[1].strip().strip('"')
+    return "unknown"
+
+
+def toolchain():
     def version(command):
         try:
-            completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        except OSError as error:
+            completed = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=30,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
             return "unavailable: %s" % error
         return completed.stdout.decode("utf-8", "replace").strip().splitlines()[0]
 
     return {
         "rust": version(["cargo", "+1.96.0", "--version"]),
         "python": "Python %s" % sys.version.split()[0],
-        "binary": {"path": rel(binary), "sha256": sha256_file(binary)},
     }
 
 
@@ -254,12 +349,17 @@ def snapshot(binary: Path, probes: bool):
     entries = [artifact_entry(binary, path, DEFINITIONS) for path in positives]
     result = {
         "schema": SCHEMA,
+        "projections": {"payload": PAYLOAD_PROJECTION, "envelope": ENVELOPE_PROJECTION},
         "head": subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=str(ROOT), stdout=subprocess.PIPE
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(ROOT),
+            stdout=subprocess.PIPE,
+            timeout=30,
         )
         .stdout.decode()
         .strip(),
-        "toolchain": toolchain(binary),
+        "implementation": implementation_of(binary),
+        "toolchain": toolchain(),
         "definitions": {
             "count": len(documents),
             "newest": newest,
@@ -279,7 +379,8 @@ def snapshot(binary: Path, probes: bool):
         "oracle": oracle_state(positives),
         "artifacts": {
             "count": len(entries),
-            "artifact_root": artifact_root(entries),
+            "payload_root": root_of(entries, lambda entry: entry["payload_sha256"]),
+            "envelope_root": root_of(entries, lambda entry: entry["envelope"]["sha256"]),
             "entries": entries,
         },
         "probes": [],
@@ -292,7 +393,37 @@ def snapshot(binary: Path, probes: bool):
     return result
 
 
-def differences(recorded, fresh):
+def comparison_projection(snapshot, include_envelope):
+    """The part of a snapshot that `--check` actually compares.
+
+    Receipts (`head`, `toolchain`, `implementation`) and observations
+    (`probes`) are recorded, never compared: `head` moves with every commit,
+    `toolchain` with the host, `implementation` is what explains an envelope
+    difference, and a probe is a finding rather than an invariant.
+
+    The envelope is compared only when both sides name the same implementation.
+    It carries `materializer_version`, so making it a gate would report a
+    release bump as a payload drift — the defect this split exists to remove.
+    The payload and its digest are always compared.
+    """
+    projected = {
+        key: value
+        for key, value in snapshot.items()
+        if key not in ("probes", "toolchain", "head", "implementation")
+    }
+    artifacts = dict(projected.get("artifacts", {}))
+    if not include_envelope:
+        artifacts.pop("envelope_root", None)
+        if "entries" in artifacts:
+            artifacts["entries"] = [
+                {key: value for key, value in entry.items() if key != "envelope"}
+                for entry in artifacts["entries"]
+            ]
+    projected["artifacts"] = artifacts
+    return projected
+
+
+def differences(recorded, fresh, include_envelope):
     diffs = []
 
     def walk(path, left, right):
@@ -318,49 +449,86 @@ def differences(recorded, fresh):
         if left != right:
             diffs.append("%s: %r -> %r" % (path, left, right))
 
-    # Probes are observations, not invariants: a changed probe result is a
-    # finding to report, not a compatibility failure.
-    #
-    # `head` and `toolchain` are receipts for when the snapshot was taken. Every
-    # phase after H0 runs at a different commit and a different binary, so
-    # comparing them would fail for the right reason at the wrong time. The
-    # compatibility claim is over definitions, corpus counts, oracle state and
-    # the artifacts themselves.
-    ignore = {"probes", "toolchain", "head"}
-    for key in sorted(set(recorded) | set(fresh)):
-        if key in ignore:
-            continue
-        walk(key, recorded.get(key), fresh.get(key))
+    left = comparison_projection(recorded, include_envelope)
+    right = comparison_projection(fresh, include_envelope)
+    walk("", left, right)
     return diffs
+
+
+def compare(recorded, fresh):
+    if recorded.get("schema") != SCHEMA:
+        print(
+            "error: %s records schema %r, this tool speaks %r"
+            % ("recorded snapshot", recorded.get("schema"), SCHEMA)
+        )
+        print(
+            "an older snapshot was taken with a different projection; keep it as "
+            "evidence and re-record rather than comparing fewer fields"
+        )
+        return 2
+
+    same_implementation = recorded.get("implementation") == fresh.get("implementation")
+    diffs = differences(recorded, fresh, same_implementation)
+    for diff in diffs:
+        print("DIFF %s" % diff)
+    if diffs:
+        print("FAIL: %d difference(s) against the recorded snapshot" % len(diffs))
+        return 1
+
+    print("OK: payload projection identical")
+    print("payload_root: %s" % fresh["artifacts"]["payload_root"])
+    if same_implementation:
+        print("envelope: identical (same implementation receipt)")
+    else:
+        print(
+            "envelope: not compared, implementation changed (%s/%s -> %s/%s)"
+            % (
+                recorded.get("implementation", {}).get("name"),
+                recorded.get("implementation", {}).get("version"),
+                fresh["implementation"].get("name"),
+                fresh["implementation"].get("version"),
+            )
+        )
+        print("recorded envelope_root: %s" % recorded["artifacts"].get("envelope_root"))
+        print("fresh    envelope_root: %s" % fresh["artifacts"]["envelope_root"])
+    return 0
+
+
+def resolve_binary(argument: str):
+    if argument:
+        path = Path(argument)
+        if not path.is_file():
+            raise SystemExit("error: no materializer binary at %s" % path)
+        return path
+    candidates = [DEBUG_BUILD / "fmp.exe", DEBUG_BUILD / "fmp"]
+    for path in candidates:
+        if path.is_file():
+            return path
+    raise SystemExit(
+        "error: no materializer binary at %s"
+        % " or ".join(rel(path) for path in candidates)
+        + "\nbuild it first: cargo +1.96.0 build --bin fmp -p fmp-cli"
+    )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Record or check the HE-1 baseline")
     parser.add_argument("--out", default=str(DEFAULT_OUT))
-    parser.add_argument("--binary", default=str(DEFAULT_BINARY))
+    parser.add_argument("--binary", default="", help="default: prototype/target/debug/fmp[.exe]")
     parser.add_argument("--check", metavar="RECORDED", help="compare against a snapshot")
-    parser.add_argument("--no-probes", action="store_true")
+    parser.add_argument(
+        "--probes",
+        action="store_true",
+        help="also run the robustness probes (one feeds a known stack overflow)",
+    )
     arguments = parser.parse_args()
 
-    binary = Path(arguments.binary)
-    if not binary.is_file():
-        print("error: no materializer binary at %s" % binary)
-        print("build it first: cargo +1.96.0 build --bin fmp -p fmp-cli")
-        return 2
-
-    fresh = snapshot(binary, not arguments.no_probes)
+    binary = resolve_binary(arguments.binary)
+    fresh = snapshot(binary, arguments.probes)
 
     if arguments.check:
         recorded = json.loads(Path(arguments.check).read_text(encoding="utf-8"))
-        diffs = differences(recorded, fresh)
-        for diff in diffs:
-            print("DIFF %s" % diff)
-        if diffs:
-            print("FAIL: %d difference(s) against %s" % (len(diffs), arguments.check))
-            return 1
-        print("OK: identical to %s" % arguments.check)
-        print("artifact_root: %s" % fresh["artifacts"]["artifact_root"])
-        return 0
+        return compare(recorded, fresh)
 
     out = Path(arguments.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -369,7 +537,7 @@ def main() -> int:
     with out.open("w", encoding="utf-8", newline="\n") as handle:
         handle.write(json.dumps(fresh, indent=2, ensure_ascii=False) + "\n")
     print(
-        "recorded %d definitions, %d positives, %d negatives, %d artifacts"
+        "recorded %d definitions, %d positives, %d negatives, %d payloads"
         % (
             fresh["definitions"]["count"],
             fresh["corpus"]["positives"],
@@ -377,9 +545,10 @@ def main() -> int:
             fresh["artifacts"]["count"],
         )
     )
-    print("artifact_root: %s" % fresh["artifacts"]["artifact_root"])
+    print("payload_root:  %s" % fresh["artifacts"]["payload_root"])
+    print("envelope_root: %s" % fresh["artifacts"]["envelope_root"])
     for probe in fresh["probes"]:
-        print("probe %s: %s (exit %d)" % (probe["probe"], probe["outcome"], probe["returncode"]))
+        print("probe %s: %s (exit %r)" % (probe["probe"], probe["outcome"], probe["returncode"]))
     print("written: %s" % out)
     return 0
 

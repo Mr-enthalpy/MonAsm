@@ -12,7 +12,7 @@
   the registry document for the `HE-AC` and `HE-T` ID families; extends
   `tools/check_ids.py` with those two families
 - Keeps in force: `ADR-0095` and `ADR-0123` for `fmp/0.1`; `ADR-0124` until
-  `ADR-0129` revises the gate set
+  `ADR-0126` adds the baseline job and `ADR-0130` revises the rest of the gate set
 
 ## Context
 
@@ -77,8 +77,8 @@ boundary.
    `fixtures/**`, `schema/fmp-v0.schema.json` and every `fmp/0.1` meaning keep
    their current status. `ADR-0095` ("frozen for the v0 scope") and `ADR-0123`
    stay in force for v0 and are not superseded. New surface is additive and
-   versioned separately: `fmp/0.2` (`ADR-0128`), `monasm-package/0.1` and
-   `monasm-bundle/0.1` (`ADR-0127`). Historical definition files are never
+   versioned separately: `fmp/0.2` (`ADR-0129`), `monasm-package/0.1` and
+   `monasm-bundle/0.1` (`ADR-0128`). Historical definition files are never
    rewritten in place.
 4. **The centre-document rule changes only for the package path.** From H2 on, a
    package's forms, coverage and status are derived from package metadata and are
@@ -95,7 +95,7 @@ boundary.
    ships as a package.
 6. **The legacy path stays, without becoming a bypass.** Every old entry point
    keeps working through a version-pinned adapter; no adapter may skip the
-   structural, identity or capability checks the new path enforces (`ADR-0126`).
+   structural, identity or capability checks the new path enforces (`ADR-0127`).
 7. **Explicit non-goals for this round**: complete ISA coverage, a semantic IR,
    instruction selection, layout solving, ABI lowering, a full object-file
    backend, a dynamic plugin platform, a macro/expression language, a real fourth
@@ -106,10 +106,14 @@ boundary.
 ## Consequences
 
 - H0 records the baseline that every later phase is compared against:
-  `research/he1/compatibility-results.json`, `artifact_root`
-  `sha256:dfd08fee9844058492138b23448073ec47d8eda42383e3f1b3e567db86a86fef`
+  `research/he1/compatibility-results.json`, `payload_root`
+  `sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9`
   over 128 positive artifacts, 104 definition documents, `122/128` oracle
-  re-derivations and six `manual-derivation` skips.
+  re-derivations and six `manual-derivation` skips. `ADR-0126` splits the digest:
+  the *payload* root above is the gate, and
+  `sha256:dfd08fee9844058492138b23448073ec47d8eda42383e3f1b3e567db86a86fef` —
+  the value first recorded here — is now the *envelope* root of the frozen
+  `research/he1/compatibility-h0-envelope.json`.
 - `HE-AC` and `HE-T` become machine-checked ID families: their single declaration
   site is the design document's §3 and §14 tables, and `check_ids.py` now requires
   every reference to resolve to one of those rows.
@@ -118,8 +122,8 @@ boundary.
   directive are unchanged.
 - The old corpus remains the compatibility oracle: a package that re-homes an
   existing family must reproduce the legacy bytes exactly before it is accepted.
-- `ADR-0124`'s review trigger is honoured, not bypassed: adding the package jobs
-  to CI happens in `ADR-0129`.
+- `ADR-0124`'s review trigger is honoured, not bypassed: `ADR-0126` adds the
+  baseline job, and adding the package jobs to CI happens in `ADR-0130`.
 - A capability gap is reported as `unsupported-capability` with a measured
   counterexample. Raw-byte escape hatches and "ask LLVM at runtime" are excluded
   by `ADR-0001` and stay excluded.
@@ -155,7 +159,7 @@ boundary.
 | One unselected `*.json` breaks the whole load | `an_unselected_file_in_the_definition_directory_breaks_loading` passes | high |
 | A synthetic namespace is rejected by the loader | `a_synthetic_namespace_is_rejected_by_the_loader` passes | high |
 | Deep JSON ends the process | `tools/he1_baseline.py` probe: `fmp materialize` on 20 000 nested arrays exits `3221225725` (`0xC00000FD`, stack overflow) | high (measured, Windows host only) |
-| Legacy payloads are stable | `research/he1/compatibility-results.json`, 128 artifacts, `--check` re-run identical | high |
+| Legacy payloads are stable | `research/he1/compatibility-results.json`, 128 artifacts, `payload_root` re-checked identical (`ADR-0126`) | high |
 | The corpus counts are 128/619 with a 611/8 phase split | `tools/he1_baseline.py` counts; the split is asserted by `planner_api.rs` and green | high |
 | Legacy behaviour is identical on other hosts | CI `42681104791` is green for the three jobs, but H0 did not re-run it | unverified in this round |
 

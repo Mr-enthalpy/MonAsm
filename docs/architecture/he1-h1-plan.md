@@ -1,9 +1,9 @@
 # H1 实施计划（草案）：封闭执行对象与身份
 
-- 状态：**草案，non-normative**。评审通过后，规范决策写入 `ADR-0126`；本文件
+- 状态：**草案，non-normative**。评审通过后，规范决策写入 `ADR-0127`；本文件
   保留为实施计划、验收映射和待审问题清单。
 - 基线：`d42125d`（H0 已提交，工作树干净）。文中行号均取自该提交。
-- 上游：`ADR-0125`；`docs/architecture/he1-horizontal-extension.md` §8（不可变
+- 上游：`ADR-0125`；`ADR-0126`（身份分层与构建收据）；`docs/architecture/he1-horizontal-extension.md` §8（不可变
   执行边界）、§13「H1」、§14（`HE-T02`/`HE-T03`/`HE-T04`/`HE-T20`）、§15.1。
 - 完成定义：`HE-AC-06` 连同 `HE-T02`、`HE-T03`、`HE-T04` 由运行期测试或编译期
   测试证明；旧 128 个产物逐字节不变（`research/he1/compatibility-results.json`）。
@@ -21,17 +21,20 @@
 
 ### 1.1 要关闭的缺口
 
-| 缺口 | 证据（已复现，非推断） | H1 是否关闭 |
+| 缺口 | 证据 | H1 是否关闭 |
 |---|---|---|
-| 已加载定义可在内存中改写，摘要不变 | `tests/he1_identity_characterization.rs::a_loaded_definition_can_be_re_encoded_under_its_original_digest` | 关闭 |
-| 计划身份覆盖原始文档，不覆盖解析后的操作数 | 同文件 `a_parsed_operand_can_change_under_a_stable_fingerprint` | 关闭 |
-| 验证用的定义与执行用的定义是两个独立参数，可以不同 | `fmp_materialize::materialize(plan: &Plan, definition: &Definition)`（`fmp-materialize/src/lib.rs:343`）：类型上不阻止传另一份定义 | 关闭 |
-| 一个未被选中的 `*.json` 决定整个加载成败 | `an_unselected_file_in_the_definition_directory_breaks_loading` | 否 — H3 |
-| 新 ISA 命名空间需要改核心 match | `a_synthetic_namespace_is_rejected_by_the_loader`（`definition.rs:714-756`） | 否 — H3 |
-| 深层 JSON 无界 | `tools/he1_baseline.py` 探针：退出 `3221225725` | 否 — H4 |
+| 已加载定义可在内存中改写，摘要不变 | `tests/he1_identity_characterization.rs::a_loaded_definition_can_be_re_encoded_under_its_original_digest`（运行即复现） | 关闭 |
+| 计划身份覆盖原始文档，不覆盖解析后的操作数 | 同文件 `a_parsed_operand_can_change_under_a_stable_fingerprint`（运行即复现） | 关闭 |
+| 验证用的定义与执行用的定义是两个独立参数，可以不同 | 读签名即可见：`fmp_materialize::materialize(plan: &Plan, definition: &Definition)`（`fmp-materialize/src/lib.rs:343`）。**静态事实，不是测试**：类型上不阻止传另一份定义 | 关闭 |
+| 一个未被选中的 `*.json` 决定整个加载成败 | `an_unselected_file_in_the_definition_directory_breaks_loading`（运行即复现） | 否 — H3 |
+| 新 ISA 命名空间需要改核心 match | `a_synthetic_namespace_is_rejected_by_the_loader`（运行即复现；`definition.rs:714-756`） | 否 — H3 |
+| 深层 JSON 无界 | `tools/he1_baseline.py --probes` 的 `deep-json` 探针：退出 `3221225725`（**不是**六个 Rust 测试之一） | 否 — H4 |
 
-H0 报告中「五个测试以记录漏洞的方式通过」指的是这些；H1 只翻转前两条。这一点
-需要明确写入 `ADR-0126`，避免验收时把 H3/H4 的条目算进 H1。
+H0 报告最初写「五个测试以记录漏洞的方式通过」，这是**错误分类**：那六个测试实际是
+**4 个缺口 + 2 个对照**（摘要失配拒绝、非对象顶层拒绝），深层 JSON 的证据来自
+Python 探针。缺口本身不变，错的是归类；`ADR-0126` 已在 `H0-report.md` §6 更正。
+H1 只翻转前两条（定义重编码、稳定指纹），这一点写进 `ADR-0127`，避免验收时把
+H3/H4 的条目算进 H1。
 
 ### 1.2 受影响的公共面（在 `d42125d` 上计数）
 
@@ -112,7 +115,7 @@ run receipt 时才决定是否需要写进新协议。
 | `src/lib.rs` | 导出 `identity` 模块与 `PlanIdentity`、`ImplementationIdentity` |
 | `src/definition.rs` 测试 | 现有 22 个模型测试按访问器改；新增「同一字节两次加载摘要相同」 |
 
-`plan_facts` 的编码规则（写进 `ADR-0126`，因为它定义身份含义）：
+`plan_facts` 的编码规则（写进 `ADR-0127`，因为它定义身份含义）：
 
 - 每个节点一个 tag 字节；字符串/数组以 `u64` 小端长度前缀；`i128` 写 16 字节
   二进制补码；对象按**结构体字段声明顺序**写出，不排序；`Option` 写 1 字节

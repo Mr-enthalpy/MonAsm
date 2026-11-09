@@ -509,17 +509,21 @@ widening.
 extension base — target packages, an immutable definition bundle, a
 target-agnostic core and package-level conformance — not more coverage. H0 is
 **complete**: the baseline is recorded in
-`research/he1/compatibility-results.json` (`artifact_root`
-`sha256:dfd08fee9844058492138b23448073ec47d8eda42383e3f1b3e567db86a86fef`;
+`research/he1/compatibility-results.json` (`payload_root`
+`sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9`;
 104 definitions, 128 positives, 619 negatives, `122/128` oracle re-derivations
 with the six `manual-derivation` skips), and the six characterization tests in
-`prototype/crates/fmp-cli/tests/he1_identity_characterization.rs` pin the four
-measured concentration points. One probe found a real gap rather than a clean
-result: a 20 000-deep JSON plan ends the `fmp` process with `0xC00000FD` (stack
-overflow), which H4 owes a bounded rejection test. Next: H1, identity closure
-(`ADR-0126`). The implementation plan draft is
+`prototype/crates/fmp-cli/tests/he1_identity_characterization.rs` pin four
+measured concentration points plus two controls. `ADR-0126` splits the artifact
+identity into a compared payload projection and an uncompared build receipt, and
+adds the `baseline` job so the 128 payloads are re-checked on a Linux runner.
+One probe found a real gap rather than a clean result: a 20 000-deep JSON plan
+ends the `fmp` process with `0xC00000FD` (stack overflow), which H4 owes a
+bounded rejection test. Next: H1, identity closure
+(`ADR-0127`). The implementation plan draft is
 `docs/architecture/he1-h1-plan.md`; its seven open decisions (D1–D7) need review
-before the ADR is written. The phase board above stays the v0 record; HE-1 phases
+before the ADR is written. The phase board above
+stays the v0 record; HE-1 phases
 are reported in `research/he1/`.
 
 ### Widening backlog

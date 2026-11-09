@@ -73,7 +73,7 @@ not roll into coverage work.
 | `docs/STATUS.md` | Phase, gate status, next action |
 | `schema/` | Machine-readable FMP schema (draft) |
 | `definitions/` | Pinned encoding definitions (`x86_64/0.1.0.json` is canonical) |
-| `packages/` | Target packages (from H2, `ADR-0127`); an ordinary extension's whole change |
+| `packages/` | Target packages (from H2, `ADR-0128`); an ordinary extension's whole change |
 | `bundles/` | Explicit bundle specs and locks (from H2); never discovered by scanning |
 | `fixtures/` | Per-ISA plans, expected bytes, oracle metadata |
 | `research/` | Evidence index and disposable external snapshots |
