@@ -131,14 +131,30 @@ def synthetic_snapshot():
     }
 
 
-def synthetic_anchor(root=None):
+def synthetic_anchor(root=None, definitions=None):
+    snapshot = synthetic_snapshot()
     if root is None:
-        root = synthetic_snapshot()["artifacts"]["payload_root"]
+        root = snapshot["artifacts"]["payload_root"]
+    if definitions is None:
+        definitions = baseline.definitions_root(snapshot["definitions"]["documents"])
     return {
         "schema": baseline.ANCHOR_SCHEMA,
         "payload_root": root,
+        "definitions_root": definitions,
         "set_by": "test",
         "note": "test anchor",
+    }
+
+
+def synthetic_artifact():
+    return {
+        "format_version": "fmp/0.1",
+        "level": 0,
+        "bytes_hex": "90",
+        "size": 1,
+        "fixups": [],
+        "fingerprint": "sha256:" + "f" * 64,
+        "materializer_version": "0.0.0",
     }
 
 
@@ -521,6 +537,29 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("no materializer binary", stderr)
 
+    def test_a_definitions_root_mismatch_is_a_diff(self):
+        path = self.write("snapshot.json", synthetic_snapshot())
+        anchor = self.write(
+            "other-definitions-anchor.json",
+            synthetic_anchor(definitions="sha256:" + "0" * 64),
+        )
+        code, stderr = self.main("--check", path, "--anchor", anchor)
+        self.assertEqual(code, 1)
+        self.assertIn("anchor/definitions_root", self.last_stdout)
+
+    def test_an_anchor_without_definitions_root_is_a_fault(self):
+        # A 0.1-shaped anchor has the right schema string only by accident; the
+        # tool must not accept a payload-only anchor as if definitions were pinned.
+        path = self.write("snapshot.json", synthetic_snapshot())
+        anchor = {
+            "schema": baseline.ANCHOR_SCHEMA,
+            "payload_root": synthetic_snapshot()["artifacts"]["payload_root"],
+        }
+        anchor_path = self.write("payload-only-anchor.json", anchor)
+        code, stderr = self.main("--check", path, "--anchor", anchor_path)
+        self.assertEqual(code, 2)
+        self.assertIn("has no sha256 definitions_root", stderr)
+
 
 class DiscoveryTests(unittest.TestCase):
     def test_the_linux_name_is_found_when_no_exe_exists(self):
@@ -602,6 +641,116 @@ class InventoryTests(unittest.TestCase):
             with self.assertRaises(baseline.Fault) as caught:
                 baseline.oracle_state([plan])
         self.assertIn("not a JSON object", str(caught.exception))
+
+
+class DefinitionsRootTests(unittest.TestCase):
+    """The anchor's definition root must change with the bytes and the content."""
+
+    def setUp(self):
+        self.documents = synthetic_snapshot()["definitions"]["documents"]
+
+    def test_the_root_is_order_independent(self):
+        reversed_documents = list(reversed(self.documents))
+        self.assertEqual(
+            baseline.definitions_root(self.documents),
+            baseline.definitions_root(reversed_documents),
+        )
+
+    def test_a_changed_file_digest_changes_the_root(self):
+        documents = copy.deepcopy(self.documents)
+        documents[0]["file_sha256"] = "sha256:" + "0" * 64
+        self.assertNotEqual(
+            baseline.definitions_root(self.documents),
+            baseline.definitions_root(documents),
+        )
+
+    def test_a_changed_canonical_digest_changes_the_root(self):
+        documents = copy.deepcopy(self.documents)
+        documents[0]["digest"] = "sha256:" + "0" * 64
+        self.assertNotEqual(
+            baseline.definitions_root(self.documents),
+            baseline.definitions_root(documents),
+        )
+
+    def test_a_changed_path_changes_the_root(self):
+        documents = copy.deepcopy(self.documents)
+        documents[0]["path"] = "definitions/x86_64/9.9.9.json"
+        self.assertNotEqual(
+            baseline.definitions_root(self.documents),
+            baseline.definitions_root(documents),
+        )
+
+
+class FreshArtifactTests(unittest.TestCase):
+    """The fresh CLI artifact is validated too, not only the recorded snapshot."""
+
+    def test_a_valid_level_zero_artifact_is_accepted(self):
+        baseline.validate_fresh_artifact(synthetic_artifact(), "fixture")
+
+    def test_a_missing_materializer_version_is_a_fault(self):
+        artifact = synthetic_artifact()
+        del artifact["materializer_version"]
+        with self.assertRaises(baseline.Fault) as caught:
+            baseline.validate_fresh_artifact(artifact, "fixture")
+        self.assertIn("materializer_version", str(caught.exception))
+
+    def test_a_non_string_materializer_version_is_a_fault(self):
+        artifact = synthetic_artifact()
+        artifact["materializer_version"] = 1
+        with self.assertRaises(baseline.Fault) as caught:
+            baseline.validate_fresh_artifact(artifact, "fixture")
+        self.assertIn("materializer_version", str(caught.exception))
+
+    def test_a_wrong_typed_level_is_a_fault(self):
+        artifact = synthetic_artifact()
+        artifact["level"] = "0"
+        with self.assertRaises(baseline.Fault) as caught:
+            baseline.validate_fresh_artifact(artifact, "fixture")
+        self.assertIn("integer 'level'", str(caught.exception))
+
+    def test_a_level_one_artifact_needs_sections_and_symbols(self):
+        artifact = {
+            "format_version": "fmp/0.1",
+            "level": 1,
+            "sections": [],
+            "fixups": [],
+            "fingerprint": "sha256:" + "f" * 64,
+            "materializer_version": "0.0.0",
+        }
+        with self.assertRaises(baseline.Fault) as caught:
+            baseline.validate_fresh_artifact(artifact, "fixture")
+        self.assertIn("'symbols'", str(caught.exception))
+
+
+class ArtifactEntryTests(unittest.TestCase):
+    """`artifact_entry()` must run the fresh-artifact check before projecting."""
+
+    def run_entry(self, artifact):
+        with tempfile.TemporaryDirectory(prefix="monasm-he1-entry-") as directory:
+            plan = Path(directory) / "X86-P1.fmp.json"
+            plan.write_text("{}", encoding="utf-8")
+            with mock.patch.object(
+                baseline,
+                "run_materialize",
+                return_value=(0, json.dumps(artifact), ""),
+            ):
+                with mock.patch.object(baseline, "rel", lambda path: "fixture"):
+                    return baseline.artifact_entry(
+                        Path("unused"), plan, Path("unused")
+                    )
+
+    def test_a_fresh_artifact_missing_materializer_version_is_a_fault(self):
+        artifact = synthetic_artifact()
+        del artifact["materializer_version"]
+        with self.assertRaises(baseline.Fault) as caught:
+            self.run_entry(artifact)
+        self.assertIn("materializer_version", str(caught.exception))
+
+    def test_a_valid_fresh_artifact_produces_an_entry(self):
+        entry = self.run_entry(synthetic_artifact())
+        self.assertEqual(entry["envelope"]["materializer_version"], "0.0.0")
+        self.assertEqual(entry["payload"]["bytes_hex"], "90")
+        self.assertNotIn("materializer_version", entry["payload"])
 
 
 if __name__ == "__main__":

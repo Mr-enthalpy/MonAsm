@@ -29,15 +29,15 @@ document, and — when `--probes` is passed — robustness observations.
 
 Usage:
 
-    python tools/he1_baseline.py --probes
-    python tools/he1_baseline.py --out research/he1/compatibility-results.json
+    python tools/he1_baseline.py --record [--probes] [--out PATH]
     python tools/he1_baseline.py --check research/he1/compatibility-results.json
 
-`--check` exits 1 on any difference in a payload, a digest or a count, and
-refuses a snapshot whose `schema` it does not know rather than silently
-comparing fewer fields. `provenance`, `toolchain`, `implementation` and `probes`
-are receipts/observations and are not compared; `envelope_root` is compared only
-when both sides name the same implementation.
+`--record` is the only way to write a snapshot; `--out` and `--probes` apply
+only to it. `--check` exits 1 on any difference in a payload, a digest or a
+count, and refuses a snapshot whose `schema` it does not know rather than
+silently comparing fewer fields. `provenance`, `toolchain`, `implementation` and
+`probes` are receipts/observations and are not compared; `envelope_root` is
+compared only when both sides name the same implementation.
 
 `provenance` holds two commits on purpose: `original_baseline_commit` is the
 commit whose artifacts H0 first recorded (read from the frozen snapshot), and
@@ -51,9 +51,10 @@ timeout in a probe is recorded as an outcome instead of raising.
 Exit codes: 0 recorded or identical, 1 mismatch, 2 usage, I/O or structural
 fault. A fault never exits 1: a regression and a broken invocation must not look
 alike. Recording is explicit (`--record`); a bare invocation refuses to overwrite
-the frozen snapshot. `--check` also requires the recorded `payload_root` to equal
-the separate anchor in `research/he1/baseline-anchor.json`, so re-recording a
-snapshot cannot silently redefine the baseline.
+the frozen snapshot. `--check` also requires the recorded `payload_root` and
+`definitions_root` to equal the separate anchor in
+`research/he1/baseline-anchor.json`, so re-recording a snapshot cannot silently
+redefine either the artifacts or the definition files.
 """
 
 from __future__ import annotations
@@ -77,7 +78,7 @@ DEFAULT_OUT = ROOT / "research/he1/compatibility-results.json"
 # ADR. `--check` compares the recorded root to this file, so a re-recorded
 # baseline cannot quietly become the reference.
 DEFAULT_ANCHOR = ROOT / "research/he1/baseline-anchor.json"
-ANCHOR_SCHEMA = "monasm.he1.baseline-anchor/0.1"
+ANCHOR_SCHEMA = "monasm.he1.baseline-anchor/0.2"
 
 # `payload/0.1` and `envelope/0.1` are the two projections; the schema name is
 # what `--check` uses to refuse an older snapshot instead of comparing less.
@@ -193,6 +194,23 @@ def definition_inventory():
     return documents, {isa: rel(path) for isa, path in newest.items()}
 
 
+def definitions_root(documents):
+    """One digest over the definition files, sorted by path.
+
+    The snapshot already lists every definition's raw-file digest and canonical
+    digest, but it lives in the file `--record` rewrites. This root is copied
+    into the separate anchor, so re-recording a whitespace-only edit to a
+    historical definition changes the root and the gate fails. The record is
+    `path\\0file_sha256\\0digest`, so both the bytes and the parsed content are
+    covered.
+    """
+    material = "\n".join(
+        "%s\0%s\0%s" % (document["path"], document["file_sha256"], document["digest"])
+        for document in sorted(documents, key=lambda document: document["path"])
+    )
+    return "sha256:" + hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
 def corpus_counts():
     positives = sorted(FIXTURES.glob("*/positive/*.fmp.json"))
     negatives = sorted(FIXTURES.glob("*/negative/*.fmp.json"))
@@ -255,6 +273,43 @@ def run_materialize(binary: Path, plan_path: Path, definitions: Path):
     return completed.returncode, stdout, stderr
 
 
+def validate_fresh_artifact(artifact, fixture):
+    """The fresh CLI artifact must keep the old envelope's required members.
+
+    `--check` compares payloads, and when the binary digest differs it drops the
+    envelope from the comparison. Without this check a new materializer could
+    omit `materializer_version` (or change another required member's type) on a
+    fixture whose payload did not move, and the gate would still pass. The value
+    of `materializer_version` may change; the member may not disappear.
+    """
+    if not isinstance(artifact, dict):
+        raise Fault("%s: the materializer emitted %s, not a JSON object" % (fixture, describe(artifact)))
+    for key in ("format_version", "fingerprint", "materializer_version"):
+        if not isinstance(artifact.get(key), str):
+            raise Fault(
+                "%s: the fresh artifact has no string %r (the old CLI contract "
+                "requires it even when the payload is unchanged)" % (fixture, key)
+            )
+    if not is_digest(artifact.get("fingerprint")):
+        raise Fault("%s: the fresh artifact fingerprint is not a sha256 digest" % fixture)
+    level = artifact.get("level")
+    if not isinstance(level, int):
+        raise Fault("%s: the fresh artifact has no integer 'level'" % fixture)
+    if not isinstance(artifact.get("fixups"), list):
+        raise Fault("%s: the fresh artifact has no fixups array" % fixture)
+    if level == 0:
+        if not isinstance(artifact.get("bytes_hex"), str):
+            raise Fault("%s: the fresh level-0 artifact has no string 'bytes_hex'" % fixture)
+        if not isinstance(artifact.get("size"), int):
+            raise Fault("%s: the fresh level-0 artifact has no integer 'size'" % fixture)
+    elif level == 1:
+        for key in ("sections", "symbols"):
+            if not isinstance(artifact.get(key), list):
+                raise Fault("%s: the fresh level-1 artifact has no %r array" % (fixture, key))
+    else:
+        raise Fault("%s: the fresh artifact level is %r, expected 0 or 1" % (fixture, level))
+
+
 def artifact_entry(binary: Path, plan_path: Path, definitions: Path):
     plan_bytes = plan_path.read_bytes()
     plan = json.loads(plan_bytes.decode("utf-8"))
@@ -265,6 +320,7 @@ def artifact_entry(binary: Path, plan_path: Path, definitions: Path):
             % (rel(plan_path), returncode, stderr.strip()[:400])
         )
     artifact = json.loads(stdout)
+    validate_fresh_artifact(artifact, rel(plan_path))
     payload = payload_of(artifact)
     fixups = payload.get("fixups", [])
     return {
@@ -666,7 +722,7 @@ def load_anchor(path):
 
 
 def validate_anchor(anchor, path):
-    """The anchor is one frozen root; it is not a second, partial snapshot."""
+    """The anchor is two frozen roots; it is not a second, partial snapshot."""
     if not isinstance(anchor, dict):
         raise Fault("the baseline anchor %s is %s, not an object" % (path, describe(anchor)))
     if anchor.get("schema") != ANCHOR_SCHEMA:
@@ -677,6 +733,11 @@ def validate_anchor(anchor, path):
     if not is_digest(anchor.get("payload_root")):
         raise Fault(
             "the baseline anchor %s has no sha256 payload_root" % path
+        )
+    if not is_digest(anchor.get("definitions_root")):
+        raise Fault(
+            "the baseline anchor %s has no sha256 definitions_root; schema 0.2 "
+            "pins the definition files as well as the artifacts" % path
         )
 
 
@@ -1032,22 +1093,33 @@ def validate_snapshot(recorded):
 
 
 def anchor_differences(recorded, anchor):
-    """The recorded root must equal the frozen anchor, independently of the run.
+    """The recorded roots must equal the frozen anchor, independently of the run.
 
     `compare()` compares a fresh recording to the recorded snapshot. If a later
     commit re-records the snapshot, both sides move together and the gate would
     still pass. The anchor is the second, slower-moving reference that makes that
-    operation visible.
+    operation visible. Definitions are anchored too: otherwise a whitespace-only
+    edit to a historical definition could be re-recorded (the payload does not
+    move) and the gate would stay green.
     """
+    diffs = []
     expected = anchor["payload_root"]
     actual = recorded["artifacts"]["payload_root"]
-    if actual == expected:
-        return []
-    return [
-        "anchor/payload_root: recorded %r != frozen %r; re-recording the "
-        "baseline does not move the anchor, and moving the anchor needs a "
-        "compatibility ADR" % (actual, expected)
-    ]
+    if actual != expected:
+        diffs.append(
+            "anchor/payload_root: recorded %r != frozen %r; re-recording the "
+            "baseline does not move the anchor, and moving the anchor needs a "
+            "compatibility ADR" % (actual, expected)
+        )
+    expected_definitions = anchor["definitions_root"]
+    actual_definitions = definitions_root(recorded["definitions"]["documents"])
+    if actual_definitions != expected_definitions:
+        diffs.append(
+            "anchor/definitions_root: recorded %r != frozen %r; the definition "
+            "files are frozen evidence, and re-recording a snapshot does not "
+            "move the anchor" % (actual_definitions, expected_definitions)
+        )
+    return diffs
 
 
 def run(arguments):
@@ -1099,6 +1171,10 @@ def run(arguments):
     )
     print("payload_root:  %s" % fresh["artifacts"]["payload_root"])
     print("envelope_root: %s" % fresh["artifacts"]["envelope_root"])
+    print(
+        "definitions_root: %s"
+        % definitions_root(fresh["definitions"]["documents"])
+    )
     for probe in fresh["probes"]:
         print("probe %s: %s (exit %r)" % (probe["probe"], probe["outcome"], probe["returncode"]))
     print("written: %s" % out)
@@ -1117,7 +1193,7 @@ def main(argv=None) -> int:
     parser.add_argument(
         "--anchor",
         default=str(DEFAULT_ANCHOR),
-        help="frozen payload_root anchor used by --check",
+        help="frozen payload_root/definitions_root anchor used by --check",
     )
     parser.add_argument(
         "--record",
