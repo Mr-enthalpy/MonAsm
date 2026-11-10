@@ -129,7 +129,7 @@ Two further failures were found while fixing that one:
    each one names the shape it requires, so a comparator bug still raises rather
    than being reported as a fault.
 9. **The comparator is itself tested, in CI, without the binary.**
-   `tools/test_he1_baseline.py` holds 38 tests over synthetic snapshots and a
+   `tools/test_he1_baseline.py` holds 50 tests over synthetic snapshots and a
    synthetic anchor; the `baseline` job runs it before installing the toolchain.
    The eight manual experiments below are kept as history, but a manual
    experiment does not run on the next commit. The tests exist specifically
@@ -163,6 +163,19 @@ Two further failures were found while fixing that one:
     and silently remove the evidence the file claims to hold. A wrong-typed root
     is a fault (2), not a diff (1). Every structural failure is raised as `Fault`
     before materialization.
+12. **Derived data is recomputed, and a missing toolchain is a receipt.**
+    Content and digest are one fact, so `validate_snapshot()` recomputes
+    `payload_sha256 = SHA256(canonical(payload))` and
+    `envelope.sha256 = SHA256(canonical(payload + materializer_version))` for
+    every entry. It also requires `definitions.count == len(documents)`, every
+    `newest` path to exist, the `by_isa` sums to equal `corpus.positives`/
+    `negatives`, `artifacts.count` to equal `corpus.positives`, and the oracle
+    kind sum/manual list to agree with the positives. A content edit with a stale
+    digest is then a corrupt snapshot (2), not baseline drift (1). Separately,
+    `toolchain()` never indexes empty stdout: a non-zero exit or empty output is
+    recorded as `unavailable`, because `toolchain` is a receipt and must not turn
+    a host problem into exit 1. Definition and oracle JSON are required to be
+    objects before `.get()` is called.
 
 ## Consequences
 
@@ -236,8 +249,10 @@ Two further failures were found while fixing that one:
 | The envelope still participates when the receipt matches | tampered `envelope.sha256` with an identical receipt → exit 1 | high (measured) |
 | Skipping the envelope does not skip the payload | `implementation` replaced **and** `payload.bytes_hex` tampered → exit 1 | high (measured) |
 | An unknown schema is refused | schema `…/0.1` → exit 2, no comparison | high (measured) |
-| A fault is not reported as a diff | missing binary, unreadable snapshot, corrupt JSON, old schema, root array/`null`, missing `artifacts`, wrong-typed `implementation`, entry without `payload_sha256`, missing projection, wrong-typed or stale root, deleted envelope → exit 2; payload/count/envelope diffs → exit 1 | high (measured, `tools/test_he1_baseline.py` 38 tests, Python 3.8.10 locally; the hosted run is the PR's next `gates` run) |
+| A fault is not reported as a diff | missing binary, unreadable snapshot, corrupt JSON, old schema, root array/`null`, missing `artifacts`, wrong-typed `implementation`, entry without `payload_sha256`, missing projection, wrong-typed or stale root, deleted envelope, content/digest mismatch, and derived-count mismatch → exit 2; payload/count/envelope diffs → exit 1 | high (measured, `tools/test_he1_baseline.py` 50 tests, Python 3.8.10 locally; the hosted run is the PR's next `gates` run) |
 | A well-formed but wrong-shaped snapshot is refused before materialization | `[]`, `null`, missing `artifacts`, string `implementation`, entry without `payload_sha256`, missing `projections.payload`, non-digest `payload_root`, `payload_root` not matching the entries, `artifacts.count` ≠ entry count, missing `envelope` → exit 2 with a named fault; the corresponding tests | high (measured) |
+| Content and declared digest cannot disagree | `payload.bytes_hex` edited without `payload_sha256` → exit 2; `envelope.sha256` changed → exit 2; `definitions.count`/`by_isa` sum/oracle sum/manual list mismatch → exit 2 | high (measured, fifth review round) |
+| A broken toolchain read is not a baseline diff | a subprocess exiting 3 with stderr → `unavailable: exit 3: …`; empty stdout → `unavailable: empty stdout`; a non-object definition/oracle record → `Fault` (2) | high (measured) |
 | Re-recording cannot silently reset the reference | `--check` with a snapshot whose `payload_root` differs from the anchor → exit 1 at the anchor, before binary discovery; missing/malformed anchor → exit 2; bare invocation and `--check --record` → exit 2 | high (measured) |
 | The comparator keeps comparing when the receipt changes | `implementation` replaced **and** `payload.bytes_hex` tampered → exit 1, pinned by `test_payload_is_compared_even_when_the_receipt_differs` | high (measured) |
 | Portable discovery and probe opt-in work | `--binary` exercised on Windows; probes ran under `--probes` only | high on Windows; Linux discovery `unverified` (the CI job passes `--binary` explicitly, so it does not exercise discovery) |

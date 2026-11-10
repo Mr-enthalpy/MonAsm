@@ -518,13 +518,17 @@ measured concentration points, one legacy-fingerprint constraint and two
 controls. `ADR-0126` splits the artifact identity into a compared payload
 projection and an uncompared build receipt, and adds the `baseline` job so the
 128 payloads are re-checked on a Linux runner; `tools/test_he1_baseline.py`
-(38 tests) turns the eight manual comparator experiments into a CI gate, a fault
+(50 tests) turns the eight manual comparator experiments into a CI gate, a fault
 now exits 2 rather than sharing exit 1 with a real diff, and a structurally
 invalid snapshot is refused before the 128 materializations instead of failing
 inside the comparator. Structural validation is now complete: projections, both
-roots, every entry's envelope, digest types and recomputed roots are checked, and
-an entry whose `envelope` was deleted is a fault even when the comparison would
-skip it. Recording is explicit (`--record`), and
+roots, every entry's envelope, digest types and recomputed roots are checked,
+each entry's content is re-hashed into its declared payload and envelope digests,
+and derived counts (`definitions.count`, `by_isa` sums, oracle sums, artifacts vs
+positives) must agree; a failing toolchain subprocess is recorded as
+`unavailable` instead of raising. An entry whose `envelope` was deleted is a
+fault even when the comparison would skip it. Recording is explicit (`--record`),
+and
 `research/he1/baseline-anchor.json` pins `payload_root` independently, so
 re-recording the snapshot cannot silently reset the reference; a mismatch is a
 diff (exit 1), a malformed anchor is a fault (exit 2), and moving the anchor
@@ -540,9 +544,14 @@ with D3/D4/D5/D7 revised after the first review, D11/D12 added after the second
 revised again after the third (allocation failure is
 `MaterializationFailure::HostFailure`, not `Internal` or a plan rejection,
 because `emit` calls `try_reserve_exact` and §8.3 requires the split), and D13
-added after the fourth: `bind` re-runs `plan::check_structure` on the public
-mutable `Plan` before producing `ValidatedPlan`, with X86-P71 odd-length and
-non-hex counterexample tests in H1a. The third round also records that
+added after the fourth and expanded after the fifth: `bind` re-runs
+`plan::check_structure` on the public mutable `Plan` before producing
+`ValidatedPlan`, covering not only X86-P71 odd-length and non-hex `payload_hex`
+but all five parser numeric bounds (`lsb` 0–127, `width` 1–64, `bits` 1–64,
+`align_bits` 0–12, `transform_shift` 0–63), with `align_bits=128`,
+`transform_shift=128`, illegal-width and `u32::MAX` width-sum regression tests in
+H1a; the validator's descriptor arithmetic moves to `u64`/`checked_add` as a
+second line of defence. The third round also records that
 `BindIdentity` is not a full-artifact replay key (a `source_trace`-only change
 keeps it equal while `payload_digest` moves) and moves the
 definition-mutability test conversion into H1a; the fourth round routes

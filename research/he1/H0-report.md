@@ -17,7 +17,7 @@ Product code: **none**. Nothing under `prototype/crates/*/src/` changed.
 | `research/he1/H0-report.md` | new | This report |
 | `tools/he1_baseline.py` | new | Records and checks the snapshot by running the real `fmp` binary; never a build input |
 | `prototype/crates/fmp-cli/tests/he1_identity_characterization.rs` | new | Seven tests: four assert a hole HE-1/H3/H4 must close, one pins a constraint H1 must preserve (the legacy fingerprint reads a field the parser drops), two are controls (digest mismatch, non-object root). The deep-JSON finding is the Python probe, not a Rust test |
-| `tools/test_he1_baseline.py` | new (§7) | 38 tests over synthetic snapshots: the comparator fails on a payload or count change, passes on a receipt change alone, still compares payloads when the receipt changes, and refuses a structurally invalid snapshot or anchor with exit 2 before materializing (§8–§9). It also proves a bare invocation cannot overwrite the frozen baseline. No binary needed, so CI runs it first |
+| `tools/test_he1_baseline.py` | new (§7) | 50 tests over synthetic snapshots: the comparator fails on a payload or count change, passes on a receipt change alone, still compares payloads when the receipt changes, and refuses a structurally invalid snapshot or anchor with exit 2 before materializing (§8–§10). It also recomputes every entry digest and derived count, proves a bare invocation cannot overwrite the frozen baseline, and records a failing toolchain subprocess as `unavailable` rather than raising. No binary needed, so CI runs it first |
 | `docs/architecture/he1-horizontal-extension.md` | moved from the repository root | Adopts the design document; header now names `ADR-0125` and the `HE-AC`/`HE-T` registry role. Trailing whitespace stripped: 811 lines, no wording removed |
 | `docs/adr/0125-he1-scope.md` | new | The scope decision and the conflict resolution |
 | `AGENTS.md` | edited | Current round, repository map (`docs/fmp-0.2/`, `docs/architecture/`, `packages/`, `bundles/`, `research/he1/`), three added done-criteria bullets. The eight hard rules and "Never do" are untouched |
@@ -65,7 +65,7 @@ prototype`; the root has no `Cargo.toml`, so the manifest path is not optional
 | oracle rerun | `122/128 re-derived, 6 skipped, 0 failed`; `toolchain: llvm-mc 23.1.2`; skips are the six `manual-derivation` records |
 | `cargo fmt --check` | clean (the new test file was formatted once with `cargo fmt --all`) |
 | `cargo test --workspace` | 61 passed, 0 failed: `determinism` 6, `fixtures` 2, `he1_identity_characterization` 7, `planner_api` 10, `fmp_materialize` 9, `fmp_model` 22, `fmp_plan` 5 |
-| `test_he1_baseline.py` | 38 passed, 0 failed — comparator, schema, anchor, record-mode, exit-code, discovery, timeout and structural-fault tests; no binary involved (19 at H0, 24 after §8, 38 after §9) |
+| `test_he1_baseline.py` | 38 passed, 0 failed — comparator, schema, anchor, record-mode, exit-code, discovery, timeout and structural-fault tests; no binary involved (19 at H0, 24 after §8, 38 after §9, 50 after §10) |
 | `he1_baseline.py` | recorded 104 definitions / 128 positives / 619 negatives / 128 artifacts; `artifact_root sha256:dfd08fee9844058492138b23448073ec47d8eda42383e3f1b3e567db86a86fef` (that value is now the **envelope** root; the gate is `payload_root` — §6) |
 | `he1_baseline.py --check` | `OK: payload projection identical`; `payload_root` unchanged; `envelope: identical (same implementation receipt)` |
 
@@ -361,6 +361,53 @@ comparator tests, `payload_root`
 unchanged. The recorded snapshot itself was not re-recorded; only its validation
 and the independent anchor were added. The hosted result for this round is the
 run attached to the PR after the push.
+
+## 10. Fifth review round (`cb1e4ad`)
+
+The fifth review confirmed the H0 evidence, accepted the H1 direction, and found
+one H1 plan blocker plus two comparator robustness gaps. No product Rust code
+changed in this round either.
+
+1. **`check_structure` covered two string rules, not every parser bound the DTO
+   type cannot enforce.** `FieldRange.lsb` (0–127), `FieldRange.width` (1–64),
+   `RangeConstraint.bits` (1–64), `RangeConstraint.align_bits` (0–12) and
+   `Fixup.transform_shift` (0–63) are all `u32`/`Option<u32>` in the DTO, so a
+   mutated `Plan` can carry values `plan::read` would reject. `align_bits = 128`
+   reaches `1i128 << align_bits`; `bits = 0` underflows `bits - 1`; a huge
+   descriptor width makes the validator's `u32` width sum overflow and can drive
+   a very large bit loop. D13 now lists all five bounds in a
+   parser-invariant/DTO-type/validator-invariant table, requires
+   `check_structure` before any validator shift or sum, and adds six
+   source-derived regression tests: `align_bits = 128`, `transform_shift = 128`,
+   illegal `lsb`/`width`/`bits`, and a `u32::MAX` width-sum case. H1a also
+   hardens the validator's descriptor arithmetic to `u64`/`checked_add` as a
+   second line of defence. The counterexamples are source-derived, not yet run.
+2. **An entry's content was not checked against its recorded digest.**
+   `validate_snapshot()` used to accept `payload.bytes_hex` edited without
+   updating `payload_sha256`, and would then report the difference as baseline
+   drift (exit 1) rather than a corrupt snapshot (exit 2). It now recomputes
+   `payload_sha256 = SHA256(canonical(payload))` and
+   `envelope.sha256 = SHA256(canonical(payload + materializer_version))` for
+   every entry before comparing roots.
+3. **Derived counts were not checked against their arrays.** The tool now
+   requires `definitions.count == len(documents)`, each `newest` path to exist in
+   `documents`, `corpus.positives`/`negatives` to equal the `by_isa` sums,
+   `artifacts.count` to equal `corpus.positives`, `oracle.kinds` to sum to
+   `corpus.positives`, and `manual_derivation` to match its oracle kind. The
+   synthetic fixtures were rebuilt from their payloads and counts, so they are
+   internally consistent instead of only shape-valid.
+4. **A failing toolchain subprocess escaped as exit 1.** `toolchain()` indexed
+   `stdout.splitlines()[0]` without checking the return code; a `cargo --version`
+   that failed wrote only to stderr and raised `IndexError`, which Python exits
+   as 1. `toolchain_version()` now returns `unavailable: exit N: ...` or
+   `unavailable: empty stdout`, and a failing subprocess is tested. Definition
+   and oracle JSON are also required to be objects before `.get()`.
+
+Re-measured after this round: 61 workspace tests (7 characterization), 50
+comparator tests, `payload_root`
+`sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9`
+unchanged. The recorded snapshot was not re-recorded. The hosted result for this
+round is the run attached to the PR after the push.
 
 ## Next
 
