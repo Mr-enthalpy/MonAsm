@@ -145,7 +145,7 @@ invocation, `--check --record`, and `--out` without `--record` are usage faults
 (exit 2), so a routine run cannot rewrite the reference by accident. The anchor
 file is never written by the tool; editing it needs a compatibility ADR.
 
-`tools/test_he1_baseline.py` is the comparator's own gate: 65 tests over
+`tools/test_he1_baseline.py` is the comparator's own gate: 67 tests over
 synthetic snapshots and a synthetic anchor, no Rust binary and no `definitions/`
 scan. It fixes the properties that would otherwise be re-learned in production:
 a payload change fails, a count change fails, a receipt change alone passes,
@@ -157,14 +157,17 @@ rather than a diff, derived counts (`definitions.count`, `by_isa` sums, oracle
 sums, artifacts vs positives) must agree, a definitions-root mismatch is a diff
 even when every payload is unchanged, a fresh artifact missing
 `materializer_version` or another required envelope member is a fault, a
+document nested too deeply for Python's JSON reader is a fault on **all four**
+paths — snapshot, anchor, the fresh plan file and the materializer's stdout — a
 deleted `envelope` is a fault even when `--check` would skip it, a failing
 toolchain subprocess is recorded as `unavailable`, and only `--record` can write
 a snapshot. The receipt bug was the first draft of `ADR-0126`'s split; the
 structural check was the third review round, the anchor/record-mode split and
 the first full structure pass were the fourth, digest recomputation plus
 derived-count checks were the fifth, the definitions root plus fresh-artifact
-validation were the sixth, and mapping `RecursionError` to a fault was the
-seventh. CI runs the suite before building `fmp`.
+validation were the sixth, mapping `RecursionError` to a fault on the snapshot
+and anchor paths was the seventh, and covering the fresh plan and the
+materializer stdout was the eighth. CI runs the suite before building `fmp`.
 
 `--binary` wins over discovery; discovery tries `prototype/target/debug/fmp.exe`
 then `prototype/target/debug/fmp`. If neither exists the tool prints the build

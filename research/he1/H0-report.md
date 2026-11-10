@@ -17,7 +17,7 @@ Product code: **none**. Nothing under `prototype/crates/*/src/` changed.
 | `research/he1/H0-report.md` | new | This report |
 | `tools/he1_baseline.py` | new | Records and checks the snapshot by running the real `fmp` binary; never a build input |
 | `prototype/crates/fmp-cli/tests/he1_identity_characterization.rs` | new | Seven tests: four assert a hole HE-1/H3/H4 must close, one pins a constraint H1 must preserve (the legacy fingerprint reads a field the parser drops), two are controls (digest mismatch, non-object root). The deep-JSON finding is the Python probe, not a Rust test |
-| `tools/test_he1_baseline.py` | new (§7) | 65 tests over synthetic snapshots: the comparator fails on a payload or count change, passes on a receipt change alone, still compares payloads when the receipt changes, and refuses a structurally invalid snapshot or anchor with exit 2 before materializing (§8–§12). It also recomputes every entry digest and derived count, pins the definition files through a separate anchor root, rejects a fresh artifact that loses a required envelope member, treats a document nested too deeply for Python's JSON reader as a fault (exit 2), proves a bare invocation cannot overwrite the frozen baseline, and records a failing toolchain subprocess as `unavailable` rather than raising. No binary needed, so CI runs it first |
+| `tools/test_he1_baseline.py` | new (§7) | 67 tests over synthetic snapshots: the comparator fails on a payload or count change, passes on a receipt change alone, still compares payloads when the receipt changes, and refuses a structurally invalid snapshot or anchor with exit 2 before materializing (§8–§13). It also recomputes every entry digest and derived count, pins the definition files through a separate anchor root, rejects a fresh artifact that loses a required envelope member, treats a document nested too deeply for Python's JSON reader as a fault (exit 2) on every path including the fresh plan and the materializer stdout, proves a bare invocation cannot overwrite the frozen baseline, and records a failing toolchain subprocess as `unavailable` rather than raising. No binary needed, so CI runs it first |
 | `docs/architecture/he1-horizontal-extension.md` | moved from the repository root | Adopts the design document; header now names `ADR-0125` and the `HE-AC`/`HE-T` registry role. Trailing whitespace stripped: 811 lines, no wording removed |
 | `docs/adr/0125-he1-scope.md` | new | The scope decision and the conflict resolution |
 | `AGENTS.md` | edited | Current round, repository map (`docs/fmp-0.2/`, `docs/architecture/`, `packages/`, `bundles/`, `research/he1/`), three added done-criteria bullets. The eight hard rules and "Never do" are untouched |
@@ -533,6 +533,51 @@ code changed in this round either; the plan-level findings land in H1a/H1b.
    envelope carries `materializer_version`.
 
 Re-measured after this round: 61 workspace tests (7 characterization), 65
+comparator tests, `payload_root`
+`sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9`
+and `definitions_root`
+`sha256:575b7c5f3817c4ed528b8e5dff02bb1fcb6d9024d17e79a79b64b9662635690e`
+unchanged. The recorded snapshot was not re-recorded. The hosted result for this
+round is the run attached to the PR after the push.
+
+## 13. Eighth review round (`78c8f98`)
+
+The eighth review accepted the H0 baseline and the H1 direction and asked for
+three local corrections plus one documentation cleanup. No product Rust code
+changed; one finding is a plan-level contradiction, one is a comparator behaviour
+gap, and one is about where an H1 compile-time test lives.
+
+1. **H1b's width counterexample was contradictory in the plan.** §4.2 replayed
+   the same eight negatives through `bind` and said width-sum was rejected by
+   `check`, but `field_descriptor.width` is bounded to `[1, 64]` and `bind` must
+   run `check_structure` first, so `u32::MAX` can never reach `check`. §3.2 now
+   states that the entry boundary does not move because the validator has a
+   second line of defence: H1a calls `check` directly to prove the arithmetic is
+   bounded, and H1b expects `E-PLAN-002` from `check_structure` for the same
+   input. §4.2 replaces the blanket "same counterexamples, no new expectations"
+   with a table whose accepted stage follows the entry point; only type-legal
+   inputs (a huge `offset`, `page` + `none`) are expected at `check`.
+2. **`artifact_entry()` still parsed JSON outside `parse_json()`.** The plan file
+   (`artifact_entry`) and the materializer's stdout were read with bare
+   `json.loads`, so a 20 000-deep document on either path escaped as
+   `RecursionError` and exit 1 — the code reserved for a recorded difference.
+   Both now go through `parse_json()`, labelled `rel(plan_path)` and
+   `"<fixture>: materializer stdout"`. Two `ArtifactEntryTests` pin them, and the
+   suite is 67 tests.
+3. **The `materialize` signature `compile_fail` test moved to
+   `fmp-materialize`.** `fmp-validate` does not depend on `fmp-materialize`, so a
+   `use fmp_materialize::materialize` doctest there would fail for "crate not
+   found" and stay green even if the signature regressed to two parameters. §4.1
+   now places the assertion in `fmp-materialize` and gives every `compile_fail`
+   row a positive control with the same import path.
+4. **Stale "current facts" removed from the H1 plan.** §1.2 no longer claims
+   that only `E-SIZE-001`/`E-BYTE-001` fail after encoding or that host failures
+   are outside `materialize`. Those two withdrawn statements moved to a new §1.3
+   table that names why each was wrong and what replaced it, so the implementing
+   agent reads one consistent plan instead of inferring which paragraph is still
+   true.
+
+Re-measured after this round: 61 workspace tests (7 characterization), 67
 comparator tests, `payload_root`
 `sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9`
 and `definitions_root`

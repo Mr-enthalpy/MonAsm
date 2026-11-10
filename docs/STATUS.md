@@ -518,10 +518,11 @@ measured concentration points, one legacy-fingerprint constraint and two
 controls. `ADR-0126` splits the artifact identity into a compared payload
 projection and an uncompared build receipt, and adds the `baseline` job so the
 128 payloads are re-checked on a Linux runner; `tools/test_he1_baseline.py`
-(65 tests) turns the eight manual comparator experiments into a CI gate, a fault
+(67 tests) turns the eight manual comparator experiments into a CI gate, a fault
 now exits 2 rather than sharing exit 1 with a real diff, a document nested too
 deeply for Python's JSON reader (`RecursionError`, not a `ValueError`) is now a
-fault rather than a traceback with exit 1, and a structurally
+fault rather than a traceback with exit 1 on every read path — snapshot, anchor,
+fresh plan and materializer stdout — and a structurally
 invalid snapshot is refused before the 128 materializations instead of failing
 inside the comparator. Structural validation is now complete: projections, both
 roots, every entry's envelope, digest types and recomputed roots are checked,
@@ -586,7 +587,22 @@ before `emit`, so H1a measures the actual stage and the set is decided there. A
 new risk is registered: `reg_number` slots may not declare `range`, so their
 total width can reach 64..127 and `1u64 << field_bits` in the validator
 overflows in debug; H1a reproduces it and either bounds `width_bits` at load or
-compares in `u128`, and "private fields" is explicitly not a discharge. Two
+compares in `u128`, and "private fields" is explicitly not a discharge. The
+eighth round corrects three local points without changing the direction. First,
+the H1b width counterexample was contradictory: `bind` runs `check_structure`
+first, so the two `u32::MAX` widths must be rejected there with `E-PLAN-002`
+and never reach `check`; H1a's direct `check` call stays as the second-line
+proof, and §4.2's replay row now gives the expected stage per entry point
+instead of reusing one expectation for both. Second, `artifact_entry()` still
+read the fresh plan and the materializer stdout with bare `json.loads`, so a
+deeply nested document on those paths exited 1; both now use `parse_json()` and
+two tests pin it (67 comparator tests total). Third, the `materialize`
+signature `compile_fail` test moves from `fmp-validate` to `fmp-materialize`,
+with a positive control sharing each import path, because `fmp-validate` cannot
+import `fmp-materialize` and the doctest would have stayed green for the wrong
+reason. The plan's two stale "current facts" (only `E-SIZE-001`/`E-BYTE-001`
+fail after encoding; no host failure inside `materialize`) moved to a §1.3
+withdrawn-conclusions table. Two
 limits
 stay open for H1 acceptance rather than being claimed as passed: `FMP_BUILD_ID`
 is `None`, and debug/release payload equality is unmeasured.
