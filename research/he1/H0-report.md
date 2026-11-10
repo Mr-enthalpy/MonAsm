@@ -17,7 +17,7 @@ Product code: **none**. Nothing under `prototype/crates/*/src/` changed.
 | `research/he1/H0-report.md` | new | This report |
 | `tools/he1_baseline.py` | new | Records and checks the snapshot by running the real `fmp` binary; never a build input |
 | `prototype/crates/fmp-cli/tests/he1_identity_characterization.rs` | new | Seven tests: four assert a hole HE-1/H3/H4 must close, one pins a constraint H1 must preserve (the legacy fingerprint reads a field the parser drops), two are controls (digest mismatch, non-object root). The deep-JSON finding is the Python probe, not a Rust test |
-| `tools/test_he1_baseline.py` | new (§7) | 63 tests over synthetic snapshots: the comparator fails on a payload or count change, passes on a receipt change alone, still compares payloads when the receipt changes, and refuses a structurally invalid snapshot or anchor with exit 2 before materializing (§8–§11). It also recomputes every entry digest and derived count, pins the definition files through a separate anchor root, rejects a fresh artifact that loses a required envelope member, proves a bare invocation cannot overwrite the frozen baseline, and records a failing toolchain subprocess as `unavailable` rather than raising. No binary needed, so CI runs it first |
+| `tools/test_he1_baseline.py` | new (§7) | 65 tests over synthetic snapshots: the comparator fails on a payload or count change, passes on a receipt change alone, still compares payloads when the receipt changes, and refuses a structurally invalid snapshot or anchor with exit 2 before materializing (§8–§12). It also recomputes every entry digest and derived count, pins the definition files through a separate anchor root, rejects a fresh artifact that loses a required envelope member, treats a document nested too deeply for Python's JSON reader as a fault (exit 2), proves a bare invocation cannot overwrite the frozen baseline, and records a failing toolchain subprocess as `unavailable` rather than raising. No binary needed, so CI runs it first |
 | `docs/architecture/he1-horizontal-extension.md` | moved from the repository root | Adopts the design document; header now names `ADR-0125` and the `HE-AC`/`HE-T` registry role. Trailing whitespace stripped: 811 lines, no wording removed |
 | `docs/adr/0125-he1-scope.md` | new | The scope decision and the conflict resolution |
 | `AGENTS.md` | edited | Current round, repository map (`docs/fmp-0.2/`, `docs/architecture/`, `packages/`, `bundles/`, `research/he1/`), three added done-criteria bullets. The eight hard rules and "Never do" are untouched |
@@ -118,12 +118,14 @@ branch was pushed; they are kept in place, with the upgrade named, rather than
 deleted.
 
 1. **Cross-host determinism — verified after the H0 commit.** Hosted run
-   `42698924288` (workflow `determinism`) ran `cargo test --workspace`, including
-   the 128-artifact digest comparisons and the characterization tests (six at
-   that run), on
-   `ubuntu-latest`, `macos-latest` and `windows-latest`: three jobs, all green.
-   This upgrades the earlier statement, which rested on run `42681104791` and
-   `EXP-R3` alone.
+   `42698924288` (workflow `determinism`) ran `cargo test --workspace` on
+   `ubuntu-latest`, `macos-latest` and `windows-latest`: three jobs, all green,
+   including the characterization tests (six at that run). The cross-host pin is
+   narrow: `determinism.rs` fixes **three** envelope digests, one per ISA. The
+   128-payload comparison is not part of that job; it is the `H0 payload
+   baseline` job in `gates`, which rebuilds on Ubuntu and compares all 128
+   recorded payloads. This upgrades the earlier statement, which rested on run
+   `42681104791` and `EXP-R3` alone.
 2. **Debug vs release payload equality.** The snapshot used a debug binary.
    `EXP-R1`–`R6` cover repeat runs, not build-profile equality.
 3. **Hosted CI on these commits — verified after the H0 commit.** Run
@@ -474,6 +476,70 @@ and `definitions_root`
 unchanged. The recorded snapshot was not re-recorded. The hosted result for this
 round is the run attached to the PR after the push.
 
+## 12. Seventh review round (`d5c0ca7`)
+
+The seventh review accepted the H0 baseline and the H1 direction, and found one
+P1 binding responsibility, two P2 plan gaps, one P3 tooling gap, one
+definition-width risk to register and two wording corrections. No product Rust
+code changed in this round either; the plan-level findings land in H1a/H1b.
+
+1. **`bind` must compare the full definition identity.** The plan moved the old
+   digest comparison out of `materialize`, but that comparison is digest-only
+   (`lib.rs:349-359`); `namespace` and `version` are constrained today only by
+   `Registry::find` (`definition.rs:805-826`) when a definition is *selected*.
+   `bind(plan: Plan, definition: Arc<Definition>)` does not force that path, so a
+   plan can declare a different `namespace` or `version` with the correct digest
+   and still become a `ValidatedPlan`. `D15` makes `bind` compare
+   `namespace`/`version`/`digest` field by field, with Pointer
+   `/definition_identity/namespace`, `/version`, `/digest`, and takes
+   `BindIdentity.definition` from the bound object. The digest Pointer and detail
+   keys stay unchanged, so the 619-negative projection stays byte-identical. H1b
+   adds the namespace-only, version-only, digest-compatibility and legacy-facade
+   tests.
+2. **`Page` + `PcRule::None` passes `check` and becomes `Internal`.** `check_fixup_kind`
+   (`fmp-validate/src/lib.rs:1153-1246`) pins `pcrel_lo12`↔`pcrel_hi`,
+   `hi20`↔`none`, `pcrel_hi`→`pcrel_lo12` and `scale`↔`transform_shift`, but not
+   `page`'s required PC reference. Change `A64-P6-adrp-lo12-pair`'s first
+   `fixups[0].pc_reference_rule` to `none` and the plan still passes; `emit`
+   (`lib.rs:725-733`) then returns `internal(...)`. `D16` adds the static
+   `page ⇒ pcrel_page` rule (`E-FIXUP-001` at `/fixups/i/pc_reference_rule`) in
+   H1a, replays it through `bind` in H1b, and requires H1a to fill a 15-row
+   table in `ADR-0127` naming the static precondition of every `internal(...)`
+   branch in `emit`. Only branches unreachable from a plan stay `Internal`.
+3. **The "three post-encode failures" value-level snapshot set was wrong.** The
+   two `E-SIZE-001` negatives (`N05`, `N05b`) are rejected by `validate`'s
+   `check_instructions` (`:655-668`) before `emit`, so they cannot demonstrate the
+   post-encode path. §4.3 now tabulates the expected stage per category
+   (`N05`/`N05b` validate; `N13` `E-BYTE-001` emit; `N20` `E-RANGE-003` apply;
+   `N04b`/`N04f` `E-FIXUP-003` apply) and lets the H1a measurement decide the
+   value-level set instead of fixing the count at three.
+4. **`RecursionError` on a deep snapshot escaped as exit 1.** CPython's
+   `json.loads` raises `RecursionError`, which is not a `ValueError`; a 20 000
+   level array produced a traceback and exit 1 — the code reserved for a
+   recorded difference. `parse_json()` now maps it to `Fault`, and `load_snapshot`,
+   `load_anchor` and `load_json_object` all read through it. Two tests (snapshot
+   and anchor) cover it; the CLI now prints the fault and exits 2.
+5. **Definition register-width numeric risk.** `reg_number` slots may not declare
+   `range` (`definition.rs:487-499`), and the total slot width is the sum of
+   placements (each ≤64, count unbounded), so `1u64 << field_bits` at
+   `fmp-validate/src/lib.rs:775` overflows for 64..127 in debug. This is an
+   existing loader/validator boundary, not an H0 finding; it is registered in §7
+   and assigned to H1a (reproduce, then bound `width_bits` at load or compare in
+   `u128`). Private fields do not discharge it.
+6. **Two evidence wordings corrected.** §5 now says the cross-host pin is three
+   envelope digests, with the 128-payload comparison attributed to the Ubuntu
+   `baseline` job, and `gates.yml` no longer claims the envelope carries the
+   exact binary digest: the binary digest is in the implementation receipt, the
+   envelope carries `materializer_version`.
+
+Re-measured after this round: 61 workspace tests (7 characterization), 65
+comparator tests, `payload_root`
+`sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9`
+and `definitions_root`
+`sha256:575b7c5f3817c4ed528b8e5dff02bb1fcb6d9024d17e79a79b64b9662635690e`
+unchanged. The recorded snapshot was not re-recorded. The hosted result for this
+round is the run attached to the PR after the push.
+
 ## Next
 
 H1 — identity closure (`ADR-0127`): private verified objects, a bound
@@ -487,8 +553,11 @@ the old `fingerprint` stays legacy and stable, and the new
 `ParsedPlanIdentity`/`ExecutionReceipt` are what change with parsed facts. The
 other two gap tests close in H3 (unselected file, ISA allowlist), the
 legacy-fingerprint constraint is preserved rather than flipped, and the deep-JSON
-probe finding is H4. The implementation plan, with its fourteen decisions
-(D1–D14), is `docs/architecture/he1-h1-plan.md`. H1a also owns
-`plan::check_structure`, the validator's bounded bit arithmetic, and their seven
-direct-call counterexamples, so the binding path cannot trust a plan merely
-because it was once parsed; H1b replays those cases through `bind`.
+probe finding is H4. The implementation plan, with its sixteen decisions
+(D1–D16), is `docs/architecture/he1-h1-plan.md`. H1a also owns
+`plan::check_structure`, the validator's bounded bit arithmetic, the
+`check_fixup_kind` `page` precondition, the `internal(...)` precondition table
+and the register-width reproduction, and their eight direct-call
+counterexamples, so the binding path cannot trust a plan merely because it was
+once parsed; H1b replays those cases through `bind` and adds the identity-triple
+mismatch tests.

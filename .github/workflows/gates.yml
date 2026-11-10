@@ -10,8 +10,9 @@ name: gates
 # `ADR-0126` adds the H0 payload job: it re-materializes all 128 positives with
 # the binary this job just built and compares the payload projection recorded in
 # `research/he1/compatibility-results.json`. It compares payloads, not the
-# envelope: the envelope carries `materializer_version` and the exact binary
-# digest, so a CI build legitimately differs from the recording host. Envelope
+# envelope: the envelope carries `materializer_version`, and the exact binary
+# digest lives in the separate implementation receipt, so a CI build
+# legitimately differs from the recording host. Envelope
 # digests are pinned narrowly instead, in `determinism.rs`.
 #
 # `check_mrs.py` and `check_rv64_source.py` stay local: both read

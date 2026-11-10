@@ -518,8 +518,10 @@ measured concentration points, one legacy-fingerprint constraint and two
 controls. `ADR-0126` splits the artifact identity into a compared payload
 projection and an uncompared build receipt, and adds the `baseline` job so the
 128 payloads are re-checked on a Linux runner; `tools/test_he1_baseline.py`
-(63 tests) turns the eight manual comparator experiments into a CI gate, a fault
-now exits 2 rather than sharing exit 1 with a real diff, and a structurally
+(65 tests) turns the eight manual comparator experiments into a CI gate, a fault
+now exits 2 rather than sharing exit 1 with a real diff, a document nested too
+deeply for Python's JSON reader (`RecursionError`, not a `ValueError`) is now a
+fault rather than a traceback with exit 1, and a structurally
 invalid snapshot is refused before the 128 materializations instead of failing
 inside the comparator. Structural validation is now complete: projections, both
 roots, every entry's envelope, digest types and recomputed roots are checked,
@@ -542,7 +544,7 @@ One probe found a real gap rather than a clean result: a 20 000-deep JSON plan
 ends the `fmp` process with `0xC00000FD` (stack overflow), which H4 owes a
 bounded rejection test. Next: H1, identity closure
 (`ADR-0127`). The implementation plan draft is
-`docs/architecture/he1-h1-plan.md`; its fourteen decisions (D1–D14) are recorded,
+`docs/architecture/he1-h1-plan.md`; its sixteen decisions (D1–D16) are recorded,
 with D3/D4/D5/D7 revised after the first review, D11/D12 added after the second
 (identity layering, and keeping `Plan.document` as a legacy-only input), D4
 revised again after the third (allocation failure is
@@ -569,7 +571,23 @@ bounded completion rather than only "no panic". The same round splits the stage
 tests by API (H1a calls `check_structure`/`check` directly; H1b replays the cases
 through `bind`) and records that the old fingerprint test is **not** flipped: the
 legacy `fingerprint` stays stable, and `ParsedPlanIdentity`/`ExecutionReceipt`
-carry the new facts. Two limits
+carry the new facts. The seventh round adds **D15** and **D16**: `bind` compares
+the full `(namespace, version, digest)` triple against the bound
+`Arc<Definition>` (the old `materialize` compared only the digest, and
+`Registry::find`'s namespace/version constraint is not on `bind`'s input), with
+H1b tests for namespace-only, version-only, digest-compatibility and the legacy
+facade; and `page` now requires `pcrel_page`, because `Page` + `PcRule::None`
+passed `check_fixup_kind` and fell into `internal(...)` in `emit` — H1a adds the
+static `E-FIXUP-001` rule, H1b replays it through `bind`, and H1a fills a 15-row
+table in `ADR-0127` naming the static precondition of every `internal(...)`
+branch. The round also withdraws the hardcoded "three post-encode failures"
+value-snapshot set: the two `E-SIZE-001` negatives are rejected by `validate`
+before `emit`, so H1a measures the actual stage and the set is decided there. A
+new risk is registered: `reg_number` slots may not declare `range`, so their
+total width can reach 64..127 and `1u64 << field_bits` in the validator
+overflows in debug; H1a reproduces it and either bounds `width_bits` at load or
+compares in `u128`, and "private fields" is explicitly not a discharge. Two
+limits
 stay open for H1 acceptance rather than being claimed as passed: `FMP_BUILD_ID`
 is `None`, and debug/release payload equality is unmeasured.
 The phase board above

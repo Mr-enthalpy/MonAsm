@@ -129,13 +129,19 @@ Two further failures were found while fixing that one:
    each one names the shape it requires, so a comparator bug still raises rather
    than being reported as a fault.
 9. **The comparator is itself tested, in CI, without the binary.**
-   `tools/test_he1_baseline.py` holds 63 tests over synthetic snapshots and a
+   `tools/test_he1_baseline.py` holds 65 tests over synthetic snapshots and a
    synthetic anchor; the `baseline` job runs it before installing the toolchain.
    The eight manual experiments below are kept as history, but a manual
    experiment does not run on the next commit. The tests exist specifically
    because the manual pass could not protect a future refactor: **a changed
    implementation receipt does not stop the payload comparison**, a structurally
    invalid snapshot exits 2 rather than 1, and prose in this ADR is not a test.
+   A document Python cannot parse because it is nested too deeply is a **fault**,
+   not a difference: `json.loads` raises `RecursionError`, which is not a
+   `ValueError`, and before this round it escaped as a traceback and exit 1 —
+   the code reserved for a recorded difference. `parse_json()` maps it to
+   `Fault`; `load_snapshot`, `load_anchor` and `load_json_object` all read
+   through it, and two tests pin the behaviour.
 10. **Recording is explicit, and a separate anchor makes re-recording visible.**
     A bare `python tools/he1_baseline.py` used to write the frozen snapshot to its
     default path, so a later commit could change an artifact, re-record, and still
@@ -273,7 +279,8 @@ Two further failures were found while fixing that one:
 | The envelope still participates when the receipt matches | tampered `envelope.sha256` with an identical receipt → exit 1 | high (measured) |
 | Skipping the envelope does not skip the payload | `implementation` replaced **and** `payload.bytes_hex` tampered → exit 1 | high (measured) |
 | An unknown schema is refused | schema `…/0.1` → exit 2, no comparison | high (measured) |
-| A fault is not reported as a diff | missing binary, unreadable snapshot, corrupt JSON, old schema, root array/`null`, missing `artifacts`, wrong-typed `implementation`, entry without `payload_sha256`, missing projection, wrong-typed or stale root, deleted envelope, content/digest mismatch, derived-count mismatch, anchor without `definitions_root`, and a fresh artifact missing a required member → exit 2; payload/count/envelope/definitions-root diffs → exit 1 | high (measured, `tools/test_he1_baseline.py` 63 tests, Python 3.8.10 locally; the hosted run is the PR's next `gates` run) |
+| A fault is not reported as a diff | missing binary, unreadable snapshot, corrupt JSON, old schema, root array/`null`, missing `artifacts`, wrong-typed `implementation`, entry without `payload_sha256`, missing projection, wrong-typed or stale root, deleted envelope, content/digest mismatch, derived-count mismatch, anchor without `definitions_root`, and a fresh artifact missing a required member → exit 2; payload/count/envelope/definitions-root diffs → exit 1 | high (measured, `tools/test_he1_baseline.py` 65 tests, Python 3.8.10 locally; the hosted run is the PR's next `gates` run) |
+| A reader limit is not a recorded difference | a 20 000-level array as `--check` snapshot or `--anchor` raises `RecursionError`; before the seventh round it escaped as a traceback and exit 1, now `parse_json()` returns `Fault` and the CLI exits 2 with `nested too deeply … not a difference` | high (measured, seventh review round) |
 | A well-formed but wrong-shaped snapshot is refused before materialization | `[]`, `null`, missing `artifacts`, string `implementation`, entry without `payload_sha256`, missing `projections.payload`, non-digest `payload_root`, `payload_root` not matching the entries, `artifacts.count` ≠ entry count, missing `envelope` → exit 2 with a named fault; the corresponding tests | high (measured) |
 | Content and declared digest cannot disagree | `payload.bytes_hex` edited without `payload_sha256` → exit 2; `envelope.sha256` changed → exit 2; `definitions.count`/`by_isa` sum/oracle sum/manual list mismatch → exit 2 | high (measured, fifth review round) |
 | A broken toolchain read is not a baseline diff | a subprocess exiting 3 with stderr → `unavailable: exit 3: …`; empty stdout → `unavailable: empty stdout`; a non-object definition/oracle record → `Fault` (2) | high (measured) |

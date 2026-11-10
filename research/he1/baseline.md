@@ -126,7 +126,8 @@ The tool re-runs the real `fmp` binary, not a Python re-implementation, so the
 snapshot is the product's output. `--check` exits 1 on any difference in a
 payload, a digest or a count, including a recorded `payload_root` or
 `definitions_root` that no longer equals the frozen anchor. It exits 2 on a usage
-or I/O fault, on a snapshot schema it does not know, or on a snapshot whose
+or I/O fault, on a snapshot schema it does not know, on a document nested too
+deeply for CPython's JSON reader, or on a snapshot whose
 structure is not the one the recorder writes: a non-object root, missing
 `projections`, a malformed
 `definitions`/`corpus`/`oracle`/`artifacts` object, a root that is not a
@@ -144,7 +145,7 @@ invocation, `--check --record`, and `--out` without `--record` are usage faults
 (exit 2), so a routine run cannot rewrite the reference by accident. The anchor
 file is never written by the tool; editing it needs a compatibility ADR.
 
-`tools/test_he1_baseline.py` is the comparator's own gate: 63 tests over
+`tools/test_he1_baseline.py` is the comparator's own gate: 65 tests over
 synthetic snapshots and a synthetic anchor, no Rust binary and no `definitions/`
 scan. It fixes the properties that would otherwise be re-learned in production:
 a payload change fails, a count change fails, a receipt change alone passes,
@@ -161,8 +162,9 @@ toolchain subprocess is recorded as `unavailable`, and only `--record` can write
 a snapshot. The receipt bug was the first draft of `ADR-0126`'s split; the
 structural check was the third review round, the anchor/record-mode split and
 the first full structure pass were the fourth, digest recomputation plus
-derived-count checks were the fifth, and the definitions root plus fresh-artifact
-validation were the sixth. CI runs the suite before building `fmp`.
+derived-count checks were the fifth, the definitions root plus fresh-artifact
+validation were the sixth, and mapping `RecursionError` to a fault was the
+seventh. CI runs the suite before building `fmp`.
 
 `--binary` wins over discovery; discovery tries `prototype/target/debug/fmp.exe`
 then `prototype/target/debug/fmp`. If neither exists the tool prints the build
@@ -215,6 +217,11 @@ should not trigger a known stack overflow or wait on a child that may hang.
 - The `deep-json` probe is recorded on Windows and reads `0xC00000FD`. Linux and
   macOS report the same fault with a different exit status or a signal; the probe
   records the outcome, not a portable code, and `--check` never compares probes.
+  This probe exercises the **Rust binary's** JSON reader. The comparator's own
+  reader is separate: a snapshot or anchor nested too deeply for CPython raises
+  `RecursionError`, which `parse_json()` maps to a `Fault` (exit 2), so a reader
+  limit can no longer masquerade as baseline drift. The Rust depth bound is still
+  H4 work.
 - The binary is a debug build. Release-vs-debug payload equality was not
   measured in H0; `EXP-R1`–`R6` cover repeat-run determinism, not profile
   equality. The build also has `FMP_BUILD_ID = None`, so the implementation
