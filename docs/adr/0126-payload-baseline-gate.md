@@ -129,7 +129,7 @@ Two further failures were found while fixing that one:
    each one names the shape it requires, so a comparator bug still raises rather
    than being reported as a fault.
 9. **The comparator is itself tested, in CI, without the binary.**
-   `tools/test_he1_baseline.py` holds 50 tests over synthetic snapshots and a
+   `tools/test_he1_baseline.py` holds 63 tests over synthetic snapshots and a
    synthetic anchor; the `baseline` job runs it before installing the toolchain.
    The eight manual experiments below are kept as history, but a manual
    experiment does not run on the next commit. The tests exist specifically
@@ -143,14 +143,14 @@ Two further failures were found while fixing that one:
     Recording now requires `--record`; a bare invocation, `--check --record`, and
     `--out` without `--record` are usage faults (exit 2). The frozen reference is
     a second file, `research/he1/baseline-anchor.json`, schema
-    `monasm.he1.baseline-anchor/0.1`, holding only `payload_root`. `--check`
-    requires the recorded root to equal it: a mismatch is a **diff** (exit 1), and
-    a missing or malformed anchor is a **fault** (exit 2). The anchor is not
-    written by the tool. It covers one value on purpose: moving it requires a
-    compatibility ADR, while `envelope_root` cannot be anchored because it
-    contains `materializer_version`. Counterexample if the anchor were missing:
-    the baseline could be reset without any ADR and the comparator would still be
-    green.
+    `monasm.he1.baseline-anchor/0.2`, holding `payload_root` and
+    `definitions_root` (decision 13). `--check` requires both recorded roots to
+    equal it: a mismatch is a **diff** (exit 1), and a missing or malformed anchor
+    is a **fault** (exit 2). The anchor is not written by the tool. Moving either
+    value requires a compatibility ADR, while `envelope_root` cannot be anchored
+    because it contains `materializer_version`. Counterexample if the anchor were
+    missing: the baseline could be reset without any ADR and the comparator would
+    still be green.
 11. **Structural validation covers the whole snapshot, including the parts
     `--check` would skip.** `validate_snapshot()` now checks `projections`,
     `definitions.count`/`documents`, `corpus.positives`/`negatives`/`by_isa`,
@@ -176,6 +176,28 @@ Two further failures were found while fixing that one:
     recorded as `unavailable`, because `toolchain` is a receipt and must not turn
     a host problem into exit 1. Definition and oracle JSON are required to be
     objects before `.get()` is called.
+13. **The definition files are anchored separately, because the snapshot cannot
+    protect them against itself.** The snapshot lists every definition's path,
+    raw-file digest and canonical digest, and `--check` compares that list with
+    the working tree. But `--record` rewrites the snapshot. Editing a historical
+    definition's whitespace changes `file_sha256` without moving any artifact
+    payload, so re-recording updates the list and the payload-only anchor still
+    matches. The anchor now also holds `definitions_root`, a SHA-256 over the
+    sorted `path\0file_sha256\0digest` records. A whitespace edit moves the raw
+    digest; a semantic edit also moves the canonical digest. The recorded
+    snapshot is still schema `0.2` and was not re-recorded. Corpus content is
+    deliberately not in this root: a `negative_corpus_root` would freeze fixtures
+    too and needs its own compatibility ADR.
+14. **The fresh artifact is validated, not only the recorded snapshot.** With a
+    different binary digest, `comparison_projection()` drops the envelope from
+    comparison, so a new materializer could omit `materializer_version` on a
+    fixture whose payload did not move and the gate would pass.
+    `artifact_entry()` now calls `validate_fresh_artifact()` on every positive
+    before projecting: `format_version`, `level`, `fingerprint`, `fixups` and
+    `materializer_version` must be present with the old types, level 0 must keep
+    `bytes_hex`/`size`, and level 1 must keep `sections`/`symbols`. The version
+    value may change; the member may not disappear. This is a shape check, not a
+    second payload comparison.
 
 ## Consequences
 
@@ -206,10 +228,12 @@ Two further failures were found while fixing that one:
   not by eight manual experiments that ran once. The manual table below stays as
   the recording of what was measured; the tests are the gate.
 - Recording is an explicit operation, and the baseline has a second, slower
-  reference: `research/he1/baseline-anchor.json` pins `payload_root` independently
-  of the snapshot. A developer who re-records the snapshot moves only the
-  snapshot; the anchor stays put, and `--check` fails at the anchor until a
-  compatibility ADR moves it.
+  reference: `research/he1/baseline-anchor.json` (schema 0.2) pins
+  `payload_root` **and** `definitions_root` independently of the snapshot. A
+  developer who re-records the snapshot moves only the snapshot; the anchor stays
+  put, and `--check` fails at the anchor until a compatibility ADR moves it. The
+  definitions root is what stops a whitespace-only edit to a historical
+  definition from being laundered by `--record`.
 - Structure validation now covers every field `validate_snapshot()` needs, and it
   runs before materialization. It deliberately checks the envelope even when the
   comparison will skip it, so removing evidence is a fault rather than an
@@ -249,11 +273,13 @@ Two further failures were found while fixing that one:
 | The envelope still participates when the receipt matches | tampered `envelope.sha256` with an identical receipt → exit 1 | high (measured) |
 | Skipping the envelope does not skip the payload | `implementation` replaced **and** `payload.bytes_hex` tampered → exit 1 | high (measured) |
 | An unknown schema is refused | schema `…/0.1` → exit 2, no comparison | high (measured) |
-| A fault is not reported as a diff | missing binary, unreadable snapshot, corrupt JSON, old schema, root array/`null`, missing `artifacts`, wrong-typed `implementation`, entry without `payload_sha256`, missing projection, wrong-typed or stale root, deleted envelope, content/digest mismatch, and derived-count mismatch → exit 2; payload/count/envelope diffs → exit 1 | high (measured, `tools/test_he1_baseline.py` 50 tests, Python 3.8.10 locally; the hosted run is the PR's next `gates` run) |
+| A fault is not reported as a diff | missing binary, unreadable snapshot, corrupt JSON, old schema, root array/`null`, missing `artifacts`, wrong-typed `implementation`, entry without `payload_sha256`, missing projection, wrong-typed or stale root, deleted envelope, content/digest mismatch, derived-count mismatch, anchor without `definitions_root`, and a fresh artifact missing a required member → exit 2; payload/count/envelope/definitions-root diffs → exit 1 | high (measured, `tools/test_he1_baseline.py` 63 tests, Python 3.8.10 locally; the hosted run is the PR's next `gates` run) |
 | A well-formed but wrong-shaped snapshot is refused before materialization | `[]`, `null`, missing `artifacts`, string `implementation`, entry without `payload_sha256`, missing `projections.payload`, non-digest `payload_root`, `payload_root` not matching the entries, `artifacts.count` ≠ entry count, missing `envelope` → exit 2 with a named fault; the corresponding tests | high (measured) |
 | Content and declared digest cannot disagree | `payload.bytes_hex` edited without `payload_sha256` → exit 2; `envelope.sha256` changed → exit 2; `definitions.count`/`by_isa` sum/oracle sum/manual list mismatch → exit 2 | high (measured, fifth review round) |
 | A broken toolchain read is not a baseline diff | a subprocess exiting 3 with stderr → `unavailable: exit 3: …`; empty stdout → `unavailable: empty stdout`; a non-object definition/oracle record → `Fault` (2) | high (measured) |
 | Re-recording cannot silently reset the reference | `--check` with a snapshot whose `payload_root` differs from the anchor → exit 1 at the anchor, before binary discovery; missing/malformed anchor → exit 2; bare invocation and `--check --record` → exit 2 | high (measured) |
+| Re-recording cannot silently reset the definition files | a recorded `file_sha256` changed (the shape a whitespace edit plus `--record` leaves) → `anchor/definitions_root` diff, exit 1, even though every payload still matches; a payload-only anchor → exit 2 | high (measured, sixth review round) |
+| A fresh artifact cannot lose a required member | `artifact_entry()` with a mocked CLI artifact lacking `materializer_version` → `Fault` (2), not a clean payload match; a wrong-typed `level` and a level-1 artifact without `symbols` are faults too | high (measured, sixth review round) |
 | The comparator keeps comparing when the receipt changes | `implementation` replaced **and** `payload.bytes_hex` tampered → exit 1, pinned by `test_payload_is_compared_even_when_the_receipt_differs` | high (measured) |
 | Portable discovery and probe opt-in work | `--binary` exercised on Windows; probes ran under `--probes` only | high on Windows; Linux discovery `unverified` (the CI job passes `--binary` explicitly, so it does not exercise discovery) |
 | `determinism.rs` pins envelope digests | read `tests/determinism.rs:158`, `:163`, `:168`; the test hashes `artifact.to_json()` at `:63` | high |

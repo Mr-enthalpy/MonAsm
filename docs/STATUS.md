@@ -518,7 +518,7 @@ measured concentration points, one legacy-fingerprint constraint and two
 controls. `ADR-0126` splits the artifact identity into a compared payload
 projection and an uncompared build receipt, and adds the `baseline` job so the
 128 payloads are re-checked on a Linux runner; `tools/test_he1_baseline.py`
-(50 tests) turns the eight manual comparator experiments into a CI gate, a fault
+(63 tests) turns the eight manual comparator experiments into a CI gate, a fault
 now exits 2 rather than sharing exit 1 with a real diff, and a structurally
 invalid snapshot is refused before the 128 materializations instead of failing
 inside the comparator. Structural validation is now complete: projections, both
@@ -527,18 +527,22 @@ each entry's content is re-hashed into its declared payload and envelope digests
 and derived counts (`definitions.count`, `by_isa` sums, oracle sums, artifacts vs
 positives) must agree; a failing toolchain subprocess is recorded as
 `unavailable` instead of raising. An entry whose `envelope` was deleted is a
-fault even when the comparison would skip it. Recording is explicit (`--record`),
-and
-`research/he1/baseline-anchor.json` pins `payload_root` independently, so
-re-recording the snapshot cannot silently reset the reference; a mismatch is a
-diff (exit 1), a malformed anchor is a fault (exit 2), and moving the anchor
-needs a compatibility ADR. The envelope root is deliberately not anchored
+fault even when the comparison would skip it, and a fresh artifact that loses a
+required member (`materializer_version`, `level`, `fingerprint`, …) is rejected
+before projection. Recording is explicit (`--record`),
+and `research/he1/baseline-anchor.json` pins `payload_root` **and**
+`definitions_root` independently, so re-recording the snapshot cannot silently
+reset either the artifacts or the definition files; a mismatch is a diff
+(exit 1), a malformed anchor is a fault (exit 2), and moving either root needs a
+compatibility ADR. The definitions root covers the sorted definition path,
+raw-file digest and canonical digest, so a whitespace-only edit followed by
+`--record` still fails the anchor. The envelope root is deliberately not anchored
 because it contains `materializer_version`.
 One probe found a real gap rather than a clean result: a 20 000-deep JSON plan
 ends the `fmp` process with `0xC00000FD` (stack overflow), which H4 owes a
 bounded rejection test. Next: H1, identity closure
 (`ADR-0127`). The implementation plan draft is
-`docs/architecture/he1-h1-plan.md`; its thirteen decisions (D1–D13) are recorded,
+`docs/architecture/he1-h1-plan.md`; its fourteen decisions (D1–D14) are recorded,
 with D3/D4/D5/D7 revised after the first review, D11/D12 added after the second
 (identity layering, and keeping `Plan.document` as a legacy-only input), D4
 revised again after the third (allocation failure is
@@ -556,7 +560,16 @@ second line of defence. The third round also records that
 keeps it equal while `payload_digest` moves) and moves the
 definition-mutability test conversion into H1a; the fourth round routes
 `MaterializationFailure::Internal` to exit 2 through a distinct internal-fault
-channel, so an implementation bug is not reported as a rejected plan. Two limits
+channel, so an implementation bug is not reported as a rejected plan. The sixth
+round adds **D14**: `offset` is a full `u64`, so `check_fixup_overlap`'s
+`offset * 8` must use `u128`/checked arithmetic and the per-bit loops in
+`check_one_writer`/`check_fixup_ownership` must be clipped to `form.bits()`;
+H1a tests both from a legally parsed JSON plan in debug and release, and requires
+bounded completion rather than only "no panic". The same round splits the stage
+tests by API (H1a calls `check_structure`/`check` directly; H1b replays the cases
+through `bind`) and records that the old fingerprint test is **not** flipped: the
+legacy `fingerprint` stays stable, and `ParsedPlanIdentity`/`ExecutionReceipt`
+carry the new facts. Two limits
 stay open for H1 acceptance rather than being claimed as passed: `FMP_BUILD_ID`
 is `None`, and debug/release payload equality is unmeasured.
 The phase board above

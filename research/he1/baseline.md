@@ -6,7 +6,7 @@ Projection recording commit: `ebddbdb02c558baff9c44d90bbdead3e3db96175` (dirty t
 Host: Windows Server 2025, `cargo 1.96.0 (30a34c682 2026-05-25)`, Python 3.8.10
 Machine-readable snapshot: `research/he1/compatibility-results.json`
 Frozen H0 snapshot: `research/he1/compatibility-h0-envelope.json`
-Frozen anchor: `research/he1/baseline-anchor.json` (`payload_root` only)
+Frozen anchor: `research/he1/baseline-anchor.json` (`payload_root` + `definitions_root`)
 
 The two commits are different facts and are named separately. The artifacts were
 first recorded at `d0082f9`; the payload/envelope projection
@@ -56,16 +56,19 @@ entries:
 |---|---|
 | `payload_root` (artifact minus `materializer_version`) | `sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9` |
 | `envelope_root` (whole artifact) | `sha256:dfd08fee9844058492138b23448073ec47d8eda42383e3f1b3e567db86a86fef` |
+| `definitions_root` (sorted path, file SHA-256, canonical digest) | `sha256:575b7c5f3817c4ed528b8e5dff02bb1fcb6d9024d17e79a79b64b9662635690e` |
 
 The second value is exactly the `artifact_root` recorded by the first H0
 snapshot. That equality is the check that the projection change moved no meaning.
 
-`payload_root` is also pinned in `research/he1/baseline-anchor.json`, a separate
-file with schema `monasm.he1.baseline-anchor/0.1`. `--check` requires the recorded
-snapshot to equal that value, so re-recording the snapshot cannot silently move
-the reference: the anchor changes only with a compatibility ADR. The envelope
-root is **not** anchored, because it contains `materializer_version`; anchoring
-it would turn a legal build-version bump into a baseline failure.
+`payload_root` and `definitions_root` are also pinned in
+`research/he1/baseline-anchor.json` (schema `monasm.he1.baseline-anchor/0.2`).
+`--check` requires the recorded snapshot to equal both values. The definitions
+root covers each definition's path, raw-file digest and canonical digest, so a
+whitespace-only edit followed by `--record` changes the root and fails the gate
+even though the artifact payloads do not move. The envelope root is **not**
+anchored, because it contains `materializer_version`; anchoring it would turn a
+legal build-version bump into a baseline failure.
 
 ## 2. What "unchanged" means for later phases
 
@@ -74,7 +77,8 @@ Frozen by this baseline, for the legacy path:
 1. The **payload** of every positive fixture: `bytes_hex` or `sections`,
    `symbols` when present, `fixups` in `fixup_record_order`, `size`, `level`,
    `fingerprint`, `format_version`. This is what `--check` compares.
-2. Every definition document's file bytes and canonical digest. No phase
+2. Every definition document's file bytes and canonical digest, both compared
+   against the snapshot and pinned by the anchor's `definitions_root`. No phase
    rewrites a file under `definitions/`.
 3. The legacy corpus counts and the negative phase split (`611` materialize,
    `8` read), which `planner_api.rs` asserts.
@@ -120,14 +124,18 @@ fails. `CI` sets `working-directory: prototype` instead, which is the same build
 
 The tool re-runs the real `fmp` binary, not a Python re-implementation, so the
 snapshot is the product's output. `--check` exits 1 on any difference in a
-payload, a digest or a count, including a recorded `payload_root` that no longer
-equals the frozen anchor. It exits 2 on a usage or I/O fault, on a snapshot
-schema it does not know, or on a snapshot whose structure is not the one the
-recorder writes: a non-object root, missing `projections`, a malformed
+payload, a digest or a count, including a recorded `payload_root` or
+`definitions_root` that no longer equals the frozen anchor. It exits 2 on a usage
+or I/O fault, on a snapshot schema it does not know, or on a snapshot whose
+structure is not the one the recorder writes: a non-object root, missing
+`projections`, a malformed
 `definitions`/`corpus`/`oracle`/`artifacts` object, a root that is not a
 `sha256:` digest, an entry without `payload`/`envelope`/`payload_sha256`, an
 `artifacts.count` that disagrees with `entries`, or roots that do not recompute
-from the entries. **A fault never exits 1**: otherwise a missing binary or a
+from the entries. It also validates each **fresh** artifact before projecting it:
+`format_version`, `level`, `fingerprint`, `fixups` and `materializer_version`
+must exist with the old types, and level 0/1 must keep `bytes_hex`/`sections`
+and `symbols`. The version value may change; the member may not disappear. **A fault never exits 1**: otherwise a missing binary or a
 corrupt snapshot would look exactly like a real payload regression.
 
 Recording is explicit: `python tools/he1_baseline.py --record` overwrites the
@@ -136,7 +144,7 @@ invocation, `--check --record`, and `--out` without `--record` are usage faults
 (exit 2), so a routine run cannot rewrite the reference by accident. The anchor
 file is never written by the tool; editing it needs a compatibility ADR.
 
-`tools/test_he1_baseline.py` is the comparator's own gate: 50 tests over
+`tools/test_he1_baseline.py` is the comparator's own gate: 63 tests over
 synthetic snapshots and a synthetic anchor, no Rust binary and no `definitions/`
 scan. It fixes the properties that would otherwise be re-learned in production:
 a payload change fails, a count change fails, a receipt change alone passes,
@@ -145,13 +153,16 @@ structurally invalid snapshot or anchor is refused with exit 2 before the 128
 materializations, a payload edited without its recorded digest or an envelope
 digest that no longer matches `payload + materializer_version` is a fault
 rather than a diff, derived counts (`definitions.count`, `by_isa` sums, oracle
-sums, artifacts vs positives) must agree, a deleted `envelope` is a fault even
-when `--check` would skip it, a failing toolchain subprocess is recorded as
-`unavailable`, and only `--record` can write a snapshot. The receipt bug was the
-first draft of `ADR-0126`'s split; the structural check was the third review
-round, the anchor/record-mode split and the first full structure pass were the
-fourth, and digest recomputation plus derived-count checks were the fifth. CI
-runs the suite before building `fmp`.
+sums, artifacts vs positives) must agree, a definitions-root mismatch is a diff
+even when every payload is unchanged, a fresh artifact missing
+`materializer_version` or another required envelope member is a fault, a
+deleted `envelope` is a fault even when `--check` would skip it, a failing
+toolchain subprocess is recorded as `unavailable`, and only `--record` can write
+a snapshot. The receipt bug was the first draft of `ADR-0126`'s split; the
+structural check was the third review round, the anchor/record-mode split and
+the first full structure pass were the fourth, digest recomputation plus
+derived-count checks were the fifth, and the definitions root plus fresh-artifact
+validation were the sixth. CI runs the suite before building `fmp`.
 
 `--binary` wins over discovery; discovery tries `prototype/target/debug/fmp.exe`
 then `prototype/target/debug/fmp`. If neither exists the tool prints the build
@@ -191,10 +202,12 @@ should not trigger a known stack overflow or wait on a child that may hang.
   (implementation receipt differs **and** the payload still changes → fail).
   Manual experiments are kept in `ADR-0126` as the record; the tests are the
   gate.
-- The anchor freezes only `payload_root`. Definition digests, corpus counts and
-  the envelope root are still checked against the snapshot and the Rust gates,
-  but they are not in the separate anchor. Widening it is a new anchor schema,
-  not an edit to this file, and it needs its own compatibility ADR.
+- The anchor freezes `payload_root` and `definitions_root`. Corpus counts, the
+  negative fixtures' content and the envelope root are still checked against the
+  snapshot and the Rust gates, but they are not in the separate anchor. A
+  `negative_corpus_root` would be a new anchor field and needs its own
+  compatibility ADR; the current anchor deliberately covers the two claims H0
+  makes: artifact payloads and definition files.
 - The comparator test proves the *comparator* does not silently skip. It cannot
   prove the snapshot covers a fact the tool never reads. Coverage of the payload
   is bounded by `artifact_entry()`'s projection, which is the whole artifact
