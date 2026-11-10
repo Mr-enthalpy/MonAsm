@@ -48,8 +48,12 @@ Probes are off by default: one of them feeds a 20 000-deep JSON document to a
 reader that currently overflows its stack. Every subprocess has a timeout, and a
 timeout in a probe is recorded as an outcome instead of raising.
 
-Exit codes: 0 recorded or identical, 1 mismatch, 2 usage or I/O fault. A fault
-never exits 1: a regression and a broken invocation must not look alike.
+Exit codes: 0 recorded or identical, 1 mismatch, 2 usage, I/O or structural
+fault. A fault never exits 1: a regression and a broken invocation must not look
+alike. Recording is explicit (`--record`); a bare invocation refuses to overwrite
+the frozen snapshot. `--check` also requires the recorded `payload_root` to equal
+the separate anchor in `research/he1/baseline-anchor.json`, so re-recording a
+snapshot cannot silently redefine the baseline.
 """
 
 from __future__ import annotations
@@ -67,6 +71,13 @@ DEFINITIONS = ROOT / "definitions"
 FIXTURES = ROOT / "fixtures"
 DEBUG_BUILD = ROOT / "prototype" / "target" / "debug"
 DEFAULT_OUT = ROOT / "research/he1/compatibility-results.json"
+
+# The frozen anchor is separate from the snapshot on purpose. A snapshot can be
+# re-recorded by a later commit; the anchor changes only with a compatibility
+# ADR. `--check` compares the recorded root to this file, so a re-recorded
+# baseline cannot quietly become the reference.
+DEFAULT_ANCHOR = ROOT / "research/he1/baseline-anchor.json"
+ANCHOR_SCHEMA = "monasm.he1.baseline-anchor/0.1"
 
 # `payload/0.1` and `envelope/0.1` are the two projections; the schema name is
 # what `--check` uses to refuse an older snapshot instead of comparing less.
@@ -594,6 +605,41 @@ def describe(value):
     return type(value).__name__
 
 
+def is_digest(value):
+    """`sha256:` plus 64 lowercase hex digits, the only digest the tool writes."""
+    if not isinstance(value, str) or not value.startswith("sha256:"):
+        return False
+    body = value[len("sha256:") :]
+    return len(body) == 64 and all(
+        character in "0123456789abcdef" for character in body
+    )
+
+
+def load_anchor(path):
+    try:
+        anchor = json.loads(Path(path).read_text(encoding="utf-8"))
+    except OSError as error:
+        raise Fault("cannot read the baseline anchor %s: %s" % (path, error))
+    except ValueError as error:
+        raise Fault("%s is not valid JSON: %s" % (path, error))
+    return anchor
+
+
+def validate_anchor(anchor, path):
+    """The anchor is one frozen root; it is not a second, partial snapshot."""
+    if not isinstance(anchor, dict):
+        raise Fault("the baseline anchor %s is %s, not an object" % (path, describe(anchor)))
+    if anchor.get("schema") != ANCHOR_SCHEMA:
+        raise Fault(
+            "the baseline anchor %s records schema %r, this tool speaks %r"
+            % (path, anchor.get("schema"), ANCHOR_SCHEMA)
+        )
+    if not is_digest(anchor.get("payload_root")):
+        raise Fault(
+            "the baseline anchor %s has no sha256 payload_root" % path
+        )
+
+
 def validate_snapshot(recorded):
     """Refuse a structurally invalid snapshot before any materialization.
 
@@ -603,6 +649,11 @@ def validate_snapshot(recorded):
     that means "the baseline moved". A corrupt snapshot is a fault (2), and it
     must cost one second rather than 128 subprocesses. Every check below is a
     shape the recorder always writes; none of them is a comparison.
+
+    The envelope is checked even when `--check` will skip it because the
+    implementation receipts differ. Otherwise deleting `envelope` from the
+    recorded file would look like a clean payload match and silently remove the
+    evidence it is supposed to hold.
     """
     if not isinstance(recorded, dict):
         raise Fault(
@@ -610,12 +661,86 @@ def validate_snapshot(recorded):
         )
     require_schema(recorded)
 
+    projections = recorded.get("projections")
+    if not isinstance(projections, dict):
+        raise Fault(
+            "the recorded snapshot's projections is %s, not an object"
+            % describe(projections)
+        )
+    for key, expected in (
+        ("payload", PAYLOAD_PROJECTION),
+        ("envelope", ENVELOPE_PROJECTION),
+    ):
+        if projections.get(key) != expected:
+            raise Fault(
+                "the recorded snapshot's projections.%s is %r, this tool speaks %r"
+                % (key, projections.get(key), expected)
+            )
+
     for key in ("definitions", "corpus", "artifacts"):
         if not isinstance(recorded.get(key), dict):
             raise Fault(
                 "the recorded snapshot's %r is %s, not an object"
                 % (key, describe(recorded.get(key)))
             )
+
+    definitions = recorded["definitions"]
+    if not isinstance(definitions.get("count"), int):
+        raise Fault("the recorded snapshot has no integer definitions.count")
+    documents = definitions.get("documents")
+    if not isinstance(documents, list):
+        raise Fault("the recorded snapshot's definitions.documents is not an array")
+    for index, document in enumerate(documents):
+        if not isinstance(document, dict):
+            raise Fault(
+                "definitions.documents[%d] is %s, not an object"
+                % (index, describe(document))
+            )
+        for key in (
+            "path",
+            "namespace",
+            "version",
+            "definition_format",
+            "isa_family",
+        ):
+            if not isinstance(document.get(key), str):
+                raise Fault(
+                    "definitions.documents[%d] has no string %r" % (index, key)
+                )
+        if not isinstance(document.get("forms"), int):
+            raise Fault(
+                "definitions.documents[%d] has no integer 'forms'" % index
+            )
+        for key in ("file_sha256", "digest"):
+            if not is_digest(document.get(key)):
+                raise Fault(
+                    "definitions.documents[%d] %s is not a sha256 digest"
+                    % (index, key)
+                )
+
+    corpus = recorded["corpus"]
+    for key in ("positives", "negatives"):
+        if not isinstance(corpus.get(key), int):
+            raise Fault("the recorded snapshot has no integer corpus.%s" % key)
+    by_isa = corpus.get("by_isa")
+    if not isinstance(by_isa, dict):
+        raise Fault("the recorded snapshot's corpus.by_isa is not an object")
+    for isa, counts in by_isa.items():
+        if not isinstance(counts, dict) or not all(
+            isinstance(counts.get(key), int) for key in ("positive", "negative")
+        ):
+            raise Fault(
+                "the recorded snapshot's corpus.by_isa[%r] has no integer "
+                "positive/negative" % isa
+            )
+
+    oracle = recorded.get("oracle")
+    if not isinstance(oracle, dict) or not isinstance(oracle.get("kinds"), dict):
+        raise Fault("the recorded snapshot's oracle.kinds is not an object")
+    if not isinstance(oracle.get("manual_derivation"), list):
+        raise Fault(
+            "the recorded snapshot's oracle.manual_derivation is not an array"
+        )
 
     artifacts = recorded["artifacts"]
     if not isinstance(artifacts.get("count"), int):
@@ -626,20 +751,152 @@ def validate_snapshot(recorded):
             "the recorded snapshot's artifacts.entries is %s, not an array"
             % describe(entries)
         )
+    if artifacts["count"] != len(entries):
+        raise Fault(
+            "the recorded snapshot says artifacts.count %d but holds %d entries"
+            % (artifacts["count"], len(entries))
+        )
+    for key in ("payload_root", "envelope_root"):
+        if not is_digest(artifacts.get(key)):
+            raise Fault(
+                "the recorded snapshot's artifacts.%s is not a sha256 digest" % key
+            )
+
     for index, entry in enumerate(entries):
         if not isinstance(entry, dict):
             raise Fault(
                 "artifacts.entries[%d] is %s, not an object" % (index, describe(entry))
             )
-        for key in ("fixture", "payload_sha256"):
+        for key in ("fixture", "plan_sha256", "fingerprint"):
             if not isinstance(entry.get(key), str):
                 raise Fault(
                     "artifacts.entries[%d] has no string %r" % (index, key)
                 )
-        if not isinstance(entry.get("payload"), dict):
+        for key in ("plan_sha256", "fingerprint"):
+            if not is_digest(entry.get(key)):
+                raise Fault(
+                    "artifacts.entries[%d] %s is not a sha256 digest"
+                    % (index, key)
+                )
+        if not isinstance(entry.get("level"), int):
+            raise Fault(
+                "artifacts.entries[%d] has no integer 'level'" % index
+            )
+        size = entry.get("size")
+        if not (size is None or isinstance(size, int)):
+            raise Fault(
+                "artifacts.entries[%d] size is %s, not an integer or null"
+                % (index, describe(size))
+            )
+        if entry["level"] == 0 and not isinstance(size, int):
+            raise Fault(
+                "artifacts.entries[%d] is level 0 but has no integer size" % index
+            )
+        for key in ("sections", "symbols", "fixup_records"):
+            if not isinstance(entry.get(key), int):
+                raise Fault(
+                    "artifacts.entries[%d] has no integer %r" % (index, key)
+                )
+        definition = entry.get("definition")
+        if not isinstance(definition, dict):
+            raise Fault(
+                "artifacts.entries[%d] has no definition object" % index
+            )
+        for key in ("namespace", "version"):
+            if not isinstance(definition.get(key), str):
+                raise Fault(
+                    "artifacts.entries[%d] definition has no string %r"
+                    % (index, key)
+                )
+        if not is_digest(definition.get("digest")):
+            raise Fault(
+                "artifacts.entries[%d] definition digest is not a sha256 digest"
+                % index
+            )
+        if not isinstance(entry.get("payload_sha256"), str):
+            raise Fault(
+                "artifacts.entries[%d] has no string 'payload_sha256'" % index
+            )
+        if not is_digest(entry.get("payload_sha256")):
+            raise Fault(
+                "artifacts.entries[%d] payload_sha256 is not a sha256 digest" % index
+            )
+        payload = entry.get("payload")
+        if not isinstance(payload, dict):
             raise Fault(
                 "artifacts.entries[%d] has no payload object" % index
             )
+        for key in ("format_version", "fingerprint"):
+            if not isinstance(payload.get(key), str):
+                raise Fault(
+                    "artifacts.entries[%d] payload has no string %r"
+                    % (index, key)
+                )
+        if not is_digest(payload.get("fingerprint")):
+            raise Fault(
+                "artifacts.entries[%d] payload fingerprint is not a sha256 digest"
+                % index
+            )
+        if not isinstance(payload.get("level"), int):
+            raise Fault(
+                "artifacts.entries[%d] payload has no integer 'level'" % index
+            )
+        if not isinstance(payload.get("fixups"), list):
+            raise Fault(
+                "artifacts.entries[%d] payload has no fixups array" % index
+            )
+        if payload["level"] == 0:
+            if not isinstance(payload.get("bytes_hex"), str):
+                raise Fault(
+                    "artifacts.entries[%d] level-0 payload has no string "
+                    "'bytes_hex'" % index
+                )
+            if not isinstance(payload.get("size"), int):
+                raise Fault(
+                    "artifacts.entries[%d] level-0 payload has no integer 'size'"
+                    % index
+                )
+        elif payload["level"] == 1:
+            for key in ("sections", "symbols"):
+                if not isinstance(payload.get(key), list):
+                    raise Fault(
+                        "artifacts.entries[%d] level-1 payload has no %r array"
+                        % (index, key)
+                    )
+        else:
+            raise Fault(
+                "artifacts.entries[%d] payload level is %r, expected 0 or 1"
+                % (index, payload["level"])
+            )
+        envelope = entry.get("envelope")
+        if not isinstance(envelope, dict):
+            raise Fault(
+                "artifacts.entries[%d] has no envelope object" % index
+            )
+        if not is_digest(envelope.get("sha256")):
+            raise Fault(
+                "artifacts.entries[%d] has no sha256 envelope.sha256" % index
+            )
+        if not isinstance(envelope.get("materializer_version"), str):
+            raise Fault(
+                "artifacts.entries[%d] has no string envelope.materializer_version"
+                % index
+            )
+
+    # The roots are derived data. If they do not match the entries, the file is
+    # internally inconsistent, not merely different from a fresh recording.
+    if artifacts["payload_root"] != root_of(
+        entries, lambda entry: entry["payload_sha256"]
+    ):
+        raise Fault(
+            "the recorded snapshot's payload_root does not match its entries"
+        )
+    if artifacts["envelope_root"] != root_of(
+        entries, lambda entry: entry["envelope"]["sha256"]
+    ):
+        raise Fault(
+            "the recorded snapshot's envelope_root does not match its entries"
+        )
 
     implementation = recorded.get("implementation")
     if not isinstance(implementation, dict):
@@ -654,13 +911,50 @@ def validate_snapshot(recorded):
             )
 
 
+def anchor_differences(recorded, anchor):
+    """The recorded root must equal the frozen anchor, independently of the run.
+
+    `compare()` compares a fresh recording to the recorded snapshot. If a later
+    commit re-records the snapshot, both sides move together and the gate would
+    still pass. The anchor is the second, slower-moving reference that makes that
+    operation visible.
+    """
+    expected = anchor["payload_root"]
+    actual = recorded["artifacts"]["payload_root"]
+    if actual == expected:
+        return []
+    return [
+        "anchor/payload_root: recorded %r != frozen %r; re-recording the "
+        "baseline does not move the anchor, and moving the anchor needs a "
+        "compatibility ADR" % (actual, expected)
+    ]
+
+
 def run(arguments):
+    if arguments.check and arguments.record:
+        raise Fault("--check and --record are different operations; choose one")
+    if not arguments.check and not arguments.record:
+        raise Fault(
+            "choose --check SNAPSHOT to compare, or --record to overwrite one; "
+            "a bare invocation no longer rewrites the frozen baseline"
+        )
+    if arguments.out and not arguments.record:
+        raise Fault("--out only applies to --record")
+
     recorded = None
     if arguments.check:
         # Read and validate before materializing: a broken snapshot is a fault,
         # and it should cost a second, not 128 subprocesses.
         recorded = load_snapshot(arguments.check)
         validate_snapshot(recorded)
+        anchor = load_anchor(arguments.anchor)
+        validate_anchor(anchor, arguments.anchor)
+        anchor_diff = anchor_differences(recorded, anchor)
+        if anchor_diff:
+            for diff in anchor_diff:
+                print("DIFF %s" % diff)
+            print("FAIL: the recorded snapshot no longer matches the frozen anchor")
+            return 1
 
     binary = resolve_binary(arguments.binary)
     fresh = snapshot(binary, arguments.probes)
@@ -668,7 +962,7 @@ def run(arguments):
     if recorded is not None:
         return compare(recorded, fresh)
 
-    out = Path(arguments.out)
+    out = Path(arguments.out or DEFAULT_OUT)
     out.parent.mkdir(parents=True, exist_ok=True)
     # `newline="\n"` keeps the snapshot LF on every host; the repository is
     # `text=auto eol=lf`, so a CRLF working copy would be a spurious diff.
@@ -688,14 +982,28 @@ def run(arguments):
     for probe in fresh["probes"]:
         print("probe %s: %s (exit %r)" % (probe["probe"], probe["outcome"], probe["returncode"]))
     print("written: %s" % out)
+    print(
+        "the anchor %s was not changed; update it only with a compatibility ADR"
+        % arguments.anchor
+    )
     return 0
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Record or check the HE-1 baseline")
-    parser.add_argument("--out", default=str(DEFAULT_OUT))
+    parser.add_argument("--out", default="", help="with --record: output path")
     parser.add_argument("--binary", default="", help="default: prototype/target/debug/fmp[.exe]")
     parser.add_argument("--check", metavar="RECORDED", help="compare against a snapshot")
+    parser.add_argument(
+        "--anchor",
+        default=str(DEFAULT_ANCHOR),
+        help="frozen payload_root anchor used by --check",
+    )
+    parser.add_argument(
+        "--record",
+        action="store_true",
+        help="overwrite a snapshot (explicit; never the default)",
+    )
     parser.add_argument(
         "--probes",
         action="store_true",

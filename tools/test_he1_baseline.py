@@ -34,6 +34,36 @@ import he1_baseline as baseline  # noqa: E402
 
 def synthetic_snapshot():
     """The smallest snapshot the comparator accepts."""
+    entries = [
+        {
+            "fixture": "fixtures/x86_64/positive/X86-P1.fmp.json",
+            "plan_sha256": "sha256:" + "c" * 64,
+            "definition": {
+                "namespace": "x86",
+                "version": "0.1.0",
+                "digest": "sha256:" + "e" * 64,
+            },
+            "level": 0,
+            "size": 1,
+            "sections": 0,
+            "symbols": 0,
+            "fixup_records": 0,
+            "fingerprint": "sha256:" + "f" * 64,
+            "payload_sha256": "sha256:" + "c" * 64,
+            "payload": {
+                "bytes_hex": "90",
+                "fingerprint": "sha256:" + "f" * 64,
+                "fixups": [],
+                "format_version": "fmp/0.1",
+                "level": 0,
+                "size": 1,
+            },
+            "envelope": {
+                "sha256": "sha256:" + "d" * 64,
+                "materializer_version": "0.0.0",
+            },
+        }
+    ]
     return {
         "schema": baseline.SCHEMA,
         "projections": {
@@ -53,24 +83,32 @@ def synthetic_snapshot():
         "toolchain": {"rust": "cargo test", "python": "Python test"},
         "definitions": {"count": 1, "newest": {}, "documents": []},
         "corpus": {"positives": 1, "negatives": 1, "by_isa": {}, "negative_phase_split": {}},
-        "oracle": {"kinds": {"assembler": 1}, "manual_derivation": []},
+        "oracle": {
+            "kinds": {"assembler": 1},
+            "manual_derivation": [],
+        },
         "artifacts": {
             "count": 1,
-            "payload_root": "sha256:" + "a" * 64,
-            "envelope_root": "sha256:" + "b" * 64,
-            "entries": [
-                {
-                    "fixture": "fixtures/x86_64/positive/X86-P1.fmp.json",
-                    "payload_sha256": "sha256:" + "c" * 64,
-                    "payload": {"bytes_hex": "90", "level": 0, "size": 1},
-                    "envelope": {
-                        "sha256": "sha256:" + "d" * 64,
-                        "materializer_version": "0.0.0",
-                    },
-                }
-            ],
+            "payload_root": baseline.root_of(
+                entries, lambda entry: entry["payload_sha256"]
+            ),
+            "envelope_root": baseline.root_of(
+                entries, lambda entry: entry["envelope"]["sha256"]
+            ),
+            "entries": entries,
         },
         "probes": [],
+    }
+
+
+def synthetic_anchor(root=None):
+    if root is None:
+        root = synthetic_snapshot()["artifacts"]["payload_root"]
+    return {
+        "schema": baseline.ANCHOR_SCHEMA,
+        "payload_root": root,
+        "set_by": "test",
+        "note": "test anchor",
     }
 
 
@@ -193,10 +231,15 @@ class CommandLineTests(unittest.TestCase):
         path.write_text(value if isinstance(value, str) else json.dumps(value), encoding="utf-8")
         return str(path)
 
+    def anchor(self, root=None):
+        return self.write("anchor.json", synthetic_anchor(root))
+
     def main(self, *arguments):
         stderr = io.StringIO()
-        with contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(io.StringIO()):
+        stdout = io.StringIO()
+        with contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(stdout):
             code = baseline.main(list(arguments))
+        self.last_stdout = stdout.getvalue()
         return code, stderr.getvalue()
 
     def test_a_missing_snapshot_is_a_fault(self):
@@ -220,7 +263,14 @@ class CommandLineTests(unittest.TestCase):
 
     def test_a_missing_binary_is_a_fault(self):
         path = self.write("snapshot.json", synthetic_snapshot())
-        code, stderr = self.main("--check", path, "--binary", str(self.root / "absent-binary"))
+        code, stderr = self.main(
+            "--check",
+            path,
+            "--anchor",
+            self.anchor(),
+            "--binary",
+            str(self.root / "absent-binary"),
+        )
         self.assertEqual(code, 2)
         self.assertIn("no materializer binary", stderr)
         self.assertIn("--manifest-path prototype/Cargo.toml", stderr)
@@ -264,6 +314,122 @@ class CommandLineTests(unittest.TestCase):
         code, stderr = self.main("--check", path)
         self.assertEqual(code, 2)
         self.assertIn("has no string 'payload_sha256'", stderr)
+
+    def test_a_missing_envelope_is_a_fault_even_when_it_would_be_skipped(self):
+        # CI's receipt differs from the recorder's, so `--check` would skip the
+        # envelope. Deleting it must still be a structural fault: otherwise the
+        # evidence the file claims to hold can disappear while the gate is green.
+        snapshot = synthetic_snapshot()
+        del snapshot["artifacts"]["entries"][0]["envelope"]
+        path = self.write("no-envelope.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("has no envelope object", stderr)
+
+    def test_a_missing_projection_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        del snapshot["projections"]["payload"]
+        path = self.write("no-projection.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("projections.payload", stderr)
+
+    def test_a_wrong_typed_payload_root_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        snapshot["artifacts"]["payload_root"] = 42
+        path = self.write("bad-root.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("payload_root is not a sha256 digest", stderr)
+
+    def test_a_payload_root_not_matching_entries_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        snapshot["artifacts"]["payload_root"] = "sha256:" + "0" * 64
+        path = self.write("stale-root.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("payload_root does not match its entries", stderr)
+
+    def test_a_payload_digest_that_is_not_sha256_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        snapshot["artifacts"]["entries"][0]["plan_sha256"] = "md5:abc"
+        path = self.write("bad-plan-digest.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("plan_sha256 is not a sha256 digest", stderr)
+
+    def test_a_level_zero_payload_without_bytes_hex_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        del snapshot["artifacts"]["entries"][0]["payload"]["bytes_hex"]
+        path = self.write("no-bytes.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("level-0 payload has no string 'bytes_hex'", stderr)
+
+    def test_a_definition_with_a_non_digest_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        snapshot["artifacts"]["entries"][0]["definition"]["digest"] = "sha256:xyz"
+        path = self.write("bad-definition.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("definition digest is not a sha256 digest", stderr)
+
+    def test_a_count_mismatch_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        snapshot["artifacts"]["count"] = 2
+        path = self.write("bad-count.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("says artifacts.count 2 but holds 1 entries", stderr)
+
+    def test_recording_requires_an_explicit_flag(self):
+        code, stderr = self.main()
+        self.assertEqual(code, 2)
+        self.assertIn("--check SNAPSHOT", stderr)
+        self.assertIn("--record", stderr)
+
+    def test_check_and_record_are_exclusive(self):
+        path = self.write("snapshot.json", synthetic_snapshot())
+        code, stderr = self.main("--check", path, "--record")
+        self.assertEqual(code, 2)
+        self.assertIn("different operations", stderr)
+
+    def test_a_missing_anchor_is_a_fault(self):
+        path = self.write("snapshot.json", synthetic_snapshot())
+        code, stderr = self.main(
+            "--check", path, "--anchor", str(self.root / "absent-anchor.json")
+        )
+        self.assertEqual(code, 2)
+        self.assertIn("cannot read the baseline anchor", stderr)
+
+    def test_an_anchor_mismatch_is_a_diff(self):
+        path = self.write("snapshot.json", synthetic_snapshot())
+        anchor = self.write("other-anchor.json", synthetic_anchor("sha256:" + "0" * 64))
+        code, stderr = self.main("--check", path, "--anchor", anchor)
+        self.assertEqual(code, 1)
+        self.assertIn("no longer matches the frozen anchor", self.last_stdout)
+
+    def test_a_wrong_typed_anchor_is_a_fault(self):
+        path = self.write("snapshot.json", synthetic_snapshot())
+        anchor = self.write("bad-anchor.json", {"schema": baseline.ANCHOR_SCHEMA})
+        code, stderr = self.main("--check", path, "--anchor", anchor)
+        self.assertEqual(code, 2)
+        self.assertIn("has no sha256 payload_root", stderr)
+
+    def test_the_anchor_accepts_the_synthetic_root(self):
+        path = self.write("snapshot.json", synthetic_snapshot())
+        anchor = self.anchor()
+        code, stderr = self.main(
+            "--check",
+            path,
+            "--anchor",
+            anchor,
+            "--binary",
+            str(self.root / "absent-binary"),
+        )
+        # The anchor matched; the run stops at binary discovery, not at the anchor.
+        self.assertEqual(code, 2)
+        self.assertIn("no materializer binary", stderr)
 
 
 class DiscoveryTests(unittest.TestCase):

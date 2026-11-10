@@ -1,0 +1,6 @@
+{
+  "schema": "monasm.he1.baseline-anchor/0.1",
+  "payload_root": "sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9",
+  "set_by": "ADR-0126",
+  "note": "Frozen H0 payload root. `tools/he1_baseline.py --check` requires the recorded snapshot to equal this value, so re-recording a snapshot cannot silently redefine the baseline. Moving this value requires a compatibility ADR; the envelope root is deliberately not anchored because it carries materializer_version."
+}
