@@ -63,9 +63,21 @@ H0 缺口表：它们来自**新信任边界**的职责划分，记在 §3.2 与
    可写投影，而不是摘要算法本身。
 2. `Definition.document` 被保存但**从未读取**（全仓库只有 `definition.rs:219`
    一处写入）：同一事实存在两份拷贝，是「两个权威来源」的现成入口。
-3. 编码后仍可能失败的是 `E-SIZE-001`（`lib.rs:583`）与 `E-BYTE-001`
-   （`lib.rs:597`）；负例里有 2 个和 1 个分别命中它们。宿主故障不在
-   `materialize` 内，它由 CLI 的 `Failure::Io` 承担（`main.rs:45-48`，exit 2）。
+3. `emit`/`apply` 的失败路径**不止** `E-SIZE-001` 与 `E-BYTE-001`：
+   `E-FIXUP-002`、`E-RANGE-003`、`E-FIXUP-003` 也只在编码阶段产生；而
+   `E-SIZE-001` 的两个负例先被 `validate` 拒绝，不进入 `emit`。`emit` 还调用
+   `try_reserve_exact`，所以分配失败是**物化器内部**的宿主事实，不是 CLI 独有。
+   每条路径最终归入哪个阶段由 H1a 实测（§4.3）；D4 的 `HostFailure` 以此为前提。
+
+### 1.3 已撤回的旧结论
+
+以下两句曾作为「当前事实」写在本节，后续评审已推翻；保留在此仅作修订历史，
+**不得**再作为 H1 的实施前提：
+
+| 旧结论 | 为什么撤回 | 取代它的当前事实 |
+|---|---|---|
+| 「编码后仍可能失败的只有 `E-SIZE-001` 与 `E-BYTE-001`」 | 只读了 `emit` 的两个返回点；`apply` 的 `E-RANGE-003`/`E-FIXUP-003`/`E-FIXUP-002` 也是编码阶段失败，且 `E-SIZE-001` 的负例实际由 `validate` 拒绝 | §1.2 第 3 条与 §4.3 的阶段表；集合由 H1a 实测决定 |
+| 「宿主故障不在 `materialize` 内，由 CLI 的 `Failure::Io` 承担」 | `emit` 的 `try_reserve_exact` 是物化器内的分配；没有 I/O 不等于没有宿主故障 | `MaterializationFailure::HostFailure(HostFault)`（D4）；CLI 只负责映射到 exit 2 |
 
 ## 2. 目标类型生命周期
 
@@ -273,7 +285,7 @@ run receipt 时才决定是否需要写进新协议。
 | `bind` | 固定顺序：**先 `plan::check_structure(&plan)`**（拒绝可变 DTO 的结构破坏：`format_version`、`payload_hex`、五个数值边界与描述符派生算术的前提），再**完整定义身份比对**（`namespace`/`version`/`digest` 三项；现 `materialize` 的 `:349-359` 只比 digest，而 `Registry::find` 的 namespace/version 约束不在 `bind` 的输入上，见 D15），再 `check`，最后 `diagnostic::sort`。`check_structure` 在**任何** validator 移位/求和之前完成；前三步都只读计划，不产生编码；新加的结构诊断只能是 `E-PLAN-001`/`E-PLAN-002`，身份错配沿用已注册的 `E-DEF-001`，所以既有负例输出不变 |
 | `check_structure` 的使用 | 返回非空即视为绑定失败：`diagnostic::sort` 后原样返回 `Vec<Diagnostic>`，不包装成 `Internal`（它是**调用者提交的 DTO 非法**，不是程序不变量破坏）。它不消耗 `Plan`，调用者修正后可以重试 |
 | `check` | 签名不变，内部改走访问器 |
-| 描述符算术与逐位循环（H1a 硬化） | (1) 描述符局部算术提升到 `u64`：`:963` 的 `lsb + width`、`:1274` 的重叠比较、`:1284` 的宽度和、`:1532` 的 `end`。(2) fixup 绝对位位置（`offset * 8 + lsb`）改用 `u128`，或 `checked_mul`/`checked_add`：`:1309-1312` 不再直接乘。(3) `check_one_writer` `:1426` 与 `check_fixup_ownership` `:1475` 的逐位循环截断到 `0..form.bits()`，宽度只访问模板内位；`u32::MAX` 宽度也必须有限步返回。(4) 合法输入输出逐字节不变。这一层是第二道防线：即使有路径绕过 `check_structure`，也不会 panic 或无界循环 |
+| 描述符算术与逐位循环（H1a 硬化） | (1) 描述符局部算术提升到 `u64`：`:963` 的 `lsb + width`、`:1274` 的重叠比较、`:1284` 的宽度和、`:1532` 的 `end`。(2) fixup 绝对位位置（`offset * 8 + lsb`）改用 `u128`，或 `checked_mul`/`checked_add`：`:1309-1312` 不再直接乘。(3) `check_one_writer` `:1426` 与 `check_fixup_ownership` `:1475` 的逐位循环截断到 `0..form.bits()`，宽度只访问模板内位；`u32::MAX` 宽度也必须有限步返回。(4) 合法输入输出逐字节不变。这一层是第二道防线：即使有路径绕过 `check_structure`，也不会 panic 或无界循环。(5) **入口边界不因第二道防线而改变**：两个 `width = u32::MAX` 是结构非法输入，`bind` 必须由 `check_structure` 以 `E-PLAN-002` 拒绝，不得到达 `check`；H1a 直接调用 `check` 只验证绕过 `bind` 时仍有界返回 |
 | `check_fixup_kind` 补 `page` 前提（H1a） | `Transform::Page` 要求 `pc_reference_rule = pcrel_page`（`03_fixup_model.md` §4/§6：`page` 的 `P` 来自 `adrp`）。今天 `check_fixup_kind`（`:1153-1246`）只钉了 `pcrel_lo12`↔`pcrel_hi`、`hi20`↔`none`、`pcrel_hi`→`pcrel_lo12` 和 `scale`↔`transform_shift`，没有 `page` 这一对，所以 A64-P6 把 `fixups[0].pc_reference_rule` 改成 `none` 后仍通过 `check`，直到 `emit` 的 `:725-733` 才以 `internal(...)` 失败。H1a 在 `check_fixup_kind` 加 `E-FIXUP-001`，Pointer 为 `/fixups/i/pc_reference_rule`。不写 AArch64 专用分支：约束按「变换所需的输入」表达 |
 | `BindIdentity`（新增） | `{ plan: ParsedPlanIdentity, definition: DefinitionIdentity }`。**没有** implementation 字段，也没有 `PayloadIdentity`：两者都要在产物存在后才知道。`definition` 从**绑定的 `Arc<Definition>`** 取，不从 `plan.definition` 的声明取（D15） |
 | `Model` | 不变（只读视图） |
@@ -346,15 +358,21 @@ stderr 文本不同，CI 可以区分。
 
 ### 4.1 编译期（`HE-T02`/`HE-T04`，「API 不可表达」）
 
-用 `compile_fail` doctest，零新依赖：
+用 `compile_fail` doctest，零新依赖；**每条断言放在能正常引用被测符号的 crate 里**，
+并配一个使用相同导入路径的正向可编译对照：
 
-| 位置 | 断言 |
-|---|---|
-| `fmp-model` crate 文档（H1a） | 外部 crate 不能写 `definition.forms`，不能 `Definition { .. }` |
-| `fmp-validate` crate 文档（H1b） | 不能 `ValidatedPlan { .. }`，不能 `Clone`；`materialize` 只接受一个参数，无法「用 A 验证、传 B 执行」 |
+| 位置 | 断言 | 正向对照 |
+|---|---|---|
+| `fmp-model` crate 文档（H1a） | 外部 crate 不能写 `definition.forms`，不能 `Definition { .. }` | 同路径读取 `namespace`/`version`/`digest` 的示例必须编译 |
+| `fmp-validate` crate 文档（H1b） | 不能 `ValidatedPlan { .. }`，不能 `Clone` | 同路径调用 `bind`/访问只读方法的示例必须编译 |
+| `fmp-materialize` crate 文档（H1b） | `materialize` 只接受一个 `&ValidatedPlan` 参数，不能「用 A 验证、传 B 执行」 | `use fmp_materialize::materialize;` 后以单个 `&ValidatedPlan` 调用的示例必须编译 |
 
-限制：`compile_fail` 只证明「编译失败」，不证明失败**原因**。计划在 doc 注释里
-写明这一点，并在评审时人工核对一次失败信息。
+`materialize` 的签名负测**不能**放在 `fmp-validate` 的文档测试里：`fmp-validate`
+不依赖 `fmp-materialize`，那里的 `use fmp_materialize::…` 会先因找不到 crate 而失败；
+`compile_fail` 只要求失败，于是签名退化回不安全的两参数形式时测试仍会绿。放在
+`fmp-materialize` 自己的文档测试里，导入与签名同属一个 crate，失败原因才是签名。
+限制仍然成立：`compile_fail` 只证明「编译失败」，不证明失败**原因**；正向对照保证
+导入路径本身可用，人工核对只作为补充，不替代这条结构。
 
 H1a 的定义可变性改造具体是：把现在直接写 `definition.digest` / `forms` /
 `template` 的那条测试拆成两半——编译期 `compile_fail` 证明字段不可写；运行期
@@ -366,8 +384,24 @@ H1a 的定义可变性改造具体是：把现在直接写 `definition.digest` /
 
 阶段边界按**被测 API** 划分，不按反例内容划分：H1a 的负例直接调用
 `plan::check_structure`（或 `fmp_validate::check`），**不调用 `bind`**，因为 `bind`
-要到 H1b 才存在；同一批反例在 H1b 再经 `bind` 测一次端到端拒绝。这样 H1a 可以
-独立全绿，不需要为了「测试已落地」提前引入半成品 `bind`。
+要到 H1b 才存在；H1b 再经 `bind` 测一次端到端拒绝。这样 H1a 可以独立全绿，不需要
+为了「测试已落地」提前引入半成品 `bind`。
+
+**输入可以复用，但预期拒绝阶段跟随入口。** `bind` 先跑 `check_structure`；结构非法
+的输入不会到达 `check`，也不得为了让 H1b 按表通过而放宽第一道检查。只有类型合法、
+语义不合法的输入（极大 `offset`、`page` 缺 PC reference）才由 `check` 拒绝。
+
+| 输入 | H1a：直接调用 | H1b：经 `bind` |
+|---|---|---|
+| 奇数长度或非十六进制 `payload_hex` | `check_structure` → `E-PLAN-002` | `E-PLAN-002`，不到 `check` |
+| `align_bits = 128`、`transform_shift = 128`、`lsb`/`width`/`bits` 越界 | `check_structure` → `E-PLAN-002` | `E-PLAN-002`，不到 `check` |
+| 两个 `field_descriptor.width = u32::MAX` | `check` 有界返回诊断（第二道防线） | `check_structure` → `E-PLAN-002`，不到 `check` |
+| `offset = u64::MAX`（类型合法） | `check` 返回诊断 | `check` 返回同一诊断 |
+| `page` + `pc_reference_rule = none` | `check` → `E-FIXUP-001` | `check` → `E-FIXUP-001` |
+
+若将来需要验证「各字段合法、但描述符总宽与 form 不匹配」的语义拒绝，应另建一个
+反例；不要复用 `u32::MAX` 这个结构非法案例，也不要把它的预期写成「由 `check`
+拒绝」。
 
 `bind` 的身份三元组比对（D15）属于 H1b 的绑定入口；`page` 的 PC reference 前提与
 `internal(...)` 前提表（D16）属于 H1a，因为前者要在 `check` 里拒绝、后者决定哪些
@@ -383,11 +417,12 @@ H1a 的定义可变性改造具体是：把现在直接写 `definition.digest` /
 | `an_alignment_outside_the_parser_bound_is_rejected_by_check_structure` | H1a 直接调用 `check_structure`：取 `A64-P4-beq-btype`（其 fixup 带 `transform_shift`），内存中把 `fixups[0].range_constraint.align_bits` 改为 128 → 在 `/fixups/0/range_constraint/align_bits` 返回 `E-PLAN-002`（`path_type: "u4"`，`found_kind: "integer 128"`）；断言 `1i128 << align_bits` 未执行、没有 panic | D13、第五轮 P1 |
 | `a_transform_shift_outside_the_parser_bound_is_rejected_by_check_structure` | H1a 直接调用 `check_structure`：同一计划把 `fixups[0].transform_shift` 改为 `Some(128)` → 在 `/fixups/0/transform_shift` 返回 `E-PLAN-002`（`path_type: "u6"`）；断言不进入缩放路径 | D13、第五轮 P1 |
 | `a_field_range_outside_the_parser_bound_is_rejected_by_check_structure` | H1a 直接调用 `check_structure`：依次设置 `field_descriptor[0].lsb = 128`、`.width = 0`、`.width = 65`、`range_constraint.bits = 0`、`.bits = 65` → 每项都在对应 Pointer 返回 `E-PLAN-002`；断言这些计划在到达 `check_fixup_descriptor` 的求和/循环前就被拒绝 | D13、第五轮 P1 |
-| `a_descriptor_width_sum_cannot_overflow` | H1a 在 `fmp-validate` 内直接调用 `check`（不经 `bind`）：把两个 `field_descriptor.width` 设为 `u32::MAX` → 断言旧的 `u32` 宽度求和与 `field.lsb + field.width` 不再 panic，且函数在有限步内返回诊断（逐位访问被 `form.bits()` 截断，不是遍历 40 亿位） | D13/D14、第五轮 P1、第六轮 P1 |
+| `a_descriptor_width_sum_cannot_overflow` | H1a 在 `fmp-validate` 内直接调用 `check`（不经 `bind`）：把两个 `field_descriptor.width` 设为 `u32::MAX` → 断言旧的 `u32` 宽度求和与 `field.lsb + field.width` 不再 panic，且函数在有限步内返回诊断（逐位访问被 `form.bits()` 截断，不是遍历 40 亿位）。这是第二道防线；同一输入经 `bind` 时由 `check_structure` 拒绝（见上表），本测试**不**主张它能到达 `check` | D13/D14、第五轮 P1、第六轮 P1 |
 | `two_huge_fixup_offsets_do_not_overflow` | H1a 从**合法解析的 JSON** 计划进入 `fmp_validate::check`（不是手改 DTO）：同一 section 的两个 fixup，`offset` 分别设为 `u64::MAX` 与 `u64::MAX - 8` → `check` 在有限步内返回诊断（site 不匹配任何 instruction），debug 与 release 都不 panic；断言 `offset * 8` 要么用 `u128`，要么用 checked 乘法，溢出时不会进入比较 | D14、第六轮 P1 |
 | `a_page_transform_without_a_page_pc_rule_is_rejected` | H1a 直接调用 `check`：取 A64-P6（首个 fixup 是 `page` + `pcrel_page`），把 `fixups[0].pc_reference_rule` 改为 `none`、其余不变 → 在 `/fixups/0/pc_reference_rule` 返回 `E-FIXUP-001`；断言不返回 `E-INTERNAL-001`、物化器未被调用 | D16、第七轮 P2 |
 | `every_internal_branch_names_its_static_precondition` | 不是运行测试：`ADR-0127` 列出 `emit` 的 15 处 `internal(...)` 与各自的保证者；H1a 提交时必须逐项填完，任一可由合法计划触发且无检查的分支都要先补检查 | D16、第七轮 P2 |
-| `the_structure_negatives_are_rejected_by_bind` | H1b 把上面八条测试（两条 hex、对齐、`transform_shift`、字段边界、宽度和、极大 offset、`page` 前提）各跑一次 `bind`：全部在对应 Pointer 返回诊断，物化器未被调用；`page`、宽度和、极大 offset 由 `check` 拒绝，其余由 `check_structure` 拒绝；不新增期望值，只证明 `bind` 的第一步确实调用了 `check_structure`/`check` | D13/D14/D16、第六轮与第七轮 P1 |
+| `the_negatives_are_rejected_at_the_stage_their_boundary_requires` | H1b 按上表把同一批输入各跑一次 `bind`：六条结构非法输入（两条 hex、对齐、`transform_shift`、字段边界、`u32::MAX` 宽度和）全部由 `check_structure` 在对应 Pointer 返回 `E-PLAN-002`，**不进入 `check`**；极大 `offset` 与 `page` 前提由 `check` 拒绝。物化器均未被调用；预期阶段按上表逐项给出，不沿用 H1a 直接调用时的那一行 | D13/D14/D16、第六轮与第七轮 P1、第八轮 P1 |
+| `a_validated_plan_is_the_only_materialize_input` | H1b：`fmp-materialize` 的正向可编译对照——`use fmp_materialize::materialize;` 后以单个 `&ValidatedPlan` 调用成功编译；同一 crate 的 `compile_fail` 文档测试断言「`Plan` + `Definition` 两参数」不再可调用。两者使用同一导入路径，排除「导入本身就失败」的假通过 | `HE-T04`、第八轮 P2 |
 | `a_declared_namespace_must_match_the_bound_definition` | H1b：取正例，只把 `definition.namespace` 改成另一个字符串（`version`/`digest` 不动），传入真实定义 → `bind` 在 `/definition_identity/namespace` 返回 `E-DEF-001`；物化器未被调用 | D15、第七轮 P1 |
 | `a_declared_version_must_match_the_bound_definition` | H1b：只改 `definition.version`（`namespace`/`digest` 不动）→ 在 `/definition_identity/version` 返回 `E-DEF-001`；同时保留「只改 digest」那条既有负例的输出，证明摘要失配的诊断未被新检查挤掉 | D15、第七轮 P1 |
 | `a_definition_identity_mismatch_is_rejected_by_the_legacy_facade` | H1b：同一错配经 `legacy::materialize` 提交 → 与 `bind` 相同的诊断与 Pointer；二参入口不能绕过身份比对 | D15、第七轮 P1 |
@@ -474,13 +509,14 @@ H1 只对「本次错误边界迁移实际触及」的负例增加值级快照�
 | 提交 | 内容 | 每步必过 |
 |---|---|---|
 | H1a | `Definition` 封闭 + `Registry` 用 `Arc` + `identity` 模块 + `Plan.legacy_document` 改名 + 逐字段 mutation 测试 + 定义可变性测试改造（`compile_fail` + 改文档重载）+ `plan::check_structure`（`format_version`、`payload_hex`、五个数值边界）与八条**直接调用 `check_structure`/`check`** 的负例（两条 X86-P71、对齐/`transform_shift`/字段边界、`u32::MAX` 宽度和、两个极大 offset、`page` 前提）+ `check_fixup_kind` 的 `page ⇒ pcrel_page` 检查 + `internal(...)` 前提表与寄存器宽度风险复现 + validator 位位置算术与逐位循环硬化（`u128`/`u64`/`checked_*`、截断到 `form.bits()`）+ fixup 错误归属实测 | `fmt`、`test --workspace`、`baseline --check`、`check_ids` |
-| H1b | `ValidatedPlan` + `bind`（第一步调用 `check_structure`，随后比对 `namespace`/`version`/`digest`）+ `BindIdentity` + 新 `materialize`/`Materialization`/`ExecutionReceipt` + `MaterializationFailure`/`HostFault`/`allocate_image` + CLI 失败分流/`exit_code` + facade + 调用点迁移 + **同一批八条结构/前提反例经 `bind` 的端到端拒绝** + namespace/version 错配与 facade 测试 + 新身份测试（旧指纹测试保持，不翻转） | 同上 + `oracle` + `check_definition` |
+| H1b | `ValidatedPlan` + `bind`（第一步调用 `check_structure`，随后比对 `namespace`/`version`/`digest`）+ `BindIdentity` + 新 `materialize`/`Materialization`/`ExecutionReceipt` + `MaterializationFailure`/`HostFault`/`allocate_image` + CLI 失败分流/`exit_code` + facade + 调用点迁移 + **同一批八条结构/前提输入经 `bind` 的端到端拒绝**（结构非法者停在 `check_structure`，只有类型合法者到达 `check`）+ namespace/version 错配与 facade 测试 + 新身份测试（旧指纹测试保持，不翻转） | 同上 + `oracle` + `check_definition` |
 | 同 PR | `docs/adr/0127-*.md` + 本文件改为「已采纳」+ `research/he1/H1-report.md` | `check_ids`、`git diff --cached --check` |
 
 一个 PR 两个提交：`ADR-0125` 决策 1 要求 H1 是一个阶段，§13.1 要求阶段内可回归。
 H1a 必须先全绿再开 H1b：八条结构/算术/前提反例在 H1a 就落地，直接测
 `check_structure`/`check`，**不调用尚不存在的 `bind`**；H1b 的 `bind` 只负责接入，
-再把同一批反例经 `bind` 测一次端到端拒绝，并补 `namespace`/`version` 的身份错配。
+再把同一批输入经 `bind` 测一次端到端拒绝，并按 §4.2 的表核对该入口的拒绝阶段
+（结构非法者不会到达 `check`），最后补 `namespace`/`version` 的身份错配。
 fixup 错误归属与 `internal(...)` 前提表也在 H1a 实测后，才冻结
 `MaterializationFailure` 的成员（§10）。
 
