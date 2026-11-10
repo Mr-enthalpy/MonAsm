@@ -1,10 +1,18 @@
 # HE-1 baseline (H0)
 
 Recorded: 2026-11-10
-Commit: `d0082f9f2d3da2786d8d1c0467d2793369ec9090` (`main`, clean tree)
+Original baseline commit: `d0082f9f2d3da2786d8d1c0467d2793369ec9090` (`main`, clean tree)
+Projection recording commit: `ebddbdb02c558baff9c44d90bbdead3e3db96175` (dirty tree)
 Host: Windows Server 2025, `cargo 1.96.0 (30a34c682 2026-05-25)`, Python 3.8.10
 Machine-readable snapshot: `research/he1/compatibility-results.json`
 Frozen H0 snapshot: `research/he1/compatibility-h0-envelope.json`
+
+The two commits are different facts and are named separately. The artifacts were
+first recorded at `d0082f9`; the payload/envelope projection
+(`ADR-0126`) was written later, while the tree was still dirty, so its
+`provenance.projection_recording_commit` is the then-current
+`ebddbdb`. Neither commit changes what was measured: both recordings print the
+same `payload_root`, which is the property that matters.
 
 This file is evidence, not a contract. The contract for "unchanged" is the JSON
 snapshot; this text explains what it covers and what it does not.
@@ -68,11 +76,18 @@ Frozen by this baseline, for the legacy path:
    record, so a seventh such record changes the count and must be registered.
 
 Receipts, recorded but not frozen: `materializer_version`, `implementation`
-(`name`, `version`, `binary_sha256`), `toolchain` and `head`. `--check` never
-compares `implementation`, `toolchain`, `head` or `probes`. It compares the
-envelope only when both sides name the same `implementation`, because the
-envelope carries the build identity; the payload is compared unconditionally.
-The recorded `head` stays `d0082f9` — the commit the snapshot was measured at.
+(`name`, `version`, `binary_sha256`), `toolchain` and `provenance`. `--check`
+never compares `implementation`, `toolchain`, `provenance` or `probes`. It
+compares the envelope only when both sides name the same `implementation`,
+because the envelope carries the build identity; the payload is compared
+unconditionally.
+
+`provenance` has three fields so that a recording is never mistaken for its
+source: `original_baseline_commit` is the frozen H0 commit the artifacts were
+first measured at (`d0082f9`, read from `compatibility-h0-envelope.json`, not
+remembered by hand); `projection_recording_commit` is HEAD when this projection
+was written (`ebddbdb`); `projection_recording_worktree` is `clean` or `dirty`.
+They differ because a projection is recorded before the commit that contains it.
 
 The three pinned digests in `prototype/crates/fmp-cli/tests/determinism.rs` are
 **envelope** digests and stay that way (`ADR-0126` decision 7): they are the
@@ -83,19 +98,32 @@ three constants and every recorded per-entry `envelope.sha256` in one commit;
 ## 3. How to reproduce
 
 ```text
-cargo +1.96.0 build --bin fmp -p fmp-cli
+cargo +1.96.0 build --bin fmp -p fmp-cli --manifest-path prototype/Cargo.toml
 python tools/he1_baseline.py --check research/he1/compatibility-results.json
 python tools/he1_baseline.py --check research/he1/compatibility-results.json \
     --binary prototype/target/debug/fmp        # Linux, macOS
+python tools/test_he1_baseline.py               # the comparator's own tests
 python tools/he1_baseline.py --probes           # re-record, probes included
 ```
+
+The build command names the workspace manifest because the repository root has
+no `Cargo.toml`; without `--manifest-path` or a `cd prototype/`, the first line
+fails. `CI` sets `working-directory: prototype` instead, which is the same build.
 
 The tool re-runs the real `fmp` binary, not a Python re-implementation, so the
 snapshot is the product's output. `--check` exits 1 on any difference in a
 payload, a digest or a count, prints every difference, and exits 2 on a usage or
-I/O fault or on a snapshot schema it does not know. Re-recording is
-`python tools/he1_baseline.py` (writes the same file); without `--probes` the
-`probes` array is written empty.
+I/O fault or on a snapshot schema it does not know. **A fault never exits 1**:
+otherwise a missing binary or a corrupt snapshot would look exactly like a real
+payload regression. Re-recording is `python tools/he1_baseline.py` (writes the
+same file); without `--probes` the `probes` array is written empty.
+
+`tools/test_he1_baseline.py` is the comparator's own gate: 19 tests over two
+synthetic snapshots, no Rust binary and no `definitions/` scan. It fixes the
+properties that would otherwise be re-learned in production: a payload change
+fails, a count change fails, a receipt change alone passes, and **a receipt
+change does not stop the payload from being compared**. The last one is the bug
+the first draft of `ADR-0126`'s split had. CI runs it before building `fmp`.
 
 `--binary` wins over discovery; discovery tries `prototype/target/debug/fmp.exe`
 then `prototype/target/debug/fmp`. If neither exists the tool prints the build
@@ -122,7 +150,7 @@ should not trigger a known stack overflow or wait on a child that may hang.
 
 ## 5. Limits of this baseline
 
-- Captured on one host, and now replayed on a second one. Hosted `gates` run
+- Captured on one host, and replayed on a second one. Hosted `gates` run
   `42714224361` (job `H0 payload baseline`) built `fmp` on Ubuntu 24.04 and
   printed the same `payload_root`, so all 128 payloads were compared there and
   matched. Its `binary_sha256` differs from the recorder's, so the envelope was
@@ -130,6 +158,18 @@ should not trigger a known stack overflow or wait on a child that may hang.
   pass. Three hosts also run `cargo test --workspace` (run `42698924288`), but
   that is the Rust suite: it pins **three** envelope digests cross-host
   (`determinism.rs`), not the 128-payload comparison.
+- The 8 negative comparator experiments in `ADR-0126` were manual. They are now
+  `tools/test_he1_baseline.py`, including the one the first manual pass missed
+  (implementation receipt differs **and** the payload still changes → fail).
+  Manual experiments are kept in `ADR-0126` as the record; the tests are the
+  gate.
+- The comparator test proves the *comparator* does not silently skip. It cannot
+  prove the snapshot covers a fact the tool never reads. Coverage of the payload
+  is bounded by `artifact_entry()`'s projection, which is the whole artifact
+  minus `materializer_version`.
+- The `deep-json` probe is recorded on Windows and reads `0xC00000FD`. Linux and
+  macOS report the same fault with a different exit status or a signal; the probe
+  records the outcome, not a portable code, and `--check` never compares probes.
 - The binary is a debug build. Release-vs-debug payload equality was not
   measured in H0; `EXP-R1`–`R6` cover repeat-run determinism, not profile
   equality.

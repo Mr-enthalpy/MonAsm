@@ -512,17 +512,22 @@ target-agnostic core and package-level conformance — not more coverage. H0 is
 `research/he1/compatibility-results.json` (`payload_root`
 `sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9`;
 104 definitions, 128 positives, 619 negatives, `122/128` oracle re-derivations
-with the six `manual-derivation` skips), and the six characterization tests in
+with the six `manual-derivation` skips), and the seven characterization tests in
 `prototype/crates/fmp-cli/tests/he1_identity_characterization.rs` pin four
-measured concentration points plus two controls. `ADR-0126` splits the artifact
-identity into a compared payload projection and an uncompared build receipt, and
-adds the `baseline` job so the 128 payloads are re-checked on a Linux runner.
+measured concentration points, one legacy-fingerprint constraint and two
+controls. `ADR-0126` splits the artifact identity into a compared payload
+projection and an uncompared build receipt, and adds the `baseline` job so the
+128 payloads are re-checked on a Linux runner; `tools/test_he1_baseline.py`
+(19 tests) turns the eight manual comparator experiments into a CI gate, and a
+fault now exits 2 rather than sharing exit 1 with a real diff.
 One probe found a real gap rather than a clean result: a 20 000-deep JSON plan
 ends the `fmp` process with `0xC00000FD` (stack overflow), which H4 owes a
 bounded rejection test. Next: H1, identity closure
 (`ADR-0127`). The implementation plan draft is
-`docs/architecture/he1-h1-plan.md`; its ten decisions (D1–D10) are recorded and
-four of them (D3, D4, D5, D7) were revised after review. The phase board above
+`docs/architecture/he1-h1-plan.md`; its twelve decisions (D1–D12) are recorded,
+with D3/D4/D5/D7 revised after the first review and D11/D12 added after the
+second (identity layering, and keeping `Plan.document` as a legacy-only input).
+The phase board above
 stays the v0 record; HE-1 phases
 are reported in `research/he1/`.
 
