@@ -8,9 +8,9 @@
 - Superseded by: none
 - Revises: the `artifact_root` consequence of `ADR-0125`; the job set of
   `ADR-0124` (a fourth job, `baseline`); `tools/he1_baseline.py`; the new
-  `tools/test_he1_baseline.py`; `research/he1/baseline.md`;
-  `research/he1/H0-report.md`; the artifact identity row of
-  `docs/architecture/he1-h1-plan.md`
+  `tools/test_he1_baseline.py`; the new `research/he1/baseline-anchor.json`;
+  `research/he1/baseline.md`; `research/he1/H0-report.md`; the artifact identity
+  row of `docs/architecture/he1-h1-plan.md`
 - Keeps in force: `ADR-0123` for the artifact envelope; the three digests in
   `prototype/crates/fmp-cli/tests/determinism.rs`, now labelled envelope digests
 
@@ -129,13 +129,40 @@ Two further failures were found while fixing that one:
    each one names the shape it requires, so a comparator bug still raises rather
    than being reported as a fault.
 9. **The comparator is itself tested, in CI, without the binary.**
-   `tools/test_he1_baseline.py` holds 24 tests over synthetic snapshots; the
-   `baseline` job runs it before installing the toolchain. The eight manual
-   experiments below are kept as history, but a manual experiment does not run on
-   the next commit. The tests exist specifically because the manual pass could not
-   protect a future refactor: **a changed implementation receipt does not stop the
-   payload comparison**, a structurally invalid snapshot exits 2 rather than 1,
-   and prose in this ADR is not a test.
+   `tools/test_he1_baseline.py` holds 38 tests over synthetic snapshots and a
+   synthetic anchor; the `baseline` job runs it before installing the toolchain.
+   The eight manual experiments below are kept as history, but a manual
+   experiment does not run on the next commit. The tests exist specifically
+   because the manual pass could not protect a future refactor: **a changed
+   implementation receipt does not stop the payload comparison**, a structurally
+   invalid snapshot exits 2 rather than 1, and prose in this ADR is not a test.
+10. **Recording is explicit, and a separate anchor makes re-recording visible.**
+    A bare `python tools/he1_baseline.py` used to write the frozen snapshot to its
+    default path, so a later commit could change an artifact, re-record, and still
+    pass a comparator that only compares the fresh run with the file in the tree.
+    Recording now requires `--record`; a bare invocation, `--check --record`, and
+    `--out` without `--record` are usage faults (exit 2). The frozen reference is
+    a second file, `research/he1/baseline-anchor.json`, schema
+    `monasm.he1.baseline-anchor/0.1`, holding only `payload_root`. `--check`
+    requires the recorded root to equal it: a mismatch is a **diff** (exit 1), and
+    a missing or malformed anchor is a **fault** (exit 2). The anchor is not
+    written by the tool. It covers one value on purpose: moving it requires a
+    compatibility ADR, while `envelope_root` cannot be anchored because it
+    contains `materializer_version`. Counterexample if the anchor were missing:
+    the baseline could be reset without any ADR and the comparator would still be
+    green.
+11. **Structural validation covers the whole snapshot, including the parts
+    `--check` would skip.** `validate_snapshot()` now checks `projections`,
+    `definitions.count`/`documents`, `corpus.positives`/`negatives`/`by_isa`,
+    `oracle.kinds`, both roots as `sha256:` digests, every entry's
+    `fixture`/`plan_sha256`/`fingerprint`/`level`/`size`/`definition`/
+    `payload_sha256`/`payload`/`envelope`, `artifacts.count == len(entries)`, and
+    recomputes both roots from the entries. The envelope is checked even when the
+    implementation receipts differ and `comparison_projection()` will drop it:
+    otherwise deleting an entry's `envelope` would look like a clean payload match
+    and silently remove the evidence the file claims to hold. A wrong-typed root
+    is a fault (2), not a diff (1). Every structural failure is raised as `Fault`
+    before materialization.
 
 ## Consequences
 
@@ -165,6 +192,15 @@ Two further failures were found while fixing that one:
 - The comparator's behaviour is covered by `tools/test_he1_baseline.py` in CI,
   not by eight manual experiments that ran once. The manual table below stays as
   the recording of what was measured; the tests are the gate.
+- Recording is an explicit operation, and the baseline has a second, slower
+  reference: `research/he1/baseline-anchor.json` pins `payload_root` independently
+  of the snapshot. A developer who re-records the snapshot moves only the
+  snapshot; the anchor stays put, and `--check` fails at the anchor until a
+  compatibility ADR moves it.
+- Structure validation now covers every field `validate_snapshot()` needs, and it
+  runs before materialization. It deliberately checks the envelope even when the
+  comparison will skip it, so removing evidence is a fault rather than an
+  identical payload.
 - The hosted `baseline` job gives Linux evidence for the 128-payload comparison.
   Before this ADR, the only such evidence was one Windows host, and "the Rust
   suite is green on three hosts" was a different claim.
@@ -200,8 +236,9 @@ Two further failures were found while fixing that one:
 | The envelope still participates when the receipt matches | tampered `envelope.sha256` with an identical receipt → exit 1 | high (measured) |
 | Skipping the envelope does not skip the payload | `implementation` replaced **and** `payload.bytes_hex` tampered → exit 1 | high (measured) |
 | An unknown schema is refused | schema `…/0.1` → exit 2, no comparison | high (measured) |
-| A fault is not reported as a diff | missing binary, unreadable snapshot, corrupt JSON, old schema, root array/`null`, missing `artifacts`, wrong-typed `implementation`, entry without `payload_sha256` → exit 2; payload/count/envelope diffs → exit 1 | high (measured, `tools/test_he1_baseline.py` 24 tests, Python 3.8.10 locally; the hosted run is the PR's next `gates` run) |
-| A well-formed but wrong-shaped snapshot is refused before materialization | `[]`, `null`, missing `artifacts`, string `implementation`, entry without `payload_sha256` → exit 2 with a named fault; five tests | high (measured) |
+| A fault is not reported as a diff | missing binary, unreadable snapshot, corrupt JSON, old schema, root array/`null`, missing `artifacts`, wrong-typed `implementation`, entry without `payload_sha256`, missing projection, wrong-typed or stale root, deleted envelope → exit 2; payload/count/envelope diffs → exit 1 | high (measured, `tools/test_he1_baseline.py` 38 tests, Python 3.8.10 locally; the hosted run is the PR's next `gates` run) |
+| A well-formed but wrong-shaped snapshot is refused before materialization | `[]`, `null`, missing `artifacts`, string `implementation`, entry without `payload_sha256`, missing `projections.payload`, non-digest `payload_root`, `payload_root` not matching the entries, `artifacts.count` ≠ entry count, missing `envelope` → exit 2 with a named fault; the corresponding tests | high (measured) |
+| Re-recording cannot silently reset the reference | `--check` with a snapshot whose `payload_root` differs from the anchor → exit 1 at the anchor, before binary discovery; missing/malformed anchor → exit 2; bare invocation and `--check --record` → exit 2 | high (measured) |
 | The comparator keeps comparing when the receipt changes | `implementation` replaced **and** `payload.bytes_hex` tampered → exit 1, pinned by `test_payload_is_compared_even_when_the_receipt_differs` | high (measured) |
 | Portable discovery and probe opt-in work | `--binary` exercised on Windows; probes ran under `--probes` only | high on Windows; Linux discovery `unverified` (the CI job passes `--binary` explicitly, so it does not exercise discovery) |
 | `determinism.rs` pins envelope digests | read `tests/determinism.rs:158`, `:163`, `:168`; the test hashes `artifact.to_json()` at `:63` | high |
@@ -221,6 +258,9 @@ broad one level down — is easy to reintroduce.
 
 - Someone wants to compare the envelope across implementations: stop. That
   re-couples build identity to payload identity and needs a new ADR.
+- Someone edits `research/he1/baseline-anchor.json` alongside a re-recording:
+  stop. The anchor exists to make that pair of edits visible; moving it needs a
+  compatibility ADR that says why the frozen payload root changed.
 - `materializer_version` changes: follow decision 7 in one commit, re-pin the
   three `determinism.rs` constants, re-record the envelope, and confirm
   `payload_root` did not move.

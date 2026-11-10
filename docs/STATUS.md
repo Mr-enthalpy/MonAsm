@@ -518,26 +518,38 @@ measured concentration points, one legacy-fingerprint constraint and two
 controls. `ADR-0126` splits the artifact identity into a compared payload
 projection and an uncompared build receipt, and adds the `baseline` job so the
 128 payloads are re-checked on a Linux runner; `tools/test_he1_baseline.py`
-(24 tests) turns the eight manual comparator experiments into a CI gate, a fault
+(38 tests) turns the eight manual comparator experiments into a CI gate, a fault
 now exits 2 rather than sharing exit 1 with a real diff, and a structurally
-invalid snapshot (a JSON array, `null`, a missing `artifacts`, a wrong-typed
-receipt) is refused before the 128 materializations instead of failing inside the
-comparator.
+invalid snapshot is refused before the 128 materializations instead of failing
+inside the comparator. Structural validation is now complete: projections, both
+roots, every entry's envelope, digest types and recomputed roots are checked, and
+an entry whose `envelope` was deleted is a fault even when the comparison would
+skip it. Recording is explicit (`--record`), and
+`research/he1/baseline-anchor.json` pins `payload_root` independently, so
+re-recording the snapshot cannot silently reset the reference; a mismatch is a
+diff (exit 1), a malformed anchor is a fault (exit 2), and moving the anchor
+needs a compatibility ADR. The envelope root is deliberately not anchored
+because it contains `materializer_version`.
 One probe found a real gap rather than a clean result: a 20 000-deep JSON plan
 ends the `fmp` process with `0xC00000FD` (stack overflow), which H4 owes a
 bounded rejection test. Next: H1, identity closure
 (`ADR-0127`). The implementation plan draft is
-`docs/architecture/he1-h1-plan.md`; its twelve decisions (D1–D12) are recorded,
+`docs/architecture/he1-h1-plan.md`; its thirteen decisions (D1–D13) are recorded,
 with D3/D4/D5/D7 revised after the first review, D11/D12 added after the second
-(identity layering, and keeping `Plan.document` as a legacy-only input), and D4
-revised again after the third: allocation failure is
+(identity layering, and keeping `Plan.document` as a legacy-only input), D4
+revised again after the third (allocation failure is
 `MaterializationFailure::HostFailure`, not `Internal` or a plan rejection,
-because `emit` calls `try_reserve_exact` and §8.3 requires the split. The third
-round also records that `BindIdentity` is not a full-artifact replay key (a
-`source_trace`-only change keeps it equal while `payload_digest` moves) and moves
-the definition-mutability test conversion into H1a. Two limits stay open for H1
-acceptance rather than being claimed as passed: `FMP_BUILD_ID` is `None`, and
-debug/release payload equality is unmeasured.
+because `emit` calls `try_reserve_exact` and §8.3 requires the split), and D13
+added after the fourth: `bind` re-runs `plan::check_structure` on the public
+mutable `Plan` before producing `ValidatedPlan`, with X86-P71 odd-length and
+non-hex counterexample tests in H1a. The third round also records that
+`BindIdentity` is not a full-artifact replay key (a `source_trace`-only change
+keeps it equal while `payload_digest` moves) and moves the
+definition-mutability test conversion into H1a; the fourth round routes
+`MaterializationFailure::Internal` to exit 2 through a distinct internal-fault
+channel, so an implementation bug is not reported as a rejected plan. Two limits
+stay open for H1 acceptance rather than being claimed as passed: `FMP_BUILD_ID`
+is `None`, and debug/release payload equality is unmeasured.
 The phase board above
 stays the v0 record; HE-1 phases
 are reported in `research/he1/`.

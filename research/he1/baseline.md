@@ -6,6 +6,7 @@ Projection recording commit: `ebddbdb02c558baff9c44d90bbdead3e3db96175` (dirty t
 Host: Windows Server 2025, `cargo 1.96.0 (30a34c682 2026-05-25)`, Python 3.8.10
 Machine-readable snapshot: `research/he1/compatibility-results.json`
 Frozen H0 snapshot: `research/he1/compatibility-h0-envelope.json`
+Frozen anchor: `research/he1/baseline-anchor.json` (`payload_root` only)
 
 The two commits are different facts and are named separately. The artifacts were
 first recorded at `d0082f9`; the payload/envelope projection
@@ -59,6 +60,13 @@ entries:
 The second value is exactly the `artifact_root` recorded by the first H0
 snapshot. That equality is the check that the projection change moved no meaning.
 
+`payload_root` is also pinned in `research/he1/baseline-anchor.json`, a separate
+file with schema `monasm.he1.baseline-anchor/0.1`. `--check` requires the recorded
+snapshot to equal that value, so re-recording the snapshot cannot silently move
+the reference: the anchor changes only with a compatibility ADR. The envelope
+root is **not** anchored, because it contains `materializer_version`; anchoring
+it would turn a legal build-version bump into a baseline failure.
+
 ## 2. What "unchanged" means for later phases
 
 Frozen by this baseline, for the legacy path:
@@ -103,7 +111,7 @@ python tools/he1_baseline.py --check research/he1/compatibility-results.json
 python tools/he1_baseline.py --check research/he1/compatibility-results.json \
     --binary prototype/target/debug/fmp        # Linux, macOS
 python tools/test_he1_baseline.py               # the comparator's own tests
-python tools/he1_baseline.py --probes           # re-record, probes included
+python tools/he1_baseline.py --record --probes  # re-record; no mode is not a no-op
 ```
 
 The build command names the workspace manifest because the repository root has
@@ -112,23 +120,33 @@ fails. `CI` sets `working-directory: prototype` instead, which is the same build
 
 The tool re-runs the real `fmp` binary, not a Python re-implementation, so the
 snapshot is the product's output. `--check` exits 1 on any difference in a
-payload, a digest or a count, prints every difference, and exits 2 on a usage or
-I/O fault, on a snapshot schema it does not know, or on a snapshot whose structure
-is not the one the recorder writes (a JSON array or `null`, a missing
-`artifacts`, an entry without `payload_sha256`, a wrongly typed `implementation`).
-**A fault never exits 1**: otherwise a missing binary or a corrupt snapshot would
-look exactly like a real payload regression. Re-recording is
-`python tools/he1_baseline.py` (writes the same file); without `--probes` the
-`probes` array is written empty.
+payload, a digest or a count, including a recorded `payload_root` that no longer
+equals the frozen anchor. It exits 2 on a usage or I/O fault, on a snapshot
+schema it does not know, or on a snapshot whose structure is not the one the
+recorder writes: a non-object root, missing `projections`, a malformed
+`definitions`/`corpus`/`oracle`/`artifacts` object, a root that is not a
+`sha256:` digest, an entry without `payload`/`envelope`/`payload_sha256`, an
+`artifacts.count` that disagrees with `entries`, or roots that do not recompute
+from the entries. **A fault never exits 1**: otherwise a missing binary or a
+corrupt snapshot would look exactly like a real payload regression.
 
-`tools/test_he1_baseline.py` is the comparator's own gate: 24 tests over
-synthetic snapshots, no Rust binary and no `definitions/` scan. It fixes the
-properties that would otherwise be re-learned in production: a payload change
-fails, a count change fails, a receipt change alone passes, **a receipt change
-does not stop the payload from being compared**, and a structurally invalid
-snapshot is refused with exit 2 before the 128 materializations. The receipt bug
-was the first draft of `ADR-0126`'s split; the structural check was the third
-review round. CI runs the suite before building `fmp`.
+Recording is explicit: `python tools/he1_baseline.py --record` overwrites the
+frozen snapshot; without `--probes` the `probes` array is written empty. A bare
+invocation, `--check --record`, and `--out` without `--record` are usage faults
+(exit 2), so a routine run cannot rewrite the reference by accident. The anchor
+file is never written by the tool; editing it needs a compatibility ADR.
+
+`tools/test_he1_baseline.py` is the comparator's own gate: 38 tests over
+synthetic snapshots and a synthetic anchor, no Rust binary and no `definitions/`
+scan. It fixes the properties that would otherwise be re-learned in production:
+a payload change fails, a count change fails, a receipt change alone passes,
+**a receipt change does not stop the payload from being compared**, a
+structurally invalid snapshot or anchor is refused with exit 2 before the 128
+materializations, a deleted `envelope` is a fault even when `--check` would skip
+it, and only `--record` can write a snapshot. The receipt bug was the first
+draft of `ADR-0126`'s split; the structural check was the third review round, and
+the anchor/record-mode split was the fourth. CI runs the suite before building
+`fmp`.
 
 `--binary` wins over discovery; discovery tries `prototype/target/debug/fmp.exe`
 then `prototype/target/debug/fmp`. If neither exists the tool prints the build
@@ -168,6 +186,10 @@ should not trigger a known stack overflow or wait on a child that may hang.
   (implementation receipt differs **and** the payload still changes → fail).
   Manual experiments are kept in `ADR-0126` as the record; the tests are the
   gate.
+- The anchor freezes only `payload_root`. Definition digests, corpus counts and
+  the envelope root are still checked against the snapshot and the Rust gates,
+  but they are not in the separate anchor. Widening it is a new anchor schema,
+  not an edit to this file, and it needs its own compatibility ADR.
 - The comparator test proves the *comparator* does not silently skip. It cannot
   prove the snapshot covers a fact the tool never reads. Coverage of the payload
   is bounded by `artifact_entry()`'s projection, which is the whole artifact

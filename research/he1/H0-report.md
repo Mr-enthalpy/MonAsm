@@ -17,7 +17,7 @@ Product code: **none**. Nothing under `prototype/crates/*/src/` changed.
 | `research/he1/H0-report.md` | new | This report |
 | `tools/he1_baseline.py` | new | Records and checks the snapshot by running the real `fmp` binary; never a build input |
 | `prototype/crates/fmp-cli/tests/he1_identity_characterization.rs` | new | Seven tests: four assert a hole HE-1/H3/H4 must close, one pins a constraint H1 must preserve (the legacy fingerprint reads a field the parser drops), two are controls (digest mismatch, non-object root). The deep-JSON finding is the Python probe, not a Rust test |
-| `tools/test_he1_baseline.py` | new (§7) | 24 tests over synthetic snapshots: the comparator fails on a payload or count change, passes on a receipt change alone, still compares payloads when the receipt changes, and refuses a structurally invalid snapshot with exit 2 before materializing (§8). No binary needed, so CI runs it first |
+| `tools/test_he1_baseline.py` | new (§7) | 38 tests over synthetic snapshots: the comparator fails on a payload or count change, passes on a receipt change alone, still compares payloads when the receipt changes, and refuses a structurally invalid snapshot or anchor with exit 2 before materializing (§8–§9). It also proves a bare invocation cannot overwrite the frozen baseline. No binary needed, so CI runs it first |
 | `docs/architecture/he1-horizontal-extension.md` | moved from the repository root | Adopts the design document; header now names `ADR-0125` and the `HE-AC`/`HE-T` registry role. Trailing whitespace stripped: 811 lines, no wording removed |
 | `docs/adr/0125-he1-scope.md` | new | The scope decision and the conflict resolution |
 | `AGENTS.md` | edited | Current round, repository map (`docs/fmp-0.2/`, `docs/architecture/`, `packages/`, `bundles/`, `research/he1/`), three added done-criteria bullets. The eight hard rules and "Never do" are untouched |
@@ -42,8 +42,8 @@ cargo +1.96.0 fmt --all -- --check            # run in prototype/
 cargo +1.96.0 test --workspace                # run in prototype/
 cargo +1.96.0 test -p fmp-cli --test he1_identity_characterization
 python tools/test_he1_baseline.py                 # the comparator's own tests
-python tools/he1_baseline.py --probes             # records; probes are opt-in
-python tools/he1_baseline.py --check research/he1/compatibility-results.json
+python tools/he1_baseline.py --record --probes    # records; probes are opt-in
+python tools/he1_baseline.py --check research/he1/compatibility-results.json --anchor research/he1/baseline-anchor.json
 git diff --cached --check                     # after staging
 ```
 
@@ -65,7 +65,7 @@ prototype`; the root has no `Cargo.toml`, so the manifest path is not optional
 | oracle rerun | `122/128 re-derived, 6 skipped, 0 failed`; `toolchain: llvm-mc 23.1.2`; skips are the six `manual-derivation` records |
 | `cargo fmt --check` | clean (the new test file was formatted once with `cargo fmt --all`) |
 | `cargo test --workspace` | 61 passed, 0 failed: `determinism` 6, `fixtures` 2, `he1_identity_characterization` 7, `planner_api` 10, `fmp_materialize` 9, `fmp_model` 22, `fmp_plan` 5 |
-| `test_he1_baseline.py` | 24 passed, 0 failed — comparator, schema, exit-code, discovery, timeout and structural-fault tests; no binary involved (19 at H0, 5 added in §8) |
+| `test_he1_baseline.py` | 38 passed, 0 failed — comparator, schema, anchor, record-mode, exit-code, discovery, timeout and structural-fault tests; no binary involved (19 at H0, 24 after §8, 38 after §9) |
 | `he1_baseline.py` | recorded 104 definitions / 128 positives / 619 negatives / 128 artifacts; `artifact_root sha256:dfd08fee9844058492138b23448073ec47d8eda42383e3f1b3e567db86a86fef` (that value is now the **envelope** root; the gate is `payload_root` — §6) |
 | `he1_baseline.py --check` | `OK: payload projection identical`; `payload_root` unchanged; `envelope: identical (same implementation receipt)` |
 
@@ -305,6 +305,63 @@ comparator tests, `payload_root`
 unchanged, `envelope: identical`. The hosted result for this round is the run
 attached to the PR after the push, not part of the recorded snapshot.
 
+## 9. Fourth review round (`66d5e14`)
+
+The fourth review accepted the H0 evidence and the H1 direction, and requested
+revisions before `ADR-0127` can be frozen. No product Rust code changed in
+this round either.
+
+1. **A re-recording could silently redefine the baseline.** The tool's default
+   output path *was* the frozen snapshot, so a later commit could change an
+   encoded artifact, re-record, and still pass the comparator. Recording is now
+   explicit (`--record`); a bare invocation and `--check --record` are usage
+   faults (exit 2), and `--out` is only valid with `--record`. A second file,
+   `research/he1/baseline-anchor.json` (schema
+   `monasm.he1.baseline-anchor/0.1`), pins only `payload_root`; `--check` requires
+   the recorded snapshot to equal it. A mismatch is a **diff** (exit 1), a
+   missing or malformed anchor is a **fault** (exit 2), and moving the anchor
+   needs a compatibility ADR. The envelope root is deliberately not anchored: it
+   contains `materializer_version`, so anchoring it would forbid a legitimate
+   build-version change.
+2. **Snapshot structure validation was still incomplete.** `validate_snapshot()`
+   now checks `projections`, `definitions.count`/`documents`, `corpus.positives`/
+   `negatives`/`by_isa`, `oracle.kinds`, both roots as `sha256:` digests, every
+   entry's `fixture`/`plan_sha256`/`fingerprint`/`level`/`size`/`definition`/
+   `payload_sha256`/`payload`/`envelope`, `artifacts.count == len(entries)`, and
+   recomputes both roots from the entries. The envelope is checked
+   unconditionally: current CI's implementation receipt differs from the
+   recorder's, so `comparison_projection()` would drop it, and a deleted envelope
+   would otherwise look like a clean payload match. Structural failures all exit
+   2 before materialization.
+3. **A public mutable `Plan` could be wrapped as `ValidatedPlan` without full
+   structural checks.** `plan::read` rejects odd-length or non-lowercase-hex
+   `payload_hex`, but `check_fragments` only compares `hex.len() / 2` with
+   `fragment.size`, and `decode_hex()` indexes `pair[1]`. Since `Plan`,
+   `Section`, `Fragment` and `FragmentBody` are public and mutable, the
+   X86-P71 data fragment `"aabbccdd"` can be changed in memory to `"aabbccdd0"`
+   (length 9, `9 / 2 == 4`) and reach an index-out-of-bounds panic; `"zzzzzzzz"`
+   would be silently decoded as zero bytes. The H1 plan now adds
+   `plan::check_structure(&Plan)` as the first step of `bind`, with those two
+   X86-P71 negative tests in H1a (`D13`, plan §3.2/§4.2). The counterexample is
+   source-derived and is labelled as such until the two tests run.
+4. **`Internal` shared the plan-rejection exit.** The frozen error spec defines
+   `E-INTERNAL-001` as an implementation-invariant violation, not user input, and
+   the CLI reserves exit 1 for a rejected plan. The plan now routes
+   `MaterializationFailure::Internal` through a distinct internal-fault channel
+   at exit 2, with `exit_code()` unit-tested; `PostEncodeAssertion` and `bind`
+   rejection stay at exit 1.
+5. **The §8 phase boundary repeated an existing limit.** `MAX_IMAGE_BYTES`
+   already exists in `fmp-validate`; H4 is now described as validating and
+   completing resource limits (parse depth, new package formats), not introducing
+   the 64 MiB image bound.
+
+Re-measured after this round: 61 workspace tests (7 characterization), 38
+comparator tests, `payload_root`
+`sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9`
+unchanged. The recorded snapshot itself was not re-recorded; only its validation
+and the independent anchor were added. The hosted result for this round is the
+run attached to the PR after the push.
+
 ## Next
 
 H1 — identity closure (`ADR-0127`): private verified objects, a bound
@@ -316,5 +373,7 @@ constraint plus a reload-changes-digest test, because private fields make the
 current test uncompilable; H1b flips the stable-fingerprint test. The other two
 gap tests close in H3 (unselected file, ISA allowlist), the legacy-fingerprint
 constraint is preserved rather than flipped, and the deep-JSON probe finding is
-H4. The implementation plan, with its twelve decisions (D1–D12), is
-`docs/architecture/he1-h1-plan.md`.
+H4. The implementation plan, with its thirteen decisions (D1–D13), is
+`docs/architecture/he1-h1-plan.md`. H1a also owns `plan::check_structure` and its
+two DTO counterexample tests, so the binding path cannot trust a plan merely
+because it was once parsed.
