@@ -33,7 +33,22 @@ import he1_baseline as baseline  # noqa: E402
 
 
 def synthetic_snapshot():
-    """The smallest snapshot the comparator accepts."""
+    """The smallest snapshot the comparator accepts.
+
+    Every derived field is computed from its input, so the fixture is a valid
+    snapshot rather than a shape that only happens to pass one check. A test that
+    wants a broken digest edits one field and leaves the dependency alone.
+    """
+    payload = {
+        "bytes_hex": "90",
+        "fingerprint": "sha256:" + "f" * 64,
+        "fixups": [],
+        "format_version": "fmp/0.1",
+        "level": 0,
+        "size": 1,
+    }
+    materializer_version = "0.0.0"
+    document_path = "definitions/x86_64/0.1.0.json"
     entries = [
         {
             "fixture": "fixtures/x86_64/positive/X86-P1.fmp.json",
@@ -49,18 +64,13 @@ def synthetic_snapshot():
             "symbols": 0,
             "fixup_records": 0,
             "fingerprint": "sha256:" + "f" * 64,
-            "payload_sha256": "sha256:" + "c" * 64,
-            "payload": {
-                "bytes_hex": "90",
-                "fingerprint": "sha256:" + "f" * 64,
-                "fixups": [],
-                "format_version": "fmp/0.1",
-                "level": 0,
-                "size": 1,
-            },
+            "payload_sha256": baseline.canonical_digest(payload),
+            "payload": payload,
             "envelope": {
-                "sha256": "sha256:" + "d" * 64,
-                "materializer_version": "0.0.0",
+                "sha256": baseline.canonical_digest(
+                    dict(payload, materializer_version=materializer_version)
+                ),
+                "materializer_version": materializer_version,
             },
         }
     ]
@@ -81,8 +91,28 @@ def synthetic_snapshot():
             "binary_sha256": "sha256:" + "1" * 64,
         },
         "toolchain": {"rust": "cargo test", "python": "Python test"},
-        "definitions": {"count": 1, "newest": {}, "documents": []},
-        "corpus": {"positives": 1, "negatives": 1, "by_isa": {}, "negative_phase_split": {}},
+        "definitions": {
+            "count": 1,
+            "newest": {"x86_64": document_path},
+            "documents": [
+                {
+                    "path": document_path,
+                    "file_sha256": "sha256:" + "b" * 64,
+                    "namespace": "x86",
+                    "version": "0.1.0",
+                    "definition_format": "fmp-def/0.1",
+                    "isa_family": "x86_64",
+                    "forms": 1,
+                    "digest": "sha256:" + "e" * 64,
+                }
+            ],
+        },
+        "corpus": {
+            "positives": 1,
+            "negatives": 1,
+            "by_isa": {"x86_64": {"positive": 1, "negative": 1}},
+            "negative_phase_split": {},
+        },
         "oracle": {
             "kinds": {"assembler": 1},
             "manual_derivation": [],
@@ -350,6 +380,66 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("payload_root does not match its entries", stderr)
 
+    def test_a_payload_edited_without_its_digest_is_a_fault(self):
+        # The content no longer hashes to the recorded digest. This is corrupt
+        # evidence (2), not a fresh-payload diff (1).
+        snapshot = synthetic_snapshot()
+        snapshot["artifacts"]["entries"][0]["payload"]["bytes_hex"] = "cc"
+        path = self.write("stale-payload.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("payload_sha256 does not match its payload", stderr)
+
+    def test_an_envelope_digest_not_matching_its_payload_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        snapshot["artifacts"]["entries"][0]["envelope"]["sha256"] = (
+            "sha256:" + "0" * 64
+        )
+        path = self.write("stale-envelope.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("envelope.sha256 does not match payload", stderr)
+
+    def test_a_definition_count_not_matching_the_document_array_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        snapshot["definitions"]["count"] = 2
+        path = self.write("bad-definitions-count.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("definitions.count 2 but holds 1 documents", stderr)
+
+    def test_a_newest_path_outside_the_document_array_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        snapshot["definitions"]["newest"]["x86_64"] = "definitions/x86_64/9.9.9.json"
+        path = self.write("bad-newest.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("which is not in definitions.documents", stderr)
+
+    def test_a_corpus_sum_not_matching_by_isa_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        snapshot["corpus"]["positives"] = 2
+        path = self.write("bad-corpus-sum.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("corpus.positives 2 but by_isa sums to 1", stderr)
+
+    def test_an_oracle_sum_not_matching_positives_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        snapshot["oracle"]["kinds"]["assembler"] = 2
+        path = self.write("bad-oracle-sum.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("oracle.kinds sum to 2 but corpus.positives is 1", stderr)
+
+    def test_a_manual_derivation_not_matching_its_oracle_kind_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        snapshot["oracle"]["manual_derivation"] = ["fixtures/x86_64/positive/X.fmp.json"]
+        path = self.write("bad-manual.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("lists 1 manual derivations but counts 0", stderr)
+
     def test_a_payload_digest_that_is_not_sha256_is_a_fault(self):
         snapshot = synthetic_snapshot()
         snapshot["artifacts"]["entries"][0]["plan_sha256"] = "md5:abc"
@@ -460,6 +550,58 @@ class TimeoutTests(unittest.TestCase):
             [sys.executable, "-c", "import time; time.sleep(30)"], 0.3
         )
         self.assertIsNone(started)
+
+
+class ToolchainTests(unittest.TestCase):
+    """A missing toolchain fact is recorded, never raised as a traceback."""
+
+    def test_a_successful_subprocess_is_recorded(self):
+        value = baseline.toolchain_version(
+            [sys.executable, "-c", "print('tool 1.0')"]
+        )
+        self.assertEqual(value, "tool 1.0")
+
+    def test_a_failing_subprocess_is_unavailable(self):
+        value = baseline.toolchain_version(
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.stderr.write('no toolchain'); sys.exit(3)",
+            ]
+        )
+        self.assertTrue(value.startswith("unavailable:"))
+        self.assertIn("exit 3", value)
+        self.assertIn("no toolchain", value)
+
+    def test_empty_stdout_is_unavailable(self):
+        value = baseline.toolchain_version([sys.executable, "-c", "pass"])
+        self.assertEqual(value, "unavailable: empty stdout")
+
+
+class InventoryTests(unittest.TestCase):
+    """Definition and oracle records must be objects before `.get()` is legal."""
+
+    def test_a_non_object_definition_is_a_fault(self):
+        with tempfile.TemporaryDirectory(prefix="monasm-he1-def-") as directory:
+            root = Path(directory)
+            path = root / "x86_64" / "0.1.0.json"
+            path.parent.mkdir(parents=True)
+            path.write_text("[]", encoding="utf-8")
+            with mock.patch.object(baseline, "DEFINITIONS", root):
+                with self.assertRaises(baseline.Fault) as caught:
+                    baseline.definition_inventory()
+        self.assertIn("not a JSON object", str(caught.exception))
+
+    def test_a_non_object_oracle_record_is_a_fault(self):
+        with tempfile.TemporaryDirectory(prefix="monasm-he1-oracle-") as directory:
+            root = Path(directory)
+            plan = root / "X86-P1.fmp.json"
+            plan.write_text("{}", encoding="utf-8")
+            oracle = root / "X86-P1.oracle.json"
+            oracle.write_text("[]", encoding="utf-8")
+            with self.assertRaises(baseline.Fault) as caught:
+                baseline.oracle_state([plan])
+        self.assertIn("not a JSON object", str(caught.exception))
 
 
 if __name__ == "__main__":

@@ -130,6 +130,24 @@ def canonical_digest(document) -> str:
     return "sha256:" + hashlib.sha256(canonical_bytes(document)).hexdigest()
 
 
+def load_json_object(path, what):
+    """Read a JSON object, or raise `Fault`.
+
+    A JSON array is valid JSON but not a document this tool may call `.get()` on.
+    Reading it here keeps a malformed definition/oracle record on the `2` path
+    instead of letting `AttributeError` escape as exit 1.
+    """
+    try:
+        document = json.loads(Path(path).read_text(encoding="utf-8"))
+    except OSError as error:
+        raise Fault("cannot read the %s %s: %s" % (what, path, error))
+    except ValueError as error:
+        raise Fault("%s is not valid JSON: %s" % (path, error))
+    if not isinstance(document, dict):
+        raise Fault("%s is %s, not a JSON object" % (path, describe(document)))
+    return document
+
+
 def version_key(path: Path):
     return [int(part) for part in path.stem.split(".")]
 
@@ -148,9 +166,13 @@ def payload_of(artifact):
 def definition_inventory():
     documents = []
     for path in sorted(DEFINITIONS.rglob("*.json")):
-        document = json.loads(path.read_text(encoding="utf-8"))
-        forms = document.get("forms", [])
-        identity = document.get("target_identity", {})
+        document = load_json_object(path, "definition")
+        forms = document.get("forms")
+        if not isinstance(forms, list):
+            raise Fault("definition %s has no forms array" % path)
+        identity = document.get("target_identity")
+        if not isinstance(identity, dict):
+            raise Fault("definition %s has no target_identity object" % path)
         documents.append(
             {
                 "path": rel(path),
@@ -189,8 +211,10 @@ def oracle_state(positives):
         oracle_path = plan_path.with_name(plan_path.name.replace(".fmp.json", ".oracle.json"))
         if not oracle_path.is_file():
             raise Fault("missing oracle record: %s" % rel(oracle_path))
-        record = json.loads(oracle_path.read_text(encoding="utf-8"))
+        record = load_json_object(oracle_path, "oracle record")
         kind = record.get("kind", "unknown")
+        if not isinstance(kind, str):
+            raise Fault("oracle record %s has a non-string kind" % rel(oracle_path))
         kinds[kind] = kinds.get(kind, 0) + 1
         # `tools/oracle/rerun.py` maps this kind to the `manual-derivation` skip.
         if kind == "manual+disassembly":
@@ -362,21 +386,37 @@ def workspace_version():
     return "unknown"
 
 
-def toolchain():
-    def version(command):
-        try:
-            completed = subprocess.run(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=30,
-            )
-        except (OSError, subprocess.TimeoutExpired) as error:
-            return "unavailable: %s" % error
-        return completed.stdout.decode("utf-8", "replace").strip().splitlines()[0]
+def toolchain_version(command, timeout=30):
+    """One toolchain fact, or an `unavailable:` string.
 
+    A non-zero exit or empty stdout is a missing fact, not a crash. Returning
+    `unavailable` keeps the receipt honest; because `toolchain` is recorded and
+    never compared, a host problem cannot turn into a baseline diff (exit 1).
+    """
+    try:
+        completed = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return "unavailable: %s" % error
+    if completed.returncode != 0:
+        detail = completed.stderr.decode("utf-8", "replace").strip()
+        return "unavailable: exit %d%s" % (
+            completed.returncode,
+            ": " + detail[:200] if detail else "",
+        )
+    lines = completed.stdout.decode("utf-8", "replace").strip().splitlines()
+    if not lines:
+        return "unavailable: empty stdout"
+    return lines[0]
+
+
+def toolchain():
     return {
-        "rust": version(["cargo", "+1.96.0", "--version"]),
+        "rust": toolchain_version(["cargo", "+1.96.0", "--version"]),
         "python": "Python %s" % sys.version.split()[0],
     }
 
@@ -408,7 +448,7 @@ def provenance():
     """
     original = None
     if FROZEN_H0_SNAPSHOT.is_file():
-        frozen = json.loads(FROZEN_H0_SNAPSHOT.read_text(encoding="utf-8"))
+        frozen = load_json_object(FROZEN_H0_SNAPSHOT, "frozen H0 snapshot")
         original = frozen.get("head")
     status = git_revision("status", "--porcelain")
     return {
@@ -690,6 +730,11 @@ def validate_snapshot(recorded):
     documents = definitions.get("documents")
     if not isinstance(documents, list):
         raise Fault("the recorded snapshot's definitions.documents is not an array")
+    if definitions["count"] != len(documents):
+        raise Fault(
+            "the recorded snapshot says definitions.count %d but holds %d documents"
+            % (definitions["count"], len(documents))
+        )
     for index, document in enumerate(documents):
         if not isinstance(document, dict):
             raise Fault(
@@ -718,6 +763,22 @@ def validate_snapshot(recorded):
                     % (index, key)
                 )
 
+    newest = definitions.get("newest")
+    if not isinstance(newest, dict):
+        raise Fault("the recorded snapshot's definitions.newest is not an object")
+    known_paths = {document["path"] for document in documents}
+    for isa, path in newest.items():
+        if not isinstance(isa, str) or not isinstance(path, str):
+            raise Fault(
+                "the recorded snapshot's definitions.newest[%r] is not a "
+                "string path" % (isa,)
+            )
+        if path not in known_paths:
+            raise Fault(
+                "the recorded snapshot's definitions.newest[%r] names %r, "
+                "which is not in definitions.documents" % (isa, path)
+            )
+
     corpus = recorded["corpus"]
     for key in ("positives", "negatives"):
         if not isinstance(corpus.get(key), int):
@@ -733,6 +794,18 @@ def validate_snapshot(recorded):
                 "the recorded snapshot's corpus.by_isa[%r] has no integer "
                 "positive/negative" % isa
             )
+    positive_sum = sum(counts["positive"] for counts in by_isa.values())
+    negative_sum = sum(counts["negative"] for counts in by_isa.values())
+    if corpus["positives"] != positive_sum:
+        raise Fault(
+            "the recorded snapshot says corpus.positives %d but by_isa sums to %d"
+            % (corpus["positives"], positive_sum)
+        )
+    if corpus["negatives"] != negative_sum:
+        raise Fault(
+            "the recorded snapshot says corpus.negatives %d but by_isa sums to %d"
+            % (corpus["negatives"], negative_sum)
+        )
 
     oracle = recorded.get("oracle")
     if not isinstance(oracle, dict) or not isinstance(oracle.get("kinds"), dict):
@@ -740,6 +813,29 @@ def validate_snapshot(recorded):
     if not isinstance(oracle.get("manual_derivation"), list):
         raise Fault(
             "the recorded snapshot's oracle.manual_derivation is not an array"
+        )
+    for kind, count in oracle["kinds"].items():
+        if not isinstance(kind, str) or not isinstance(count, int):
+            raise Fault(
+                "the recorded snapshot's oracle.kinds[%r] is not a string/int "
+                "pair" % (kind,)
+            )
+    if sum(oracle["kinds"].values()) != corpus["positives"]:
+        raise Fault(
+            "the recorded snapshot's oracle.kinds sum to %d but corpus.positives "
+            "is %d" % (sum(oracle["kinds"].values()), corpus["positives"])
+        )
+    for index, fixture in enumerate(oracle["manual_derivation"]):
+        if not isinstance(fixture, str):
+            raise Fault(
+                "the recorded snapshot's oracle.manual_derivation[%d] is not a "
+                "string" % index
+            )
+    manual_count = oracle["kinds"].get("manual+disassembly", 0)
+    if len(oracle["manual_derivation"]) != manual_count:
+        raise Fault(
+            "the recorded snapshot lists %d manual derivations but counts %d"
+            % (len(oracle["manual_derivation"]), manual_count)
         )
 
     artifacts = recorded["artifacts"]
@@ -755,6 +851,11 @@ def validate_snapshot(recorded):
         raise Fault(
             "the recorded snapshot says artifacts.count %d but holds %d entries"
             % (artifacts["count"], len(entries))
+        )
+    if artifacts["count"] != corpus["positives"]:
+        raise Fault(
+            "the recorded snapshot records %d artifacts for %d positive fixtures"
+            % (artifacts["count"], corpus["positives"])
         )
     for key in ("payload_root", "envelope_root"):
         if not is_digest(artifacts.get(key)):
@@ -881,6 +982,25 @@ def validate_snapshot(recorded):
             raise Fault(
                 "artifacts.entries[%d] has no string envelope.materializer_version"
                 % index
+            )
+
+    # Digests are derived data too. Recompute them before the roots: an edited
+    # payload whose recorded digest was left alone would otherwise surface as a
+    # fresh-payload diff (exit 1) instead of a corrupt snapshot (exit 2).
+    for index, entry in enumerate(entries):
+        if entry["payload_sha256"] != canonical_digest(entry["payload"]):
+            raise Fault(
+                "artifacts.entries[%d].payload_sha256 does not match its payload"
+                % index
+            )
+        envelope_object = dict(entry["payload"])
+        envelope_object["materializer_version"] = entry["envelope"][
+            "materializer_version"
+        ]
+        if entry["envelope"]["sha256"] != canonical_digest(envelope_object):
+            raise Fault(
+                "artifacts.entries[%d].envelope.sha256 does not match payload + "
+                "materializer_version" % index
             )
 
     # The roots are derived data. If they do not match the entries, the file is
