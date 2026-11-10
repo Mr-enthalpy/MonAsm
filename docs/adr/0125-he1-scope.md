@@ -93,9 +93,15 @@ boundary.
    family an ADR closed (`ADR-0025`'s `b`/`h` widths, `ADR-0115`'s `movabs`,
    `ADR-0094`'s absent families). Such a slice needs its own ADR first, even if it
    ships as a package.
-6. **The legacy path stays, without becoming a bypass.** Every old entry point
+6. **The legacy path stays, without becoming a bypass.** Every old *entry point*
    keeps working through a version-pinned adapter; no adapter may skip the
    structural, identity or capability checks the new path enforces (`ADR-0127`).
+   "Entry point" here means the published surface: the `fmp/0.1` document format,
+   the artifact envelope and the `fmp` CLI's observable behaviour (arguments,
+   exit codes, stderr diagnostics). It does **not** promise Rust library source
+   compatibility: `fmp-materialize`'s function signatures may change, and the H1
+   plan states that explicitly. A caller outside this repository that links the
+   crate has to migrate; a script that runs `fmp materialize` does not.
 7. **Explicit non-goals for this round**: complete ISA coverage, a semantic IR,
    instruction selection, layout solving, ABI lowering, a full object-file
    backend, a dynamic plugin platform, a macro/expression language, a real fourth

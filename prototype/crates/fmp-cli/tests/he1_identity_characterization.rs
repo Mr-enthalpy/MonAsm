@@ -5,19 +5,21 @@
 //! requiring correct behaviour: a definition can be re-encoded under its original
 //! digest, a parsed operand can change under a stable fingerprint, one unselected
 //! `*.json` breaks the whole load, and a synthetic namespace is rejected by the
-//! loader. The other two are controls — a plan naming another definition's digest,
-//! and a plan whose top level is not an object — and assert the rejection that
-//! already happens. They exist so that:
+//! loader. One is a **constraint**: the legacy fingerprint hashes the raw
+//! document, so it sees fields the parser drops. Two are controls — a plan naming
+//! another definition's digest, and a plan whose top level is not an object — and
+//! assert the rejection that already happens. They exist so that:
 //!
 //! - H0 can report "reproduced" for the audit risks instead of "inferred"; and
 //! - H1/H3 can flip each gap test into a rejection test, at which point the test
 //!   name and body change and this file shrinks.
 //!
 //! Do not read a green run here as a property of the system. For the four gap
-//! tests the property is the opposite of what they assert. The deep-JSON finding
-//! is **not** in this file: it is the `deep-json` probe in
-//! `tools/he1_baseline.py`, because the crash is inside the parser and cannot be
-//! observed safely in-process.
+//! tests the property is the opposite of what they assert. The constraint test
+//! asserts a property H1 must **preserve**, and the two controls assert
+//! rejections H1 must keep. The deep-JSON finding is **not** in this file: it is
+//! the `deep-json` probe in `tools/he1_baseline.py`, because the crash is inside
+//! the parser and cannot be observed safely in-process.
 
 use std::path::PathBuf;
 
@@ -112,6 +114,63 @@ fn a_parsed_operand_can_change_under_a_stable_fingerprint() {
         .expect("register 1 is legal in this slot")
         .bytes;
     assert_ne!(before, after, "the executed facts changed");
+}
+
+/// Constraint, not a gap: the legacy fingerprint hashes the **raw document**, and
+/// the parser deliberately drops fields that document allows — `source_trace` on
+/// an instruction (`plan.rs:604-651`), `type`/`size` on a symbol
+/// (`plan.rs:545-602`). So two plans can share every parsed field and still have
+/// different fingerprints. H1 cannot delete `Plan.document` while promising
+/// `fingerprint()` stays byte-identical; it has to keep the raw document as a
+/// read-only, legacy-only input.
+#[test]
+fn a_legacy_fingerprint_covers_document_fields_the_parser_drops() {
+    let definition = fmp_model::definition::read(&definition_bytes("x86_64", "0.1.0"))
+        .expect("the shipped table loads");
+    let path = root().join("fixtures/x86_64/positive/X86-P1-mov-r64-both-directions.fmp.json");
+    let bytes = std::fs::read(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+    let plain = fmp_model::plan::read(&bytes).expect("the fixture parses");
+
+    // Add a field the reader accepts and does not retain, straight into the raw
+    // document, so the parsed DTO is the only thing the two plans share.
+    let mut document = fmp_model::json::parse(&bytes).expect("the fixture parses as JSON");
+    let fmp_model::json::Json::Object(root) = &mut document else {
+        panic!("a plan is an object");
+    };
+    let instructions = root
+        .iter_mut()
+        .find(|(key, _)| key == "instructions")
+        .map(|(_, value)| value)
+        .expect("the fixture has instructions");
+    let fmp_model::json::Json::Array(items) = instructions else {
+        panic!("instructions is an array");
+    };
+    let fmp_model::json::Json::Object(first) = &mut items[0] else {
+        panic!("an instruction is an object");
+    };
+    first.push((
+        "source_trace".to_string(),
+        fmp_model::json::Json::Object(vec![
+            (
+                "file".to_string(),
+                fmp_model::json::Json::Str("planner.fmp".to_string()),
+            ),
+            ("line".to_string(), fmp_model::json::Json::Int(12)),
+            ("node".to_string(), fmp_model::json::Json::Int(7)),
+        ]),
+    ));
+    let traced = fmp_model::plan::bind(&document).expect("source_trace is accepted");
+
+    assert_eq!(
+        format!("{:?}", plain.instructions),
+        format!("{:?}", traced.instructions),
+        "the parsed instruction has no field for source_trace"
+    );
+    assert_ne!(
+        fmp_materialize::fingerprint(&plain, &definition),
+        fmp_materialize::fingerprint(&traced, &definition),
+        "the fingerprint hashes the raw document, so it sees source_trace"
+    );
 }
 
 /// `HE-T06`: `Registry::load_dir` reads every `*.json` under the directory, so a

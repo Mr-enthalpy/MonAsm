@@ -30,20 +30,22 @@
 | 验证用的定义与执行用的定义是两个独立参数，可以不同 | 读签名即可见：`fmp_materialize::materialize(plan: &Plan, definition: &Definition)`（`fmp-materialize/src/lib.rs:343`）。**静态事实，不是测试**：类型上不阻止传另一份定义 | 关闭 |
 | 一个未被选中的 `*.json` 决定整个加载成败 | `an_unselected_file_in_the_definition_directory_breaks_loading`（运行即复现） | 否 — H3 |
 | 新 ISA 命名空间需要改核心 match | `a_synthetic_namespace_is_rejected_by_the_loader`（运行即复现；`definition.rs:714-756`） | 否 — H3 |
-| 深层 JSON 无界 | `tools/he1_baseline.py --probes` 的 `deep-json` 探针：退出 `3221225725`（**不是**六个 Rust 测试之一） | 否 — H4 |
+| 深层 JSON 无界 | `tools/he1_baseline.py --probes` 的 `deep-json` 探针：退出 `3221225725`（**不是** Rust 测试之一） | 否 — H4 |
+| 旧指纹依赖解析器丢弃的原始文档字段 | `a_legacy_fingerprint_covers_document_fields_the_parser_drops`：加 `source_trace` 后解析结果不变、指纹改变 | **必须保留**（约束，不是缺口；`D12`） |
 
-H0 报告最初写「五个测试以记录漏洞的方式通过」，这是**错误分类**：那六个测试实际是
-**4 个缺口 + 2 个对照**（摘要失配拒绝、非对象顶层拒绝），深层 JSON 的证据来自
-Python 探针。缺口本身不变，错的是归类；`ADR-0126` 已在 `H0-report.md` §6 更正。
-H1 只翻转前两条（定义重编码、稳定指纹），这一点写进 `ADR-0127`，避免验收时把
-H3/H4 的条目算进 H1。
+H0 报告最初写「五个测试以记录漏洞的方式通过」，这是**错误分类**：那批测试实际是
+**4 个缺口 + 1 个约束 + 2 个对照**（摘要失配拒绝、非对象顶层拒绝），深层 JSON 的
+证据来自 Python 探针。缺口本身不变，错的是归类；`ADR-0126` 已在 `H0-report.md` §6
+更正，第二轮评审后又补了那条约束测试（`H0-report.md` §7）。
+H1 只翻转前两条（定义重编码、稳定指纹），保留约束测试，这一点写进 `ADR-0127`，
+避免验收时把 H3/H4 的条目算进 H1。
 
 ### 1.2 受影响的公共面（在 `d42125d` 上计数）
 
 | 符号 | 定义位置 | 调用点 |
 |---|---|---|
 | `fmp_materialize::materialize(&Plan, &Definition)` | `fmp-materialize/src/lib.rs:343` | 19 处（`fmp-cli/src/main.rs` 1、`fixtures.rs` 2、`determinism.rs` 4、`planner_api.rs` 3、`he1_identity_characterization.rs` 4、`fmp-materialize` 自身 5） |
-| `fmp_materialize::fingerprint(&Plan, &Definition)` | 同文件 `:919` | 11 处 |
+| `fmp_materialize::fingerprint(&Plan, &Definition)` | 同文件 `:919` | 14 处（`d42125d` 上 11 处；H0 的 legacy 约束测试多 3 处） |
 | `Registry::load_dir` | `fmp-model/src/definition.rs:788` | 8 处 |
 | `Definition` 的公开字段读写 | `definition.rs:21-30` | `forms`/`digest`/`namespace`/`version`/`target`/`definition_format` 共约 30 处 |
 | `Plan`/`Instruction`/`Operand` 的公开字段 | `plan.rs:21-33`、`:136-166` | 大量；H1 **不**封闭它们（见 §2.3） |
@@ -69,15 +71,23 @@ definition bytes --read--> Definition（字段私有、无 &mut、无公开构�
 plan bytes --read--> Plan（公开 DTO，可以可变）        |
                                    |                   |
                                    +--- bind ----------+--> ValidatedPlan
-                                        （摘要比对 + check + 身份）
+                                        （摘要比对 + check + BindIdentity）
                                                               |
                                                               v
-                                                        materialize
+                                                         materialize
                                                               |
-                                                    Artifact（DTO，envelope 不变）
-                                                              |
-                                           payload_digest / ExecutionIdentity
+                                          Artifact + ExecutionReceipt
+                                     （implementation 与 payload 由物化器附加）
 ```
+
+依赖方向只有两条边，且不新增第三条：
+
+- `fmp-validate → fmp-model`（现状，`fmp-validate/Cargo.toml` 只依赖模型）；
+- `fmp-materialize → fmp-validate + fmp-model`。
+
+所以**构建身份不能出现在验证器里**。`bind` 产出 `BindIdentity { plan, definition }`；
+`ImplementationIdentity` 与载荷身份由 `fmp-materialize` 在真正执行、产物存在之后附加，
+组成 `ExecutionReceipt`。分层依据是「谁才知道它」：验证器不可能知道将来由谁执行。
 
 ### 2.2 四个身份
 
@@ -86,7 +96,7 @@ plan bytes --read--> Plan（公开 DTO，可以可变）        |
 
 | 身份 | 类型（拟） | 定义位置 | 覆盖什么 | 缺它的具体反例 | 反例来源 |
 |---|---|---|---|---|---|
-| plan | `fmp_model::identity::ParsedPlanIdentity` | `fmp-model` | 解析后的全部计划字段，除 `provenance` 与已删除的 `document`；算法名 `plan-identity/0.1` | 改 `operands[1].payload.reg`，身份不变 → 同一凭证对应不同机器码 | **已实测**（H0 测试 2） |
+| plan | `fmp_model::identity::ParsedPlanIdentity` | `fmp-model` | 解析后的全部计划字段，除 `provenance` 与 `legacy_document`；算法名 `plan-identity/0.1` | 改 `operands[1].payload.reg`，身份不变 → 同一凭证对应不同机器码 | **已实测**（H0 测试 2） |
 | definition | 现有 `namespace`/`version`/`digest` 的只读访问 | `fmp-model` | 定义文档的 canonical 摘要（加载时算出） | 改模板保留摘要 → 同一凭证执行未验证规则 | **已实测**（H0 测试 1） |
 | artifact | `fmp_materialize::payload_digest(&Artifact)` | `fmp-materialize` | `payload/0.1` 投影的 canonical sha256：artifact 去掉 `materializer_version` | 只哈希 `bytes_hex`：改一个 fixup 的 target/addend 而字节不变 → 回放声称同一输出 | `ADR-0126` 决策 1 的反例栏 |
 | implementation | `fmp_materialize::ImplementationIdentity` | **物化器构建层**，不是 `fmp-model` | `{name, version, build: Option<String>}`；`build` 来自 `option_env!("FMP_BUILD_ID")` | 取 `fmp-model` 的 `CARGO_PKG_*`：名字是 `fmp-model`、版本是 workspace 的 `0.0.0`，两个不同提交的身份会相同（`HE-T20` 不满足） | 读 `prototype/Cargo.toml`；`ADR-0126` Context 第 1 条 |
@@ -95,8 +105,19 @@ plan bytes --read--> Plan（公开 DTO，可以可变）        |
 「机器语义身份」。它覆盖 `path`（诊断指针），而 `path` 不是编码决策；叫成「语义
 身份」会让人以为身份变了一定意味着机器码变。
 
-`ExecutionIdentity` 由 `bind` 产出并挂在 `ValidatedPlan` 上，含前两项与
-implementation；artifact 身份在产物存在后才能算，单独提供。
+`bind` 只产出计划与定义的绑定身份，挂在 `ValidatedPlan` 上：
+
+```text
+BindIdentity      { plan: ParsedPlanIdentity, definition: DefinitionIdentity }   // fmp-validate
+ExecutionReceipt  { bind: BindIdentity, implementation: ImplementationIdentity,
+                    payload: PayloadIdentity }                                     // fmp-materialize
+```
+
+`ValidatedPlan` 里没有 implementation 字段。**这条不是风格选择**：`fmp-validate`
+引用 `fmp-materialize` 的类型会形成 crate 环（后者已经依赖前者）；就算绕开环，让
+验证结果依赖「谁在验证」也违反 `INV-05`——同一计划的验证结论必须与宿主无关。
+`ExecutionReceipt` 由 `materialize` 返回（§3.3），因此「执行过」和「有收据」是同一
+件事，不存在忘记调用的空档。
 
 `ImplementationIdentity` 取不到 `FMP_BUILD_ID` 时记为 `build: None`，并**不再宣称**
 满足 `HE-T20`——只有记录了 `build` 的构建才满足。它是编译期常量
@@ -114,6 +135,13 @@ run receipt 时才决定是否需要写进新协议。
 - **不封闭**：`Plan`、`Instruction`、`Operand`、`Fixup`。设计 §8.2 允许公开 DTO
   可变，只要它**不是执行凭证**。这样 `planner_api.rs` 里大量「解析后改一个字段
   造负例」的写法继续成立，改动面从 ~1500 行降到 ~20 处。
+- **`Plan.legacy_document` 保留，但只有一个读者**：`Plan.document` 改名为
+  `legacy_document`，注释写明「只供 `fingerprint()`；`bind`、`ParsedPlanIdentity`
+  与任何执行路径都不得读取」。它不能删：解析 DTO 不保留 `source_trace`、
+  `symbol.type`、`symbol.size`，而旧 `fingerprint()` 哈希的是原始文档
+  （`fmp-materialize/src/lib.rs:920`），删掉字段就没法保持旧指纹逐字节不变。
+  `a_legacy_fingerprint_covers_document_fields_the_parser_drops` 已实测这一点。
+  要删除它，必须先改指纹算法并新开 ADR——不能用「删一个没人读的字段」的名义做。
 - `ValidatedPlan` 是唯一凭证：私有字段、无 `&mut`、无公开构造、不实现 `Clone`
   （克隆会制造第二份可独立演进的事实，收益为零）。
 
@@ -125,22 +153,45 @@ run receipt 时才决定是否需要写进新协议。
 |---|---|
 | `src/definition.rs` | `Definition` 字段全部私有：`document` 删除，`forms`/`digest`/`namespace`/`version`/`target`/`definition_format` 改为只读方法；`bind_document`（`:177-227`）仍是唯一构造点；`Registry` 改存 `Vec<Arc<Definition>>`，`find` 返回 `Arc<Definition>` |
 | `src/identity.rs`（新增） | `plan_facts(&Plan) -> Vec<u8>`：定长、无 map、无浮点、无宏；`ParsedPlanIdentity::of(&Plan)`，算法名 `plan-identity/0.1`。**不放** `ImplementationIdentity`——它属于物化器层 |
+| `src/plan.rs` | `Plan.document` 改名 `legacy_document`，字段注释限定为「旧 `fingerprint()` 的唯一输入」；不加任何新访问器 |
 | `src/lib.rs` | 导出 `identity` 模块与 `ParsedPlanIdentity`；**不**导出 `ImplementationIdentity` |
 | `src/definition.rs` 测试 | 现有 22 个模型测试按访问器改；新增「同一字节两次加载摘要相同」 |
 
 `plan_facts` 的编码规则（写进 `ADR-0127`，因为它定义身份含义）：
 
-- 每个节点一个 tag 字节；字符串/数组以 `u64` 小端长度前缀；`i128` 写 16 字节
-  二进制补码；对象按**结构体字段声明顺序**写出，不排序；`Option` 写 1 字节
-  presence。
-- 排除：`Plan.document`、`Plan.provenance`。其余全部包含，包括 `path`
+版本与域分隔：
+
+- 算法名 `plan-identity/0.1`；哈希输入是 `b"plan-identity/0.1\0" ++ facts`，输出
+  `sha256:<64 hex>`。域分隔串与算法名是同一个字面量：换算法必须同时换它，否则
+  两套事实会落进同一哈希域。
+- `ADR-0127` 必须写全下表；本计划只给初始分配。改 tag 或改字段顺序都是算法变更。
+
+| tag | 原语 | 载荷 |
+|---|---|---|
+| `0x01` | u8 / bool | 1 字节 |
+| `0x02` | u64 | 8 字节小端 |
+| `0x03` | i128 | 16 字节小端，二进制补码 |
+| `0x04` | str | u64 字节长度 + UTF-8 |
+| `0x05` | option-none | 无 |
+| `0x06` | option-some | 后跟一个值 |
+| `0x07` | vec | u64 元素数 + 元素 |
+| `0x08` | struct | 后跟各字段值 |
+| `0x09` | enum | u32 变体号（按声明顺序）+ 负载 |
+
+- **结构体字段顺序与枚举变体号是协议，不是实现细节。** Rust 的声明顺序会随重构
+  变化，所以 `ADR-0127` 要把每个被覆盖类型的字段列表和每个枚举的变体号写成规范
+  性文本；逐字段 mutation 表只证明「都覆盖了」，不证明「编号稳定」。
+- **固定测试向量。** `ADR-0127` 至少给出 3 个固定计划的十六进制摘要，其中一个由
+  Python 独立实现重算（硬规则 5：两个独立来源）。只由 Rust 实现生成、再用同一
+  实现验证的向量不算证据。
+- 排除：`Plan.legacy_document`、`Plan.provenance`。其余全部包含，包括 `path`
   （诊断用指针）。包含 `path` 是有意选择：身份只需**至少**覆盖执行事实，多覆盖
   一个确定性字段不产生歧义；若将来证明 `path` 会误伤，仍需新 ADR 才能改。
 - **穷尽解构，不用 `..`，枚举不写 `_ =>` 兜底。** 被覆盖的每个结构体都列全字段：
 
   ```rust
   // 要求：列全，编译器盯着
-  let Plan { document: _, provenance: _, format_version, target, definition,
+  let Plan { legacy_document: _, provenance: _, format_version, target, definition,
              output, sections, symbols, instructions, fixups } = plan;
   let Instruction { instruction_id, section_id, offset, form_id, operands,
                     expected_size, expected_digest, path } = instruction;
@@ -159,11 +210,15 @@ run receipt 时才决定是否需要写进新协议。
 
 | 项 | 改动 |
 |---|---|
-| `ValidatedPlan`（新增） | `{ plan: Plan, definition: Arc<Definition>, identity: ExecutionIdentity }`；唯一构造 `bind(plan: Plan, definition: Arc<Definition>) -> Result<Self, Vec<Diagnostic>>` |
+| `ValidatedPlan`（新增） | `{ plan: Plan, definition: Arc<Definition>, identity: BindIdentity }`；唯一构造 `bind(plan: Plan, definition: Arc<Definition>) -> Result<Self, Vec<Diagnostic>>` |
 | `bind` | 复用现有顺序：先摘要比对（现 `materialize` 的 `:349-359`），再 `check`，最后 `diagnostic::sort`。顺序不变是负例门禁的前提 |
 | `check` | 签名不变，内部改走访问器 |
-| `ExecutionIdentity`（新增） | `{ plan: ParsedPlanIdentity, definition: DefinitionIdentity, implementation: ImplementationIdentity }` |
+| `BindIdentity`（新增） | `{ plan: ParsedPlanIdentity, definition: DefinitionIdentity }`。**没有** implementation 字段，也没有 `PayloadIdentity`：两者都要在产物存在后才知道 |
 | `Model` | 不变（只读视图） |
+
+依赖守卫：`fmp-validate` 的 `[dependencies]` 只允许 `fmp-model`。`ADR-0127` 加一条
+可执行的检查（`cargo tree -p fmp-validate --edges normal` 不得出现
+`fmp-materialize`），并在评审时人工确认一次；这条检查比口头约定便宜。
 
 `bind` 承接今天的摘要错误，因此负例里那条 `E-DEF-001`
 `/definition_identity/digest` 的输出必须逐字节相同。
@@ -172,26 +227,31 @@ run receipt 时才决定是否需要写进新协议。
 
 | 项 | 改动 |
 |---|---|
-| `materialize` | 改为 `materialize(&ValidatedPlan) -> Result<Artifact, MaterializationFailure>`，不再接收 `&Plan`/`&Definition`，也**不再重复**摘要比对与 `check` |
-| `MaterializationFailure`（新增） | 两个变体：`PostEncodeAssertion(Vec<Diagnostic>)`（只在产物字节生成后才能发现）与 `Internal(Diagnostic)`（`E-INTERNAL-001`）。**不设 `Rejected`**：`bind` 之后不应再有静态拒绝，给一个不可达变体只会造出语义模糊的分支。宿主故障留在 CLI exit 2（`main.rs:45-48`） |
+| `materialize` | 改为 `materialize(&ValidatedPlan) -> Result<Materialization, MaterializationFailure>`，不再接收 `&Plan`/`&Definition`，也**不再重复**摘要比对与 `check` |
+| `Materialization`（新增） | `{ artifact: Artifact, receipt: ExecutionReceipt }`。返回 receipt 而不是另设一个「记得调用」的函数：执行过就必须有收据 |
+| `ImplementationIdentity`（新增） | `{ name: "fmp-materialize", version: env!("CARGO_PKG_VERSION"), build: option_env!("FMP_BUILD_ID").map(str::to_string) }`。物化器层独有；`fmp-validate` 不引用它 |
+| `ExecutionReceipt`（新增） | `{ bind: BindIdentity, implementation: ImplementationIdentity, payload: PayloadIdentity }`，由 `materialize` 在产物生成后组装 |
+| `MaterializationFailure`（新增） | 两个变体：`PostEncodeAssertion(Vec<Diagnostic>)`（只在产物字节生成后才能发现）与 `Internal(Diagnostic)`（`E-INTERNAL-001`）。**不设 `Rejected`**：`bind` 之后不应再有静态拒绝，给一个不可达变体只会造出语义模糊的分支 |
+| 宿主故障的归属 | `materialize` 是纯内存计算：`fmp-materialize/src/lib.rs` 的 `std::fs` 只出现在测试里（`:947`、`:1075`），产品路径没有 I/O。所以宿主故障不会从它内部产生，仍由 CLI 在调用前后承担（`main.rs:45-48`，exit 2）。若 H4 引入 64 MiB 映像上限，那是**新的**失败类，需要新 ADR 加变体，不能塞进 `Internal` |
 | `post-encode` 的成员必须先实测 | `emit` 今天还能返回 `E-FIXUP-002`（`:689`）、`E-RANGE-003`（`:710`）、`E-FIXUP-003`（`:766`）、`E-FIXUP-002`（`:833`）。它们是「`check` 没拦住」还是「只能在此刻发现」，H1a 必须先跑一遍负例确认，再决定归入哪一个变体；**不猜**。若某条在 `check` 已拒绝，它属于 `bind` 的 `Vec<Diagnostic>` |
-| `fingerprint` | **算法与输出逐字节不变**，文档注释改为「legacy envelope 身份，按 `ADR-0123` 解释；不覆盖解析后的操作数；不可用于新身份」 |
+| `fingerprint` | **算法与输出逐字节不变**，唯一输入是 `Plan.legacy_document`；文档注释改为「legacy envelope 身份，按 `ADR-0123` 解释；不覆盖解析后的操作数；不可用于新身份」。`a_legacy_fingerprint_covers_document_fields_the_parser_drops` 钉住它对 `source_trace` 的敏感性 |
 | `payload_digest`（新增） | `payload/0.1` 投影的 canonical sha256：`to_json()` 去掉 `materializer_version`。**不是** `canonical_digest(to_json())`——那会把构建身份算进载荷（`ADR-0126`） |
 | `lookup`（`:881`） | 走 `definition.forms()` |
-| `legacy::materialize`（新增，`#[deprecated]`） | `(&Plan, Arc<Definition>)`：内部 `bind` 后调用新 `materialize`。它**不是源码兼容入口**：路径和参数类型都变了；它的作用是保留一个「两参数形状且无法绕过检查」的过渡函数（§5） |
+| `legacy::materialize`（新增，`#[deprecated]`） | `(&Plan, Arc<Definition>)`：内部 `bind` 后调用新 `materialize`，只返回 `artifact`、丢掉 receipt。它**不是源码兼容入口**：路径和参数类型都变了；它的作用是保留一个「两参数形状且无法绕过检查」的过渡函数（§5） |
 
 ### 3.4 `fmp-cli`
 
 `main.rs:100-110` 改为 `Registry::load_dir` → `plan::read` → `Registry::find`
-（得 `Arc<Definition>`）→ `bind` → `materialize`。失败仍把完整诊断数组写到
-stderr、exit 1；`MaterializationFailure` 的两个变体都按同一格式打印，负例输出
-不变。宿主故障仍由 `Failure::Io` 承担（exit 2）。
+（得 `Arc<Definition>`）→ `bind` → `materialize`。返回的 `Materialization` 里
+CLI 只打印 `artifact`；`receipt` H1 不落盘（H3 建 run receipt 时才决定协议）。
+失败仍把完整诊断数组写到 stderr、exit 1；`MaterializationFailure` 的两个变体都按
+同一格式打印，负例输出不变。宿主故障仍由 `Failure::Io` 承担（exit 2）。
 
 ### 3.5 测试改造
 
 | 文件 | 改动 |
 |---|---|
-| `he1_identity_characterization.rs` | 2 条翻转成拒绝测试；其余 4 条保留，文件头加「所属阶段」表（H1 关 2 条、H3 关 2 条、2 条对照；深层 JSON 属 H4，证据是 Python 探针，不是该文件的测试） |
+| `he1_identity_characterization.rs` | 2 条翻转成拒绝测试；其余 5 条保留（H3 关 2 条缺口、1 条 legacy 约束、2 条对照），文件头加「所属阶段」表；深层 JSON 属 H4，证据是 Python 探针，不是该文件的测试 |
 | `fixtures.rs`、`determinism.rs`、`planner_api.rs` | `materialize` 改走 `bind`；`find` 返回 `Arc` 后约 8 处加 `&` |
 | `fmp-materialize` 单测 | 5 处 `materialize` + 4 处 `fingerprint` 按新签名改 |
 
@@ -218,6 +278,10 @@ stderr、exit 1；`MaterializationFailure` 的两个变体都按同一格式打�
 | `a_mutated_operand_changes_the_plan_identity` | 改 `payload.reg` → `ParsedPlanIdentity` 变 | `HE-T02`/`HE-T04` |
 | `plan_identity_covers_every_parsed_field` | 逐字段 mutation 表（section/instruction/operand/modifier/fixup/symbol/output/target），每项都必须改变身份 | 硬规则 2 的逐字段反例 |
 | `plan_identity_ignores_provenance` | 只改 `provenance` → 身份不变（与 legacy `fingerprint` 的排除一致） | §12 |
+| `plan_identity_ignores_the_legacy_document` | 只改 `source_trace` → `ParsedPlanIdentity` **不变**、旧 `fingerprint` **变**；两者是不同主张，不能互相替代 | D12 |
+| `a_legacy_fingerprint_covers_document_fields_the_parser_drops` | H0 的约束测试，H1 之后仍然通过（改名 `legacy_document` 不改变行为） | `HE-AC-10`、D12 |
+| `receipt_names_the_build_that_ran` | `receipt.implementation` 来自物化器的编译期常量；`FMP_BUILD_ID` 缺失时记 `build: None` 且不宣称满足 `HE-T20` | `HE-T20`、D9 |
+| `bind_reports_only_plan_and_definition` | `ValidatedPlan` 的 `BindIdentity` 里没有 implementation 字段（编译期 + 依赖方向） | D11 |
 | `payload_digest_follows_the_bytes` | 改一个操作数 → 字节变 → 载荷身份变；再改 `materializer_version` → 载荷身份**不变**、envelope 变 | `HE-T20`、`ADR-0126` |
 | `legacy_facade_rejects_a_digest_mismatch` | 二参 facade 同样拒绝（H0 的对照测试迁到这里） | `HE-T04` |
 | `bind_reports_the_definition_it_bound` | `identity.definition.digest` 等于实际执行定义的摘要 | `HE-AC-06` |
@@ -234,6 +298,7 @@ stderr、exit 1；`MaterializationFailure` 的两个变体都按同一格式打�
 | 门禁 | 实际保证 |
 |---|---|
 | `python tools/he1_baseline.py --check research/he1/compatibility-results.json` | 128 个产物**载荷**（`payload/0.1`）、104 个定义摘要、计数、oracle 状态不变。`envelope` 只在实现收据相同时才比较 |
+| `python tools/test_he1_baseline.py` | 比较器自检：payload 变化必失败、实现收据不同时仍比较 payload、结构或计数变化必失败。不依赖真实二进制，因此 CI 里先于基线比较运行 |
 | `cargo test --workspace` 的 `fixtures`/`planner_api` | 619 个负例的 **code + Pointer + detail-key 集合**相等。detail 值与顺序**不在**门禁内 |
 | `determinism.rs` | 每 ISA 一条 **envelope** 摘要（`materializer_version` 在内），跨三主机 |
 | `fixtures.rs` 的 Level-1 用例 | envelope 形状未被新身份污染 |
@@ -257,12 +322,14 @@ H1 只把「值级」保证加到 3 条**编码后失败**的负例上（`E-SIZE
 | FMP 文档面（`fmp/0.1` 计划、`fmp-def/0.1|0.2` 定义） | **不变**。字段、语义、拒绝规则不动 |
 | 128 个正例的**载荷** | **不变**（`payload_root` 不变）。这是 `HE-AC-10` 的判据 |
 | Artifact **envelope** | 形状不变、不加字段；`materializer_version` 仍是 envelope 收据，可变 |
-| 旧 `fingerprint` | 算法与输出不变；文档标注 legacy，**不**作为新可信身份 |
+| 旧 `fingerprint` | 算法与输出不变，输入仍是 `Plan.legacy_document`（只读、legacy-only）；文档标注 legacy，**不**作为新可信身份 |
 | **Rust 库 API** | **允许迁移**。`fmp_materialize::materialize` 的路径与参数类型都变；`legacy::materialize` 只是「两参数形状且无法绕过检查」的过渡函数，**不是源码兼容入口**。仓库外的调用者需要改代码 |
+| 「旧入口」指什么 | `fmp/0.1` 文档面、产物 envelope 与 `fmp` CLI 行为。**不是** Rust 库函数签名；`ADR-0125` 决策 6 的 adapter 只承诺前者 |
 | 619 个负例诊断 | code + Pointer + detail-key **集合**不变；3 条编码后失败的值级快照（§4.3） |
 | 定义文件与形态 | 不改；`definitions/**` 一个字节不动 |
 | 错误码 | 不新增。`E-DEF-001`/`E-SIZE-001`/`E-BYTE-001`/`E-INTERNAL-001` 均已注册 |
-| 计数 | 不改 `STATUS.md` 的 v0 计数；测试数会变（6 个 characterization 里 2 个改名/翻转） |
+| 宿主故障 | `materialize` 内没有 I/O，宿主故障不进 `MaterializationFailure`；CLI 以 `Failure::Io`、exit 2 承担。H4 的资源上限若引入，是新失败类 |
+| 计数 | 不改 `STATUS.md` 的 v0 计数；测试数会变（7 个 characterization 里 2 个改名/翻转，其余保留） |
 | 依赖方向 | 不变：`validate → model`，`materialize → validate + model` |
 
 「原型阶段允许 API 迁移」是本轮的明确选择（§9 D5）；如果评审要求旧库调用点源码
@@ -273,8 +340,8 @@ H1 只把「值级」保证加到 3 条**编码后失败**的负例上（`E-SIZE
 
 | 提交 | 内容 | 每步必过 |
 |---|---|---|
-| H1a | `Definition` 封闭 + `Registry` 用 `Arc` + `identity` 模块 + 逐字段 mutation 测试 | `fmt`、`test --workspace`、`baseline --check`、`check_ids` |
-| H1b | `ValidatedPlan` + `bind` + 新 `materialize` 签名 + `MaterializationFailure` + facade + 调用点迁移 + 2 条测试翻转 | 同上 + `oracle` + `check_definition` |
+| H1a | `Definition` 封闭 + `Registry` 用 `Arc` + `identity` 模块 + `Plan.legacy_document` 改名 + 逐字段 mutation 测试 | `fmt`、`test --workspace`、`baseline --check`、`check_ids` |
+| H1b | `ValidatedPlan` + `bind` + `BindIdentity` + 新 `materialize`/`Materialization`/`ExecutionReceipt` + `MaterializationFailure` + facade + 调用点迁移 + 2 条测试翻转 | 同上 + `oracle` + `check_definition` |
 | 同 PR | `docs/adr/0127-*.md` + 本文件改为「已采纳」+ `research/he1/H1-report.md` | `check_ids`、`git diff --cached --check` |
 
 一个 PR 两个提交：`ADR-0125` 决策 1 要求 H1 是一个阶段，§13.1 要求阶段内可回归。
@@ -285,7 +352,8 @@ H1 只把「值级」保证加到 3 条**编码后失败**的负例上（`E-SIZE
 |---|---|
 | 身份算法写错，导致不同事实同身份 | 逐字段 mutation 表；`plan_facts` 是纯函数，可单测 |
 | 给结构体加字段后忘记同步身份，漏洞复发 | **编译期**：穷尽解构、不用 `..`、枚举不写 `_ =>`（§3.1） |
-| `plan_facts` 与 `bind` 漂移成两个权威来源 | 只从 `Plan` 读数，不读 `document`；`document` 字段直接删除 |
+| `plan_facts` 与 `bind` 漂移成两个权威来源 | 只从 `Plan` 读数，不读 `legacy_document`；`legacy_document` 只有一个读者（旧 `fingerprint`），并由 H0 约束测试钉住 |
+| 身份编码的字段顺序随重构变化，旧身份无法重算 | `ADR-0127` 把字段顺序与 tag 写成协议文本，附 3 个固定向量（其中一个用 Python 独立重算） |
 | 诊断顺序变化，负例面扩大 | 619 个负例的 code/Pointer/detail-key 集合门禁；`bind` 内顺序照抄现实现；3 条编码后失败另有值级快照 |
 | `Arc` 改动扩散 | 编译器引导，约 8 处；`Registry` 仍保持确定性顺序 |
 | 有人继续用二参入口绕过 | facade 内部就是 `bind`；另加一条测试证明摘要不符仍被拒 |
@@ -306,7 +374,8 @@ H1 只把「值级」保证加到 3 条**编码后失败**的负例上（`E-SIZE
 
 ## 9. 待审决策
 
-`D3`/`D4`/`D5`/`D7` 已按评审修订；`D8`–`D10` 是本轮新增。
+`D3`/`D4`/`D5`/`D7` 按第一轮评审修订，`D8`–`D10` 同轮新增；`D11`–`D12` 是
+第二轮评审（`ebddbdb`）后新增。
 
 | # | 问题 | 决定（推荐） | 状态 | 备选与代价 |
 |---|---|---|---|---|
@@ -320,6 +389,8 @@ H1 只把「值级」保证加到 3 条**编码后失败**的负例上（`E-SIZE
 | D8 | 身份是否分层 | **三层**：`payload`（比较）、`envelope`（同收据才比较）、`implementation`（只记录），各自带版本名。`payload_digest` 必须去掉 `materializer_version` | 新增（设计 §7.2 本就如此分层） | 单一摘要：构建版本一改就误报载荷漂移，`ADR-0126` 已实测 |
 | D9 | `ImplementationIdentity` 从哪来 | 由**物化器构建层**提供 `{name, version, build}`，`build` 取 `option_env!("FMP_BUILD_ID")`；取不到记 `None`，且不宣称满足 `HE-T20` | 新增 | 用 `fmp-model` 的 `CARGO_PKG_*`：名字与版本都不指向物化器 |
 | D10 | 负例门禁的声明范围 | 619 条只保证 **code + Pointer + detail-key 集合**；额外对 3 条编码后失败加**值级**快照 | 新增 | 619 条全量值级快照：把合法的措辞调整变成门禁失败，维护成本不成比例 |
+| D11 | 身份归属与依赖方向 | **`bind` 只产 `BindIdentity { plan, definition }`**；`ImplementationIdentity`、载荷身份与 `ExecutionReceipt` 只在 `fmp-materialize`；`fmp-validate` 的依赖只允许 `fmp-model`，并加 `cargo tree` 检查 | 新增（第二轮 P1） | 把 implementation 放进 `BindIdentity`：要么 `fmp-validate → fmp-materialize` 成环，要么让验证结论依赖宿主 |
+| D12 | `Plan.document` 如何处置 | **保留并改名 `legacy_document`**，只供旧 `fingerprint()` 只读；`ParsedPlanIdentity` 与执行路径都不读；删除它需要新指纹算法 + 新 ADR | 新增（第二轮 P1） | 直接删除：解析器丢弃 `source_trace`/`symbol.type`/`symbol.size`，旧指纹无法保持逐字节不变（已实测） |
 
 ## 10. 证据状态
 
@@ -328,11 +399,14 @@ H1 只把「值级」保证加到 3 条**编码后失败**的负例上（`E-SIZE
 | 六个缺口中的三个由 H1 关闭 | 前两条有运行测试；第三条是可读签名事实（§1.1）。另有三条归 H3/H4 | 高 |
 | `Definition.digest` 在加载时由文档算出 | 读 `definition.rs:217` | 高 |
 | `Definition.document` 从未被读取 | 全仓库 grep `.document`：只有写入处 | 高 |
+| 旧 `fingerprint` 依赖原始文档中解析器丢弃的字段 | `a_legacy_fingerprint_covers_document_fields_the_parser_drops` 通过：加 `source_trace` 后解析 DTO 不变、指纹改变 | 高（已实测） |
+| `fmp-validate` 不依赖 `fmp-materialize` | 读 `prototype/crates/fmp-validate/Cargo.toml`：`[dependencies]` 只有 `fmp-model` | 高 |
+| `materialize` 的产品路径没有 I/O | `std::fs` 只出现在 `fmp-materialize/src/lib.rs` 的测试里（`:947`、`:1075`） | 高 |
 | 编码后**至少**有两种失败 | 读 `lib.rs:583`、`:597`；负例计数 2 与 1 | 高 |
 | 编码后失败**只有**两种 | `emit` 另有 `E-FIXUP-002`/`E-FIXUP-003`/`E-RANGE-003`（`:689`、`:766`、`:833`、`:710`）；是否都被 `check` 提前拦住 **未测** | **未验证** — H1a 先跑负例确认 |
 | envelope 不能加字段 | `fixtures.rs:143-153` 固定整份 artifact | 高 |
 | 现有负例门禁只比三元组 | 读 `fixtures.rs:220-254`、`planner_api.rs:247`：排序后的 `(code, path, detail-key 集合)` | 高 |
 | `determinism.rs` 钉的是 envelope 摘要 | 读 `:63` 的 `canonical_bytes(&artifact.to_json())` 与 `:158`/`:163`/`:168` 三个常量 | 高 |
-| 调用点数量 | 在 `d42125d` 上 grep 计数 | 高（会随实现变动） |
+| 调用点数量 | 在 `d42125d` 与当前树上 grep 计数（§1.2） | 高（会随实现变动） |
 | `compile_fail` doctest 能覆盖 API 约束 | 未在本仓库跑过 | **未验证** — 第一个提交时先证明它能触发 |
 | 两个提交都全绿 | 尚未实施 | 未验证 |
