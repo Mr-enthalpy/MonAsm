@@ -26,7 +26,7 @@
 | 缺口 | 证据 | H1 是否关闭 |
 |---|---|---|
 | 已加载定义可在内存中改写，摘要不变 | `tests/he1_identity_characterization.rs::a_loaded_definition_can_be_re_encoded_under_its_original_digest`（运行即复现） | 关闭 |
-| 计划身份覆盖原始文档，不覆盖解析后的操作数 | 同文件 `a_parsed_operand_can_change_under_a_stable_fingerprint`（运行即复现） | 关闭 |
+| 计划身份覆盖原始文档，不覆盖解析后的操作数 | 同文件 `a_parsed_operand_can_change_under_a_stable_fingerprint`（运行即复现） | 关闭 — 由 `ParsedPlanIdentity`/`ExecutionReceipt` 覆盖解析后事实；旧 `fingerprint` 仍不变是**保留的 legacy 行为**，不是待翻转的缺陷 |
 | 验证用的定义与执行用的定义是两个独立参数，可以不同 | 读签名即可见：`fmp_materialize::materialize(plan: &Plan, definition: &Definition)`（`fmp-materialize/src/lib.rs:343`）。**静态事实，不是测试**：类型上不阻止传另一份定义 | 关闭 |
 | 一个未被选中的 `*.json` 决定整个加载成败 | `an_unselected_file_in_the_definition_directory_breaks_loading`（运行即复现） | 否 — H3 |
 | 新 ISA 命名空间需要改核心 match | `a_synthetic_namespace_is_rejected_by_the_loader`（运行即复现；`definition.rs:714-756`） | 否 — H3 |
@@ -37,8 +37,10 @@ H0 报告最初写「五个测试以记录漏洞的方式通过」，这是**错
 **4 个缺口 + 1 个约束 + 2 个对照**（摘要失配拒绝、非对象顶层拒绝），深层 JSON 的
 证据来自 Python 探针。缺口本身不变，错的是归类；`ADR-0126` 已在 `H0-report.md` §6
 更正，第二轮评审后又补了那条约束测试（`H0-report.md` §7）。
-H1 只翻转前两条（定义重编码、稳定指纹），保留约束测试，这一点写进 `ADR-0127`，
-避免验收时把 H3/H4 的条目算进 H1。
+H1 不再「翻转稳定指纹」：第一条按 §4.1 改成 `compile_fail` + 重载测试；第二条
+（解析后操作数变化、旧指纹不变）保留为 legacy 行为，由 `ParsedPlanIdentity` 与
+`ExecutionReceipt` 覆盖新事实。H1 保留约束测试，这一点写进 `ADR-0127`，避免验收时
+把 H3/H4 的条目算进 H1。
 
 ### 1.2 受影响的公共面（在 `d42125d` 上计数）
 
@@ -267,7 +269,7 @@ run receipt 时才决定是否需要写进新协议。
 | `bind` | 固定顺序：**先 `plan::check_structure(&plan)`**（拒绝可变 DTO 的结构破坏：`format_version`、`payload_hex`、五个数值边界与描述符派生算术的前提），再摘要比对（现 `materialize` 的 `:349-359`），再 `check`，最后 `diagnostic::sort`。`check_structure` 在**任何** validator 移位/求和之前完成；前三步都只读计划，不产生编码；新加的只能是 `E-PLAN-001`/`E-PLAN-002`，而这两条今天的负例在 `plan::read` 已先拒绝，所以既有负例输出不变 |
 | `check_structure` 的使用 | 返回非空即视为绑定失败：`diagnostic::sort` 后原样返回 `Vec<Diagnostic>`，不包装成 `Internal`（它是**调用者提交的 DTO 非法**，不是程序不变量破坏）。它不消耗 `Plan`，调用者修正后可以重试 |
 | `check` | 签名不变，内部改走访问器 |
-| `check_fixup_descriptor`（H1a 硬化） | 宽度求和从 `u32` 改为 `u64`（或 `checked_add`）；`:963`、`:1274`、`:1532` 的描述符边界也提升到 `u64`。合法输入输出逐字节不变；这层只保证即使未来有路径绕过 `check_structure`，越界宽度也不会 panic。用直接调用 `check` 的单元测试钉住 `u32::MAX` 宽度 |
+| 描述符算术与逐位循环（H1a 硬化） | (1) 描述符局部算术提升到 `u64`：`:963` 的 `lsb + width`、`:1274` 的重叠比较、`:1284` 的宽度和、`:1532` 的 `end`。(2) fixup 绝对位位置（`offset * 8 + lsb`）改用 `u128`，或 `checked_mul`/`checked_add`：`:1309-1312` 不再直接乘。(3) `check_one_writer` `:1426` 与 `check_fixup_ownership` `:1475` 的逐位循环截断到 `0..form.bits()`，宽度只访问模板内位；`u32::MAX` 宽度也必须有限步返回。(4) 合法输入输出逐字节不变。这一层是第二道防线：即使有路径绕过 `check_structure`，也不会 panic 或无界循环 |
 | `BindIdentity`（新增） | `{ plan: ParsedPlanIdentity, definition: DefinitionIdentity }`。**没有** implementation 字段，也没有 `PayloadIdentity`：两者都要在产物存在后才知道 |
 | `Model` | 不变（只读视图） |
 
@@ -326,7 +328,7 @@ stderr 文本不同，CI 可以区分。
 
 | 文件 | 改动 |
 |---|---|
-| `he1_identity_characterization.rs` | H1a 改定义可变性那条（见 §4.1）：字段私有化后它无法编译，改成 `compile_fail` + 「改文档后重载得到新摘要」；H1b 只翻转指纹那条（`a_parsed_operand_can_change_under_a_stable_fingerprint` → 拒绝）。其余 5 条保留（H3 关 2 条缺口、1 条 legacy 约束、2 条对照），文件头加「所属阶段」表；深层 JSON 属 H4，证据是 Python 探针，不是该文件的测试 |
+| `he1_identity_characterization.rs` | H1a 改定义可变性那条（见 §4.1）：字段私有化后它无法编译，改成 `compile_fail` + 「改文档后重载得到新摘要」。H1b **不翻转** `a_parsed_operand_can_change_under_a_stable_fingerprint`：它证明旧指纹仍不变，这个行为必须保留；新身份由 `a_legacy_fingerprint_is_not_a_trusted_cache_key` 与 `a_mutated_operand_changes_the_plan_identity` 覆盖。其余 5 条保留（H3 关 2 条缺口、1 条 legacy 约束、2 条对照），文件头加「所属阶段」表；深层 JSON 属 H4，证据是 Python 探针，不是该文件的测试 |
 | `fixtures.rs`、`determinism.rs`、`planner_api.rs` | `materialize` 改走 `bind`；`find` 返回 `Arc` 后约 8 处加 `&` |
 | `fmp-materialize` 单测 | 5 处 `materialize` + 4 处 `fingerprint` 按新签名改 |
 
@@ -352,21 +354,29 @@ H1a 的定义可变性改造具体是：把现在直接写 `definition.digest` /
 
 ### 4.2 运行期
 
+阶段边界按**被测 API** 划分，不按反例内容划分：H1a 的负例直接调用
+`plan::check_structure`（或 `fmp_validate::check`），**不调用 `bind`**，因为 `bind`
+要到 H1b 才存在；同一批反例在 H1b 再经 `bind` 测一次端到端拒绝。这样 H1a 可以
+独立全绿，不需要为了「测试已落地」提前引入半成品 `bind`。
+
 | 测试（拟名） | 断言 | 对应 |
 |---|---|---|
 | `a_definition_reloads_to_the_same_digest` | 同一字节两次加载摘要相同；换行/键序不同但 canonical 相同则摘要相同 | `HE-T03` |
 | `a_tampered_definition_document_is_rejected_by_bind` | 改模板保留计划中的旧摘要 → `E-DEF-001` `/definition_identity/digest` | `HE-T03` |
-| `a_mutated_operand_changes_the_plan_identity` | 改 `payload.reg` → `ParsedPlanIdentity` 变 | `HE-T02`/`HE-T04` |
-| `a_data_fragment_with_odd_length_hex_is_rejected_by_bind` | 取 X86-P71 的四字节数据片段，内存中把 `payload_hex` 改为 `"aabbccdd0"`（长度 9，`9 / 2 == 4`，所以旧 `check_fragments` 不会拒绝）→ `bind` 在该 fragment 的 `/payload_hex` 返回 `E-PLAN-002`；断言物化器未被调用、没有 panic | D13、第四轮 P1 |
-| `a_data_fragment_with_non_hex_payload_is_rejected_by_bind` | 同样片段改为 `"zzzzzzzz"`（长度与字节数都合法，`decode_hex` 的 `digit()` 会把 `z` 当 0）→ `bind` 返回 `E-PLAN-002`；断言既没有产物，也没有静默替换的字节 | D13、第四轮 P1 |
-| `an_alignment_outside_the_parser_bound_is_rejected_by_bind` | 取 `A64-P4-beq-btype`（其 fixup 带 `transform_shift`），内存中把 `fixups[0].range_constraint.align_bits` 改为 128 → `bind` 在 `/fixups/0/range_constraint/align_bits` 返回 `E-PLAN-002`（`path_type: "u4"`，`found_kind: "integer 128"`）；断言 `1i128 << align_bits` 未执行、物化器未被调用、没有 panic | D13、第五轮 P1 |
-| `a_transform_shift_outside_the_parser_bound_is_rejected_by_bind` | 同一计划把 `fixups[0].transform_shift` 改为 `Some(128)` → `bind` 在 `/fixups/0/transform_shift` 返回 `E-PLAN-002`（`path_type: "u6"`）；断言不进入缩放路径 | D13、第五轮 P1 |
-| `a_field_range_outside_the_parser_bound_is_rejected_by_bind` | 依次设置 `field_descriptor[0].lsb = 128`、`.width = 0`、`.width = 65`、`range_constraint.bits = 0`、`.bits = 65` → 每项都在对应 Pointer 返回 `E-PLAN-002`；断言这些计划在到达 `check_fixup_descriptor` 的求和/循环前就被拒绝 | D13、第五轮 P1 |
-| `a_descriptor_width_sum_cannot_overflow` | 把两个 `field_descriptor.width` 设为 `u32::MAX`（绕过解析器）后 `bind` → 第一个宽度由 `check_structure` 在 `/fixups/0/field_descriptor/0/width` 返回 `E-PLAN-002`；另在 `fmp-validate` 内直接调用 `check`（不经 `bind`），断言旧的 `u32` 宽度求和不再 panic（H1a 的 `u64`/`checked_add` 硬化） | D13、第五轮 P1 |
+| `a_mutated_operand_changes_the_plan_identity` | H1b：改 `payload.reg` → `ParsedPlanIdentity` 变；同一计划的旧 `fingerprint` **仍不变**（legacy 行为，见 `a_legacy_fingerprint_covers_document_fields_the_parser_drops`），断言新身份的变化不依赖旧指纹变化 | `HE-T02`/`HE-T04`、D3/D12、第六轮 P1 |
+| `a_data_fragment_with_odd_length_hex_is_rejected_by_check_structure` | H1a 直接调用 `check_structure`：取 X86-P71 的四字节数据片段，内存中把 `payload_hex` 改为 `"aabbccdd0"`（长度 9，`9 / 2 == 4`，所以旧 `check_fragments` 不会拒绝）→ 在该 fragment 的 `/payload_hex` 返回 `E-PLAN-002`；断言物化器未被调用、没有 panic | D13、第四轮 P1 |
+| `a_data_fragment_with_non_hex_payload_is_rejected_by_check_structure` | H1a 直接调用 `check_structure`：同样片段改为 `"zzzzzzzz"`（长度与字节数都合法，`decode_hex` 的 `digit()` 会把 `z` 当 0）→ 返回 `E-PLAN-002`；断言既没有产物，也没有静默替换的字节 | D13、第四轮 P1 |
+| `an_alignment_outside_the_parser_bound_is_rejected_by_check_structure` | H1a 直接调用 `check_structure`：取 `A64-P4-beq-btype`（其 fixup 带 `transform_shift`），内存中把 `fixups[0].range_constraint.align_bits` 改为 128 → 在 `/fixups/0/range_constraint/align_bits` 返回 `E-PLAN-002`（`path_type: "u4"`，`found_kind: "integer 128"`）；断言 `1i128 << align_bits` 未执行、没有 panic | D13、第五轮 P1 |
+| `a_transform_shift_outside_the_parser_bound_is_rejected_by_check_structure` | H1a 直接调用 `check_structure`：同一计划把 `fixups[0].transform_shift` 改为 `Some(128)` → 在 `/fixups/0/transform_shift` 返回 `E-PLAN-002`（`path_type: "u6"`）；断言不进入缩放路径 | D13、第五轮 P1 |
+| `a_field_range_outside_the_parser_bound_is_rejected_by_check_structure` | H1a 直接调用 `check_structure`：依次设置 `field_descriptor[0].lsb = 128`、`.width = 0`、`.width = 65`、`range_constraint.bits = 0`、`.bits = 65` → 每项都在对应 Pointer 返回 `E-PLAN-002`；断言这些计划在到达 `check_fixup_descriptor` 的求和/循环前就被拒绝 | D13、第五轮 P1 |
+| `a_descriptor_width_sum_cannot_overflow` | H1a 在 `fmp-validate` 内直接调用 `check`（不经 `bind`）：把两个 `field_descriptor.width` 设为 `u32::MAX` → 断言旧的 `u32` 宽度求和与 `field.lsb + field.width` 不再 panic，且函数在有限步内返回诊断（逐位访问被 `form.bits()` 截断，不是遍历 40 亿位） | D13/D14、第五轮 P1、第六轮 P1 |
+| `two_huge_fixup_offsets_do_not_overflow` | H1a 从**合法解析的 JSON** 计划进入 `fmp_validate::check`（不是手改 DTO）：同一 section 的两个 fixup，`offset` 分别设为 `u64::MAX` 与 `u64::MAX - 8` → `check` 在有限步内返回诊断（site 不匹配任何 instruction），debug 与 release 都不 panic；断言 `offset * 8` 要么用 `u128`，要么用 checked 乘法，溢出时不会进入比较 | D14、第六轮 P1 |
+| `the_structure_negatives_are_rejected_by_bind` | H1b 把上面七条测试（两条 hex、对齐、`transform_shift`、字段边界、宽度和、极大 offset）各跑一次 `bind`：全部在对应 Pointer 返回诊断，物化器未被调用；不新增期望值，只证明 `bind` 的第一步确实调用了 `check_structure`/`check` | D13/D14、第六轮 P1 |
 | `plan_identity_covers_every_parsed_field` | 逐字段 mutation 表（section/instruction/operand/modifier/fixup/symbol/output/target），每项都必须改变身份 | 硬规则 2 的逐字段反例 |
 | `plan_identity_ignores_provenance` | 只改 `provenance` → 身份不变（与 legacy `fingerprint` 的排除一致） | §12 |
 | `a_definition_edit_reloads_to_a_new_digest` | 改定义文档字节后重载：`digest` 变；旧计划按旧摘要被 `bind` 拒绝。替代 H1a 之后无法编译的字段直改测试 | `HE-T03` |
 | `plan_identity_ignores_the_legacy_document` | 只改 `source_trace` → `ParsedPlanIdentity` **不变**、旧 `fingerprint` **变**；两者是不同主张，不能互相替代 | D12 |
+| `a_legacy_fingerprint_is_not_a_trusted_cache_key` | 改一个解析后操作数：旧 `fingerprint` 不变，但 `ParsedPlanIdentity` 与 `ExecutionReceipt` 变。验收要求「旧行为保持 + 新身份随执行事实变化」，**不**要求把旧指纹测试翻成拒绝 | D3/D12、第六轮 P1 |
 | `a_bind_identity_does_not_identify_the_legacy_artifact` | 计划 A 与「A + `source_trace`」：两个 `BindIdentity` 字段都相同，`fingerprint` 与 `payload_digest` 都不同；完整收据能区分 | D3、D12 |
 | `an_image_reservation_failure_is_a_host_failure` | 注入 `allocate_image` 失败 → `MaterializationFailure::HostFailure`，不是 `Internal`、不是诊断数组；同一计划在够内存的主机上仍成功 | D4、`§8.3` |
 | `a_legacy_fingerprint_covers_document_fields_the_parser_drops` | H0 的约束测试，H1 之后仍然通过（改名 `legacy_document` 不改变行为） | `HE-AC-10`、D12 |
@@ -388,8 +398,8 @@ H1a 的定义可变性改造具体是：把现在直接写 `definition.digest` /
 
 | 门禁 | 实际保证 |
 |---|---|
-| `python tools/he1_baseline.py --check research/he1/compatibility-results.json` | 128 个产物**载荷**（`payload/0.1`）、104 个定义摘要、计数、oracle 状态不变；记录快照的 `payload_root` 还必须等于 `research/he1/baseline-anchor.json`。`envelope` 只在实现收据相同时才比较；结构错误、内容与声明摘要不符、派生计数不一致都先于物化以 exit 2 拒绝 |
-| `python tools/test_he1_baseline.py` | 比较器自检：payload 变化必失败、实现收据不同时仍比较 payload、结构或计数变化必失败、改 `payload.bytes_hex` 不改摘要 / 改 envelope 摘要 / `definitions.count` 与文档数不符 / `by_isa` 和与语料计数不符 / oracle 和与正例数不符都是故障、删除 `envelope` 是故障、锚点不符是差异、裸调用不能重录、失败的工具链子进程记为 `unavailable` 而不是抛异常。不依赖真实二进制，因此 CI 里先于基线比较运行 |
+| `python tools/he1_baseline.py --check research/he1/compatibility-results.json` | 128 个产物**载荷**（`payload/0.1`）、104 个定义摘要、计数、oracle 状态不变；记录快照的 `payload_root` **和** `definitions_root` 还必须等于 `research/he1/baseline-anchor.json`，且每个 fresh artifact 的必需 envelope 成员必须存在。`envelope` 只在实现收据相同时才比较；结构错误、内容与声明摘要不符、派生计数不一致都先于物化以 exit 2 拒绝 |
+| `python tools/test_he1_baseline.py` | 比较器自检：payload 变化必失败、实现收据不同时仍比较 payload、结构或计数变化必失败、改 `payload.bytes_hex` 不改摘要 / 改 envelope 摘要 / `definitions.count` 与文档数不符 / `by_isa` 和与语料计数不符 / oracle 和与正例数不符都是故障、删除 `envelope` 是故障、锚点不符（含 `definitions_root`）是差异、缺 `definitions_root` 的锚点是故障、fresh artifact 缺 `materializer_version` 等必需成员是故障、裸调用不能重录、失败的工具链子进程记为 `unavailable` 而不是抛异常。不依赖真实二进制，因此 CI 里先于基线比较运行 |
 | `cargo test --workspace` 的 `fixtures`/`planner_api` | 619 个负例的 **code + Pointer + detail-key 集合**相等。detail 值与顺序**不在**门禁内 |
 | `determinism.rs` | 每 ISA 一条 **envelope** 摘要（`materializer_version` 在内），跨三主机 |
 | `fixtures.rs` 的 Level-1 用例 | envelope 形状未被新身份污染 |
@@ -418,11 +428,11 @@ H1 只把「值级」保证加到 3 条**编码后失败**的负例上（`E-SIZE
 | **Rust 库 API** | **允许迁移**。`fmp_materialize::materialize` 的路径与参数类型都变；`legacy::materialize` 只是「两参数形状且无法绕过检查」的过渡函数，**不是源码兼容入口**。仓库外的调用者需要改代码 |
 | 「旧入口」指什么 | `fmp/0.1` 文档面、产物 envelope 与 `fmp` CLI 行为。**不是** Rust 库函数签名；`ADR-0125` 决策 6 的 adapter 只承诺前者 |
 | 619 个负例诊断 | code + Pointer + detail-key **集合**不变；3 条编码后失败的值级快照（§4.3） |
-| 定义文件与形态 | 不改；`definitions/**` 一个字节不动 |
+| 定义文件与形态 | 不改；`definitions/**` 一个字节不动（H0 锚点的 `definitions_root` 不变） |
 | 错误码 | 不新增。`E-DEF-001`/`E-SIZE-001`/`E-BYTE-001`/`E-INTERNAL-001` 均已注册 |
 | 宿主故障 | 分配失败由 `MaterializationFailure::HostFailure(HostFault)` 表达，CLI 映射为 exit 2 的宿主通道（与 `Failure::Io` 同级）。64 MiB 上限已在 `fmp-validate`，不新增限制；H4 若加新的主机相关限制，是新的 `HostFault` 变体 |
 | 内部故障 | `MaterializationFailure::Internal`（`E-INTERNAL-001`）映射为 exit 2 的独立内部故障通道，stderr 先打 `internal fault:`；**不**与 `bind` 拒绝、`PostEncodeAssertion` 共用 exit 1，避免把实现缺陷说成用户计划错误 |
-| 计数 | 不改 `STATUS.md` 的 v0 计数；测试数会变（7 个 characterization 里 1 个翻转、1 个改为 `compile_fail` + 重载测试，其余保留） |
+| 计数 | 不改 `STATUS.md` 的 v0 计数；测试数会变（7 个 characterization 里 1 个改为 `compile_fail` + 重载测试，其余保留；H1b 新增身份测试，**不**翻转旧指纹测试） |
 | 依赖方向 | 不变：`validate → model`，`materialize → validate + model` |
 
 「原型阶段允许 API 迁移」是本轮的明确选择（§9 D5）；如果评审要求旧库调用点源码
@@ -433,13 +443,14 @@ H1 只把「值级」保证加到 3 条**编码后失败**的负例上（`E-SIZE
 
 | 提交 | 内容 | 每步必过 |
 |---|---|---|
-| H1a | `Definition` 封闭 + `Registry` 用 `Arc` + `identity` 模块 + `Plan.legacy_document` 改名 + 逐字段 mutation 测试 + 定义可变性测试改造（`compile_fail` + 改文档重载）+ `plan::check_structure`（`format_version`、`payload_hex`、五个数值边界）与两条 X86-P71 DTO 结构负例 + 四个数值边界负例 + `fmp-validate` 描述符算术硬化（`u64`/`checked_add`）与 `u32::MAX` 宽度不 panic 测试 + fixup 错误归属实测 | `fmt`、`test --workspace`、`baseline --check`、`check_ids` |
-| H1b | `ValidatedPlan` + `bind`（第一步调用 `check_structure`）+ `BindIdentity` + 新 `materialize`/`Materialization`/`ExecutionReceipt` + `MaterializationFailure`/`HostFault`/`allocate_image` + CLI 失败分流/`exit_code` + facade + 调用点迁移 + **1 条**测试翻转（指纹） | 同上 + `oracle` + `check_definition` |
+| H1a | `Definition` 封闭 + `Registry` 用 `Arc` + `identity` 模块 + `Plan.legacy_document` 改名 + 逐字段 mutation 测试 + 定义可变性测试改造（`compile_fail` + 改文档重载）+ `plan::check_structure`（`format_version`、`payload_hex`、五个数值边界）与七条**直接调用 `check_structure`/`check`** 的负例（两条 X86-P71、对齐/`transform_shift`/字段边界、`u32::MAX` 宽度和、两个极大 offset）+ validator 位位置算术与逐位循环硬化（`u128`/`u64`/`checked_*`、截断到 `form.bits()`）+ fixup 错误归属实测 | `fmt`、`test --workspace`、`baseline --check`、`check_ids` |
+| H1b | `ValidatedPlan` + `bind`（第一步调用 `check_structure`）+ `BindIdentity` + 新 `materialize`/`Materialization`/`ExecutionReceipt` + `MaterializationFailure`/`HostFault`/`allocate_image` + CLI 失败分流/`exit_code` + facade + 调用点迁移 + **同一批七条结构反例经 `bind` 的端到端拒绝** + 新身份测试（旧指纹测试保持，不翻转） | 同上 + `oracle` + `check_definition` |
 | 同 PR | `docs/adr/0127-*.md` + 本文件改为「已采纳」+ `research/he1/H1-report.md` | `check_ids`、`git diff --cached --check` |
 
 一个 PR 两个提交：`ADR-0125` 决策 1 要求 H1 是一个阶段，§13.1 要求阶段内可回归。
-H1a 必须先全绿再开 H1b：`check_structure` 与两条 DTO 反例在 H1a 就落地，H1b 的
-`bind` 只负责接入；fixup 错误归属也在 H1a 实测后，才冻结
+H1a 必须先全绿再开 H1b：七条结构/算术反例在 H1a 就落地，直接测
+`check_structure`/`check`，**不调用尚不存在的 `bind`**；H1b 的 `bind` 只负责接入，
+再把同一批反例经 `bind` 测一次端到端拒绝。fixup 错误归属也在 H1a 实测后，才冻结
 `MaterializationFailure` 的成员（§10）。
 
 ## 7. 风险与回滚
@@ -453,6 +464,7 @@ H1a 必须先全绿再开 H1b：`check_structure` 与两条 DTO 反例在 H1a �
 | 诊断顺序变化，负例面扩大 | 619 个负例的 code/Pointer/detail-key 集合门禁；`bind` 内顺序照抄现实现；3 条编码后失败另有值级快照 |
 | `Arc` 改动扩散 | 编译器引导，约 8 处；`Registry` 仍保持确定性顺序 |
 | 可变 DTO 绕过解析器规则，把非法 hex 或越界数值送进 validator/materializer | `bind` 先跑 `check_structure`：X86-P71 的奇数长度与非十六进制两条负例；`align_bits=128`、`transform_shift=128`、`lsb/width/bits` 越界与 `u32::MAX` 宽度求和四条负例；`fmp-validate` 的描述符算术改成 `u64`/`checked_add` 作第二道防线；`decode_hex` 保持现状，不改成「猜一个字节」 |
+| 合法解析范围内的数值在 validator 内溢出或无界循环 | `offset` 是解析器允许的完整 `u64`：`check_fixup_overlap` 的 `offset * 8` 可溢出，`check_one_writer` 会按 `u32::MAX` 宽度逐位遍历。H1a 用 `u128`/`checked_*` 计算绝对位位置，并把逐位循环截断到 `form.bits()`；`two_huge_fixup_offsets_do_not_overflow` 从合法 JSON 进入 `check`，debug/release 各跑一次 |
 | `Internal` 被误分类成用户计划错误 | `Failure::Internal` 独立变体 + `exit_code` 单测；exit 1 只留给 `Rejected` 与 `PostEncodeAssertion` |
 | 有人继续用二参入口绕过 | facade 内部就是 `bind`；另加一条测试证明摘要不符仍被拒 |
 | envelope 意外新增字段 | Level-1 夹具 + `payload_root` |
@@ -480,7 +492,8 @@ H1a 必须先全绿再开 H1b：`check_structure` 与两条 DTO 反例在 H1a �
 第二轮评审（`ebddbdb`）后新增；`D4` 在第三轮评审（`ccdc7a3`）后再次修订，加回
 `HostFailure`；`D13` 是第四轮评审（`66d5e14`）后新增，封闭「公开可变 DTO 被当成
 已解析合法输入」的缺口；第五轮评审（`cb1e4ad`）把其范围从两个字符串规则扩到
-全部五个解析器数值边界。
+全部五个解析器数值边界；第六轮评审（`fe369ef`）新增 `D14`，封闭 `offset * 8`
+溢出与无界逐位循环，并把 H1a/H1b 的测试边界按被测 API 拆开。
 
 | # | 问题 | 决定（推荐） | 状态 | 备选与代价 |
 |---|---|---|---|---|
@@ -497,6 +510,7 @@ H1a 必须先全绿再开 H1b：`check_structure` 与两条 DTO 反例在 H1a �
 | D11 | 身份归属与依赖方向 | **`bind` 只产 `BindIdentity { plan, definition }`**；`ImplementationIdentity`、载荷身份与 `ExecutionReceipt` 只在 `fmp-materialize`；`fmp-validate` 的依赖只允许 `fmp-model`，并加 `cargo tree` 检查 | 新增（第二轮 P1） | 把 implementation 放进 `BindIdentity`：要么 `fmp-validate → fmp-materialize` 成环，要么让验证结论依赖宿主 |
 | D12 | `Plan.document` 如何处置 | **保留并改名 `legacy_document`**，只供旧 `fingerprint()` 只读；`ParsedPlanIdentity` 与编码/布局/fixup 决策都不读。**但它经 `fingerprint` 仍影响 `payload_digest`**：`BindIdentity` 相同的两个计划（A 与 A+`source_trace`）`fingerprint` 与 `payload_digest` 都不同，所以它**不是完整 legacy Artifact 的重放键**；完整身份必须用含 `PayloadIdentity` 的 `ExecutionReceipt`。删除它需要新指纹算法 + 新 ADR | 新增（第二轮 P1）→ **第三轮补充反例** | 直接删除：解析器丢弃 `source_trace`/`symbol.type`/`symbol.size`，旧指纹无法保持逐字节不变（已实测） |
 | D13 | 公开可变的 `Plan` DTO 如何进入 `bind` | **不信任类型，重新验证结构**：`plan::check_structure(&Plan)` 重放解析器中未被类型强制的全部规则——`format_version`、`payload_hex` 的偶数长度小写十六进制，以及 `FieldRange.lsb` 0–127、`FieldRange.width` 1–64、`RangeConstraint.bits` 1–64、`RangeConstraint.align_bits` 0–12、`Fixup.transform_shift` 0–63 五个数值边界。`bind` 在摘要比对、`check` 与任何移位/求和之前调用。`fmp-validate` 的描述符算术同时改为 `u64`/`checked_add`，但那是第二道防线，不是替代。`Plan` 继续公开可变，`planner_api.rs` 的负例写法不变；`ValidatedPlan` 仍是唯一凭证 | 新增（第四轮 P1）→ **第五轮扩围** | 改成只有私有字段的构造器/包装类型：`planner_api.rs` 约 1500 行「解析后改字段」的负例要重写，且会把「测试便利」误当成「执行信任」；只复用 `check()`：`check_fragments` 只比 `len()/2 == size`（奇数长度仍会进 `decode_hex`），且 `check` 本身在 `align_bits >= 128`、`bits == 0`、`width = u32::MAX` 时会 panic |
+| D14 | validator 的位位置算术与逐位循环如何有界 | **先有界，再比较**：fixup 绝对位位置（`offset * 8 + lsb`）用 `u128` 计算（`u64::MAX * 8 + u32` 在 `u128` 内必然可表示），描述符局部算术用 `u64`/`checked_*`；`check_fixup_overlap` 不再执行 unchecked `offset * 8`。`check_one_writer`/`check_fixup_ownership` 的逐位循环只遍历与 `0..form.bits()` 的交集，超出模板的宽度由 `check_fixup_descriptor` 的 `E-FIXUP-005` 报告，循环不按 `u32::MAX` 走。H1a 用**合法解析的 JSON** 计划（两个极大 offset，同一 section）和 `u32::MAX` 宽度测试，debug 与 release 都必须在有限步返回 | 新增（第六轮 P1） | 只把求和改成 `u64`：`offset * 8` 仍溢出、逐位循环仍无界；前序检查出错就跳过后续检查：会少报重叠/ownership 诊断，改变 619 负例集合 |
 
 ## 10. 证据状态
 
@@ -510,7 +524,9 @@ H1a 必须先全绿再开 H1b：`check_structure` 与两条 DTO 反例在 H1a �
 | `materialize` 的产品路径没有 I/O | `std::fs` 只出现在 `fmp-materialize/src/lib.rs` 的测试里（`:947`、`:1075`） | 高（I/O 事实） |
 | 无 I/O ≠ 无宿主故障 | `emit` 在 `:400` 调用 `try_reserve_exact(size)`，失败时 `:401` 记 `internal("image reservation failed")`；分配失败只取决于主机资源 | 高（源码事实）— 所以 D4 保留 `HostFailure` |
 | 64 MiB 映像上限已在 `fmp-validate` | `MAX_IMAGE_BYTES` 定义在 `fmp-validate/src/lib.rs:18`，检查在 `:285` | 高 — 不是 H4 新增 |
-| 公开可变 DTO 能绕过解析器的结构检查 | `plan.rs:515-523` 只在 `read` 路径检查 `payload_hex`；`:858-860`/`:922-943` 的五个数值边界也只在那条路径；`fmp-validate/src/lib.rs:452` 只比 `hex.len() / 2`，`:821` 直接移位 `align_bits`，`:1284` 以 `u32` 求宽度和；`fmp-materialize/src/lib.rs:887-890` 直接访问 `pair[1]`。这些相加构成源码级反例 | 高（源码事实）— 尚未跑修改后的 Rust 程序；H1a 用 X86-P71 与 `A64-P4` 落六条运行负例（D13） |
+| 公开可变 DTO 能绕过解析器的结构检查 | `plan.rs:515-523` 只在 `read` 路径检查 `payload_hex`；`:858-860`/`:922-943` 的五个数值边界也只在那条路径；`fmp-validate/src/lib.rs:452` 只比 `hex.len() / 2`，`:821` 直接移位 `align_bits`，`:1284` 以 `u32` 求宽度和；`fmp-materialize/src/lib.rs:887-890` 直接访问 `pair[1]`。这些相加构成源码级反例 | 高（源码事实）— 尚未跑修改后的 Rust 程序；H1a 用 X86-P71 与 `A64-P4` 落七条运行负例（D13/D14） |
+| 合法解析的极大 `offset` 会让重叠检查溢出 | `check_fixup_overlap` 无条件在 `check_fixups` 之后运行（`:1010`），用 `fixup.offset * 8 + lsb`（`:1309-1312`）；`offset` 是解析器允许的完整 `u64`，两个同节 fixup 即可触发 unchecked 乘法 | 高（源码事实）— debug 可能 panic；H1a 的 `two_huge_fixup_offsets_do_not_overflow` 从合法 JSON 实测 |
+| 异常宽度会让逐位检查无界 | `check_one_writer` `:1426` 遍历 `lsb..lsb+width`，宽度越界只是 `continue`；`check_fixup_ownership` `:1475` 用 `u32` 加法构造同一范围 | 高（源码事实）— `u32::MAX` 宽度可遍历约 40 亿位；H1a 的宽度测试要求有限步返回 |
 | CLI 现有出口是 `0/1/2` 三分 | `fmp-cli/src/main.rs:16` 与 `:30-56`；`04_errors.md:78` 把 `E-INTERNAL-001` 定义为实现缺陷 | 高 — 所以 `Internal` 必须走 exit 2，而不是与计划拒绝共用 1 |
 | 宿主分配失败应独立分类 | HE-1 设计 `docs/architecture/he1-horizontal-extension.md` §8.3 明确写入 `HostFailure` | 高 |
 | 编码后**至少**有两种失败 | 读 `lib.rs:583`、`:597`；负例计数 2 与 1 | 高 |
