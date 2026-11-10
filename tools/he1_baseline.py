@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """H0 compatibility baseline for the HE-1 refactor.
 
-This is a development tool, not a product gate: it records what the current
-materializer actually emits, so every later HE-1 phase can prove that the old
-payloads did not move. It never writes to `definitions/`, `fixtures/` or the
+This records what the current materializer actually emits, so every later HE-1
+phase can prove that the old payloads did not move. It is a development tool
+*and*, since `ADR-0126`, a hosted gate (`baseline` in `gates.yml`); the product
+build never reads it. It never writes to `definitions/`, `fixtures/` or the
 `prototype/` tree; its only output is the JSON file named by `--out`.
 
 Identity is split into three layers, because they answer different questions:
@@ -34,15 +35,21 @@ Usage:
 
 `--check` exits 1 on any difference in a payload, a digest or a count, and
 refuses a snapshot whose `schema` it does not know rather than silently
-comparing fewer fields. `head`, `toolchain`, `implementation` and `probes` are
-receipts/observations and are not compared; `envelope_root` is compared only
+comparing fewer fields. `provenance`, `toolchain`, `implementation` and `probes`
+are receipts/observations and are not compared; `envelope_root` is compared only
 when both sides name the same implementation.
+
+`provenance` holds two commits on purpose: `original_baseline_commit` is the
+commit whose artifacts H0 first recorded (read from the frozen snapshot), and
+`projection_recording_commit` is HEAD when this projection was written. They
+differ because a projection can be recorded before it is committed.
 
 Probes are off by default: one of them feeds a 20 000-deep JSON document to a
 reader that currently overflows its stack. Every subprocess has a timeout, and a
-timeout is recorded as an outcome instead of raising.
+timeout in a probe is recorded as an outcome instead of raising.
 
-Exit codes: 0 recorded or identical, 1 mismatch, 2 usage or I/O fault.
+Exit codes: 0 recorded or identical, 1 mismatch, 2 usage or I/O fault. A fault
+never exits 1: a regression and a broken invocation must not look alike.
 """
 
 from __future__ import annotations
@@ -78,6 +85,18 @@ PROBE_TIMEOUT = 60
 # has no depth limit, small enough to stay far from the process memory limit.
 DEEP_DEPTH = 20000
 
+# The frozen H0 snapshot, kept byte-identical when the gate moved to the payload
+# projection. It is the only place the original recording commit is written down.
+FROZEN_H0_SNAPSHOT = ROOT / "research/he1/compatibility-h0-envelope.json"
+
+BUILD_COMMAND = (
+    "cargo +1.96.0 build --bin fmp -p fmp-cli --manifest-path prototype/Cargo.toml"
+)
+
+
+class Fault(Exception):
+    """A usage or I/O fault. It exits 2, never 1: a broken run is not a diff."""
+
 
 def rel(path: Path) -> str:
     return path.relative_to(ROOT).as_posix()
@@ -111,7 +130,7 @@ def payload_of(artifact):
     envelope minus exactly one key, and the tests below pin that.
     """
     if not isinstance(artifact, dict):
-        raise SystemExit("artifact is not a JSON object")
+        raise Fault("artifact is not a JSON object")
     return {key: value for key, value in artifact.items() if key != "materializer_version"}
 
 
@@ -158,7 +177,7 @@ def oracle_state(positives):
     for plan_path in positives:
         oracle_path = plan_path.with_name(plan_path.name.replace(".fmp.json", ".oracle.json"))
         if not oracle_path.is_file():
-            raise SystemExit("missing oracle record: %s" % rel(oracle_path))
+            raise Fault("missing oracle record: %s" % rel(oracle_path))
         record = json.loads(oracle_path.read_text(encoding="utf-8"))
         kind = record.get("kind", "unknown")
         kinds[kind] = kinds.get(kind, 0) + 1
@@ -168,17 +187,31 @@ def oracle_state(positives):
     return {"kinds": kinds, "manual_derivation": manual}
 
 
-def run_materialize(binary: Path, plan_path: Path, definitions: Path):
-    """Run one materialization with a timeout; a hang is a finding, not a lock."""
+def run_limited(command, timeout):
+    """Run a command with a bound; `None` means it did not finish in time.
+
+    Separated from its callers so the timeout branch is testable without a
+    materializer binary and without waiting on a real hang.
+    """
     try:
-        completed = subprocess.run(
-            [str(binary), "materialize", str(plan_path), "--definitions", str(definitions)],
+        return subprocess.run(
+            command,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            timeout=MATERIALIZE_TIMEOUT,
+            timeout=timeout,
         )
     except subprocess.TimeoutExpired:
-        raise SystemExit(
+        return None
+
+
+def run_materialize(binary: Path, plan_path: Path, definitions: Path):
+    """Run one materialization with a timeout; a hang is a finding, not a lock."""
+    completed = run_limited(
+        [str(binary), "materialize", str(plan_path), "--definitions", str(definitions)],
+        MATERIALIZE_TIMEOUT,
+    )
+    if completed is None:
+        raise Fault(
             "%s: the materializer did not finish within %d s"
             % (rel(plan_path), MATERIALIZE_TIMEOUT)
         )
@@ -192,7 +225,7 @@ def artifact_entry(binary: Path, plan_path: Path, definitions: Path):
     plan = json.loads(plan_bytes.decode("utf-8"))
     returncode, stdout, stderr = run_materialize(binary, plan_path, definitions)
     if returncode != 0:
-        raise SystemExit(
+        raise Fault(
             "%s: the baseline expects a positive to materialize, got exit %d: %s"
             % (rel(plan_path), returncode, stderr.strip()[:400])
         )
@@ -232,14 +265,11 @@ def probe_deep_json(binary: Path, definitions: Path, scratch: Path):
     body = "[" * DEEP_DEPTH + "]" * DEEP_DEPTH
     plan = scratch / "deep.fmp.json"
     plan.write_text(body, encoding="utf-8")
-    try:
-        completed = subprocess.run(
-            [str(binary), "materialize", str(plan), "--definitions", str(definitions)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=PROBE_TIMEOUT,
-        )
-    except subprocess.TimeoutExpired:
+    completed = run_limited(
+        [str(binary), "materialize", str(plan), "--definitions", str(definitions)],
+        PROBE_TIMEOUT,
+    )
+    if completed is None:
         return {
             "probe": "deep-json",
             "input": "%d nested arrays" % DEEP_DEPTH,
@@ -276,14 +306,11 @@ def probe_oversized_field(binary: Path, definitions: Path, scratch: Path):
     plan["x_he1_probe"] = "a" * (1 << 20)
     path = scratch / "oversized.fmp.json"
     path.write_text(json.dumps(plan), encoding="utf-8")
-    try:
-        completed = subprocess.run(
-            [str(binary), "materialize", str(path), "--definitions", str(definitions)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=PROBE_TIMEOUT,
-        )
-    except subprocess.TimeoutExpired:
+    completed = run_limited(
+        [str(binary), "materialize", str(path), "--definitions", str(definitions)],
+        PROBE_TIMEOUT,
+    )
+    if completed is None:
         return {
             "probe": "unknown-field-1mib",
             "input": "a valid positive with one 1 MiB unknown member",
@@ -343,6 +370,45 @@ def toolchain():
     }
 
 
+def git_revision(*arguments):
+    """A git fact, or `None`. Provenance must not turn missing git into a fault."""
+    try:
+        completed = subprocess.run(
+            ["git", *arguments],
+            cwd=str(ROOT),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if completed.returncode != 0:
+        return None
+    return completed.stdout.decode("utf-8", "replace").strip()
+
+
+def provenance():
+    """Two commits and a worktree flag: three facts, three fields.
+
+    `original_baseline_commit` is read from the frozen H0 snapshot instead of
+    being remembered here, so it cannot drift from the evidence. The other two
+    describe *this* recording; they differ from the first because a projection is
+    usually written before the commit that records it.
+    """
+    original = None
+    if FROZEN_H0_SNAPSHOT.is_file():
+        frozen = json.loads(FROZEN_H0_SNAPSHOT.read_text(encoding="utf-8"))
+        original = frozen.get("head")
+    status = git_revision("status", "--porcelain")
+    return {
+        "original_baseline_commit": original,
+        "projection_recording_commit": git_revision("rev-parse", "HEAD"),
+        "projection_recording_worktree": (
+            "unknown" if status is None else ("clean" if status == "" else "dirty")
+        ),
+    }
+
+
 def snapshot(binary: Path, probes: bool):
     documents, newest = definition_inventory()
     positives, negatives, by_isa = corpus_counts()
@@ -350,14 +416,7 @@ def snapshot(binary: Path, probes: bool):
     result = {
         "schema": SCHEMA,
         "projections": {"payload": PAYLOAD_PROJECTION, "envelope": ENVELOPE_PROJECTION},
-        "head": subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=str(ROOT),
-            stdout=subprocess.PIPE,
-            timeout=30,
-        )
-        .stdout.decode()
-        .strip(),
+        "provenance": provenance(),
         "implementation": implementation_of(binary),
         "toolchain": toolchain(),
         "definitions": {
@@ -396,10 +455,10 @@ def snapshot(binary: Path, probes: bool):
 def comparison_projection(snapshot, include_envelope):
     """The part of a snapshot that `--check` actually compares.
 
-    Receipts (`head`, `toolchain`, `implementation`) and observations
-    (`probes`) are recorded, never compared: `head` moves with every commit,
-    `toolchain` with the host, `implementation` is what explains an envelope
-    difference, and a probe is a finding rather than an invariant.
+    Receipts (`provenance`, `toolchain`, `implementation`) and observations
+    (`probes`) are recorded, never compared: `provenance` moves with every
+    commit, `toolchain` with the host, `implementation` is what explains an
+    envelope difference, and a probe is a finding rather than an invariant.
 
     The envelope is compared only when both sides name the same implementation.
     It carries `materializer_version`, so making it a gate would report a
@@ -409,7 +468,7 @@ def comparison_projection(snapshot, include_envelope):
     projected = {
         key: value
         for key, value in snapshot.items()
-        if key not in ("probes", "toolchain", "head", "implementation")
+        if key not in ("probes", "toolchain", "provenance", "implementation")
     }
     artifacts = dict(projected.get("artifacts", {}))
     if not include_envelope:
@@ -465,17 +524,6 @@ def receipt_label(receipt):
 
 
 def compare(recorded, fresh):
-    if recorded.get("schema") != SCHEMA:
-        print(
-            "error: %s records schema %r, this tool speaks %r"
-            % ("recorded snapshot", recorded.get("schema"), SCHEMA)
-        )
-        print(
-            "an older snapshot was taken with a different projection; keep it as "
-            "evidence and re-record rather than comparing fewer fields"
-        )
-        return 2
-
     same_implementation = recorded.get("implementation") == fresh.get("implementation")
     diffs = differences(recorded, fresh, same_implementation)
     for diff in diffs:
@@ -508,36 +556,49 @@ def resolve_binary(argument: str):
     if argument:
         path = Path(argument)
         if not path.is_file():
-            raise SystemExit("error: no materializer binary at %s" % path)
+            raise Fault("no materializer binary at %s\nbuild it first: %s" % (path, BUILD_COMMAND))
         return path
     candidates = [DEBUG_BUILD / "fmp.exe", DEBUG_BUILD / "fmp"]
     for path in candidates:
         if path.is_file():
             return path
-    raise SystemExit(
-        "error: no materializer binary at %s"
-        % " or ".join(rel(path) for path in candidates)
-        + "\nbuild it first: cargo +1.96.0 build --bin fmp -p fmp-cli"
+    raise Fault(
+        "no materializer binary at %s\nbuild it first: %s"
+        % (" or ".join(rel(path) for path in candidates), BUILD_COMMAND)
     )
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Record or check the HE-1 baseline")
-    parser.add_argument("--out", default=str(DEFAULT_OUT))
-    parser.add_argument("--binary", default="", help="default: prototype/target/debug/fmp[.exe]")
-    parser.add_argument("--check", metavar="RECORDED", help="compare against a snapshot")
-    parser.add_argument(
-        "--probes",
-        action="store_true",
-        help="also run the robustness probes (one feeds a known stack overflow)",
-    )
-    arguments = parser.parse_args()
+def load_snapshot(path):
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except OSError as error:
+        raise Fault("cannot read the recorded snapshot %s: %s" % (path, error))
+    except ValueError as error:
+        raise Fault("%s is not valid JSON: %s" % (path, error))
+
+
+def require_schema(recorded):
+    if recorded.get("schema") != SCHEMA:
+        raise Fault(
+            "recorded snapshot records schema %r, this tool speaks %r; an older "
+            "snapshot was taken with a different projection, so keep it as evidence "
+            "and re-record rather than comparing fewer fields"
+            % (recorded.get("schema"), SCHEMA)
+        )
+
+
+def run(arguments):
+    recorded = None
+    if arguments.check:
+        # Read and validate before materializing: a broken snapshot is a fault,
+        # and it should cost a second, not 128 subprocesses.
+        recorded = load_snapshot(arguments.check)
+        require_schema(recorded)
 
     binary = resolve_binary(arguments.binary)
     fresh = snapshot(binary, arguments.probes)
 
-    if arguments.check:
-        recorded = json.loads(Path(arguments.check).read_text(encoding="utf-8"))
+    if recorded is not None:
         return compare(recorded, fresh)
 
     out = Path(arguments.out)
@@ -561,6 +622,30 @@ def main() -> int:
         print("probe %s: %s (exit %r)" % (probe["probe"], probe["outcome"], probe["returncode"]))
     print("written: %s" % out)
     return 0
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description="Record or check the HE-1 baseline")
+    parser.add_argument("--out", default=str(DEFAULT_OUT))
+    parser.add_argument("--binary", default="", help="default: prototype/target/debug/fmp[.exe]")
+    parser.add_argument("--check", metavar="RECORDED", help="compare against a snapshot")
+    parser.add_argument(
+        "--probes",
+        action="store_true",
+        help="also run the robustness probes (one feeds a known stack overflow)",
+    )
+    arguments = parser.parse_args(argv)
+    try:
+        return run(arguments)
+    except Fault as fault:
+        print("error: %s" % fault, file=sys.stderr)
+        return 2
+    except OSError as error:
+        print("error: %s" % error, file=sys.stderr)
+        return 2
+    except ValueError as error:
+        print("error: %s" % error, file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

@@ -7,9 +7,10 @@
 - Supersedes: none
 - Superseded by: none
 - Revises: the `artifact_root` consequence of `ADR-0125`; the job set of
-  `ADR-0124` (a fourth job, `baseline`); `tools/he1_baseline.py`;
-  `research/he1/baseline.md`; `research/he1/H0-report.md`; the artifact identity
-  row of `docs/architecture/he1-h1-plan.md`
+  `ADR-0124` (a fourth job, `baseline`); `tools/he1_baseline.py`; the new
+  `tools/test_he1_baseline.py`; `research/he1/baseline.md`;
+  `research/he1/H0-report.md`; the artifact identity row of
+  `docs/architecture/he1-h1-plan.md`
 - Keeps in force: `ADR-0123` for the artifact envelope; the three digests in
   `prototype/crates/fmp-cli/tests/determinism.rs`, now labelled envelope digests
 
@@ -51,7 +52,8 @@ Two further failures were found while fixing that one:
 2. **The H0 evidence classification was wrong.** `H0-report.md` said five of the
    six characterization tests document a hole. The file actually holds four gap
    tests, one digest-mismatch control and one non-object-root control; the deep
-   JSON finding comes from the Python probe, not from a Rust test.
+   JSON finding comes from the Python probe, not from a Rust test. (A second
+   review added a constraint test, see decision 9.)
 
 ## Decision
 
@@ -71,7 +73,11 @@ Two further failures were found while fixing that one:
 2. **The snapshot schema is `monasm.he1.baseline/0.2`, and `--check` refuses what
    it does not know.** An unknown schema exits 2 with an explanation instead of
    comparing a subset of fields. A check that silently compares less is worse
-   than a check that fails.
+   than a check that fails. Schema 0.2 also replaces the single `head` field with
+   `provenance { original_baseline_commit, projection_recording_commit,
+   projection_recording_worktree }`: one `head` conflated two commits — the one
+   whose artifacts were recorded (`d0082f9`) and the one that wrote this
+   projection (`ebddbdb`) — and a reader could not tell which claim it supported.
 3. **The old snapshot is kept as frozen evidence, not overwritten.**
    `research/he1/compatibility-h0-envelope.json` is the H0 file moved by
    `git mv`, bytes unchanged, schema `monasm.he1.baseline/0.1`. The new
@@ -92,13 +98,15 @@ Two further failures were found while fixing that one:
    2. No host is a special case in the code.
 6. **The payload comparison is a hosted job.** `gates.yml` gains `baseline`
    (Ubuntu 24.04): install the pinned toolchain, `cargo +1.96.0 build --bin fmp
-   -p fmp-cli`, then `python tools/he1_baseline.py --check
+   -p fmp-cli` in `prototype/`, then `python tools/he1_baseline.py --check
    research/he1/compatibility-results.json --binary
-   prototype/target/debug/fmp`. This revises `ADR-0124` decision 1, which
-   enumerated three jobs, and `ADR-0125`'s statement that adding CI jobs waits
-   for `ADR-0130`. The job compares payloads only; the envelope is skipped with
-   a printed reason because the CI binary digest differs from the recorder's.
-   That limitation is stated in the workflow comment, not hidden.
+   prototype/target/debug/fmp`. It also runs `python tools/test_he1_baseline.py`
+   first, before the toolchain is installed, because those tests need no binary.
+   This revises `ADR-0124` decision 1, which enumerated three jobs, and
+   `ADR-0125`'s statement that adding CI jobs waits for `ADR-0130`. The job
+   compares payloads only; the envelope is skipped with a printed reason because
+   the CI binary digest differs from the recorder's. That limitation is stated in
+   the workflow comment, not hidden.
 7. **`determinism.rs` keeps its pinned digests, and they stay envelope digests.**
    Three fixtures keep the strictest available cross-host check, including
    `materializer_version`. The consequence is a procedure, recorded here so it is
@@ -106,6 +114,22 @@ Two further failures were found while fixing that one:
    constants and every recorded per-entry `envelope.sha256` in the same commit,
    and `payload_root` must not move. A commit that moves `payload_root` is a
    payload change and needs its own compatibility statement.
+8. **A fault never exits 1.** The tool raises `Fault` for every usage and I/O
+   failure — missing binary, unreadable or corrupt snapshot, unknown schema,
+   timeout, a positive fixture that does not materialize — and `main()` maps it
+   to exit 2 once. Exit 1 is reserved for a recorded difference. The former
+   `raise SystemExit("...")` calls produced exit 1, so a typo in `--binary` and a
+   real payload regression were indistinguishable; a gate whose failure mode is
+   "maybe a regression, maybe a typo" gets re-run instead of investigated. The
+   snapshot is now read and validated *before* any materialization, so a bad
+   snapshot costs one second instead of 128 subprocesses.
+9. **The comparator is itself tested, in CI, without the binary.**
+   `tools/test_he1_baseline.py` holds 19 tests over two synthetic snapshots; the
+   `baseline` job runs it before installing the toolchain. The eight manual
+   experiments below are kept as history, but a manual experiment does not run on
+   the next commit. Two of the tests exist specifically because the manual pass
+   could not protect a future refactor: **a changed implementation receipt does
+   not stop the payload comparison**, and prose in this ADR is not a test.
 
 ## Consequences
 
@@ -119,14 +143,23 @@ Two further failures were found while fixing that one:
 - A release bump is now a one-commit operation with a verifiable property: the
   payload root is unchanged, so the bump is provably not an encoding change.
 - `H0-report.md` and the characterization-test module comment are corrected to
-  4 gaps + 2 controls, and the deep-JSON row now names the Python probe as its
-  source.
+  4 gaps + 1 constraint + 2 controls (7 tests), and the deep-JSON row now names
+  the Python probe as its source. The constraint is the legacy fingerprint's
+  dependence on fields the parser drops; it is a property H1 must preserve, not a
+  hole (H1 plan `D12`).
+- The snapshot's `head` is replaced by `provenance`: the original baseline commit
+  and the projection recording commit are separate fields, so neither is read as
+  the other.
+- `tools/he1_baseline.py` is no longer a development-only habit: it is a gate,
+  so its failure modes are part of the contract. Exit 1 is a difference, exit 2
+  is a usage or I/O fault or an unknown schema, and a fault is raised as `Fault`
+  and mapped once in `main()`.
+- The comparator's behaviour is covered by `tools/test_he1_baseline.py` in CI,
+  not by eight manual experiments that ran once. The manual table below stays as
+  the recording of what was measured; the tests are the gate.
 - The hosted `baseline` job gives Linux evidence for the 128-payload comparison.
   Before this ADR, the only such evidence was one Windows host, and "the Rust
   suite is green on three hosts" was a different claim.
-- `tools/he1_baseline.py` is no longer a development-only habit: it is a gate,
-  so its failure modes are part of the contract. Exit 1 is a difference, exit 2
-  is a usage or I/O fault or an unknown schema.
 
 ## Alternatives rejected
 
@@ -159,6 +192,8 @@ Two further failures were found while fixing that one:
 | The envelope still participates when the receipt matches | tampered `envelope.sha256` with an identical receipt → exit 1 | high (measured) |
 | Skipping the envelope does not skip the payload | `implementation` replaced **and** `payload.bytes_hex` tampered → exit 1 | high (measured) |
 | An unknown schema is refused | schema `…/0.1` → exit 2, no comparison | high (measured) |
+| A fault is not reported as a diff | missing binary, unreadable snapshot, corrupt JSON, old schema → exit 2; payload/count/envelope diffs → exit 1 | high (measured, `tools/test_he1_baseline.py` 19 tests, Python 3.8.10 locally; the hosted run is the PR's next `gates` run) |
+| The comparator keeps comparing when the receipt changes | `implementation` replaced **and** `payload.bytes_hex` tampered → exit 1, pinned by `test_payload_is_compared_even_when_the_receipt_differs` | high (measured) |
 | Portable discovery and probe opt-in work | `--binary` exercised on Windows; probes ran under `--probes` only | high on Windows; Linux discovery `unverified` (the CI job passes `--binary` explicitly, so it does not exercise discovery) |
 | `determinism.rs` pins envelope digests | read `tests/determinism.rs:158`, `:163`, `:168`; the test hashes `artifact.to_json()` at `:63` | high |
 | The CI job passes | `gates` run `42714224361`, job `H0 payload baseline`, green on Ubuntu 24.04 / Python 3.12 | high |
@@ -167,9 +202,11 @@ Two further failures were found while fixing that one:
 The first draft of the split contained its own version of the defect it was
 fixing: when the implementation receipts differed, the comparison filtered diffs
 by path prefix and dropped **every** per-entry difference, not only the envelope
-digest. The `implementation` + `payload` control above is what caught it. It is
-recorded here because the failure mode — a filter that is correct at the top
-level and too broad one level down — is easy to reintroduce.
+digest. The `implementation` + `payload` control above is what caught it; it is
+now `test_payload_is_compared_even_when_the_receipt_differs`, so the next
+refactor is caught by a test rather than by a reviewer. It is recorded here
+because the failure mode — a filter that is correct at the top level and too
+broad one level down — is easy to reintroduce.
 
 ## Review triggers
 

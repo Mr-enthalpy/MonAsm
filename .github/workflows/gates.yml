@@ -110,6 +110,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Before the binary exists: these tests do not need it, and a comparator
+      # that had quietly stopped comparing would otherwise stay green.
+      - name: The comparator itself is tested
+        run: python tools/test_he1_baseline.py
+
       - name: Install the pinned toolchain
         run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
 

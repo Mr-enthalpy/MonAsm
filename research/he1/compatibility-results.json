@@ -4,7 +4,11 @@
     "payload": "payload/0.1",
     "envelope": "envelope/0.1"
   },
-  "head": "c92d4c033478dc729bf8e7ebc9547ded010d8b79",
+  "provenance": {
+    "original_baseline_commit": "d0082f9f2d3da2786d8d1c0467d2793369ec9090",
+    "projection_recording_commit": "ebddbdb02c558baff9c44d90bbdead3e3db96175",
+    "projection_recording_worktree": "dirty"
+  },
   "implementation": {
     "name": "fmp-materialize",
     "version": "0.0.0",
@@ -5224,7 +5228,7 @@
       "input": "20000 nested arrays",
       "returncode": 3221225725,
       "outcome": "abnormal-exit",
-      "stderr_head": "thread 'main' (43464) has overflowed its stack",
+      "stderr_head": "thread 'main' (37080) has overflowed its stack",
       "note": "A rejection is the desired shape; an abnormal exit or a stack overflow is a measured gap for H4, not a pass."
     },
     {
