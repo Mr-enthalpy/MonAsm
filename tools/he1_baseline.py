@@ -131,6 +131,25 @@ def canonical_digest(document) -> str:
     return "sha256:" + hashlib.sha256(canonical_bytes(document)).hexdigest()
 
 
+def parse_json(text, path):
+    """Parse JSON or raise `Fault`.
+
+    `RecursionError` is caught explicitly: CPython raises it for deeply nested
+    input, it is not a `ValueError`, and letting it escape would print a
+    traceback and exit 1 — the code reserved for a recorded difference. A
+    reader limit is a fault, not a baseline drift.
+    """
+    try:
+        return json.loads(text)
+    except RecursionError:
+        raise Fault(
+            "%s is nested too deeply for Python's JSON reader; a reader limit "
+            "is a fault (exit 2), not a difference" % path
+        )
+    except ValueError as error:
+        raise Fault("%s is not valid JSON: %s" % (path, error))
+
+
 def load_json_object(path, what):
     """Read a JSON object, or raise `Fault`.
 
@@ -139,11 +158,10 @@ def load_json_object(path, what):
     instead of letting `AttributeError` escape as exit 1.
     """
     try:
-        document = json.loads(Path(path).read_text(encoding="utf-8"))
+        text = Path(path).read_text(encoding="utf-8")
     except OSError as error:
         raise Fault("cannot read the %s %s: %s" % (what, path, error))
-    except ValueError as error:
-        raise Fault("%s is not valid JSON: %s" % (path, error))
+    document = parse_json(text, path)
     if not isinstance(document, dict):
         raise Fault("%s is %s, not a JSON object" % (path, describe(document)))
     return document
@@ -683,11 +701,10 @@ def resolve_binary(argument: str):
 
 def load_snapshot(path):
     try:
-        return json.loads(Path(path).read_text(encoding="utf-8"))
+        text = Path(path).read_text(encoding="utf-8")
     except OSError as error:
         raise Fault("cannot read the recorded snapshot %s: %s" % (path, error))
-    except ValueError as error:
-        raise Fault("%s is not valid JSON: %s" % (path, error))
+    return parse_json(text, path)
 
 
 def require_schema(recorded):
@@ -719,12 +736,10 @@ def is_digest(value):
 
 def load_anchor(path):
     try:
-        anchor = json.loads(Path(path).read_text(encoding="utf-8"))
+        text = Path(path).read_text(encoding="utf-8")
     except OSError as error:
         raise Fault("cannot read the baseline anchor %s: %s" % (path, error))
-    except ValueError as error:
-        raise Fault("%s is not valid JSON: %s" % (path, error))
-    return anchor
+    return parse_json(text, path)
 
 
 def validate_anchor(anchor, path):

@@ -299,6 +299,23 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("not valid JSON", stderr)
 
+    def test_a_deeply_nested_snapshot_is_a_fault(self):
+        # `json.loads` raises `RecursionError`, which is not a `ValueError`; it
+        # used to escape as a traceback and exit 1 -- the code that means "the
+        # baseline moved". A reader limit is a fault, not a difference.
+        path = self.write("deep.json", "[" * 20000 + "]" * 20000)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("nested too deeply", stderr)
+        self.assertIn("not a difference", stderr)
+
+    def test_a_deeply_nested_anchor_is_a_fault(self):
+        path = self.write("snapshot.json", synthetic_snapshot())
+        anchor = self.write("deep-anchor.json", "[" * 20000 + "]" * 20000)
+        code, stderr = self.main("--check", path, "--anchor", anchor)
+        self.assertEqual(code, 2)
+        self.assertIn("nested too deeply", stderr)
+
     def test_an_old_schema_is_a_fault_before_any_binary_runs(self):
         # No --binary is passed, and the check must fail before discovery: a
         # schema refusal is a usage fact, not something to learn after 128 runs.
