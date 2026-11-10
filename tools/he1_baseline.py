@@ -641,6 +641,12 @@ def compare(recorded, fresh):
 
     print("OK: payload projection identical")
     print("payload_root: %s" % fresh["artifacts"]["payload_root"])
+    # Print the anchored definition root too: `--check` fails on a mismatch
+    # silently otherwise, and the gate log should show what was pinned.
+    print(
+        "definitions_root: %s"
+        % definitions_root(fresh["definitions"]["documents"])
+    )
     if same_implementation:
         print("envelope: identical (same implementation receipt)")
     else:

@@ -67,7 +67,7 @@ prototype`; the root has no `Cargo.toml`, so the manifest path is not optional
 | `cargo test --workspace` | 61 passed, 0 failed: `determinism` 6, `fixtures` 2, `he1_identity_characterization` 7, `planner_api` 10, `fmp_materialize` 9, `fmp_model` 22, `fmp_plan` 5 |
 | `test_he1_baseline.py` | 63 passed, 0 failed — comparator, schema, anchor, definitions-root, fresh-artifact, record-mode, exit-code, discovery, timeout and structural-fault tests; no binary involved (19 at H0, 24 after §8, 38 after §9, 50 after §10, 63 after §11) |
 | `he1_baseline.py` | recorded 104 definitions / 128 positives / 619 negatives / 128 artifacts; `artifact_root sha256:dfd08fee9844058492138b23448073ec47d8eda42383e3f1b3e567db86a86fef` (that value is now the **envelope** root; the gate is `payload_root` — §6) |
-| `he1_baseline.py --check` | `OK: payload projection identical`; `payload_root` unchanged; `envelope: identical (same implementation receipt)` |
+| `he1_baseline.py --check` | `OK: payload projection identical`; `payload_root` and `definitions_root` unchanged; `envelope: identical (same implementation receipt)` |
 
 Name the six skips: `X86-P1`, `X86-P4`, `X86-P5`, `X86-P9`, `X86-P10`,
 `X86-P83`. They are `kind = manual+disassembly` by design; the tool derives the
