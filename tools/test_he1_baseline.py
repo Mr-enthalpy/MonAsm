@@ -742,14 +742,15 @@ class FreshArtifactTests(unittest.TestCase):
 class ArtifactEntryTests(unittest.TestCase):
     """`artifact_entry()` must run the fresh-artifact check before projecting."""
 
-    def run_entry(self, artifact):
+    def run_entry(self, artifact=None, plan_text="{}", stdout=None):
+        output = json.dumps(artifact) if stdout is None else stdout
         with tempfile.TemporaryDirectory(prefix="monasm-he1-entry-") as directory:
             plan = Path(directory) / "X86-P1.fmp.json"
-            plan.write_text("{}", encoding="utf-8")
+            plan.write_text(plan_text, encoding="utf-8")
             with mock.patch.object(
                 baseline,
                 "run_materialize",
-                return_value=(0, json.dumps(artifact), ""),
+                return_value=(0, output, ""),
             ):
                 with mock.patch.object(baseline, "rel", lambda path: "fixture"):
                     return baseline.artifact_entry(
@@ -768,6 +769,21 @@ class ArtifactEntryTests(unittest.TestCase):
         self.assertEqual(entry["envelope"]["materializer_version"], "0.0.0")
         self.assertEqual(entry["payload"]["bytes_hex"], "90")
         self.assertNotIn("materializer_version", entry["payload"])
+
+    def test_a_deeply_nested_plan_is_a_fault_not_a_crash(self):
+        # The plan is read here, not only inside `load_snapshot`; a reader
+        # depth limit on this path is still a fault (exit 2), not a traceback.
+        with self.assertRaises(baseline.Fault) as caught:
+            self.run_entry(synthetic_artifact(), plan_text="[" * 20000 + "]" * 20000)
+        self.assertIn("nested too deeply", str(caught.exception))
+
+    def test_a_deeply_nested_fresh_artifact_is_a_fault_not_a_crash(self):
+        # Same for the materializer's own stdout: it is parsed here, after the
+        # subprocess, and must not escape as `RecursionError`.
+        with self.assertRaises(baseline.Fault) as caught:
+            self.run_entry(stdout="[" * 20000 + "]" * 20000)
+        self.assertIn("nested too deeply", str(caught.exception))
+        self.assertIn("materializer stdout", str(caught.exception))
 
 
 if __name__ == "__main__":

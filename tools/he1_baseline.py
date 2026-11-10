@@ -330,14 +330,14 @@ def validate_fresh_artifact(artifact, fixture):
 
 def artifact_entry(binary: Path, plan_path: Path, definitions: Path):
     plan_bytes = plan_path.read_bytes()
-    plan = json.loads(plan_bytes.decode("utf-8"))
+    plan = parse_json(plan_bytes.decode("utf-8"), rel(plan_path))
     returncode, stdout, stderr = run_materialize(binary, plan_path, definitions)
     if returncode != 0:
         raise Fault(
             "%s: the baseline expects a positive to materialize, got exit %d: %s"
             % (rel(plan_path), returncode, stderr.strip()[:400])
         )
-    artifact = json.loads(stdout)
+    artifact = parse_json(stdout, "%s: materializer stdout" % rel(plan_path))
     validate_fresh_artifact(artifact, rel(plan_path))
     payload = payload_of(artifact)
     fixups = payload.get("fixups", [])
