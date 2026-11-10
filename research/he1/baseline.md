@@ -113,17 +113,22 @@ fails. `CI` sets `working-directory: prototype` instead, which is the same build
 The tool re-runs the real `fmp` binary, not a Python re-implementation, so the
 snapshot is the product's output. `--check` exits 1 on any difference in a
 payload, a digest or a count, prints every difference, and exits 2 on a usage or
-I/O fault or on a snapshot schema it does not know. **A fault never exits 1**:
-otherwise a missing binary or a corrupt snapshot would look exactly like a real
-payload regression. Re-recording is `python tools/he1_baseline.py` (writes the
-same file); without `--probes` the `probes` array is written empty.
+I/O fault, on a snapshot schema it does not know, or on a snapshot whose structure
+is not the one the recorder writes (a JSON array or `null`, a missing
+`artifacts`, an entry without `payload_sha256`, a wrongly typed `implementation`).
+**A fault never exits 1**: otherwise a missing binary or a corrupt snapshot would
+look exactly like a real payload regression. Re-recording is
+`python tools/he1_baseline.py` (writes the same file); without `--probes` the
+`probes` array is written empty.
 
-`tools/test_he1_baseline.py` is the comparator's own gate: 19 tests over two
+`tools/test_he1_baseline.py` is the comparator's own gate: 24 tests over
 synthetic snapshots, no Rust binary and no `definitions/` scan. It fixes the
 properties that would otherwise be re-learned in production: a payload change
-fails, a count change fails, a receipt change alone passes, and **a receipt
-change does not stop the payload from being compared**. The last one is the bug
-the first draft of `ADR-0126`'s split had. CI runs it before building `fmp`.
+fails, a count change fails, a receipt change alone passes, **a receipt change
+does not stop the payload from being compared**, and a structurally invalid
+snapshot is refused with exit 2 before the 128 materializations. The receipt bug
+was the first draft of `ADR-0126`'s split; the structural check was the third
+review round. CI runs the suite before building `fmp`.
 
 `--binary` wins over discovery; discovery tries `prototype/target/debug/fmp.exe`
 then `prototype/target/debug/fmp`. If neither exists the tool prints the build
@@ -172,7 +177,9 @@ should not trigger a known stack overflow or wait on a child that may hang.
   records the outcome, not a portable code, and `--check` never compares probes.
 - The binary is a debug build. Release-vs-debug payload equality was not
   measured in H0; `EXP-R1`–`R6` cover repeat-run determinism, not profile
-  equality.
+  equality. The build also has `FMP_BUILD_ID = None`, so the implementation
+  receipt cannot yet trace a hosted artifact back to a build; both are H1
+  acceptance caveats, not H0 passes.
 - The snapshot proves the legacy payloads did not move. It does not prove they
   are correct; correctness remains with the two-source oracle gate.
 - Local Python is 3.8.10; the `baseline` job runs the tool on 3.12, so its CI

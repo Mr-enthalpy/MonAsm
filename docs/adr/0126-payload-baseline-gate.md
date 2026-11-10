@@ -114,22 +114,28 @@ Two further failures were found while fixing that one:
    constants and every recorded per-entry `envelope.sha256` in the same commit,
    and `payload_root` must not move. A commit that moves `payload_root` is a
    payload change and needs its own compatibility statement.
-8. **A fault never exits 1.** The tool raises `Fault` for every usage and I/O
-   failure — missing binary, unreadable or corrupt snapshot, unknown schema,
-   timeout, a positive fixture that does not materialize — and `main()` maps it
-   to exit 2 once. Exit 1 is reserved for a recorded difference. The former
-   `raise SystemExit("...")` calls produced exit 1, so a typo in `--binary` and a
-   real payload regression were indistinguishable; a gate whose failure mode is
-   "maybe a regression, maybe a typo" gets re-run instead of investigated. The
-   snapshot is now read and validated *before* any materialization, so a bad
-   snapshot costs one second instead of 128 subprocesses.
+8. **A fault never exits 1.** The tool raises `Fault` for every usage, I/O and
+   structural failure — missing binary, unreadable or corrupt snapshot, unknown
+   schema, a snapshot that is not the shape the recorder writes (`[]`, `null`, a
+   missing `artifacts`, an entry without `payload_sha256`, a wrongly typed
+   `implementation`), timeout, a positive fixture that does not materialize — and
+   `main()` maps it to exit 2 once. Exit 1 is reserved for a recorded difference.
+   The former `raise SystemExit("...")` calls produced exit 1, so a typo in
+   `--binary` and a real payload regression were indistinguishable; a gate whose
+   failure mode is "maybe a regression, maybe a typo" gets re-run instead of
+   investigated. The snapshot is now read and validated *before* any
+   materialization, so a bad snapshot costs one second instead of 128
+   subprocesses. The structural checks are explicit, not one `except Exception`:
+   each one names the shape it requires, so a comparator bug still raises rather
+   than being reported as a fault.
 9. **The comparator is itself tested, in CI, without the binary.**
-   `tools/test_he1_baseline.py` holds 19 tests over two synthetic snapshots; the
+   `tools/test_he1_baseline.py` holds 24 tests over synthetic snapshots; the
    `baseline` job runs it before installing the toolchain. The eight manual
    experiments below are kept as history, but a manual experiment does not run on
-   the next commit. Two of the tests exist specifically because the manual pass
-   could not protect a future refactor: **a changed implementation receipt does
-   not stop the payload comparison**, and prose in this ADR is not a test.
+   the next commit. The tests exist specifically because the manual pass could not
+   protect a future refactor: **a changed implementation receipt does not stop the
+   payload comparison**, a structurally invalid snapshot exits 2 rather than 1,
+   and prose in this ADR is not a test.
 
 ## Consequences
 
@@ -152,8 +158,10 @@ Two further failures were found while fixing that one:
   the other.
 - `tools/he1_baseline.py` is no longer a development-only habit: it is a gate,
   so its failure modes are part of the contract. Exit 1 is a difference, exit 2
-  is a usage or I/O fault or an unknown schema, and a fault is raised as `Fault`
-  and mapped once in `main()`.
+  is a usage, I/O or structural fault or an unknown schema, and a fault is raised
+  as `Fault` and mapped once in `main()`. The structural validation closed a real
+  gap: a JSON `[]` or `null` decodes successfully but is not a snapshot, and it
+  used to exit 1 from an uncaught `AttributeError` inside the comparator.
 - The comparator's behaviour is covered by `tools/test_he1_baseline.py` in CI,
   not by eight manual experiments that ran once. The manual table below stays as
   the recording of what was measured; the tests are the gate.
@@ -192,7 +200,8 @@ Two further failures were found while fixing that one:
 | The envelope still participates when the receipt matches | tampered `envelope.sha256` with an identical receipt → exit 1 | high (measured) |
 | Skipping the envelope does not skip the payload | `implementation` replaced **and** `payload.bytes_hex` tampered → exit 1 | high (measured) |
 | An unknown schema is refused | schema `…/0.1` → exit 2, no comparison | high (measured) |
-| A fault is not reported as a diff | missing binary, unreadable snapshot, corrupt JSON, old schema → exit 2; payload/count/envelope diffs → exit 1 | high (measured, `tools/test_he1_baseline.py` 19 tests, Python 3.8.10 locally; the hosted run is the PR's next `gates` run) |
+| A fault is not reported as a diff | missing binary, unreadable snapshot, corrupt JSON, old schema, root array/`null`, missing `artifacts`, wrong-typed `implementation`, entry without `payload_sha256` → exit 2; payload/count/envelope diffs → exit 1 | high (measured, `tools/test_he1_baseline.py` 24 tests, Python 3.8.10 locally; the hosted run is the PR's next `gates` run) |
+| A well-formed but wrong-shaped snapshot is refused before materialization | `[]`, `null`, missing `artifacts`, string `implementation`, entry without `payload_sha256` → exit 2 with a named fault; five tests | high (measured) |
 | The comparator keeps comparing when the receipt changes | `implementation` replaced **and** `payload.bytes_hex` tampered → exit 1, pinned by `test_payload_is_compared_even_when_the_receipt_differs` | high (measured) |
 | Portable discovery and probe opt-in work | `--binary` exercised on Windows; probes ran under `--probes` only | high on Windows; Linux discovery `unverified` (the CI job passes `--binary` explicitly, so it does not exercise discovery) |
 | `determinism.rs` pins envelope digests | read `tests/determinism.rs:158`, `:163`, `:168`; the test hashes `artifact.to_json()` at `:63` | high |

@@ -17,7 +17,7 @@ Product code: **none**. Nothing under `prototype/crates/*/src/` changed.
 | `research/he1/H0-report.md` | new | This report |
 | `tools/he1_baseline.py` | new | Records and checks the snapshot by running the real `fmp` binary; never a build input |
 | `prototype/crates/fmp-cli/tests/he1_identity_characterization.rs` | new | Seven tests: four assert a hole HE-1/H3/H4 must close, one pins a constraint H1 must preserve (the legacy fingerprint reads a field the parser drops), two are controls (digest mismatch, non-object root). The deep-JSON finding is the Python probe, not a Rust test |
-| `tools/test_he1_baseline.py` | new (§7) | 19 tests over synthetic snapshots: the comparator fails on a payload or count change, passes on a receipt change alone, and still compares payloads when the receipt changes. No binary needed, so CI runs it first |
+| `tools/test_he1_baseline.py` | new (§7) | 24 tests over synthetic snapshots: the comparator fails on a payload or count change, passes on a receipt change alone, still compares payloads when the receipt changes, and refuses a structurally invalid snapshot with exit 2 before materializing (§8). No binary needed, so CI runs it first |
 | `docs/architecture/he1-horizontal-extension.md` | moved from the repository root | Adopts the design document; header now names `ADR-0125` and the `HE-AC`/`HE-T` registry role. Trailing whitespace stripped: 811 lines, no wording removed |
 | `docs/adr/0125-he1-scope.md` | new | The scope decision and the conflict resolution |
 | `AGENTS.md` | edited | Current round, repository map (`docs/fmp-0.2/`, `docs/architecture/`, `packages/`, `bundles/`, `research/he1/`), three added done-criteria bullets. The eight hard rules and "Never do" are untouched |
@@ -65,7 +65,7 @@ prototype`; the root has no `Cargo.toml`, so the manifest path is not optional
 | oracle rerun | `122/128 re-derived, 6 skipped, 0 failed`; `toolchain: llvm-mc 23.1.2`; skips are the six `manual-derivation` records |
 | `cargo fmt --check` | clean (the new test file was formatted once with `cargo fmt --all`) |
 | `cargo test --workspace` | 61 passed, 0 failed: `determinism` 6, `fixtures` 2, `he1_identity_characterization` 7, `planner_api` 10, `fmp_materialize` 9, `fmp_model` 22, `fmp_plan` 5 |
-| `test_he1_baseline.py` | 19 passed, 0 failed — comparator, schema, exit-code, discovery and timeout tests; no binary involved |
+| `test_he1_baseline.py` | 24 passed, 0 failed — comparator, schema, exit-code, discovery, timeout and structural-fault tests; no binary involved (19 at H0, 5 added in §8) |
 | `he1_baseline.py` | recorded 104 definitions / 128 positives / 619 negatives / 128 artifacts; `artifact_root sha256:dfd08fee9844058492138b23448073ec47d8eda42383e3f1b3e567db86a86fef` (that value is now the **envelope** root; the gate is `payload_root` — §6) |
 | `he1_baseline.py --check` | `OK: payload projection identical`; `payload_root` unchanged; `envelope: identical (same implementation receipt)` |
 
@@ -95,7 +95,10 @@ count from the records, so a seventh cannot appear silently.
   `definitions/` and `fixtures/` are byte-identical to `d0082f9`.
 - **Documented behaviour:** none changed. Four new tests *pass by asserting the
   current hole*; they are labelled as characterization tests and will be flipped
-  in H1/H3/H4. A green run here is not a property claim. One is a constraint —
+  in H1/H3/H4. A green run here is not a property claim. The definition
+  re-encode test cannot be flipped in place once `Definition` fields are private
+  (H1a), so it is replaced by a `compile_fail` constraint plus a
+  `reload-changes-digest` test rather than flipped (`§8`). One is a constraint —
   the legacy fingerprint sees raw-document fields the parser drops — and asserts
   a property H1 must preserve. The other two are controls: a digest mismatch and
   a non-object root, both rejected today.
@@ -213,8 +216,9 @@ code; it corrects the baseline tool, its tests and the documents.
    snapshot is read and validated before any materialization, so a bad snapshot
    costs one second, not 128 subprocesses.
 2. **The comparator had no regression test.** The eight controls above were run
-   by hand once. `tools/test_he1_baseline.py` makes them 19 tests over two
-   synthetic snapshots — no binary, no `definitions/` scan — and the `baseline`
+   by hand once. `tools/test_he1_baseline.py` makes them 19 tests at this round
+   (24 after §8) over two synthetic snapshots — no binary, no `definitions/` scan
+   — and the `baseline`
    job runs it before installing the toolchain. It pins the property the first
    draft of the split broke: **a changed implementation receipt does not stop the
    payload from being compared**.
@@ -252,14 +256,65 @@ Re-measured on the second round: 61 workspace tests (7 characterization),
 unchanged, `envelope_root` unchanged. The five existing gap/control tests and
 their verdicts did not change.
 
+## 8. Third review round (`ccdc7a3`)
+
+The third review accepted the H0 evidence and the H1 direction, and requested
+four changes before `ADR-0127` can be frozen. None of them touches product Rust
+code; this round changes the baseline tool, its self-tests, and the H1 plan.
+
+1. **A structurally invalid snapshot still exited 1.** `require_schema()` called
+   `recorded.get("schema")` without first checking that the decoded JSON was an
+   object, so a snapshot of `[]` or `null` raised an uncaught `AttributeError`
+   and Python exited 1 — the code that means "the baseline moved". A new
+   `validate_snapshot()` checks the root object, the three sub-objects,
+   `artifacts.count`, every entry's `fixture`/`payload_sha256`/`payload`, and the
+   implementation receipt's string fields, and raises `Fault` (exit 2) before the
+   128 subprocesses start. This is still not a blanket `except Exception`: each
+   check names the shape it requires.
+2. **Five structural-fault tests were added** (24 total now): `[]`, `null`, a
+   missing `artifacts`, a wrongly typed `implementation`, and an entry without
+   `payload_sha256`. Each asserts exit 2 and the fault message, so the old
+   behaviour would fail the suite.
+3. **The H1 plan had misclassified allocation failure.** It claimed the
+   materializer cannot produce a host failure because its product path has no
+   I/O. `emit()` already calls `bytes.try_reserve_exact(size)` at
+   `fmp-materialize/src/lib.rs:400`, with a comment at `:397-399` saying the
+   failure is "a host limit, not a plan property"; allocation failure depends on
+   host resources. `MAX_IMAGE_BYTES` already exists at
+   `fmp-validate/src/lib.rs:18` (checked at `:285`), and design §8.3 requires a
+   separate `HostFailure`. `D4` now keeps three variants —
+   `PostEncodeAssertion`, `Internal`, `HostFailure(HostFault)` — with an
+   injectable `allocate_image` seam for the test; the CLI maps `HostFailure` to
+   exit 2.
+4. **`BindIdentity` was described as if it identified the whole artifact.**
+   Plan A and plan B = A plus `source_trace` have equal `ParsedPlanIdentity` and
+   `DefinitionIdentity`, but different legacy `fingerprint` values and therefore
+   different `payload_digest`s, because `fingerprint` is an `Artifact` field.
+   `D3`/`D12` now say `BindIdentity` is a parse/bind identity, not a replay or
+   cache key; full identity needs the `ExecutionReceipt`. A two-plan regression
+   test is planned.
+5. **The H1a/H1b split contradicted the compiler.** Private `Definition` fields
+   make the current definition-mutability test stop compiling. Its conversion
+   (`compile_fail` plus a reload-changes-digest runtime test) is now owned by
+   H1a; H1b flips only the fingerprint test. Each commit can then pass the
+   workspace tests on its own.
+
+Re-measured after this round: 61 workspace tests (7 characterization), 24
+comparator tests, `payload_root`
+`sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9`
+unchanged, `envelope: identical`. The hosted result for this round is the run
+attached to the PR after the push, not part of the recorded snapshot.
+
 ## Next
 
 H1 — identity closure (`ADR-0127`): private verified objects, a bound
 `ValidatedPlan`, one fact source per identity, separate plan/definition/artifact/
 implementation identities, and the legacy facade that cannot bypass the checks.
 Exit: no supported API can make execution facts and a verified identity
-disagree. H1 flips two of the four gap tests (the definition re-encode and the
-stable fingerprint); the other two close in H3 (unselected file, ISA allowlist),
-the legacy-fingerprint constraint is preserved rather than flipped, and the
-deep-JSON probe finding is H4. The implementation plan, with its twelve decisions
-(D1–D12), is `docs/architecture/he1-h1-plan.md`.
+disagree. H1a converts the definition re-encode test into a `compile_fail`
+constraint plus a reload-changes-digest test, because private fields make the
+current test uncompilable; H1b flips the stable-fingerprint test. The other two
+gap tests close in H3 (unselected file, ISA allowlist), the legacy-fingerprint
+constraint is preserved rather than flipped, and the deep-JSON probe finding is
+H4. The implementation plan, with its twelve decisions (D1–D12), is
+`docs/architecture/he1-h1-plan.md`.
