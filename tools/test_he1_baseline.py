@@ -225,6 +225,46 @@ class CommandLineTests(unittest.TestCase):
         self.assertIn("no materializer binary", stderr)
         self.assertIn("--manifest-path prototype/Cargo.toml", stderr)
 
+    # A snapshot can be valid JSON and still not be a snapshot. Each of these
+    # used to raise inside the comparator and exit 1 -- the code that means
+    # "the baseline moved".
+
+    def test_a_json_array_is_a_fault(self):
+        path = self.write("array.json", [])
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("is list, not a JSON object", stderr)
+
+    def test_json_null_is_a_fault(self):
+        path = self.write("null.json", "null")
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("is null, not a JSON object", stderr)
+
+    def test_a_missing_artifacts_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        del snapshot["artifacts"]
+        path = self.write("no-artifacts.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("'artifacts' is null, not an object", stderr)
+
+    def test_a_wrong_implementation_type_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        snapshot["implementation"] = "fmp-materialize/0.0.0"
+        path = self.write("bad-receipt.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("implementation is str, not an object", stderr)
+
+    def test_an_entry_without_a_payload_digest_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        del snapshot["artifacts"]["entries"][0]["payload_sha256"]
+        path = self.write("no-digest.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("has no string 'payload_sha256'", stderr)
+
 
 class DiscoveryTests(unittest.TestCase):
     def test_the_linux_name_is_found_when_no_exe_exists(self):

@@ -587,13 +587,80 @@ def require_schema(recorded):
         )
 
 
+def describe(value):
+    """The JSON type of a value, for a fault message."""
+    if value is None:
+        return "null"
+    return type(value).__name__
+
+
+def validate_snapshot(recorded):
+    """Refuse a structurally invalid snapshot before any materialization.
+
+    `--check` compares field by field, so a snapshot that is a JSON array, a bare
+    `null`, or missing `artifacts` used to fail inside the walker with an
+    uncaught `AttributeError`/`KeyError` -- which Python exits as 1, the code
+    that means "the baseline moved". A corrupt snapshot is a fault (2), and it
+    must cost one second rather than 128 subprocesses. Every check below is a
+    shape the recorder always writes; none of them is a comparison.
+    """
+    if not isinstance(recorded, dict):
+        raise Fault(
+            "the recorded snapshot is %s, not a JSON object" % describe(recorded)
+        )
+    require_schema(recorded)
+
+    for key in ("definitions", "corpus", "artifacts"):
+        if not isinstance(recorded.get(key), dict):
+            raise Fault(
+                "the recorded snapshot's %r is %s, not an object"
+                % (key, describe(recorded.get(key)))
+            )
+
+    artifacts = recorded["artifacts"]
+    if not isinstance(artifacts.get("count"), int):
+        raise Fault("the recorded snapshot has no integer artifacts.count")
+    entries = artifacts.get("entries")
+    if not isinstance(entries, list):
+        raise Fault(
+            "the recorded snapshot's artifacts.entries is %s, not an array"
+            % describe(entries)
+        )
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            raise Fault(
+                "artifacts.entries[%d] is %s, not an object" % (index, describe(entry))
+            )
+        for key in ("fixture", "payload_sha256"):
+            if not isinstance(entry.get(key), str):
+                raise Fault(
+                    "artifacts.entries[%d] has no string %r" % (index, key)
+                )
+        if not isinstance(entry.get("payload"), dict):
+            raise Fault(
+                "artifacts.entries[%d] has no payload object" % index
+            )
+
+    implementation = recorded.get("implementation")
+    if not isinstance(implementation, dict):
+        raise Fault(
+            "the recorded snapshot's implementation is %s, not an object"
+            % describe(implementation)
+        )
+    for key in ("name", "version", "binary_sha256"):
+        if not isinstance(implementation.get(key), str):
+            raise Fault(
+                "the recorded snapshot's implementation has no string %r" % key
+            )
+
+
 def run(arguments):
     recorded = None
     if arguments.check:
         # Read and validate before materializing: a broken snapshot is a fault,
         # and it should cost a second, not 128 subprocesses.
         recorded = load_snapshot(arguments.check)
-        require_schema(recorded)
+        validate_snapshot(recorded)
 
     binary = resolve_binary(arguments.binary)
     fresh = snapshot(binary, arguments.probes)
