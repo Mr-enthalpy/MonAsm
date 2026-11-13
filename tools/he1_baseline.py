@@ -688,11 +688,16 @@ def resolve_binary(argument: str):
         path = Path(argument)
         if not path.is_file():
             raise Fault("no materializer binary at %s\nbuild it first: %s" % (path, BUILD_COMMAND))
-        return path
+        # An explicit relative path such as `./fmp` stringifies to "fmp", and
+        # POSIX `subprocess` then searches PATH: the executed program and the
+        # file `sha256_file()` hashes could be two different binaries. Return
+        # the resolved absolute path so execution and the build receipt share
+        # one file.
+        return path.resolve()
     candidates = [DEBUG_BUILD / "fmp.exe", DEBUG_BUILD / "fmp"]
     for path in candidates:
         if path.is_file():
-            return path
+            return path.resolve()
     raise Fault(
         "no materializer binary at %s\nbuild it first: %s"
         % (" or ".join(rel(path) for path in candidates), BUILD_COMMAND)

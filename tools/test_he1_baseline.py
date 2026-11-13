@@ -639,7 +639,7 @@ class DiscoveryTests(unittest.TestCase):
             binary = Path(directory) / "fmp"
             binary.write_bytes(b"")
             with mock.patch.object(baseline, "DEBUG_BUILD", Path(directory)):
-                self.assertEqual(baseline.resolve_binary(""), binary)
+                self.assertEqual(baseline.resolve_binary(""), binary.resolve())
 
     def test_the_executable_name_wins_on_windows(self):
         with tempfile.TemporaryDirectory(prefix="monasm-he1-bin-") as directory:
@@ -647,7 +647,44 @@ class DiscoveryTests(unittest.TestCase):
             preferred.write_bytes(b"")
             (Path(directory) / "fmp").write_bytes(b"")
             with mock.patch.object(baseline, "DEBUG_BUILD", Path(directory)):
-                self.assertEqual(baseline.resolve_binary(""), preferred)
+                self.assertEqual(baseline.resolve_binary(""), preferred.resolve())
+
+    @unittest.skipIf(os.name == "nt", "POSIX PATH lookup is the regression target")
+    def test_an_explicit_relative_binary_executes_and_hashes_the_same_file(self):
+        # `./fmp` used to become `Path("fmp")`, whose `str()` is "fmp"; POSIX
+        # `subprocess` then searched PATH while `sha256_file()` opened the local
+        # file. A same-named PATH program made the executed binary and the
+        # recorded digest disagree. Resolve the argument, then execute it.
+        with tempfile.TemporaryDirectory(prefix="monasm-he1-local-") as local_dir, \
+             tempfile.TemporaryDirectory(prefix="monasm-he1-path-") as path_dir:
+            local = Path(local_dir) / "fmp"
+            shadow = Path(path_dir) / "fmp"
+            local.write_text("#!/bin/sh\necho LOCAL_SELECTED\n", encoding="utf-8")
+            shadow.write_text("#!/bin/sh\necho PATH_SHADOW\n", encoding="utf-8")
+            local.chmod(0o755)
+            shadow.chmod(0o755)
+
+            old_cwd = os.getcwd()
+            old_path = os.environ.get("PATH", "")
+            os.chdir(local_dir)
+            os.environ["PATH"] = path_dir + os.pathsep + old_path
+            try:
+                binary = baseline.resolve_binary("./fmp")
+                code, stdout, stderr = baseline.run_materialize(
+                    binary, Path("plan.json"), Path("definitions")
+                )
+            finally:
+                os.chdir(old_cwd)
+                os.environ["PATH"] = old_path
+
+            self.assertTrue(binary.is_absolute())
+            self.assertEqual(code, 0)
+            self.assertEqual(stdout.strip(), "LOCAL_SELECTED")
+            self.assertEqual(stderr.strip(), "")
+            self.assertEqual(baseline.sha256_file(binary), baseline.sha256_file(local))
+            self.assertNotEqual(
+                baseline.sha256_file(binary), baseline.sha256_file(shadow)
+            )
 
 
 class TimeoutTests(unittest.TestCase):
