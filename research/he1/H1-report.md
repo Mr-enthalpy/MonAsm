@@ -595,3 +595,39 @@ Evidence: `a_short_image_is_a_host_failure`, `a_long_image_is_a_host_failure`,
 `determinism` `43496573111`). Nothing under `definitions/`, `fixtures/`,
 `schema/` or `docs/fmp-v0/` changed; both roots stayed put and the oracle stayed
 `122/128`.
+
+### 11.10 Build-identity anchor and remaining boundaries
+
+The second audit found no P1 and approved the merge. It found one CI anchor
+problem: `actions/checkout` checks out GitHub's merge commit on `pull_request`,
+while `FMP_BUILD_ID` was set to `github.event.pull_request.head.sha`. In the
+`2441968` run both trees were identical — head `244196827…` and merge
+`52289897…` both had tree `30c488fe…` — so no receipt was mislabeled, but the
+anchor was conventional and would drift once `main` advanced.
+
+The compiling jobs now derive `FMP_BUILD_ID` from `git rev-parse HEAD` after
+checkout, assert `FMP_BUILD_ID == git rev-parse HEAD`, and record the PR head
+separately in the log and job summary. On a pull request the label is therefore
+the merge commit the job built, not the head it did not build; on a push it is
+the pushed commit. Evidence on head `a61b906`: `gates` run `43501514747` and
+`determinism` run `43501515039` are green; every compiling job logs
+`checked-out commit: 83466702fa9b4074b87e46f4448c59a4e4f216c8`,
+`PR head: a61b906dd4076df4b2b66fd6c4a4e5984e8eea75` and
+`FMP_BUILD_ID=83466702fa9b4074b87e46f4448c59a4e4f216c8`, and the equality step
+passes on ubuntu, macos and windows. The receipt still has only `build`; a
+separate receipt field for the PR head belongs to H3's persistence decision.
+
+The same audit's other findings stay stated boundaries, now in the code
+comments:
+
+- `verify_receipt()` is a payload-integrity check, not a provenance proof. It
+  does not re-run execution and cannot prove `BindIdentity` produced the bytes;
+  replacing both public fields defeats it. Sealing the pair is H3.
+- `fmp_validate::check()` is steps 2–7 only; `bind` is the full admission
+  entry. A plan that only passed `check` is not a `ValidatedPlan`.
+- The CLI prints only the artifact, so a CLI consumer cannot obtain the receipt
+  until H3's output protocol. This is the accepted H1 scope.
+- Deep JSON input can still exhaust the parser stack; that remains H4, and H1b
+  does not claim otherwise.
+- `Internal` still has no deliberately forced process test; the pure
+  classification test and the unreachable-after-`check` table are the coverage.

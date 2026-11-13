@@ -720,7 +720,12 @@ workspace, document and definition, baseline and oracle jobs (its log prints
 allocator's exact-length contract, `verify_receipt`, and the N13 CLI process
 test) is green on `7df6f48`: `gates` run `43496573107` passes the workspace,
 document and definition, baseline and oracle jobs, and `determinism` run
-`43496573111` passes on ubuntu, macos and windows. **H1 is therefore accepted**
+`43496573111` passes on ubuntu, macos and windows. The post-acceptance CI anchor
+fix is green on `a61b906`: `gates` run `43501514747` and `determinism` run
+`43501515039` pass, and every compiling job logs the merge commit it checked out
+(`83466702fa9b4074b87e46f4448c59a4e4f216c8`), the PR head
+(`a61b906dd4076df4b2b66fd6c4a4e5984e8eea75`) and the same value in
+`FMP_BUILD_ID`, with an equality assertion. **H1 is therefore accepted**
 on `7df6f48` (2026-11-14): `HE-AC-06` with `HE-T02`/`HE-T03`/`HE-T04` is proved
 by the compile-time and runtime tests below, the 128 payloads and 104
 definitions are unchanged, the oracle is still `122/128`, the receipt names its
