@@ -6,6 +6,11 @@ name: determinism
 # `prototype/crates/fmp-cli/tests/determinism.rs` are compared across OSes.
 # The evidence record is `research/evidence/experiments/EXP-0033-determinism.md`
 # §6; a green run is the second-host observation, not a substitute for it.
+#
+# `HE-T20`: every host labels the commit it actually checked out (`git
+# rev-parse HEAD`), so a receipt from any host names the built tree instead of
+# a head SHA that may differ from GitHub's merge checkout. The PR head is
+# recorded separately in each host's log and job summary.
 
 on:
   push:
@@ -27,6 +32,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # `HE-T20`: every host labels the checked-out commit, not the PR head.
+      # On a pull request the checkout is GitHub's merge commit; the head is
+      # logged separately. Bash is requested because Windows defaults to pwsh.
+      - name: Label the build with the checked-out commit
+        shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse HEAD)"
+          test -n "${commit}"
+          echo "FMP_BUILD_ID=${commit}" >> "${GITHUB_ENV}"
+          head="${PR_HEAD_SHA:-${commit}}"
+          echo "checked-out commit: ${commit}"
+          echo "PR head: ${head}"
+          {
+            echo "### Build identity"
+            echo ""
+            echo "| field | value |"
+            echo "|---|---|"
+            echo "| checked-out commit | \`${commit}\` |"
+            echo "| PR head | \`${head}\` |"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Record the runner host
         run: |
           rustc -Vv
@@ -34,6 +63,16 @@ jobs:
 
       - name: Install the pinned toolchain
         run: rustup toolchain install 1.96.0 --profile minimal --no-self-update
+
+      # `HE-T20`: all three hosts must carry a label that names the checked-out
+      # commit, not only agree with each other.
+      - name: The build label names the checked-out commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${FMP_BUILD_ID}"
+          test "${FMP_BUILD_ID}" = "$(git rev-parse HEAD)"
+          echo "FMP_BUILD_ID=${FMP_BUILD_ID}"
 
       - name: Test the workspace
         working-directory: prototype

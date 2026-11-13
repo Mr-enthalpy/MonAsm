@@ -13,6 +13,8 @@ use std::path::{Path, PathBuf};
 use fmp_model::json::Json;
 use fmp_model::Registry;
 
+mod support;
+
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
 }
@@ -100,7 +102,7 @@ fn positives_reproduce_the_oracle_bytes() {
         let definition = registry
             .find(&plan.definition.namespace, &plan.definition.version)
             .unwrap_or_else(|error| panic!("{name}: {}", error.message()));
-        let artifact = match fmp_materialize::materialize(&plan, &definition) {
+        let artifact = match support::execute(plan.clone(), definition) {
             Ok(artifact) => artifact,
             Err(errors) => panic!(
                 "{name} was rejected:\n{}",
@@ -206,10 +208,7 @@ fn negatives_produce_exactly_the_registered_diagnostics() {
             let definition = registry
                 .find(&plan.definition.namespace, &plan.definition.version)
                 .unwrap_or_else(|error| panic!("{name}: {}", error.message()));
-            match fmp_materialize::materialize(&plan, &definition) {
-                Ok(artifact) => panic!("{name} was accepted and emitted {}", artifact.bytes_hex()),
-                Err(errors) => errors,
-            }
+            support::diagnostics(plan, definition)
         };
 
         let wanted = expected

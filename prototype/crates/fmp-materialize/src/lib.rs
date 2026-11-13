@@ -10,6 +10,39 @@
 //! instruction are the definition's template with the declared fields replaced;
 //! the bytes of a section are its fragments in `offset` order; the image is the
 //! sections in `section_order`.
+//!
+//! ## One input, one receipt (`ADR-0127`, H1b)
+//!
+//! [`materialize`] accepts only a [`fmp_validate::ValidatedPlan`], a value only
+//! [`fmp_validate::bind`] can produce. There is no two-argument form that could
+//! execute a plan before its definition identity was compared, and no way to
+//! "validate A, execute B": the plan and the definition travel together.
+//!
+//! ```compile_fail
+//! use fmp_materialize::materialize;
+//! use fmp_model::{Definition, Plan};
+//!
+//! fn run(plan: &Plan, definition: &Definition) -> fmp_materialize::Materialization {
+//!     materialize(plan, definition).expect("the two-argument form is gone")
+//! }
+//! ```
+//!
+//! The positive control uses the same import and a single `&ValidatedPlan`, so a
+//! broken import cannot be mistaken for a rejected signature:
+//!
+//! ```
+//! use fmp_materialize::materialize;
+//! use fmp_validate::ValidatedPlan;
+//!
+//! fn run(plan: &ValidatedPlan) -> fmp_materialize::Materialization {
+//!     materialize(plan).expect("bound plans are executable")
+//! }
+//! ```
+//!
+//! A successful call returns a [`Materialization`]: the artifact and an
+//! [`ExecutionReceipt`] assembled from the bound identity, this build's
+//! [`ImplementationIdentity`] and the payload digest. "Executed" and "has a
+//! receipt" are the same event, so there is no separate call to forget.
 
 #![forbid(unsafe_code)]
 
@@ -21,9 +54,13 @@ use fmp_model::plan::{
     Fixup, FixupTarget, FragmentBody, Mode, Payload, PcRule, Plan, RangeConstraint, Section,
     Transform,
 };
+use fmp_validate::{BindIdentity, ValidatedPlan};
 
 /// The version recorded in the artifact envelope. Audit only.
 pub const MATERIALIZER_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// The algorithm name of [`payload_digest`] (`ADR-0126`).
+pub const PAYLOAD_IDENTITY_ALGORITHM: &str = "payload/0.1";
 
 /// The materialized result: `01_contract.md` §11.1 and §11.2.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -339,37 +376,236 @@ fn target_name(target: &FixupTarget) -> String {
     }
 }
 
-/// Validate, then emit. `Err` is the complete diagnostic set and no artifact.
-pub fn materialize(plan: &Plan, definition: &Definition) -> Result<Artifact, Vec<Diagnostic>> {
-    let mut errors = Vec::new();
-
-    // Step 3: the plan's digest must name this definition exactly. A digest
-    // mismatch is checked before any rule is applied, because the rules below
-    // are the ones the digest vouches for.
-    if plan.definition.digest != definition.digest() {
-        errors.push(
-            Diagnostic::new(codes::E_DEF_001, "/definition_identity/digest")
-                .with("declared", plan.definition.digest.as_str())
-                .with("actual", definition.digest())
-                .with(
-                    "reason",
-                    "definition digest does not match the loaded definition",
-                ),
-        );
-    }
-
-    // Steps 2, 4, 5, 6, 7 and the output gates.
-    errors.extend(fmp_validate::check(plan, definition));
-    diagnostic::sort(&mut errors);
-    if !errors.is_empty() {
-        return Err(errors);
-    }
-
-    emit(plan, definition)
+/// The identity of the build that executed a plan (`ADR-0126` D9).
+///
+/// The name and version come from this crate's package, not from `fmp-model`:
+/// the model's version is the workspace's and says nothing about which encoder
+/// ran. `build` is the compile-time `FMP_BUILD_ID`; when it is absent the
+/// receipt records `None` and does not claim `HE-T20`. Nothing is read from the
+/// environment at run time (`INV-05`).
+///
+/// `build` names a **source revision**, not a binary. Two builds of the same
+/// revision can differ in profile, compiler or target, so a full binary identity
+/// needs a build-manifest or binary digest; the baseline tool records that
+/// digest beside the receipt and `payload_digest` already pins the executed
+/// bytes. Adding the binary digest to this struct is deliberately left to the
+/// stage that persists receipts.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ImplementationIdentity {
+    name: &'static str,
+    version: &'static str,
+    build: Option<&'static str>,
 }
 
-fn emit(plan: &Plan, definition: &Definition) -> Result<Artifact, Vec<Diagnostic>> {
-    let mut errors = Vec::new();
+impl ImplementationIdentity {
+    pub fn current() -> Self {
+        ImplementationIdentity {
+            name: env!("CARGO_PKG_NAME"),
+            version: MATERIALIZER_VERSION,
+            build: option_env!("FMP_BUILD_ID"),
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        self.name
+    }
+
+    pub fn version(&self) -> &str {
+        self.version
+    }
+
+    /// The build label recorded at compile time, if the build set one.
+    pub fn build(&self) -> Option<&str> {
+        self.build
+    }
+}
+
+/// The `payload/0.1` projection of an artifact (`ADR-0126`).
+///
+/// The projection is [`Artifact::to_json`] with `materializer_version` removed,
+/// so a build change moves the envelope but never this identity. It is **not**
+/// `canonical_digest(to_json())`: that would fold the build receipt into the
+/// payload and reproduce the bug `ADR-0126` records.
+pub fn payload_digest(artifact: &Artifact) -> String {
+    let mut payload = artifact.to_json();
+    if let Json::Object(entries) = &mut payload {
+        entries.retain(|(key, _)| key != "materializer_version");
+    }
+    fmp_model::canonical::sha256_prefixed(&[&fmp_model::canonical::canonical_bytes(&payload)])
+}
+
+/// The payload identity attached to an [`ExecutionReceipt`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PayloadIdentity {
+    digest: String,
+}
+
+impl PayloadIdentity {
+    fn of(artifact: &Artifact) -> Self {
+        PayloadIdentity {
+            digest: payload_digest(artifact),
+        }
+    }
+
+    /// `sha256:<64 lowercase hex>` over the `payload/0.1` projection.
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
+
+    pub fn algorithm(&self) -> &'static str {
+        PAYLOAD_IDENTITY_ALGORITHM
+    }
+}
+
+/// What was executed, with what, and what came out (`ADR-0127` §3).
+///
+/// This is the full identity. `BindIdentity` alone is not a replay or cache key:
+/// a plan that differs only in `source_trace` binds identically while the legacy
+/// fingerprint — and therefore the payload — differs. Only the receipt carries
+/// the payload digest.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExecutionReceipt {
+    bind: BindIdentity,
+    implementation: ImplementationIdentity,
+    payload: PayloadIdentity,
+}
+
+impl ExecutionReceipt {
+    pub fn bind(&self) -> &BindIdentity {
+        &self.bind
+    }
+
+    pub fn implementation(&self) -> &ImplementationIdentity {
+        &self.implementation
+    }
+
+    pub fn payload(&self) -> &PayloadIdentity {
+        &self.payload
+    }
+}
+
+/// A successful execution: the artifact and the receipt that names it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Materialization {
+    pub artifact: Artifact,
+    pub receipt: ExecutionReceipt,
+}
+
+impl Materialization {
+    /// Whether the receipt still describes `artifact`.
+    ///
+    /// Both fields are public because a caller needs the bytes, so a caller can
+    /// break the pairing by editing the artifact after execution. Call this
+    /// before persisting or replaying: `false` means the recorded digest was
+    /// computed for different bytes. It compares the `payload/0.1` projection;
+    /// it does not re-run validation or encoding.
+    ///
+    /// This is a payload-integrity check, not a provenance proof. It does not
+    /// prove that the receipt's `BindIdentity` produced these bytes, and a
+    /// caller that replaces both public fields can make it return `true` again.
+    /// Sealing the pair, or binding it to a trusted pipeline, belongs to the
+    /// stage that persists receipts.
+    pub fn verify_receipt(&self) -> bool {
+        self.receipt.payload.digest() == payload_digest(&self.artifact)
+    }
+}
+
+/// A host limit, not a plan property and not an invariant break (`ADR-0127` D4).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum HostFault {
+    /// The host could not provide a zero-filled image of `requested` bytes. The
+    /// request is kept as `u64`, the width the plan declares, so a size the host
+    /// cannot even represent is still reported as a limit rather than as an
+    /// internal fault.
+    ImageReservation { requested: u64 },
+    /// The allocator returned an image whose length is not the requested one.
+    ///
+    /// [`materialize`] never encodes into it: a short buffer would panic on the
+    /// first fragment write and a long one would emit bytes the frozen plan did
+    /// not declare, so a violated allocator contract is a host failure, not a
+    /// plan rejection and not an internal invariant.
+    ImageLength { requested: u64, actual: u64 },
+}
+
+impl HostFault {
+    /// Prose for the CLI's host channel. It carries no plan bytes and no
+    /// diagnostic code, because no error code means "this host ran out".
+    pub fn message(&self) -> String {
+        match self {
+            HostFault::ImageReservation { requested } => {
+                format!("the host could not reserve a {requested}-byte image")
+            }
+            HostFault::ImageLength { requested, actual } => format!(
+                "the allocator returned a {actual}-byte image for a {requested}-byte request"
+            ),
+        }
+    }
+}
+
+/// Why a validated plan did not produce an artifact.
+///
+/// There is deliberately no `Rejected` variant: [`fmp_validate::bind`] owns
+/// static rejection, so reaching `materialize` with a rejection would mean the
+/// credential was bypassed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MaterializationFailure {
+    /// The plan failed an assertion that only the encoded bytes can decide
+    /// (`E-SIZE-001`, `E-BYTE-001`, `E-RANGE-003`, `E-FIXUP-002`,
+    /// `E-FIXUP-003`). `ADR-0127` §9 measured the reachable set.
+    PostEncodeAssertion(Vec<Diagnostic>),
+    /// An implementation invariant broke (`E-INTERNAL-001`), never user input.
+    Internal(Diagnostic),
+    /// This host could not satisfy a resource request.
+    HostFailure(HostFault),
+}
+
+/// Reserve and zero a `size`-byte image.
+///
+/// The request is bounded by `E-LIMIT-001` (64 MiB) before encoding, so a
+/// failure here is the host's memory, not the plan's shape (`ADR-0127` §8).
+pub fn allocate_image(size: u64) -> Result<Vec<u8>, HostFault> {
+    let requested =
+        usize::try_from(size).map_err(|_| HostFault::ImageReservation { requested: size })?;
+    let mut image = Vec::new();
+    image
+        .try_reserve_exact(requested)
+        .map_err(|_| HostFault::ImageReservation { requested: size })?;
+    image.resize(requested, 0);
+    Ok(image)
+}
+
+/// Execute a bound plan and return the artifact with its receipt.
+pub fn materialize(validated: &ValidatedPlan) -> Result<Materialization, MaterializationFailure> {
+    materialize_with_allocator(validated, allocate_image)
+}
+
+/// [`materialize`] with the image allocator injected, so the host-failure path
+/// can be tested without exhausting memory or reading a hidden switch.
+///
+/// The callback must return exactly `size` bytes. That is checked before any
+/// fragment is written: a short buffer would panic on the first write and a long
+/// one would emit bytes the frozen plan did not declare, so either mismatch is
+/// [`HostFault::ImageLength`] and produces no artifact.
+pub fn materialize_with_allocator(
+    validated: &ValidatedPlan,
+    allocate: impl Fn(u64) -> Result<Vec<u8>, HostFault>,
+) -> Result<Materialization, MaterializationFailure> {
+    let artifact = emit(validated, &allocate)?;
+    let receipt = ExecutionReceipt {
+        bind: validated.identity().clone(),
+        implementation: ImplementationIdentity::current(),
+        payload: PayloadIdentity::of(&artifact),
+    };
+    Ok(Materialization { artifact, receipt })
+}
+
+fn emit(
+    validated: &ValidatedPlan,
+    allocate: &dyn Fn(u64) -> Result<Vec<u8>, HostFault>,
+) -> Result<Artifact, MaterializationFailure> {
+    let plan = validated.plan();
+    let definition = validated.definition();
+    let mut errors: Vec<Diagnostic> = Vec::new();
     let mut sections: Vec<SectionImage> = Vec::new();
     let mut records: Vec<Record> = Vec::new();
 
@@ -381,27 +617,30 @@ fn emit(plan: &Plan, definition: &Definition) -> Result<Artifact, Vec<Diagnostic
         {
             Some(section) => section,
             None => {
-                errors.push(internal("section_order names an unvalidated section"));
-                continue;
+                return Err(MaterializationFailure::Internal(internal(
+                    "section_order names an unvalidated section",
+                )))
             }
         };
         let mut bytes: Vec<u8> = Vec::new();
         if section.image_backed {
-            let size = match usize::try_from(section.declared_size) {
-                Ok(size) => size,
-                Err(_) => {
-                    errors.push(internal("validated image size does not fit the host"));
-                    continue;
-                }
-            };
             // The validator capped the total at `MAX_IMAGE_BYTES`, so a failed
-            // reservation here is a host limit, not a plan property. Report it
-            // instead of letting `resize` abort the process.
-            if bytes.try_reserve_exact(size).is_err() {
-                errors.push(internal("image reservation failed"));
-                continue;
+            // reservation is a host limit, not a plan property. Report it
+            // without aborting the process.
+            let image =
+                allocate(section.declared_size).map_err(MaterializationFailure::HostFailure)?;
+            // The frozen size is the one fact this loop must never learn from
+            // the allocator: a shorter buffer panics on the first write and a
+            // longer one would return more bytes than the plan declares.
+            if image.len() as u64 != section.declared_size {
+                return Err(MaterializationFailure::HostFailure(
+                    HostFault::ImageLength {
+                        requested: section.declared_size,
+                        actual: image.len() as u64,
+                    },
+                ));
             }
-            bytes.resize(size, 0);
+            bytes = image;
             for fragment in &section.fragments {
                 let at = fragment.offset as usize;
                 match &fragment.body {
@@ -422,15 +661,19 @@ fn emit(plan: &Plan, definition: &Definition) -> Result<Artifact, Vec<Diagnostic
                         {
                             Some(instruction) => instruction,
                             None => {
-                                errors.push(internal("fragment names an unvalidated instruction"));
-                                continue;
+                                return Err(MaterializationFailure::Internal(internal(
+                                    "fragment names an unvalidated instruction",
+                                )))
                             }
                         };
                         match encode_instruction(plan, definition, section, instruction) {
                             Ok(encoded) => {
                                 bytes[at..at + encoded.len()].copy_from_slice(&encoded);
                             }
-                            Err(found) => errors.extend(found),
+                            Err(MaterializationFailure::PostEncodeAssertion(found)) => {
+                                errors.extend(found)
+                            }
+                            Err(other) => return Err(other),
                         }
                     }
                 }
@@ -467,7 +710,11 @@ fn emit(plan: &Plan, definition: &Definition) -> Result<Artifact, Vec<Diagnostic
                     .find(|symbol| &symbol.symbol_id == symbol_id)
                 {
                     Some(symbol) => entries.push(SymbolEntry::of(symbol)),
-                    None => errors.push(internal("symbol_order names an unvalidated symbol")),
+                    None => {
+                        return Err(MaterializationFailure::Internal(internal(
+                            "symbol_order names an unvalidated symbol",
+                        )))
+                    }
                 }
             }
         } else {
@@ -484,7 +731,7 @@ fn emit(plan: &Plan, definition: &Definition) -> Result<Artifact, Vec<Diagnostic
 
     if !errors.is_empty() {
         diagnostic::sort(&mut errors);
-        return Err(errors);
+        return Err(MaterializationFailure::PostEncodeAssertion(errors));
     }
 
     // The Level 0 image is exactly the image-backed section bytes in
@@ -497,9 +744,9 @@ fn emit(plan: &Plan, definition: &Definition) -> Result<Artifact, Vec<Diagnostic
         fmp_model::plan::Artifact::Bytes => 0,
         fmp_model::plan::Artifact::Sections => 1,
         fmp_model::plan::Artifact::Unknown(_) => {
-            return Err(vec![internal(
+            return Err(MaterializationFailure::Internal(internal(
                 "an unvalidated artifact value reached emission",
-            )])
+            )))
         }
     };
 
@@ -559,11 +806,14 @@ fn encode_instruction(
     definition: &Definition,
     section: &Section,
     instruction: &fmp_model::plan::Instruction,
-) -> Result<Vec<u8>, Vec<Diagnostic>> {
-    let mut errors = Vec::new();
+) -> Result<Vec<u8>, MaterializationFailure> {
     let form = match lookup(definition, &instruction.form_id) {
         Some(form) => form,
-        None => return Err(vec![internal("validated form disappeared")]),
+        None => {
+            return Err(MaterializationFailure::Internal(internal(
+                "validated form disappeared",
+            )))
+        }
     };
     let mut bytes = form.template.clone();
 
@@ -581,7 +831,7 @@ fn encode_instruction(
     }
 
     if bytes.len() as u64 != instruction.expected_size {
-        errors.push(
+        return Err(MaterializationFailure::PostEncodeAssertion(vec![
             Diagnostic::new(
                 codes::E_SIZE_001,
                 instruction.path.clone() + "/expected_size",
@@ -589,15 +839,14 @@ fn encode_instruction(
             .with("instruction_id", instruction.instruction_id.as_str())
             .with("expected", instruction.expected_size)
             .with("actual", bytes.len() as u64),
-        );
-        return Err(errors);
+        ]));
     }
 
     // The digest is a check on the encoded bytes, never an input to them.
     if let Some(declared) = &instruction.expected_digest {
         let actual = fmp_model::canonical::sha256_prefixed(&[&bytes]);
         if &actual != declared {
-            errors.push(
+            return Err(MaterializationFailure::PostEncodeAssertion(vec![
                 Diagnostic::new(
                     codes::E_BYTE_001,
                     instruction.path.clone() + "/expected_digest",
@@ -605,24 +854,25 @@ fn encode_instruction(
                 .with("instruction_id", instruction.instruction_id.as_str())
                 .with("declared", declared.as_str())
                 .with("actual", actual),
-            );
-            return Err(errors);
+            ]));
         }
     }
 
+    let mut errors = Vec::new();
     for fixup in plan.fixups.iter().filter(|fixup| {
         fixup.section_id == section.section_id && fixup.offset == instruction.offset
     }) {
         match apply(fixup, plan, section, instruction, &mut bytes) {
             Ok(()) => {}
-            Err(found) => errors.push(found),
+            Err(MaterializationFailure::PostEncodeAssertion(found)) => errors.extend(found),
+            Err(other) => return Err(other),
         }
     }
 
     if errors.is_empty() {
         Ok(bytes)
     } else {
-        Err(errors)
+        Err(MaterializationFailure::PostEncodeAssertion(errors))
     }
 }
 
@@ -675,7 +925,7 @@ fn apply(
     section: &Section,
     instruction: &fmp_model::plan::Instruction,
     bytes: &mut [u8],
-) -> Result<(), Diagnostic> {
+) -> Result<(), MaterializationFailure> {
     match fixup.resolution_mode {
         Mode::EmitRelocation => {
             // Zero the covered bits and emit a record; never compute a value.
@@ -695,7 +945,7 @@ fn apply(
                 // same section, so the offset is on the same origin as `S`.
                 PcRule::PcrelHi => match paired_hi_offset(fixup, plan) {
                     Some(offset) => Some(offset),
-                    None => return Err(internal("validated pcrel_hi pair disappeared")),
+                    None => return Err(internal_failure("validated pcrel_hi pair disappeared")),
                 },
                 PcRule::Unknown(_) => None,
             };
@@ -709,12 +959,11 @@ fn apply(
                 (Some(offset), true) => match section.base_address {
                     Some(base) => Some(base as i128 + offset),
                     None => {
-                        return Err(Diagnostic::new(
-                            codes::E_FIXUP_002,
-                            fixup.path.clone() + "/target",
-                        )
-                        .with("fixup_id", fixup.fixup_id.as_str())
-                        .with("target", target_name(&fixup.target)))
+                        return Err(post(
+                            Diagnostic::new(codes::E_FIXUP_002, fixup.path.clone() + "/target")
+                                .with("fixup_id", fixup.fixup_id.as_str())
+                                .with("target", target_name(&fixup.target)),
+                        ))
                     }
                 },
             };
@@ -730,12 +979,14 @@ fn apply(
             if fixup.range_constraint.align_bits > 0 {
                 let unit = 1i128 << fixup.range_constraint.align_bits;
                 if displaced % unit != 0 {
-                    return Err(Diagnostic::new(
-                        codes::E_RANGE_003,
-                        fixup.path.clone() + "/value_transform",
-                    )
-                    .with("required_align", fixup.range_constraint.align_bits)
-                    .with("value", displaced));
+                    return Err(post(
+                        Diagnostic::new(
+                            codes::E_RANGE_003,
+                            fixup.path.clone() + "/value_transform",
+                        )
+                        .with("required_align", fixup.range_constraint.align_bits)
+                        .with("value", displaced),
+                    ));
                 }
             }
 
@@ -749,7 +1000,7 @@ fn apply(
                     let reference = match reference {
                         Some(reference) => reference,
                         None => {
-                            return Err(internal(
+                            return Err(internal_failure(
                                 "value_transform `page` needs a pc_reference_rule",
                             ))
                         }
@@ -768,7 +1019,7 @@ fn apply(
                 // `fmp/0.1` has no semantics for these; `check_fixup_kind`
                 // rejected the plan before emission.
                 Transform::Lo12S | Transform::Unknown(_) => {
-                    return Err(internal("validated transform disappeared"))
+                    return Err(internal_failure("validated transform disappeared"))
                 }
             };
 
@@ -786,19 +1037,31 @@ fn apply(
                     (0, (1i128 << constraint.bits) - 1)
                 };
                 if transformed < min || transformed > max {
-                    return Err(Diagnostic::new(codes::E_FIXUP_003, fixup.path.clone())
-                        .with("fixup_id", fixup.fixup_id.as_str())
-                        .with("min", min)
-                        .with("max", max)
-                        .with("value", transformed));
+                    return Err(post(
+                        Diagnostic::new(codes::E_FIXUP_003, fixup.path.clone())
+                            .with("fixup_id", fixup.fixup_id.as_str())
+                            .with("min", min)
+                            .with("max", max)
+                            .with("value", transformed),
+                    ));
                 }
             }
 
             write_descriptor(bytes, fixup, transformed);
             Ok(())
         }
-        Mode::Unknown(_) => Err(internal("validated resolution_mode disappeared")),
+        Mode::Unknown(_) => Err(internal_failure("validated resolution_mode disappeared")),
     }
+}
+
+/// One post-encode diagnostic as a [`MaterializationFailure`].
+fn post(diagnostic: Diagnostic) -> MaterializationFailure {
+    MaterializationFailure::PostEncodeAssertion(vec![diagnostic])
+}
+
+/// One unreachable-after-`bind` branch (`ADR-0127` §8).
+fn internal_failure(invariant: &str) -> MaterializationFailure {
+    MaterializationFailure::Internal(internal(invariant))
 }
 
 /// `P` for `pcrel_hi`: the site offset of the group's single `hi` member.
@@ -818,21 +1081,27 @@ fn paired_hi_offset(fixup: &Fixup, plan: &Plan) -> Option<i128> {
 }
 
 /// `S`: the target's value, plus whether it is an absolute address.
-fn source(fixup: &Fixup, plan: &Plan, site: &Section) -> Result<(i128, bool), Diagnostic> {
+fn source(
+    fixup: &Fixup,
+    plan: &Plan,
+    site: &Section,
+) -> Result<(i128, bool), MaterializationFailure> {
     match &fixup.target {
         FixupTarget::Absolute(address) => Ok((*address as i128, true)),
         // `section_relative` is rejected statically (`E-VERSION-001`), so
         // reaching this arm means the validator did not run.
-        FixupTarget::SectionRelative(_) => Err(internal("validated target kind disappeared")),
+        FixupTarget::SectionRelative(_) => {
+            Err(internal_failure("validated target kind disappeared"))
+        }
         FixupTarget::Symbol(symbol_id) => {
             let symbol = plan
                 .symbols
                 .iter()
                 .find(|symbol| &symbol.symbol_id == symbol_id)
-                .ok_or_else(|| internal("validated symbol disappeared"))?;
+                .ok_or_else(|| internal_failure("validated symbol disappeared"))?;
             let offset = symbol
                 .offset
-                .ok_or_else(|| internal("validated symbol has no location"))?
+                .ok_or_else(|| internal_failure("validated symbol has no location"))?
                 as i128;
             // A same-section PC-relative reference is translation-invariant, so
             // offsets alone are exact; anything else needs the section base.
@@ -852,14 +1121,14 @@ fn source(fixup: &Fixup, plan: &Plan, site: &Section) -> Result<(i128, bool), Di
             match section.and_then(|section| section.base_address) {
                 Some(base) if !offsets_are_enough => Ok((base as i128 + offset, true)),
                 _ if offsets_are_enough => Ok((offset, false)),
-                _ => Err(
+                _ => Err(post(
                     Diagnostic::new(codes::E_FIXUP_002, fixup.path.clone() + "/target")
                         .with("fixup_id", fixup.fixup_id.as_str())
                         .with("target", symbol_id.as_str()),
-                ),
+                )),
             }
         }
-        FixupTarget::Unknown(_) => Err(internal("validated target kind disappeared")),
+        FixupTarget::Unknown(_) => Err(internal_failure("validated target kind disappeared")),
     }
 }
 
@@ -951,7 +1220,14 @@ fn internal(invariant: &str) -> Diagnostic {
     Diagnostic::new(codes::E_INTERNAL_001, "").with("invariant", invariant)
 }
 
-/// Contract §12's fingerprint, with `provenance` excluded as §12 requires.
+/// Legacy envelope identity, as `ADR-0123` defines it.
+///
+/// The only input besides the definition identity is [`Plan::legacy_document`].
+/// It therefore covers document fields the parser drops (`source_trace`,
+/// `symbol.type`, `symbol.size`) and does **not** cover the parsed operands, so
+/// it is not a trusted cache key and not the new execution identity
+/// (`ADR-0127` D12). The algorithm and output stay byte-identical because this
+/// value is an `Artifact` field, and therefore still moves with `payload_digest`.
 pub fn fingerprint(plan: &Plan, definition: &Definition) -> String {
     let mut document = plan.legacy_document.clone();
     if let Json::Object(entries) = &mut document {
@@ -973,6 +1249,50 @@ pub fn fingerprint(plan: &Plan, definition: &Definition) -> String {
     ])
 }
 
+/// Transitional two-argument entry point (`ADR-0127` D5).
+///
+/// It exists so a caller that still has `(&Plan, Arc<Definition>)` cannot skip
+/// binding: the implementation runs [`fmp_validate::bind`] and then the same
+/// [`materialize`](crate::materialize) as every other path. It is **not** a
+/// source-compatible replacement for the H0 function — the path and the
+/// definition argument both changed.
+///
+/// [`LegacyFailure::Rejected`] is a `bind` rejection; a post-bind failure keeps
+/// its [`MaterializationFailure`] classification, including host faults that a
+/// plain `Vec<Diagnostic>` could not represent.
+pub mod legacy {
+    use std::sync::Arc;
+
+    use fmp_model::definition::Definition;
+    use fmp_model::diagnostic::Diagnostic;
+    use fmp_model::Plan;
+
+    use crate::{Artifact, MaterializationFailure};
+
+    /// Why the transitional entry did not produce an artifact.
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub enum LegacyFailure {
+        /// [`fmp_validate::bind`] rejected the plan or the definition identity.
+        Rejected(Vec<Diagnostic>),
+        /// The plan was bound, but execution failed.
+        Materialization(MaterializationFailure),
+    }
+
+    #[deprecated(
+        note = "use fmp_validate::bind followed by fmp_materialize::materialize; this shape routes through both but discards the receipt"
+    )]
+    pub fn materialize(
+        plan: &Plan,
+        definition: Arc<Definition>,
+    ) -> Result<Artifact, LegacyFailure> {
+        let validated =
+            fmp_validate::bind(plan.clone(), definition).map_err(LegacyFailure::Rejected)?;
+        crate::materialize(&validated)
+            .map(|materialization| materialization.artifact)
+            .map_err(LegacyFailure::Materialization)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -989,11 +1309,20 @@ mod tests {
         .expect("definition table is part of the repository")
     }
 
+    /// Bind first, then execute: the only path a plan can take.
+    fn execute(plan: Plan, definition: Definition) -> Artifact {
+        let validated = fmp_validate::bind(plan, std::sync::Arc::new(definition))
+            .unwrap_or_else(|errors| panic!("the fixture binds: {errors:#?}"));
+        materialize(&validated)
+            .unwrap_or_else(|failure| panic!("the fixture executes: {failure:?}"))
+            .artifact
+    }
+
     #[test]
     fn encodes_the_example_plan() {
         let plan = fmp_model::plan::read(plan_source().as_bytes()).unwrap();
         let definition = fmp_model::definition::read(&definition_bytes()).unwrap();
-        let artifact = materialize(&plan, &definition).unwrap();
+        let artifact = execute(plan, definition);
         // dest = rax (rm), src = rcx (reg): `48 89 c8`, measured as
         // `movq %rcx, %rax` by llvm-mc (EXP-0004).
         assert_eq!(artifact.bytes_hex(), "4889c8");
@@ -1117,7 +1446,7 @@ mod tests {
     fn level_one_splits_sections_and_keeps_the_level_zero_image() {
         let plan = level_one_plan();
         let definition = definition_for("x86_64/0.2.0.json");
-        let artifact = materialize(&plan, &definition).unwrap();
+        let artifact = execute(plan, definition);
 
         assert_eq!(artifact.level, 1);
         assert_eq!(artifact.sections.len(), 2);
@@ -1134,7 +1463,7 @@ mod tests {
     fn level_one_symbols_follow_symbol_order() {
         let plan = level_one_plan();
         let definition = definition_for("x86_64/0.2.0.json");
-        let artifact = materialize(&plan, &definition).unwrap();
+        let artifact = execute(plan, definition);
         let symbols = artifact
             .symbols
             .as_ref()
@@ -1170,7 +1499,7 @@ mod tests {
         }
         let plan = fmp_model::plan::bind(&document).unwrap();
         let definition = definition_for("x86_64/0.2.0.json");
-        let artifact = materialize(&plan, &definition).unwrap();
+        let artifact = execute(plan, definition);
         assert!(artifact.symbols.is_none());
         assert!(artifact.to_json().get("symbols").is_none());
     }
@@ -1179,7 +1508,7 @@ mod tests {
     fn level_zero_envelope_keeps_its_fields_and_order() {
         let plan = fmp_model::plan::read(plan_source().as_bytes()).unwrap();
         let definition = fmp_model::definition::read(&definition_bytes()).unwrap();
-        let artifact = materialize(&plan, &definition).unwrap();
+        let artifact = execute(plan, definition);
         let envelope = artifact.to_json();
         let keys: Vec<&str> = match &envelope {
             Json::Object(entries) => entries.iter().map(|(key, _)| key.as_str()).collect(),

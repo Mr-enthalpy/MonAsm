@@ -13,15 +13,19 @@
 //!   nothing to stdout, so a caller can never mistake a partial artifact for a
 //!   result.
 //!
-//! Exit codes: `0` artifact emitted, `1` plan rejected, `2` usage or I/O fault.
+//! Exit codes: `0` artifact emitted, `1` plan or definition rejected (including a
+//! post-encode assertion), `2` a host, implementation, usage or I/O fault. An
+//! internal invariant break is printed after an `internal fault:` marker on
+//! stderr and never shares the rejection code (`ADR-0127` §3.4).
 
 #![forbid(unsafe_code)]
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use fmp_materialize::MaterializationFailure;
 use fmp_model::diagnostic::Diagnostic;
-use fmp_model::json;
+use fmp_model::json::{self, Json};
 use fmp_model::Registry;
 
 const USAGE: &str = "usage: fmp materialize <plan.json> --definitions <dir>";
@@ -29,30 +33,63 @@ const USAGE: &str = "usage: fmp materialize <plan.json> --definitions <dir>";
 fn main() -> ExitCode {
     match run(std::env::args().skip(1).collect()) {
         Ok(()) => ExitCode::SUCCESS,
-        Err(Failure::Rejected(diagnostics)) => {
-            let mut out = Vec::with_capacity(diagnostics.len());
-            for diagnostic in &diagnostics {
-                out.push(diagnostic.to_json());
-            }
-            eprintln!("{}", json::pretty(&json::Json::Array(out)));
-            ExitCode::from(1)
-        }
-        Err(Failure::Usage(message)) => {
-            eprintln!("fmp: {message}");
-            eprintln!("{USAGE}");
-            ExitCode::from(2)
-        }
-        Err(Failure::Io(message)) => {
-            eprintln!("fmp: {message}");
-            ExitCode::from(2)
+        Err(failure) => {
+            report(&failure);
+            ExitCode::from(exit_code(&failure))
         }
     }
 }
 
+/// Exit 1 is a rejected plan; exit 2 is the host or the implementation.
+///
+/// `Internal` must not share the rejection path: `E-INTERNAL-001` means an
+/// implementation invariant broke, never that the caller's plan is illegal.
+fn exit_code(failure: &Failure) -> u8 {
+    match failure {
+        Failure::Rejected(_) => 1,
+        Failure::Internal(_) | Failure::Host(_) | Failure::Usage(_) | Failure::Io(_) => 2,
+    }
+}
+
+fn report(failure: &Failure) {
+    match failure {
+        Failure::Rejected(diagnostics) => print_diagnostics(diagnostics),
+        Failure::Internal(diagnostic) => {
+            eprintln!("internal fault:");
+            print_diagnostics(std::slice::from_ref(diagnostic));
+        }
+        Failure::Host(message) => eprintln!("fmp: host failure: {message}"),
+        Failure::Usage(message) => {
+            eprintln!("fmp: {message}");
+            eprintln!("{USAGE}");
+        }
+        Failure::Io(message) => eprintln!("fmp: {message}"),
+    }
+}
+
+fn print_diagnostics(diagnostics: &[Diagnostic]) {
+    let mut out = Vec::with_capacity(diagnostics.len());
+    for diagnostic in diagnostics {
+        out.push(diagnostic.to_json());
+    }
+    eprintln!("{}", json::pretty(&Json::Array(out)));
+}
+
 enum Failure {
     Rejected(Vec<Diagnostic>),
+    Internal(Diagnostic),
+    Host(String),
     Usage(String),
     Io(String),
+}
+
+/// Map an execution failure to the channel that owns it (`ADR-0127` §3.4).
+fn classify(failure: MaterializationFailure) -> Failure {
+    match failure {
+        MaterializationFailure::PostEncodeAssertion(diagnostics) => Failure::Rejected(diagnostics),
+        MaterializationFailure::Internal(diagnostic) => Failure::Internal(diagnostic),
+        MaterializationFailure::HostFailure(fault) => Failure::Host(fault.message()),
+    }
 }
 
 fn run(args: Vec<String>) -> Result<(), Failure> {
@@ -105,11 +142,45 @@ fn run(args: Vec<String>) -> Result<(), Failure> {
     let definition = registry
         .find(&plan.definition.namespace, &plan.definition.version)
         .map_err(|error| Failure::Rejected(vec![error]))?;
-    let artifact = fmp_materialize::materialize(&plan, &definition).map_err(Failure::Rejected)?;
-    println!("{}", json::pretty(&artifact.to_json()));
+    let validated = fmp_validate::bind(plan, definition).map_err(Failure::Rejected)?;
+    let materialization = fmp_materialize::materialize(&validated).map_err(classify)?;
+    println!("{}", json::pretty(&materialization.artifact.to_json()));
     Ok(())
 }
 
 fn read(path: &Path) -> Result<Vec<u8>, Failure> {
     std::fs::read(path).map_err(|error| Failure::Io(format!("{}: {error}", path.display())))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fmp_model::codes;
+
+    #[test]
+    fn the_exit_code_separates_rejection_from_internal_fault() {
+        assert_eq!(exit_code(&Failure::Rejected(Vec::new())), 1);
+        assert_eq!(
+            exit_code(&Failure::Internal(Diagnostic::new(
+                codes::E_INTERNAL_001,
+                ""
+            ))),
+            2,
+            "an implementation fault is not a rejected plan"
+        );
+        assert_eq!(exit_code(&Failure::Host("no memory".to_string())), 2);
+        assert_eq!(exit_code(&Failure::Usage("bad".to_string())), 2);
+        assert_eq!(exit_code(&Failure::Io("missing".to_string())), 2);
+    }
+
+    #[test]
+    fn a_post_encode_assertion_stays_on_the_plan_channel() {
+        let rejected = classify(MaterializationFailure::PostEncodeAssertion(Vec::new()));
+        assert_eq!(exit_code(&rejected), 1);
+        let internal = classify(MaterializationFailure::Internal(Diagnostic::new(
+            codes::E_INTERNAL_001,
+            "",
+        )));
+        assert_eq!(exit_code(&internal), 2);
+    }
 }

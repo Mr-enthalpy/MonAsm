@@ -21,6 +21,14 @@ name: gates
 # legitimately differs from the recording host. Envelope
 # digests are pinned narrowly instead, in `determinism.rs`.
 #
+# `HE-T20`/`ADR-0127` D9: the receipt's `build` field is
+# `option_env!("FMP_BUILD_ID")`, so it only exists when the crate is compiled
+# with the variable. The workspace and baseline jobs derive it from the commit
+# they actually checked out (`git rev-parse HEAD`) and assert the two agree, so
+# the receipt names the built tree. On a pull request that commit is GitHub's
+# merge commit, not the head; the head is recorded separately in the log and
+# job summary. A local build keeps `None`.
+#
 # `check_mrs.py` and `check_rv64_source.py` stay local: both read
 # `research/external/`, which is gitignored, so a hosted runner cannot have it.
 # See ADR-0124 for why that is not a hole in the gate.
@@ -99,6 +107,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # `HE-T20`/`ADR-0127` D9: the receipt is compiled with
+      # `option_env!("FMP_BUILD_ID")`, so the label must name the commit this
+      # job actually checked out. Deriving it from `HEAD` removes the old
+      # head-SHA/merge-commit mismatch: a pull request checkout is GitHub's
+      # merge commit, a push checkout is the pushed commit. The PR head, when
+      # present, is recorded separately instead of being passed off as the build.
+      - name: Label the build with the checked-out commit
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse HEAD)"
+          test -n "${commit}"
+          echo "FMP_BUILD_ID=${commit}" >> "${GITHUB_ENV}"
+          head="${PR_HEAD_SHA:-${commit}}"
+          echo "checked-out commit: ${commit}"
+          echo "PR head: ${head}"
+          {
+            echo "### Build identity"
+            echo ""
+            echo "| field | value |"
+            echo "|---|---|"
+            echo "| checked-out commit | \`${commit}\` |"
+            echo "| PR head | \`${head}\` |"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Install the pinned toolchain
         run: |
           rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
@@ -107,6 +141,17 @@ jobs:
       - name: Formatting
         working-directory: prototype
         run: cargo +"$RUST_TOOLCHAIN" fmt --all -- --check
+
+      # `HE-T20`: a workflow edit that drops the label would otherwise change
+      # the receipt silently, because a build without the variable is a valid
+      # local build. This asserts the label is present and that it names the
+      # checked-out commit, so the merge-commit/head-SHA split cannot return.
+      - name: The build label names the checked-out commit
+        run: |
+          set -euo pipefail
+          test -n "${FMP_BUILD_ID}"
+          test "${FMP_BUILD_ID}" = "$(git rev-parse HEAD)"
+          echo "FMP_BUILD_ID=${FMP_BUILD_ID}"
 
       - name: Test the workspace
         working-directory: prototype
@@ -144,6 +189,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Same label as the workspace job: the baseline binary is a shipped build,
+      # and its receipt should name the commit this job built.
+      - name: Label the build with the checked-out commit
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse HEAD)"
+          test -n "${commit}"
+          echo "FMP_BUILD_ID=${commit}" >> "${GITHUB_ENV}"
+          head="${PR_HEAD_SHA:-${commit}}"
+          echo "checked-out commit: ${commit}"
+          echo "PR head: ${head}"
+          {
+            echo "### Build identity"
+            echo ""
+            echo "| field | value |"
+            echo "|---|---|"
+            echo "| checked-out commit | \`${commit}\` |"
+            echo "| PR head | \`${head}\` |"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -155,6 +222,15 @@ jobs:
 
       - name: Install the pinned toolchain
         run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
+
+      # The shipped binary must record the same label the workspace proves; a
+      # baseline binary built without it would carry `build: None`.
+      - name: The build label names the checked-out commit
+        run: |
+          set -euo pipefail
+          test -n "${FMP_BUILD_ID}"
+          test "${FMP_BUILD_ID}" = "$(git rev-parse HEAD)"
+          echo "FMP_BUILD_ID=${FMP_BUILD_ID}"
 
       - name: Build the materializer
         working-directory: prototype

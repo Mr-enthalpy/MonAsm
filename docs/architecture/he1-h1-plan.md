@@ -1,8 +1,9 @@
 # H1 实施计划：封闭执行对象与身份
 
-- 状态：**已采纳（H1a 已落地，H1b 未开始）**。规范决策在
-  `docs/adr/0127-execution-identity.md`；本文件保留为实施计划、验收映射和
-  待审问题清单。H1a 的实现范围与实测证据见 `research/he1/H1-report.md`。
+- 状态：**已采纳（H1a 与 H1b 已落地；H1 已于 2026-11-14 验收，见 §11.8）**。
+  规范决策在 `docs/adr/0127-execution-identity.md`；本文件保留为实施计划、
+  验收映射和待审问题清单。H1a/H1b 的实现范围与实测证据见
+  `research/he1/H1-report.md`。
 - 基线：`d42125d`（H0 已提交，工作树干净）。文中行号均取自该提交；H1a 新增
   代码的行号取自 `he1/h1a-identity-core` 的落地提交。
 - 上游：`ADR-0125`；`ADR-0126`（身份分层与构建收据）；
@@ -17,11 +18,20 @@ H1a（§6 表第一行）已落地并全绿：`Definition` 封闭、`Registry` �
 改名、`plan::check_structure`、validator 的 `u128`/`u64`/`checked_*` 硬化、
 `page ⇒ pcrel_page` 规则、九条直接调用 `check_structure`/`check` 的测试函数
 （计划里的八类反例加寄存器宽度复现）、`internal(...)` 前提表与编码后失败阶段
-实测。H1b（§6 表第二行）**尚未开始**：
-`ValidatedPlan`、`bind`、新的 `materialize`、`ExecutionReceipt`、
-`MaterializationFailure`、CLI 失败分流和 facade 都还不存在。今天的
-`materialize` 仍是 H0 的二参入口，仍自行比对摘要。本文件中凡描述 H1b 的段落
-都是计划，不是现状。
+实测。H1b（§6 表第二行）也已落地：`ValidatedPlan`、`bind`、新的
+`materialize`、`ExecutionReceipt`、`MaterializationFailure`、CLI 失败分流和
+facade 都已实现并被测试覆盖；`bind`/`materialize` 的 doctest 把「只能传
+`ValidatedPlan`」写成编译期负例。合并前审计补上了公开 allocator 的精确长度
+契约（短/长映像都是 `HostFault::ImageLength`，在写任何片段之前失败）、
+`Materialization::verify_receipt` 与 N13 的真实 CLI 进程测试。H1 **已验收**
+（2026-11-14，`7df6f48`）：`HE-AC-06` 与 `HE-T02`/`HE-T03`/`HE-T04` 有运行期和
+编译期证据；debug/release 载荷一致性已对语料实测（同一 `payload_root
+sha256:3f6d177d…ffefad9`）；CI 以 PR head SHA 作为 `FMP_BUILD_ID` 编译，receipt
+因此记录构建来源；三主机 CI 在 `7df6f48` 上全绿（`gates` run `43496573107`、
+`determinism` run `43496573111`）。合并前审计把锚点改为实际检出的提交：CI 从
+`git rev-parse HEAD` 生成 `FMP_BUILD_ID` 并断言两者相等，PR head 在日志与 job
+summary 中单独记录（见报告 §11.10）；该修正在 `a61b906` 上全绿（`gates` run
+`43501514747`、`determinism` run `43501515039`）。验收只覆盖 H1，H2–H4 仍未开始。
 
 ---
 
@@ -318,13 +328,13 @@ run receipt 时才决定是否需要写进新协议。
 | 项 | 改动 |
 |---|---|
 | `materialize` | 改为 `materialize(&ValidatedPlan) -> Result<Materialization, MaterializationFailure>`，不再接收 `&Plan`/`&Definition`，也**不再重复**摘要比对与 `check` |
-| `Materialization`（新增） | `{ artifact: Artifact, receipt: ExecutionReceipt }`。返回 receipt 而不是另设一个「记得调用」的函数：执行过就必须有收据 |
+| `Materialization`（新增） | `{ artifact: Artifact, receipt: ExecutionReceipt }`。返回 receipt 而不是另设一个「记得调用」的函数：执行过就必须有收据。两个字段公开（调用方需要字节），所以调用方可以在返回后修改 artifact；`verify_receipt()` 按 `payload/0.1` 投影重算并与 receipt 比较，`false` 即两者不再描述同一产物。持久化或重放前必须调用；它不重新验证计划，也不重新编码 |
 | `ImplementationIdentity`（新增） | `{ name: "fmp-materialize", version: env!("CARGO_PKG_VERSION"), build: option_env!("FMP_BUILD_ID").map(str::to_string) }`。物化器层独有；`fmp-validate` 不引用它 |
 | `ExecutionReceipt`（新增） | `{ bind: BindIdentity, implementation: ImplementationIdentity, payload: PayloadIdentity }`，由 `materialize` 在产物生成后组装 |
 | `MaterializationFailure`（新增） | 三个变体：`PostEncodeAssertion(Vec<Diagnostic>)`（只在产物字节生成后才能发现）、`Internal(Diagnostic)`（`E-INTERNAL-001`）、`HostFailure(HostFault)`。**不设 `Rejected`**：`bind` 之后不应再有静态拒绝，给一个不可达变体只会造出语义模糊的分支。这条主张以 §4.2 的 `internal(...)` 前提表为前提：H1a 必须把**可由计划触发**的内部故障清零（D16），否则 `Internal` 会变成一条隐藏的拒绝路径 |
-| `HostFault`（新增） | 初始只有一个变体 `ImageReservation { requested: usize }`。它描述「这台机器没能满足一次请求」，不描述计划；诊断文本由 CLI 组装，不带可变字节。H4 若加入新的主机相关限制，是新变体，不是新 crate |
+| `HostFault`（新增） | 两个变体：`ImageReservation { requested: u64 }`（主机给不出声明尺寸的零填充映像；请求保留 `u64`，连 `usize` 都表示不了的尺寸仍报主机限制）和 `ImageLength { requested: u64, actual: u64 }`（分配器返回的长度不等于请求长度）。它描述「这台机器没有履行分配契约」，不描述计划；诊断文本由 CLI 组装，不带可变字节。H4 若加入新的主机相关限制，是新变体，不是新 crate |
 | 宿主故障的归属 | **没有 I/O 不等于没有宿主故障。** `emit` 在 `:400` 的 `try_reserve_exact(size)` 就是一次分配，源码注释 `:397-399` 已经写明「a failed reservation here is a host limit, not a plan property」；64 MiB 上限**已经存在**于 `fmp-validate/src/lib.rs:18`（检查在 `:285`），不是 H4 才引入。分配失败取决于主机资源状态，既不是计划属性，也不是 `E-INTERNAL-001`——该码的意思是「不变量被破坏」，而这里不变量成立、只是主机给不出内存。设计 §8.3 明确要求把主机分配失败独立归类为 `HostFailure`。CLI 把 `HostFailure` 映射到 exit 2 的宿主通道（与 `Failure::Io` 同级），而不是 exit 1 |
-| 分配失败的测试 | 把 `try_reserve_exact` 抽成 `fn allocate_image(size: usize) -> Result<Vec<u8>, HostFault>`，`emit` 只调用它。测试传入一个在指定 size 上返回 `Err(ImageReservation { .. })` 的同签名函数参数。**不用**全局开关、环境变量或真的耗尽内存：前者是隐藏输入（`INV-05`），后者不稳定且会拖垮 CI。断言 `MaterializationFailure::HostFailure`，并断言它不是 `Internal`、不是诊断数组 |
+| 分配失败的测试 | 把 `try_reserve_exact` 抽成 `fn allocate_image(size: usize) -> Result<Vec<u8>, HostFault>`，`emit` 只调用它。测试传入一个在指定 size 上返回 `Err(ImageReservation { .. })` 的同签名函数参数。**不用**全局开关、环境变量或真的耗尽内存：前者是隐藏输入（`INV-05`），后者不稳定且会拖垮 CI。断言 `MaterializationFailure::HostFailure`，并断言它不是 `Internal`、不是诊断数组。注入入口的公开契约是「恰好 `size` 字节」：短缓冲区会在首次片段写入时 panic，长缓冲区会返回冻结计划未声明的字节，所以长度不一致必须在写任何片段**之前**判为 `HostFailure::ImageLength`，且不产生 artifact。`a_short_image_is_a_host_failure` 与 `a_long_image_is_a_host_failure` 分别钉住两条路径 |
 | `post-encode` 的成员必须先实测 | `emit` 今天还能返回 `E-FIXUP-002`（`:689`、`:833`）、`E-RANGE-003`（`:710`）、`E-FIXUP-003`（`:766`）。它们是「`check` 没拦住」还是「只能在此刻发现」，H1a 必须先跑一遍负例确认，再决定归入哪一个变体；**不猜**。若某条在 `check` 已拒绝，它属于 `bind` 的 `Vec<Diagnostic>`。`emit` 另有 15 处 `internal(...)`（`:384`、`:393`、`:401`、`:425`、`:470`、`:500`、`:566`、`:675`、`:729`、`:748`、`:777`、`:803`、`:809`、`:812`、`:839`）；H1a 为每一处填「由哪项验证保证」的 `ADR-0127` 表格，填不出的就是缺口，先补检查（`:729` 的 `page` 缺 PC reference 已确认是缺口，见 §3.2），只剩确实不可由计划触发的分支归入 `Internal`；`:401` 的分配失败改判 `HostFailure` |
 | `fingerprint` | **算法与输出逐字节不变**，唯一输入是 `Plan.legacy_document`；文档注释改为「legacy envelope 身份，按 `ADR-0123` 解释；不覆盖解析后的操作数；不可用于新身份」。`a_legacy_fingerprint_covers_document_fields_the_parser_drops` 钉住它对 `source_trace` 的敏感性 |
 | `payload_digest`（新增） | `payload/0.1` 投影的 canonical sha256：`to_json()` 去掉 `materializer_version`。**不是** `canonical_digest(to_json())`——那会把构建身份算进载荷（`ADR-0126`） |

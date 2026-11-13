@@ -1,6 +1,6 @@
 # Status
 
-Updated: 2026-11-10
+Updated: 2026-11-14
 Phase: **7 complete** (M6 coverage round 2, `ADR-0112`; S1 `ADR-0113`, S2 `ADR-0114`, S3 `ADR-0115`, S4 `ADR-0116`, S5 `ADR-0117`, S6 `ADR-0118`, S7 `ADR-0119` and the closure `ADR-0120` landed): Phase 4 is complete (all eight invariants `verified`; `EXP-R3` passes on three CI hosts; `N22` closes INV-04 and `N23a` closes INV-06). Phase 5 froze the contract set for the v0 scope (`ADR-0095`), published `08_final_recommendation.md` (§A–§H plus Q1–Q10) and closed `AC-10` with the Phase 6 roadmap M1–M5. Phase 6 M1 (error-coverage gate) is complete with `N24a`–`N24h`, M2 (oracle rerun harness) is complete with `tools/oracle/rerun.py`, and M3 (Level 1 object writer) is complete with `X86-P71` and `ADR-0096`; M3 also added `N24i` and repointed `N24h`. M4 (planner boundary) is complete: `fmp-plan` is implemented and the `planner_api.rs` parity gate runs ten tests over the 128 positives, the 611 `materialize`-phase negatives, from-scratch authoring, closed keys, enum spellings and determinism. M5 (coverage widening) is **complete**: `A64-P20` names the three unused `imm6-asr` rows, `ADR-0098`/`RV-P9` add the RV64 absolute `lui`+`addi` split with `hi20`, and `ADR-0099`/`RV-P10` add `riscv:jalr/rd-rs1-imm12` with the `auipc` + `jalr` call pair. The seven-item first wave is complete after `ADR-0103`, which adds `fmp-def/0.2` per-form `requires_extensions` and the `X86-P74`/`N06b`/`N06c` vectors. The oracle recovery backlog is closed too: all 29 `input-not-stored` inputs were recovered or rebuilt and `tools/oracle/rerun.py` now reports `122/128` with the six `manual-derivation` skips (it reported `116/121` and five skips when M5 closed). `ADR-0111` closes the phase: seven slices landed under `ADR-0104`-`ADR-0110` and the stale metrics are reconciled. Phase 7 M6 is **complete** under `ADR-0112`: `10_m6_plan.md` fixes seven coverage slices (`ADR-0113`-`ADR-0119`) plus the closure `ADR-0120`, with no contract change and no new artifact level. `S1` landed under `ADR-0113`: the integer ALU register/register family in the `opcode` direction (`x86/0.75.0`, 15 rows, `X86-P81`), with `EC-42` widened to the six direction pairs. The round closes at 82 new rows and 841 forms across 104 documents, with 128 positives and 611 negatives (`ADR-0120`). An audit of `47a383b` then closed under `ADR-0121`-`ADR-0124`: fixup bits must belong to exactly one non-inverted `operand_value` slot and the descriptor order must match that slot's placement order (`ADR-0121`); the numeric domains and the 64 MiB image ceiling are checked before the arithmetic they protect (`E-LIMIT-001`, `ADR-0122`); `target.kind: section_relative` and a symbol offset past `declared_size` are refused (`ADR-0123`); and the document, definition, formatting, workspace and oracle gates now run in `.github/workflows/gates.yml`, with the oracle harness driven by argv instead of a shell (`ADR-0124`). Eight negatives land (`N05b`, `N07g`, `N07h`, `N24j`-`N24l`, `N25a`, `N25b`), so the corpus is 128 positives and 619 negatives (611 `materialize`-phase plus 8 `read`-phase), and `04_errors.md` §2.4 records 39 of 44 active codes.
 Owner: Mr-enthalpy
 
@@ -544,8 +544,10 @@ raw-file digest and canonical digest, so a whitespace-only edit followed by
 because it contains `materializer_version`.
 One probe found a real gap rather than a clean result: a 20 000-deep JSON plan
 ends the `fmp` process with `0xC00000FD` (stack overflow), which H4 owes a
-bounded rejection test. Next: H1b, the binding half of identity closure
-(`ADR-0127`); H1a has landed (below). The accepted implementation plan is
+bounded rejection test. H1b has landed and **H1 is accepted** (below,
+2026-11-14): the three-host run is green, the receipt names its source revision,
+and release payloads equal the debug-recorded snapshot. The accepted
+implementation plan is
 `docs/architecture/he1-h1-plan.md`; its sixteen decisions (D1–D16) are recorded,
 with D3/D4/D5/D7 revised after the first review, D11/D12 added after the second
 (identity layering, and keeping `Plan.document` as a legacy-only input), D4
@@ -626,8 +628,10 @@ with a local `fmp` and a PATH shadow pins the executed program and the recorded
 digest to the same file (POSIX-only; CI passes a path with a separator and never
 took the bare-name branch). Two
 limits
-stay open for H1 acceptance rather than being claimed as passed: `FMP_BUILD_ID`
-is `None`, and debug/release payload equality is unmeasured.
+were left open for H1 acceptance rather than being claimed as passed:
+`FMP_BUILD_ID` was `None`, and debug/release payload equality was unmeasured.
+H1b settles the second (below) and wires the first into CI, where the receipt
+names the pull request head SHA.
 
 **H1a is landed** (2026-11-13, branch `he1/h1a-identity-core`, `ADR-0127`;
 review amendment 2026-11-14): `Definition` is a closed loaded object (private
@@ -658,10 +662,75 @@ reaches `fmp-materialize`. The second `compile_fail` doctest names every
 `pub` in a scratch copy turns both negative doctests red. Neither frozen root
 moved: `payload_root` and `definitions_root` are unchanged, and `definitions/`,
 `fixtures/`, `docs/fmp-v0/` and the 128 payloads are untouched.
-H1a evidence and test names are in `research/he1/H1-report.md`. H1b
-(`ValidatedPlan`, `bind`, the new `materialize`, `ExecutionReceipt`,
-`MaterializationFailure` and the CLI failure split) is next and **not started**;
-the current `materialize` is still the two-argument H0 entry point.
+H1a evidence and test names are in `research/he1/H1-report.md`.
+**H1b is landed** (2026-11-14, branch `he1/h1b-validated-plan`,
+`ADR-0127`): `fmp_validate::bind` is the only producer of `ValidatedPlan`
+(private fields, no `Clone`, no public constructor) and runs
+`check_structure`, then the full `(namespace, version, digest)` comparison
+against the bound `Arc<Definition>`, then `check`; `BindIdentity` records the
+parsed plan and the bound table only. `fmp_materialize::materialize` accepts
+only a `&ValidatedPlan` and returns `Materialization { artifact, receipt }`;
+`ExecutionReceipt` adds this build's `ImplementationIdentity` and the
+`payload/0.1` digest, so a `source_trace`-only plan binds identically while its
+payload moves. `MaterializationFailure` has exactly `PostEncodeAssertion`,
+`Internal` and `HostFailure(HostFault)`; an image reservation keeps the plan's
+`u64` request and is injectable, so the host path is tested without exhausting
+memory. The injected allocator must return exactly `declared_size` bytes: a
+short image would panic on the first fragment write and a long one would return
+bytes the plan never declared, so either is `HostFault::ImageLength` before any
+fragment is written and no artifact exists. `Materialization::verify_receipt`
+re-checks the recorded digest against the current artifact, and
+`ImplementationIdentity::build` is documented as a source revision rather than a
+binary identity. The CLI keeps `bind`/post-encode rejections at exit 1 and routes
+`Internal` (after an `internal fault:` marker), `HostFailure`, usage and I/O to
+exit 2 through distinct channels; `exit_code` is a pure, unit-tested function
+and `cli_failure.rs` exercises the real process, including N13 post-encode
+(exit 1, empty stdout, `E-BYTE-001` at `/instructions/0/expected_digest`). The
+deprecated `legacy::materialize` routes through `bind` and keeps a
+`LegacyFailure` distinction, so a host fault is not flattened into a diagnostic
+array. `he1_bind.rs` replays the structural and `check` inputs through the public
+entry; `he1_execution.rs` covers the identity, receipt, allocator (reservation,
+short image, long image) and facade properties; `he1_stage_boundaries.rs` pins
+value-level snapshots for the four measured post-encode fixtures — N13
+`declared`/`actual`, N20 `required_align`/`value`, N04b/N04f
+`min`/`max`/`value` — while the other 615 negatives keep the code + Pointer +
+detail-key gate, so the 619 triples are unchanged. `payload_root` and `definitions_root` are unchanged, the oracle is
+still `122/128` with six `manual-derivation` skips, and the workspace, doctest,
+release bounds/wide-field, `check_ids`, `check_definition`, `plan_identity`,
+baseline and `git diff --check` gates pass locally. The three-host CI run is
+green on `3b26bb1`: `gates` run `43487661759` passes the workspace, document and
+definition, baseline and oracle jobs, and `determinism` run `43487662063` passes
+on ubuntu, macos and windows. Debug/release payload equality is now measured for
+the corpus: the release binary reproduces the same `payload_root`
+(`sha256:3f6d177d…ffefad9`) as the debug-recorded snapshot, with its own binary
+digest. The build label is wired into
+CI: `gates.yml` (`workspace`, `baseline`) and `determinism.yml` (`cross-host`)
+set `FMP_BUILD_ID` from the commit they actually checked out
+(`git rev-parse HEAD`) and assert the two agree; on a pull request that is
+GitHub's merge commit, with the PR head recorded separately in the log and job
+summary. The receipt therefore names the built tree, not a head SHA the job did
+not test; local builds keep `None`. An empty label, a label present at run time
+but absent from the compiled identity, or a label that differs from
+`git rev-parse HEAD` fails the job; the first two directions were measured, and
+the third is an exact string comparison. The run
+carrying this wiring is green on `176d396`: `gates` run `43492746429` passes the
+workspace, document and definition, baseline and oracle jobs (its log prints
+`FMP_BUILD_ID=176d396b8dc8080f5c247352b794f18c0ff8d233`), and `determinism` run
+`43492746267` passes on ubuntu, macos and windows. The pre-merge audit fix (the
+allocator's exact-length contract, `verify_receipt`, and the N13 CLI process
+test) is green on `7df6f48`: `gates` run `43496573107` passes the workspace,
+document and definition, baseline and oracle jobs, and `determinism` run
+`43496573111` passes on ubuntu, macos and windows. The post-acceptance CI anchor
+fix is green on `a61b906`: `gates` run `43501514747` and `determinism` run
+`43501515039` pass, and every compiling job logs the merge commit it checked out
+(`83466702fa9b4074b87e46f4448c59a4e4f216c8`), the PR head
+(`a61b906dd4076df4b2b66fd6c4a4e5984e8eea75`) and the same value in
+`FMP_BUILD_ID`, with an equality assertion. **H1 is therefore accepted**
+on `7df6f48` (2026-11-14): `HE-AC-06` with `HE-T02`/`HE-T03`/`HE-T04` is proved
+by the compile-time and runtime tests below, the 128 payloads and 104
+definitions are unchanged, the oracle is still `122/128`, the receipt names its
+build, and debug/release payloads agree. The acceptance covers H1 only; H2–H4
+and plans outside the fixture corpus stay open.
 The phase board above
 stays the v0 record; HE-1 phases
 are reported in `research/he1/`.

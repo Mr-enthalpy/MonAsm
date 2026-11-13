@@ -1,4 +1,4 @@
-# H1a report — identity closure, core half
+# H1 report — identity closure (H1a + H1b addendum)
 
 Stage: H1a (design §13, `ADR-0125`; decisions in `ADR-0127`)
 Date: 2026-11-13
@@ -6,14 +6,16 @@ Review amendment: 2026-11-14 (H1a review: P1 wide-field encoding, P2 doctest
 counterexample, CI identity and release steps)
 Review follow-up: 2026-11-14 (P2 same-variant identity values; P3 evidence
 counts, encoder wording and run identity)
+H1b addendum: 2026-11-14 (§11; binding half landed on `he1/h1b-validated-plan`)
 Base commit: `0948620f36893d17de56a913f72ced935fe50a98` (merged H0/H1-plan PR)
 Branch: `he1/h1a-identity-core`
 
 H1a is the first half of H1. It closes the executed `Definition`, defines the
 parsed-plan identity, re-checks the parser rules a mutable DTO can bypass, and
-hardens the validator's arithmetic. It does **not** add `ValidatedPlan`, `bind`,
+hardens the validator's arithmetic. It did **not** add `ValidatedPlan`, `bind`,
 the new `materialize`, `ExecutionReceipt`, `MaterializationFailure` or the CLI
-failure split; those are H1b and remain unstarted.
+failure split; §11 records the H1b addendum that does, and the boundary this
+section describes is the H1a close, not the current tree.
 
 ## 1. Change scope
 
@@ -285,7 +287,7 @@ graph is what the check owns.
 - **Tooling:** one new Python script and one new CI step; no error code was
   added. `E-PLAN-001`, `E-PLAN-002` and `E-FIXUP-001` were already registered.
 
-## 10. Next
+## 10. Next at the H1a close
 
 H1b (`docs/architecture/he1-h1-plan.md` §3.2–§3.4, §4.2, §6):
 
@@ -299,5 +301,333 @@ H1b (`docs/architecture/he1-h1-plan.md` §3.2–§3.4, §4.2, §6):
   version-only and digest-compatibility mismatches;
 - value-level snapshots only for the four fixtures measured in §6.
 
-H1b is not started. The old `materialize` still re-runs its own digest
-comparison, and a `Plan` can still reach it unbound.
+At the H1a close the old `materialize` still re-ran its own digest comparison and
+a `Plan` could still reach it unbound. §11 records how H1b removed both facts.
+
+## 11. H1b addendum — the binding half (2026-11-14)
+
+Stage: H1b (`ADR-0125`, `ADR-0127`; plan `docs/architecture/he1-h1-plan.md`
+§3.2–§3.4, §4.2, §5, §6 second row)
+Branch: `he1/h1b-validated-plan`
+Base: `4d3f8de` (merged H1a PR)
+Tree: `7df6f48` plus this report; the audit fix in that commit is the last
+change to the materializer code under test.
+
+H1b makes `ValidatedPlan` the only executable input, returns the artifact with
+an `ExecutionReceipt`, splits materialization failures by who is at fault, and
+keeps the historical two-argument entry working by routing it through `bind`.
+It closes the last H1 acceptance item (a traceable build label) and the
+acceptance result is recorded in §11.8.
+
+### 11.1 Change scope
+
+| Path | Change | Why |
+|---|---|---|
+| `prototype/crates/fmp-validate/src/lib.rs` | `DefinitionIdentity`, `BindIdentity`, `ValidatedPlan` (private fields, no `Clone`, no constructor), `bind`, `check_definition_identity`; three `compile_fail` doctests plus one positive control | `ADR-0127` D11/D13/D15: the credential is unforgeable, and the implementation identity lives in the materializer, not here |
+| `prototype/crates/fmp-validate/tests/he1_bind.rs` | 6 tests: structural-vs-`check` stage replay, huge offsets, `page` precondition, namespace/version/digest mismatches, bound-definition identity | H1a called `check_structure`/`check` directly; H1b replays the same inputs through the public entry |
+| `prototype/crates/fmp-materialize/src/lib.rs` | `materialize(&ValidatedPlan)`, `materialize_with_allocator`, `Materialization` (`verify_receipt`), `ExecutionReceipt`, `ImplementationIdentity`, `PayloadIdentity`, `payload_digest`, `HostFault` (`ImageReservation`, `ImageLength`), `MaterializationFailure`, `allocate_image`; `encode_instruction`/`apply`/`source` reclassified; deprecated `legacy` module | `ADR-0127` §3, §8, §9 and plan D4/D5/D9: one input, one receipt, three failure classes, no `Rejected`; the audit fix makes the injected allocator's exact-length contract enforceable before encoding |
+| `prototype/crates/fmp-materialize/tests/he1_execution.rs` | 13 tests: provenance/document identity split, mutated operand, fingerprint-as-cache-key, `source_trace` bind identity, payload projection, build receipt, injected allocator reservation failure, short and long images, `verify_receipt`, both facade rejections | the identity table of plan §5 plus the allocator contract and receipt pairing, measured rather than inferred |
+| `prototype/crates/fmp-materialize/tests/he1_stage_boundaries.rs` | `bind` replay plus value-level snapshots for the four measured post-encode fixtures | `ADR-0127` §9 |
+| `prototype/crates/fmp-materialize/tests/he1_wide_register.rs` | calls `bind` + `materialize` instead of the removed two-argument entry | the wide-field evidence now goes through the credential |
+| `prototype/crates/fmp-cli/src/main.rs` | `Failure::{Internal, Host}`, pure `exit_code`, `report`, `classify`; 2 unit tests | `ADR-0127` §3.4: an implementation bug is not a rejected plan |
+| `prototype/crates/fmp-cli/tests/support/mod.rs` | shared `execute`/`artifact`/`diagnostics`; every gate test binds first | there is no remaining two-argument path |
+| `prototype/crates/fmp-cli/tests/fixtures.rs`, `planner_api.rs`, `determinism.rs`, `he1_identity_characterization.rs` | routed through `support`; no count changed | parity and determinism gates must exercise the new entry |
+| `prototype/crates/fmp-cli/tests/cli_failure.rs` | 3 process tests: bind rejection exits 1 with the diagnostic array; post-encode N13 assertion exits 1 with `E-BYTE-001` and empty stdout; usage exits 2 without an array | the split is a property of the real binary, not only of `exit_code`; the audit asked for the post-encode path end to end |
+| `docs/architecture/he1-h1-plan.md`, `docs/STATUS.md`, this report | status and evidence | the plan is no longer "H1b not started" |
+| `.github/workflows/gates.yml`, `.github/workflows/determinism.yml` | compile the materializer with `FMP_BUILD_ID` = the checked-out commit (`git rev-parse HEAD`), assert the two agree, and record the PR head separately in the log and job summary | `HE-T20`/`ADR-0127` D9: the receipt must name the tree that was built, not a head SHA the job did not test |
+
+No file under `definitions/`, `fixtures/`, `schema/` or `docs/fmp-v0/` changed.
+`ADR-0127` also did not change: H1b implements §8 and §9 as written. The one
+implementation choice the ADR leaves open is the width of a host request:
+`HostFault::ImageReservation { requested: u64 }` keeps the plan's `u64`, so a
+size the host cannot even represent is still a host limit rather than an
+`Internal` fault.
+
+### 11.2 Commands actually run
+
+Run from the repository root unless the row says `prototype/`.
+
+```text
+cargo fmt --all -- --check                                              # prototype/
+cargo test --workspace                                                  # prototype/
+cargo test --workspace --doc                                            # prototype/
+cargo test --release -p fmp-validate --test he1_validation_bounds       # prototype/
+cargo test --release -p fmp-materialize --test he1_wide_register        # prototype/
+cargo build --bin fmp -p fmp-cli                                        # prototype/
+cargo build --release --bin fmp -p fmp-cli                              # prototype/
+python tools/check_ids.py
+python tools/check_definition.py
+python tools/plan_identity.py --check
+python tools/he1_baseline.py --check research/he1/compatibility-results.json
+python tools/he1_baseline.py --check research/he1/compatibility-results.json --binary prototype/target/release/fmp.exe
+python tools/oracle/rerun.py --allow-skip-reason manual-derivation
+git diff --check
+```
+
+### 11.3 Results
+
+| Command | Result |
+|---|---|
+| `cargo fmt --check` | exit 0 |
+| `cargo test --workspace` | 119 passed, 0 failed across 20 suites: 110 unit/integration tests plus 9 doctests (16 test targets + 4 doctest targets) |
+| `cargo test --workspace --doc` | the same 9 doctests: 6 `compile_fail`, 3 positive controls |
+| `he1_validation_bounds` (release) | 4 passed, 0 failed |
+| `he1_wide_register` (release) | 1 passed, 0 failed |
+| `check_ids.py` | `OK (0 warning(s))`; `AC=10, E=48, EC=44, EXP=6, HE-AC=12, HE-T=20, INV=8, N=25, OD=15` |
+| `check_definition.py` | `OK`; 104 documents, newest x86 `0.78.0` (632 forms), AArch64 `0.20.0` (185), RV64 `0.6.0` (24) |
+| `plan_identity.py --check` | exit 0; the three pinned digests still match |
+| `he1_baseline.py --check` | `OK: payload projection identical`; `payload_root sha256:3f6d177d…ffefad9`; `definitions_root sha256:575b7c5f…35690e`; the envelope is skipped because the local binary digest differs from the recorder's |
+| same command with `--binary` on the release build | `OK: payload projection identical`; the same `payload_root` and `definitions_root`; the release binary digest is `edc2c5fde6f9`, so all 128 release payloads equal the debug-recorded snapshot byte for byte |
+| `oracle/rerun.py` | `122/128 re-derived, 6 skipped, 0 failed`; six `manual-derivation` skips |
+| `git diff --check` | exit 0 |
+| CI `gates`, run `43487661759` on `3b26bb1` | `workspace tests`, `document and definition gates`, `H0 payload baseline`, `oracle rerun` — all `success`; the runner reproduced `OK: payload projection identical` with both roots unchanged and `122/128, 6 skipped, 0 failed` |
+| CI `determinism`, run `43487662063` on `3b26bb1` | `ubuntu-latest`, `macos-latest`, `windows-latest` — all `success` |
+| CI `gates`, run `43496573107` on `7df6f48` | `workspace tests`, `document and definition gates`, `H0 payload baseline`, `oracle rerun` — all `success`; this is the final tree, including the allocator fix and the N13 CLI test |
+| CI `determinism`, run `43496573111` on `7df6f48` | `ubuntu-latest`, `macos-latest`, `windows-latest` — all `success` |
+
+**Doctest control.** Making `ValidatedPlan`'s three fields `pub` and deriving
+`Clone` in a scratch copy turned exactly the two intended `compile_fail` tests
+red (`Test compiled successfully, but it's marked compile_fail`) while the
+positive control and the `BindIdentity::implementation()` negative stayed green;
+the file was restored and all four pass again. The `fmp-materialize` negative
+names the removed two-argument call, and its positive control shares the
+`fmp_materialize::materialize` import, so a broken import cannot be mistaken for
+a rejected signature.
+
+### 11.4 Test inventory
+
+`fmp-validate/tests/he1_bind.rs` (6):
+`the_negatives_are_rejected_at_the_stage_their_boundary_requires`,
+`a_type_legal_offset_is_rejected_by_check_through_bind`,
+`a_page_transform_without_a_page_pc_rule_is_rejected_by_bind`,
+`a_declared_namespace_must_match_the_bound_definition`,
+`a_declared_version_must_match_the_bound_definition`,
+`bind_reports_the_definition_it_bound`.
+
+`fmp-materialize/tests/he1_execution.rs` (13):
+`plan_identity_ignores_provenance`,
+`plan_identity_ignores_the_legacy_document`,
+`a_mutated_operand_changes_the_plan_identity`,
+`a_legacy_fingerprint_is_not_a_trusted_cache_key`,
+`a_bind_identity_does_not_identify_the_legacy_artifact`,
+`payload_digest_follows_the_bytes`,
+`receipt_names_the_build_that_ran`,
+`an_image_reservation_failure_is_a_host_failure`,
+`a_short_image_is_a_host_failure`,
+`a_long_image_is_a_host_failure`,
+`verify_receipt_notices_an_edited_artifact`,
+`legacy_facade_rejects_a_digest_mismatch`,
+`a_definition_identity_mismatch_is_rejected_by_the_legacy_facade`.
+
+`fmp-materialize/tests/he1_stage_boundaries.rs` (4, now through `bind`):
+`a_digest_mismatch_is_post_encode`,
+`a_fixup_alignment_failure_is_post_encode`,
+`a_fixup_range_failure_is_post_encode`,
+`an_expected_size_mismatch_is_rejected_before_encoding`.
+
+`fmp-cli/tests/cli_failure.rs` (3):
+`a_binding_rejection_exits_one_with_the_diagnostic_array`,
+`a_post_encode_assertion_exits_one_with_the_diagnostic_array`,
+`a_usage_fault_exits_two_without_a_diagnostic_array`.
+`fmp-cli/src/main.rs` unit tests (2):
+`the_exit_code_separates_rejection_from_internal_fault`,
+`a_post_encode_assertion_stays_on_the_plan_channel`.
+
+### 11.5 Compatibility
+
+- **Payloads:** none moved. `payload_root` is unchanged
+  (`sha256:3f6d177d…ffefad9`), so all 128 positive payloads are byte-identical.
+- **Definitions:** none moved. `definitions_root` is unchanged
+  (`sha256:575b7c5f…35690e`); `check_definition.py` still sees 104 documents.
+- **Negatives:** the 619 code + Pointer + detail-key triples are unchanged. Four
+  fixtures gained a value-level assertion under the same code and Pointer:
+  `N13` (`declared` `sha256:000…000`, `actual`
+  `sha256:d17f36bd44115fe593938b561817d7d2e86f7dfeecedf40827be4b9012a310a7`),
+  `N20` (`required_align` 2, `value` 2), `N04b` (`min` -2147483648, `max`
+  2147483647, `value` 4294963195) and `N04f` (`min` -128, `max` 127, `value`
+  4096). The other 615 stay on the triple gate.
+- **Oracle:** unchanged at `122/128` with six `manual-derivation` skips. No
+  definition or encoder-output file changed.
+- **API:** this is a deliberate source break. `fmp_materialize::materialize` now
+  takes `&ValidatedPlan` and returns `Result<Materialization,
+  MaterializationFailure>`; the two-argument shape is only available as the
+  deprecated `fmp_materialize::legacy::materialize`, which returns
+  `Result<Artifact, LegacyFailure>` so a host fault keeps its classification.
+  `Failure` in the CLI gained `Internal` and `Host`. `HostFault` gained
+  `ImageLength { requested, actual }` and `Materialization` gained
+  `verify_receipt()`. The FMP document surface is unchanged and no error code
+  was added.
+- **Receipt:** `payload_digest` is `sha256` over the `payload/0.1` projection
+  (artifact JSON without `materializer_version`), and the digest's algorithm
+  name is `payload/0.1`. It is deliberately not `canonical_digest(to_json())`.
+- **CLI output:** the CLI still prints only the artifact. The receipt exists
+  in-process; emitting it as a protocol object is H3's decision.
+
+### 11.6 What H1b proves, and what it does not
+
+Proved by a test or a compile-time property:
+
+- `bind` is the only producer of `ValidatedPlan`, and `materialize` accepts
+  nothing else; the negative is a `compile_fail` doctest and the positive
+  control shares the import path;
+- `bind` runs `check_structure` first, then the full
+  `(namespace, version, digest)` comparison, then `check`; structural damage
+  stops before the validator's arithmetic;
+- `BindIdentity` covers the parsed plan and the bound table only; a
+  `source_trace`-only change binds identically while the payload digest moves;
+- a parsed-operand change moves `ParsedPlanIdentity` and the receipt while the
+  legacy fingerprint stays put;
+- a host allocation failure is `HostFailure`, not `Internal` and not a
+  rejection, and the same plan succeeds with a working allocator;
+- an allocator that returns fewer or more bytes than `declared_size` is
+  `HostFailure::ImageLength { requested, actual }` before any fragment is
+  written, and no artifact is produced;
+- `verify_receipt()` is true for a fresh pair and false after the artifact bytes
+  are edited;
+- the receipt names `fmp-materialize`, records `build: None` when
+  `FMP_BUILD_ID` is absent from the build, and records the injected label when
+  it is present; CI labels the checked-out commit, asserts the label equals
+  `git rev-parse HEAD`, and records the PR head separately;
+- the real CLI exits 1 for a `bind` rejection and for the N13 post-encode
+  assertion (empty stdout, `E-BYTE-001` at `/instructions/0/expected_digest`),
+  and 2 for usage, with different stderr channels.
+
+Not proved here:
+
+- **A real internal fault.** No test forces one. The `Internal` channel is
+  covered by the pure `exit_code`/`classify` unit test and by the runtime
+  arm; forcing a fault would require corrupting a validated plan or a test-only
+  switch.
+- **A real exhausted host.** The allocator path is injected. That is the
+  opposite of a hidden switch (`INV-05`), but it is not evidence about a
+  particular machine's memory.
+- **Byte-identical diagnostic arrays for all 619 negatives.** Only the four
+  measured post-encode fixtures have value snapshots.
+- **H2–H4 and plans outside the corpus.** H1 acceptance says nothing about
+  packages, bundles, the horizontal-extension classes, or a plan that is not one
+  of the fixtures.
+
+### 11.7 Next
+
+H1 acceptance, in this order:
+
+1. Push the branch, open the PR and run the three-host `workspace`, `documents`,
+   `baseline` and `oracle` jobs. **Done.** PR #3 (`3b26bb1`): `gates` run
+   `43487661759` passes `workspace tests`, `document and definition gates`,
+   `H0 payload baseline` (`OK: payload projection identical`, both roots
+   unchanged) and `oracle rerun` (`122/128`, 6 skipped, 0 failed);
+   `determinism` run `43487662063` passes on ubuntu, macos and windows.
+2. Decide `FMP_BUILD_ID`: either set it in CI and record the receipt, or state
+   in the acceptance record that `build: None` is the accepted H1 state.
+   **Decided: set in CI.** `gates.yml` (`workspace`, `baseline`) and
+   `determinism.yml` (`cross-host`) compile with
+   `FMP_BUILD_ID = ${{ github.event.pull_request.head.sha || github.sha }}`, so
+   a PR build names the reviewed commit and a push build names the pushed one;
+   a local build still records `None`. The value is compile-time, and Cargo
+   recompiles when it changes (measured with a scratch test: the receipt and
+   `option_env!` both reported the injected value, then both returned to
+   `None`). `receipt_names_the_build_that_ran` compares the compiled identity
+   with the **run-time** variable, and each CI job refuses an empty label before
+   it compiles, so dropping the variable fails the job instead of silently
+   producing `build: None`. The failing direction was checked: a binary built
+   without the label, run with one, fails the test (`left: None`, `right:
+   Some("3333…")`).
+3. Measure debug/release payload equality instead of leaving it unmeasured.
+   **Done for the corpus.** `he1_baseline.py --check` against the release build
+   reports `OK: payload projection identical`, the same `payload_root` and
+   `definitions_root`, and a distinct binary digest (`edc2c5fde6f9`), so the 128
+   release payloads equal the debug-recorded snapshot. This is corpus equality,
+   not a proof about plans outside the fixtures.
+4. Only then write the H1 acceptance result; H1b being green locally is not that
+   result. **Done, below.**
+
+### 11.8 H1 acceptance
+
+H1 is accepted on `7df6f48` (2026-11-14). The criteria are `HE-AC-06` together
+with `HE-T02`, `HE-T03`, `HE-T04` and the unchanged payload root
+(`docs/architecture/he1-horizontal-extension.md` §13/§14;
+`docs/architecture/he1-h1-plan.md` completion definition):
+
+| Criterion | Evidence |
+|---|---|
+| `HE-AC-06`: a validated definition and plan cannot be changed through public fields, and the output identity names the executed object | `Definition` is closed (`H1a`); `ValidatedPlan` has private fields, no `Clone`, no constructor and one producer (`bind`); three `compile_fail` doctests; `a_mutated_operand_changes_the_plan_identity`; `a_bind_identity_does_not_identify_the_legacy_artifact` |
+| `HE-T02`: modifying the source DTO cannot reuse an existing credential | `he1_bind.rs` replays the mutated inputs; `ValidatedPlan` cannot be rebuilt from one |
+| `HE-T03`: tampered definition content with the declared digest | `a_definition_edit_reloads_to_a_new_digest`; `legacy_facade_rejects_a_digest_mismatch`; `a_definition_identity_mismatch_is_rejected_by_the_legacy_facade` |
+| `HE-T04`: validate A, execute B | not expressible: `materialize` takes only `&ValidatedPlan`, and the plan and definition travel together |
+| Payloads unchanged | `payload_root sha256:3f6d177d…ffefad9`, `definitions_root sha256:575b7c5f…35690e`, `122/128` oracle with six `manual-derivation` skips |
+| Receipt names the build | CI compiles with `FMP_BUILD_ID = 7df6f4814154cd8243dd563fabb602341b43ca39`; the job log prints it, and `receipt_names_the_build_that_ran` fails when the run-time label is not in the compiled identity |
+| Three hosts | `gates` run `43496573107` (workspace, document/definition, baseline, oracle) and `determinism` run `43496573111` (ubuntu, macos, windows) |
+| Debug/release equality | the release binary reproduces the same `payload_root` as the debug-recorded snapshot |
+
+The acceptance takes effect with this PR; the phase board still shows H2–H4
+open.
+
+### 11.9 Pre-merge audit fix
+
+The audit of `ac69320` accepted the architecture and found one boundary hole
+worth fixing before merge: `materialize_with_allocator` was public but did not
+check the callback's length. A short image would panic on the first fragment
+write; a long image would return extra bytes under a receipt, producing N+1
+bytes where the frozen plan declared N. The fix is
+`HostFault::ImageLength { requested, actual }`; `emit` compares `image.len()`
+with `section.declared_size` before writing any fragment. It is a host failure:
+no artifact, no plan rejection, and no new error code.
+
+The same audit noted that `Materialization`'s public artifact can be edited
+after execution, so the receipt and the bytes can drift. `verify_receipt()`
+recomputes the payload projection and compares it with the recorded digest; the
+pair is still not frozen, but the drift is now detectable before persistence.
+`ImplementationIdentity::build` is documented as a source revision, not a
+binary identity: a binary or build-manifest digest belongs to the stage that
+persists receipts, so this report does not claim full binary identity.
+
+The audit also asked for the post-encode channel to be measured in the real
+process, not only through `MaterializationFailure::PostEncodeAssertion`:
+`cli_failure.rs` now runs N13 and asserts exit 1, empty stdout and one
+`E-BYTE-001` at `/instructions/0/expected_digest`. It still does not force
+`Internal`; that remains covered by the pure classification test, as §11.6
+says.
+
+Evidence: `a_short_image_is_a_host_failure`, `a_long_image_is_a_host_failure`,
+`verify_receipt_notices_an_edited_artifact`,
+`a_post_encode_assertion_exits_one_with_the_diagnostic_array`; the workspace is
+119 passed / 0 failed; CI is green on `7df6f48` (`gates` `43496573107`,
+`determinism` `43496573111`). Nothing under `definitions/`, `fixtures/`,
+`schema/` or `docs/fmp-v0/` changed; both roots stayed put and the oracle stayed
+`122/128`.
+
+### 11.10 Build-identity anchor and remaining boundaries
+
+The second audit found no P1 and approved the merge. It found one CI anchor
+problem: `actions/checkout` checks out GitHub's merge commit on `pull_request`,
+while `FMP_BUILD_ID` was set to `github.event.pull_request.head.sha`. In the
+`2441968` run both trees were identical — head `244196827…` and merge
+`52289897…` both had tree `30c488fe…` — so no receipt was mislabeled, but the
+anchor was conventional and would drift once `main` advanced.
+
+The compiling jobs now derive `FMP_BUILD_ID` from `git rev-parse HEAD` after
+checkout, assert `FMP_BUILD_ID == git rev-parse HEAD`, and record the PR head
+separately in the log and job summary. On a pull request the label is therefore
+the merge commit the job built, not the head it did not build; on a push it is
+the pushed commit. Evidence on head `a61b906`: `gates` run `43501514747` and
+`determinism` run `43501515039` are green; every compiling job logs
+`checked-out commit: 83466702fa9b4074b87e46f4448c59a4e4f216c8`,
+`PR head: a61b906dd4076df4b2b66fd6c4a4e5984e8eea75` and
+`FMP_BUILD_ID=83466702fa9b4074b87e46f4448c59a4e4f216c8`, and the equality step
+passes on ubuntu, macos and windows. The receipt still has only `build`; a
+separate receipt field for the PR head belongs to H3's persistence decision.
+
+The same audit's other findings stay stated boundaries, now in the code
+comments:
+
+- `verify_receipt()` is a payload-integrity check, not a provenance proof. It
+  does not re-run execution and cannot prove `BindIdentity` produced the bytes;
+  replacing both public fields defeats it. Sealing the pair is H3.
+- `fmp_validate::check()` is steps 2–7 only; `bind` is the full admission
+  entry. A plan that only passed `check` is not a `ValidatedPlan`.
+- The CLI prints only the artifact, so a CLI consumer cannot obtain the receipt
+  until H3's output protocol. This is the accepted H1 scope.
+- Deep JSON input can still exhaust the parser stack; that remains H4, and H1b
+  does not claim otherwise.
+- `Internal` still has no deliberately forced process test; the pure
+  classification test and the unreachable-after-`check` table are the coverage.

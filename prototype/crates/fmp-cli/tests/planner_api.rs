@@ -28,6 +28,8 @@ use fmp_plan::{
     SectionKind, Symbol, SymbolKind, TargetIdentity, Transform,
 };
 
+mod support;
+
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
 }
@@ -179,7 +181,7 @@ fn positives_reproduce_the_oracle_through_the_builder() {
         let definition = registry
             .find(&plan.definition.namespace, &plan.definition.version)
             .unwrap_or_else(|error| panic!("{name}: {}", error.message()));
-        let artifact = match fmp_materialize::materialize(&plan, &definition) {
+        let artifact = match support::execute(plan.clone(), definition.clone()) {
             Ok(artifact) => artifact,
             Err(errors) => panic!(
                 "{name} was rejected after rebuilding:\n{}",
@@ -268,13 +270,7 @@ fn negatives_reject_at_the_same_code_path_and_detail_keys() {
         let definition = registry
             .find(&plan.definition.namespace, &plan.definition.version)
             .unwrap_or_else(|error| panic!("{name}: {}", error.message()));
-        let errors = match fmp_materialize::materialize(&plan, &definition) {
-            Ok(artifact) => panic!(
-                "{name} was accepted after rebuilding and emitted {}",
-                artifact.bytes_hex()
-            ),
-            Err(errors) => errors,
-        };
+        let errors = support::diagnostics(plan, definition);
 
         let wanted = expected
             .get("errors")
@@ -800,7 +796,7 @@ fn from_scratch_positives_materialize_to_the_oracle_bytes() {
         let definition = registry
             .find(&plan.definition.namespace, &plan.definition.version)
             .unwrap_or_else(|error| panic!("{name}: {}", error.message()));
-        let artifact = match fmp_materialize::materialize(&plan, &definition) {
+        let artifact = match support::execute(plan.clone(), definition.clone()) {
             Ok(artifact) => artifact,
             Err(errors) => panic!(
                 "{name} built from scratch was rejected:\n{}",
