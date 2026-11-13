@@ -734,6 +734,70 @@ mod tests {
         assert_ne!(digest_of(&first), digest_of(&sample_plan()));
     }
 
+    /// The per-field table proves that switching an enum variant moves the
+    /// digest. It does not prove that the value *inside* one variant does: a
+    /// `Payload::Register(_)` encoded as a constant would still differ from
+    /// `Payload::Value(_)`. Each row here keeps the variant fixed and changes
+    /// only its value, so a dropped or constant-folded value fails this test.
+    #[test]
+    fn same_variant_values_change_the_identity() {
+        type Mutation = fn(&mut Plan);
+        let cases: Vec<(&'static str, Mutation, Mutation)> = vec![
+            (
+                "payload.register",
+                |p| p.instructions[0].operands[0].payload = Payload::Register(1),
+                |p| p.instructions[0].operands[0].payload = Payload::Register(2),
+            ),
+            (
+                "payload.symbol",
+                |p| p.instructions[0].operands[0].payload = Payload::Symbol("a".into()),
+                |p| p.instructions[0].operands[0].payload = Payload::Symbol("b".into()),
+            ),
+            (
+                "fixup.target.absolute",
+                |p| p.fixups[0].target = FixupTarget::Absolute(1),
+                |p| p.fixups[0].target = FixupTarget::Absolute(2),
+            ),
+            (
+                "fixup.target.symbol",
+                |p| p.fixups[0].target = FixupTarget::Symbol("a".into()),
+                |p| p.fixups[0].target = FixupTarget::Symbol("b".into()),
+            ),
+            (
+                "option.some",
+                |p| p.definition.source_ref = Some("a".into()),
+                |p| p.definition.source_ref = Some("b".into()),
+            ),
+            (
+                "vector.element",
+                |p| p.output.section_order = vec!["a".into(), "b".into()],
+                |p| p.output.section_order = vec!["a".into(), "c".into()],
+            ),
+            (
+                "vector.order",
+                |p| p.output.section_order = vec!["a".into(), "b".into()],
+                |p| p.output.section_order = vec!["b".into(), "a".into()],
+            ),
+            (
+                "vector.count",
+                |p| p.output.section_order = vec!["a".into()],
+                |p| p.output.section_order = vec!["a".into(), "b".into()],
+            ),
+        ];
+
+        for (name, first, second) in cases {
+            let mut left = unknown_variants_plan();
+            first(&mut left);
+            let mut right = unknown_variants_plan();
+            second(&mut right);
+            assert_ne!(
+                digest_of(&left),
+                digest_of(&right),
+                "{name} changed inside one variant but the identity did not"
+            );
+        }
+    }
+
     /// Hard rule 2's per-field counterexample: every covered field must move the
     /// digest when it changes. The table names one mutation per field of every
     /// covered struct, so a field added to the encoder but forgotten here (or a
