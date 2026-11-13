@@ -376,6 +376,8 @@ git diff --check
 | `he1_baseline.py --check` | `OK: payload projection identical`; `payload_root sha256:3f6d177d…ffefad9`; `definitions_root sha256:575b7c5f…35690e`; the envelope is skipped because the local binary digest differs from the recorder's |
 | `oracle/rerun.py` | `122/128 re-derived, 6 skipped, 0 failed`; six `manual-derivation` skips |
 | `git diff --check` | exit 0 |
+| CI `gates`, run `43487661759` on `3b26bb1` | `workspace tests`, `document and definition gates`, `H0 payload baseline`, `oracle rerun` — all `success`; the runner reproduced `OK: payload projection identical` with both roots unchanged and `122/128, 6 skipped, 0 failed` |
+| CI `determinism`, run `43487662063` on `3b26bb1` | `ubuntu-latest`, `macos-latest`, `windows-latest` — all `success` |
 
 **Doctest control.** Making `ValidatedPlan`'s three fields `pub` and deriving
 `Clone` in a scratch copy turned exactly the two intended `compile_fail` tests
@@ -472,8 +474,8 @@ Proved by a test or a compile-time property:
 
 Not proved here:
 
-- **H1 acceptance.** The three-host CI run has not happened; `FMP_BUILD_ID` is
-  still `None`; debug/release payload equality is unmeasured.
+- **H1 acceptance.** `FMP_BUILD_ID` is still `None` and debug/release payload
+  equality is unmeasured. The three-host CI run is green (§11.7 step 1).
 - **A real internal fault.** No test forces one. The `Internal` channel is
   covered by the pure `exit_code`/`classify` unit test and by the runtime
   arm; forcing a fault would require corrupting a validated plan or a test-only
@@ -489,7 +491,11 @@ Not proved here:
 H1 acceptance, in this order:
 
 1. Push the branch, open the PR and run the three-host `workspace`, `documents`,
-   `baseline` and `oracle` jobs.
+   `baseline` and `oracle` jobs. **Done.** PR #3 (`3b26bb1`): `gates` run
+   `43487661759` passes `workspace tests`, `document and definition gates`,
+   `H0 payload baseline` (`OK: payload projection identical`, both roots
+   unchanged) and `oracle rerun` (`122/128`, 6 skipped, 0 failed);
+   `determinism` run `43487662063` passes on ubuntu, macos and windows.
 2. Decide `FMP_BUILD_ID`: either set it in CI and record the receipt, or state
    in the acceptance record that `build: None` is the accepted H1 state.
 3. Measure debug/release payload equality instead of leaving it unmeasured.

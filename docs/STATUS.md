@@ -687,9 +687,11 @@ negatives keep the code + Pointer + detail-key gate, so the 619 triples are
 unchanged. `payload_root` and `definitions_root` are unchanged, the oracle is
 still `122/128` with six `manual-derivation` skips, and the workspace, doctest,
 release bounds/wide-field, `check_ids`, `check_definition`, `plan_identity`,
-baseline and `git diff --check` gates pass locally. This is not yet an H1
-acceptance claim: `FMP_BUILD_ID` is still `None`, debug/release payload equality
-is unmeasured, and the three-host CI run has not happened.
+baseline and `git diff --check` gates pass locally. The three-host CI run is
+green on `3b26bb1`: `gates` run `43487661759` passes the workspace, document and
+definition, baseline and oracle jobs, and `determinism` run `43487662063` passes
+on ubuntu, macos and windows. This is still not an H1 acceptance claim:
+`FMP_BUILD_ID` is `None` and debug/release payload equality is unmeasured.
 The phase board above
 stays the v0 record; HE-1 phases
 are reported in `research/he1/`.
