@@ -121,6 +121,16 @@ jobs:
         working-directory: prototype
         run: cargo +"$RUST_TOOLCHAIN" fmt --all -- --check
 
+      # `HE-T20`: a workflow edit that drops the label would otherwise change
+      # the receipt silently, because a build without the variable is a valid
+      # local build. The receipt test compares the compiled identity with the
+      # run-time value; this step fails when a CI run has no value at all.
+      - name: The build label is present
+        run: |
+          set -euo pipefail
+          test -n "${FMP_BUILD_ID}"
+          echo "FMP_BUILD_ID=${FMP_BUILD_ID}"
+
       - name: Test the workspace
         working-directory: prototype
         run: cargo +"$RUST_TOOLCHAIN" test --workspace
@@ -172,6 +182,14 @@ jobs:
 
       - name: Install the pinned toolchain
         run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
+
+      # The shipped binary must record the same label the workspace proves; a
+      # baseline binary built without it would carry `build: None`.
+      - name: The build label is present
+        run: |
+          set -euo pipefail
+          test -n "${FMP_BUILD_ID}"
+          echo "FMP_BUILD_ID=${FMP_BUILD_ID}"
 
       - name: Build the materializer
         working-directory: prototype

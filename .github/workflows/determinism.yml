@@ -43,6 +43,15 @@ jobs:
       - name: Install the pinned toolchain
         run: rustup toolchain install 1.96.0 --profile minimal --no-self-update
 
+      # `HE-T20`: all three hosts must carry a label, not only agree with each
+      # other. Bash is requested because the Windows runner defaults to pwsh.
+      - name: The build label is present
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${FMP_BUILD_ID}"
+          echo "FMP_BUILD_ID=${FMP_BUILD_ID}"
+
       - name: Test the workspace
         working-directory: prototype
         run: cargo +1.96.0 test --workspace

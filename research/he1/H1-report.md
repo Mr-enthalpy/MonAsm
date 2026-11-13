@@ -471,8 +471,9 @@ Proved by a test or a compile-time property:
   legacy fingerprint stays put;
 - a host allocation failure is `HostFailure`, not `Internal` and not a
   rejection, and the same plan succeeds with a working allocator;
-- the receipt names `fmp-materialize` and records `build: None` when
-  `FMP_BUILD_ID` is absent, so it makes no `HE-T20` claim;
+- the receipt names `fmp-materialize`, records `build: None` when
+  `FMP_BUILD_ID` is absent from the build, and records the injected label when
+  it is present; CI compiles with the PR head SHA and refuses an empty label;
 - the real CLI exits 1 for a `bind` rejection and 2 for usage, with different
   stderr channels.
 
@@ -510,8 +511,12 @@ H1 acceptance, in this order:
    a local build still records `None`. The value is compile-time, and Cargo
    recompiles when it changes (measured with a scratch test: the receipt and
    `option_env!` both reported the injected value, then both returned to
-   `None`). `receipt_names_the_build_that_ran` compares the two, so a CI run
-   fails if the label stops reaching the receipt.
+   `None`). `receipt_names_the_build_that_ran` compares the compiled identity
+   with the **run-time** variable, and each CI job refuses an empty label before
+   it compiles, so dropping the variable fails the job instead of silently
+   producing `build: None`. The failing direction was checked: a binary built
+   without the label, run with one, fails the test (`left: None`, `right:
+   Some("3333…")`).
 3. Measure debug/release payload equality instead of leaving it unmeasured.
    **Done for the corpus.** `he1_baseline.py --check` against the release build
    reports `OK: payload projection identical`, the same `payload_root` and

@@ -338,9 +338,21 @@ fn receipt_names_the_build_that_ran() {
         fmp_materialize::MATERIALIZER_VERSION
     );
     assert_eq!(implementation.build(), option_env!("FMP_BUILD_ID"));
-    if implementation.build().is_none() {
+
+    // A compile-time label can disappear without any compiler error: a local
+    // build legitimately has none, and a CI build that stopped passing the
+    // variable would look the same. CI sets the variable for the test process
+    // as well, so a run-time value the receipt does not carry means the label
+    // was not compiled in, and the job's own non-empty check catches a workflow
+    // that drops the variable entirely.
+    match std::env::var("FMP_BUILD_ID") {
+        Ok(runtime) => assert_eq!(
+            implementation.build(),
+            Some(runtime.as_str()),
+            "the receipt did not record the build label this process was given"
+        ),
         // No build label: the receipt must not claim `HE-T20` coverage.
-        assert_eq!(implementation, &ImplementationIdentity::current());
+        Err(_) => assert_eq!(implementation.build(), None),
     }
 }
 
