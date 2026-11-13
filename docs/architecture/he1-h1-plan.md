@@ -21,12 +21,14 @@ H1a（§6 表第一行）已落地并全绿：`Definition` 封闭、`Registry` �
 实测。H1b（§6 表第二行）也已落地：`ValidatedPlan`、`bind`、新的
 `materialize`、`ExecutionReceipt`、`MaterializationFailure`、CLI 失败分流和
 facade 都已实现并被测试覆盖；`bind`/`materialize` 的 doctest 把「只能传
-`ValidatedPlan`」写成编译期负例。H1 **已验收**（2026-11-14，`176d396`）：
-`HE-AC-06` 与 `HE-T02`/`HE-T03`/`HE-T04` 有运行期和编译期证据；debug/release
-载荷一致性已对语料实测（同一 `payload_root sha256:3f6d177d…ffefad9`）；CI 以
-PR head SHA 作为 `FMP_BUILD_ID` 编译，receipt 因此记录构建来源；三主机 CI 在
-`176d396` 上全绿（`gates` run `43492746429`、`determinism` run `43492746267`）。
-验收只覆盖 H1，H2–H4 仍未开始。
+`ValidatedPlan`」写成编译期负例。合并前审计补上了公开 allocator 的精确长度
+契约（短/长映像都是 `HostFault::ImageLength`，在写任何片段之前失败）、
+`Materialization::verify_receipt` 与 N13 的真实 CLI 进程测试。H1 **已验收**
+（2026-11-14，`7df6f48`）：`HE-AC-06` 与 `HE-T02`/`HE-T03`/`HE-T04` 有运行期和
+编译期证据；debug/release 载荷一致性已对语料实测（同一 `payload_root
+sha256:3f6d177d…ffefad9`）；CI 以 PR head SHA 作为 `FMP_BUILD_ID` 编译，receipt
+因此记录构建来源；三主机 CI 在 `7df6f48` 上全绿（`gates` run `43496573107`、
+`determinism` run `43496573111`）。验收只覆盖 H1，H2–H4 仍未开始。
 
 ---
 

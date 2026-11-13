@@ -310,8 +310,8 @@ Stage: H1b (`ADR-0125`, `ADR-0127`; plan `docs/architecture/he1-h1-plan.md`
 §3.2–§3.4, §4.2, §5, §6 second row)
 Branch: `he1/h1b-validated-plan`
 Base: `4d3f8de` (merged H1a PR)
-Tree: `176d396` plus this report; the materializer code under test did not
-change after the commands below.
+Tree: `7df6f48` plus this report; the audit fix in that commit is the last
+change to the materializer code under test.
 
 H1b makes `ValidatedPlan` the only executable input, returns the artifact with
 an `ExecutionReceipt`, splits materialization failures by who is at fault, and
@@ -325,14 +325,14 @@ acceptance result is recorded in §11.8.
 |---|---|---|
 | `prototype/crates/fmp-validate/src/lib.rs` | `DefinitionIdentity`, `BindIdentity`, `ValidatedPlan` (private fields, no `Clone`, no constructor), `bind`, `check_definition_identity`; three `compile_fail` doctests plus one positive control | `ADR-0127` D11/D13/D15: the credential is unforgeable, and the implementation identity lives in the materializer, not here |
 | `prototype/crates/fmp-validate/tests/he1_bind.rs` | 6 tests: structural-vs-`check` stage replay, huge offsets, `page` precondition, namespace/version/digest mismatches, bound-definition identity | H1a called `check_structure`/`check` directly; H1b replays the same inputs through the public entry |
-| `prototype/crates/fmp-materialize/src/lib.rs` | `materialize(&ValidatedPlan)`, `materialize_with_allocator`, `Materialization`, `ExecutionReceipt`, `ImplementationIdentity`, `PayloadIdentity`, `payload_digest`, `HostFault`, `MaterializationFailure`, `allocate_image`; `encode_instruction`/`apply`/`source` reclassified; deprecated `legacy` module | `ADR-0127` §3, §8, §9 and plan D4/D5/D9: one input, one receipt, three failure classes, no `Rejected` |
-| `prototype/crates/fmp-materialize/tests/he1_execution.rs` | 10 tests: provenance/document identity split, mutated operand, fingerprint-as-cache-key, `source_trace` bind identity, payload projection, build receipt, injected allocator failure, both facade rejections | the identity table of plan §5, measured rather than inferred |
+| `prototype/crates/fmp-materialize/src/lib.rs` | `materialize(&ValidatedPlan)`, `materialize_with_allocator`, `Materialization` (`verify_receipt`), `ExecutionReceipt`, `ImplementationIdentity`, `PayloadIdentity`, `payload_digest`, `HostFault` (`ImageReservation`, `ImageLength`), `MaterializationFailure`, `allocate_image`; `encode_instruction`/`apply`/`source` reclassified; deprecated `legacy` module | `ADR-0127` §3, §8, §9 and plan D4/D5/D9: one input, one receipt, three failure classes, no `Rejected`; the audit fix makes the injected allocator's exact-length contract enforceable before encoding |
+| `prototype/crates/fmp-materialize/tests/he1_execution.rs` | 13 tests: provenance/document identity split, mutated operand, fingerprint-as-cache-key, `source_trace` bind identity, payload projection, build receipt, injected allocator reservation failure, short and long images, `verify_receipt`, both facade rejections | the identity table of plan §5 plus the allocator contract and receipt pairing, measured rather than inferred |
 | `prototype/crates/fmp-materialize/tests/he1_stage_boundaries.rs` | `bind` replay plus value-level snapshots for the four measured post-encode fixtures | `ADR-0127` §9 |
 | `prototype/crates/fmp-materialize/tests/he1_wide_register.rs` | calls `bind` + `materialize` instead of the removed two-argument entry | the wide-field evidence now goes through the credential |
 | `prototype/crates/fmp-cli/src/main.rs` | `Failure::{Internal, Host}`, pure `exit_code`, `report`, `classify`; 2 unit tests | `ADR-0127` §3.4: an implementation bug is not a rejected plan |
 | `prototype/crates/fmp-cli/tests/support/mod.rs` | shared `execute`/`artifact`/`diagnostics`; every gate test binds first | there is no remaining two-argument path |
 | `prototype/crates/fmp-cli/tests/fixtures.rs`, `planner_api.rs`, `determinism.rs`, `he1_identity_characterization.rs` | routed through `support`; no count changed | parity and determinism gates must exercise the new entry |
-| `prototype/crates/fmp-cli/tests/cli_failure.rs` | 2 process tests: bind rejection exits 1 with the diagnostic array; usage exits 2 without one | the split is a property of the real binary, not only of `exit_code` |
+| `prototype/crates/fmp-cli/tests/cli_failure.rs` | 3 process tests: bind rejection exits 1 with the diagnostic array; post-encode N13 assertion exits 1 with `E-BYTE-001` and empty stdout; usage exits 2 without an array | the split is a property of the real binary, not only of `exit_code`; the audit asked for the post-encode path end to end |
 | `docs/architecture/he1-h1-plan.md`, `docs/STATUS.md`, this report | status and evidence | the plan is no longer "H1b not started" |
 | `.github/workflows/gates.yml`, `.github/workflows/determinism.yml` | compile the materializer with `FMP_BUILD_ID` = the PR head SHA (or the pushed commit) | `HE-T20`/`ADR-0127` D9: the receipt must name a source revision when a hosted build makes one |
 
@@ -369,7 +369,7 @@ git diff --check
 | Command | Result |
 |---|---|
 | `cargo fmt --check` | exit 0 |
-| `cargo test --workspace` | 115 passed, 0 failed across 20 suites: 106 unit/integration tests plus 9 doctests (16 test targets + 4 doctest targets) |
+| `cargo test --workspace` | 119 passed, 0 failed across 20 suites: 110 unit/integration tests plus 9 doctests (16 test targets + 4 doctest targets) |
 | `cargo test --workspace --doc` | the same 9 doctests: 6 `compile_fail`, 3 positive controls |
 | `he1_validation_bounds` (release) | 4 passed, 0 failed |
 | `he1_wide_register` (release) | 1 passed, 0 failed |
@@ -382,6 +382,8 @@ git diff --check
 | `git diff --check` | exit 0 |
 | CI `gates`, run `43487661759` on `3b26bb1` | `workspace tests`, `document and definition gates`, `H0 payload baseline`, `oracle rerun` — all `success`; the runner reproduced `OK: payload projection identical` with both roots unchanged and `122/128, 6 skipped, 0 failed` |
 | CI `determinism`, run `43487662063` on `3b26bb1` | `ubuntu-latest`, `macos-latest`, `windows-latest` — all `success` |
+| CI `gates`, run `43496573107` on `7df6f48` | `workspace tests`, `document and definition gates`, `H0 payload baseline`, `oracle rerun` — all `success`; this is the final tree, including the allocator fix and the N13 CLI test |
+| CI `determinism`, run `43496573111` on `7df6f48` | `ubuntu-latest`, `macos-latest`, `windows-latest` — all `success` |
 
 **Doctest control.** Making `ValidatedPlan`'s three fields `pub` and deriving
 `Clone` in a scratch copy turned exactly the two intended `compile_fail` tests
@@ -402,7 +404,7 @@ a rejected signature.
 `a_declared_version_must_match_the_bound_definition`,
 `bind_reports_the_definition_it_bound`.
 
-`fmp-materialize/tests/he1_execution.rs` (10):
+`fmp-materialize/tests/he1_execution.rs` (13):
 `plan_identity_ignores_provenance`,
 `plan_identity_ignores_the_legacy_document`,
 `a_mutated_operand_changes_the_plan_identity`,
@@ -411,6 +413,9 @@ a rejected signature.
 `payload_digest_follows_the_bytes`,
 `receipt_names_the_build_that_ran`,
 `an_image_reservation_failure_is_a_host_failure`,
+`a_short_image_is_a_host_failure`,
+`a_long_image_is_a_host_failure`,
+`verify_receipt_notices_an_edited_artifact`,
 `legacy_facade_rejects_a_digest_mismatch`,
 `a_definition_identity_mismatch_is_rejected_by_the_legacy_facade`.
 
@@ -420,8 +425,9 @@ a rejected signature.
 `a_fixup_range_failure_is_post_encode`,
 `an_expected_size_mismatch_is_rejected_before_encoding`.
 
-`fmp-cli/tests/cli_failure.rs` (2):
+`fmp-cli/tests/cli_failure.rs` (3):
 `a_binding_rejection_exits_one_with_the_diagnostic_array`,
+`a_post_encode_assertion_exits_one_with_the_diagnostic_array`,
 `a_usage_fault_exits_two_without_a_diagnostic_array`.
 `fmp-cli/src/main.rs` unit tests (2):
 `the_exit_code_separates_rejection_from_internal_fault`,
@@ -447,8 +453,10 @@ a rejected signature.
   MaterializationFailure>`; the two-argument shape is only available as the
   deprecated `fmp_materialize::legacy::materialize`, which returns
   `Result<Artifact, LegacyFailure>` so a host fault keeps its classification.
-  `Failure` in the CLI gained `Internal` and `Host`. The FMP document surface is
-  unchanged and no error code was added.
+  `Failure` in the CLI gained `Internal` and `Host`. `HostFault` gained
+  `ImageLength { requested, actual }` and `Materialization` gained
+  `verify_receipt()`. The FMP document surface is unchanged and no error code
+  was added.
 - **Receipt:** `payload_digest` is `sha256` over the `payload/0.1` projection
   (artifact JSON without `materializer_version`), and the digest's algorithm
   name is `payload/0.1`. It is deliberately not `canonical_digest(to_json())`.
@@ -471,11 +479,17 @@ Proved by a test or a compile-time property:
   legacy fingerprint stays put;
 - a host allocation failure is `HostFailure`, not `Internal` and not a
   rejection, and the same plan succeeds with a working allocator;
+- an allocator that returns fewer or more bytes than `declared_size` is
+  `HostFailure::ImageLength { requested, actual }` before any fragment is
+  written, and no artifact is produced;
+- `verify_receipt()` is true for a fresh pair and false after the artifact bytes
+  are edited;
 - the receipt names `fmp-materialize`, records `build: None` when
   `FMP_BUILD_ID` is absent from the build, and records the injected label when
   it is present; CI compiles with the PR head SHA and refuses an empty label;
-- the real CLI exits 1 for a `bind` rejection and 2 for usage, with different
-  stderr channels.
+- the real CLI exits 1 for a `bind` rejection and for the N13 post-encode
+  assertion (empty stdout, `E-BYTE-001` at `/instructions/0/expected_digest`),
+  and 2 for usage, with different stderr channels.
 
 Not proved here:
 
@@ -528,7 +542,7 @@ H1 acceptance, in this order:
 
 ### 11.8 H1 acceptance
 
-H1 is accepted on `176d396` (2026-11-14). The criteria are `HE-AC-06` together
+H1 is accepted on `7df6f48` (2026-11-14). The criteria are `HE-AC-06` together
 with `HE-T02`, `HE-T03`, `HE-T04` and the unchanged payload root
 (`docs/architecture/he1-horizontal-extension.md` §13/§14;
 `docs/architecture/he1-h1-plan.md` completion definition):
@@ -540,9 +554,43 @@ with `HE-T02`, `HE-T03`, `HE-T04` and the unchanged payload root
 | `HE-T03`: tampered definition content with the declared digest | `a_definition_edit_reloads_to_a_new_digest`; `legacy_facade_rejects_a_digest_mismatch`; `a_definition_identity_mismatch_is_rejected_by_the_legacy_facade` |
 | `HE-T04`: validate A, execute B | not expressible: `materialize` takes only `&ValidatedPlan`, and the plan and definition travel together |
 | Payloads unchanged | `payload_root sha256:3f6d177d…ffefad9`, `definitions_root sha256:575b7c5f…35690e`, `122/128` oracle with six `manual-derivation` skips |
-| Receipt names the build | CI compiles with `FMP_BUILD_ID = 176d396b8dc8080f5c247352b794f18c0ff8d233`; the job log prints it, and `receipt_names_the_build_that_ran` fails when the run-time label is not in the compiled identity |
-| Three hosts | `gates` run `43492746429` (workspace, document/definition, baseline, oracle) and `determinism` run `43492746267` (ubuntu, macos, windows) |
+| Receipt names the build | CI compiles with `FMP_BUILD_ID = 7df6f4814154cd8243dd563fabb602341b43ca39`; the job log prints it, and `receipt_names_the_build_that_ran` fails when the run-time label is not in the compiled identity |
+| Three hosts | `gates` run `43496573107` (workspace, document/definition, baseline, oracle) and `determinism` run `43496573111` (ubuntu, macos, windows) |
 | Debug/release equality | the release binary reproduces the same `payload_root` as the debug-recorded snapshot |
 
 The acceptance takes effect with this PR; the phase board still shows H2–H4
 open.
+
+### 11.9 Pre-merge audit fix
+
+The audit of `ac69320` accepted the architecture and found one boundary hole
+worth fixing before merge: `materialize_with_allocator` was public but did not
+check the callback's length. A short image would panic on the first fragment
+write; a long image would return extra bytes under a receipt, producing N+1
+bytes where the frozen plan declared N. The fix is
+`HostFault::ImageLength { requested, actual }`; `emit` compares `image.len()`
+with `section.declared_size` before writing any fragment. It is a host failure:
+no artifact, no plan rejection, and no new error code.
+
+The same audit noted that `Materialization`'s public artifact can be edited
+after execution, so the receipt and the bytes can drift. `verify_receipt()`
+recomputes the payload projection and compares it with the recorded digest; the
+pair is still not frozen, but the drift is now detectable before persistence.
+`ImplementationIdentity::build` is documented as a source revision, not a
+binary identity: a binary or build-manifest digest belongs to the stage that
+persists receipts, so this report does not claim full binary identity.
+
+The audit also asked for the post-encode channel to be measured in the real
+process, not only through `MaterializationFailure::PostEncodeAssertion`:
+`cli_failure.rs` now runs N13 and asserts exit 1, empty stdout and one
+`E-BYTE-001` at `/instructions/0/expected_digest`. It still does not force
+`Internal`; that remains covered by the pure classification test, as §11.6
+says.
+
+Evidence: `a_short_image_is_a_host_failure`, `a_long_image_is_a_host_failure`,
+`verify_receipt_notices_an_edited_artifact`,
+`a_post_encode_assertion_exits_one_with_the_diagnostic_array`; the workspace is
+119 passed / 0 failed; CI is green on `7df6f48` (`gates` `43496573107`,
+`determinism` `43496573111`). Nothing under `definitions/`, `fixtures/`,
+`schema/` or `docs/fmp-v0/` changed; both roots stayed put and the oracle stayed
+`122/128`.

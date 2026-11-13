@@ -675,19 +675,26 @@ only a `&ValidatedPlan` and returns `Materialization { artifact, receipt }`;
 payload moves. `MaterializationFailure` has exactly `PostEncodeAssertion`,
 `Internal` and `HostFailure(HostFault)`; an image reservation keeps the plan's
 `u64` request and is injectable, so the host path is tested without exhausting
-memory. The CLI keeps `bind`/post-encode rejections at exit 1 and routes
+memory. The injected allocator must return exactly `declared_size` bytes: a
+short image would panic on the first fragment write and a long one would return
+bytes the plan never declared, so either is `HostFault::ImageLength` before any
+fragment is written and no artifact exists. `Materialization::verify_receipt`
+re-checks the recorded digest against the current artifact, and
+`ImplementationIdentity::build` is documented as a source revision rather than a
+binary identity. The CLI keeps `bind`/post-encode rejections at exit 1 and routes
 `Internal` (after an `internal fault:` marker), `HostFailure`, usage and I/O to
 exit 2 through distinct channels; `exit_code` is a pure, unit-tested function
-and `cli_failure.rs` exercises the real process. The deprecated
-`legacy::materialize` routes through `bind` and keeps a `LegacyFailure`
-distinction, so a host fault is not flattened into a diagnostic array.
-`he1_bind.rs` replays the structural and `check` inputs through the public
-entry; `he1_execution.rs` covers the identity, receipt, allocator and facade
-properties; `he1_stage_boundaries.rs` pins value-level snapshots for the four
-measured post-encode fixtures — N13 `declared`/`actual`, N20
-`required_align`/`value`, N04b/N04f `min`/`max`/`value` — while the other 615
-negatives keep the code + Pointer + detail-key gate, so the 619 triples are
-unchanged. `payload_root` and `definitions_root` are unchanged, the oracle is
+and `cli_failure.rs` exercises the real process, including N13 post-encode
+(exit 1, empty stdout, `E-BYTE-001` at `/instructions/0/expected_digest`). The
+deprecated `legacy::materialize` routes through `bind` and keeps a
+`LegacyFailure` distinction, so a host fault is not flattened into a diagnostic
+array. `he1_bind.rs` replays the structural and `check` inputs through the public
+entry; `he1_execution.rs` covers the identity, receipt, allocator (reservation,
+short image, long image) and facade properties; `he1_stage_boundaries.rs` pins
+value-level snapshots for the four measured post-encode fixtures — N13
+`declared`/`actual`, N20 `required_align`/`value`, N04b/N04f
+`min`/`max`/`value` — while the other 615 negatives keep the code + Pointer +
+detail-key gate, so the 619 triples are unchanged. `payload_root` and `definitions_root` are unchanged, the oracle is
 still `122/128` with six `manual-derivation` skips, and the workspace, doctest,
 release bounds/wide-field, `check_ids`, `check_definition`, `plan_identity`,
 baseline and `git diff --check` gates pass locally. The three-host CI run is
@@ -705,12 +712,16 @@ compiled identity, fails the job; both directions were measured. The run
 carrying this wiring is green on `176d396`: `gates` run `43492746429` passes the
 workspace, document and definition, baseline and oracle jobs (its log prints
 `FMP_BUILD_ID=176d396b8dc8080f5c247352b794f18c0ff8d233`), and `determinism` run
-`43492746267` passes on ubuntu, macos and windows. **H1 is therefore accepted**
-(2026-11-14): `HE-AC-06` with `HE-T02`/`HE-T03`/`HE-T04` is proved by the
-compile-time and runtime tests below, the 128 payloads and 104 definitions are
-unchanged, the oracle is still `122/128`, the receipt names its build, and
-debug/release payloads agree. The acceptance covers H1 only; H2–H4 and plans
-outside the fixture corpus stay open.
+`43492746267` passes on ubuntu, macos and windows. The pre-merge audit fix (the
+allocator's exact-length contract, `verify_receipt`, and the N13 CLI process
+test) is green on `7df6f48`: `gates` run `43496573107` passes the workspace,
+document and definition, baseline and oracle jobs, and `determinism` run
+`43496573111` passes on ubuntu, macos and windows. **H1 is therefore accepted**
+on `7df6f48` (2026-11-14): `HE-AC-06` with `HE-T02`/`HE-T03`/`HE-T04` is proved
+by the compile-time and runtime tests below, the 128 payloads and 104
+definitions are unchanged, the oracle is still `122/128`, the receipt names its
+build, and debug/release payloads agree. The acceptance covers H1 only; H2–H4
+and plans outside the fixture corpus stay open.
 The phase board above
 stays the v0 record; HE-1 phases
 are reported in `research/he1/`.
