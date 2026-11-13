@@ -17,7 +17,7 @@ Product code: **none**. Nothing under `prototype/crates/*/src/` changed.
 | `research/he1/H0-report.md` | new | This report |
 | `tools/he1_baseline.py` | new | Records and checks the snapshot by running the real `fmp` binary; never a build input |
 | `prototype/crates/fmp-cli/tests/he1_identity_characterization.rs` | new | Seven tests: four assert a hole HE-1/H3/H4 must close, one pins a constraint H1 must preserve (the legacy fingerprint reads a field the parser drops), two are controls (digest mismatch, non-object root). The deep-JSON finding is the Python probe, not a Rust test |
-| `tools/test_he1_baseline.py` | new (§7) | 67 tests over synthetic snapshots: the comparator fails on a payload or count change, passes on a receipt change alone, still compares payloads when the receipt changes, and refuses a structurally invalid snapshot or anchor with exit 2 before materializing (§8–§13). It also recomputes every entry digest and derived count, pins the definition files through a separate anchor root, rejects a fresh artifact that loses a required envelope member, treats a document nested too deeply for Python's JSON reader as a fault (exit 2) on every path including the fresh plan and the materializer stdout, proves a bare invocation cannot overwrite the frozen baseline, and records a failing toolchain subprocess as `unavailable` rather than raising. No binary needed, so CI runs it first |
+| `tools/test_he1_baseline.py` | new (§7) | 74 tests over synthetic snapshots: the comparator fails on a payload or count change, passes on a receipt change alone, still compares payloads when the receipt changes, and refuses a structurally invalid snapshot or anchor with exit 2 before materializing (§8–§14). It also recomputes every entry digest and derived count, pins the definition files through a separate anchor root, rejects a fresh artifact that loses a required envelope member, treats a document nested too deeply for Python's JSON reader as a fault (exit 2) on every path including the fresh plan and the materializer stdout, rejects a JSON boolean where an integer is required (`level`, `size`, counts), proves a bare invocation cannot overwrite the frozen baseline, and records a failing toolchain subprocess as `unavailable` rather than raising. No binary needed, so CI runs it first |
 | `docs/architecture/he1-horizontal-extension.md` | moved from the repository root | Adopts the design document; header now names `ADR-0125` and the `HE-AC`/`HE-T` registry role. Trailing whitespace stripped: 811 lines, no wording removed |
 | `docs/adr/0125-he1-scope.md` | new | The scope decision and the conflict resolution |
 | `AGENTS.md` | edited | Current round, repository map (`docs/fmp-0.2/`, `docs/architecture/`, `packages/`, `bundles/`, `research/he1/`), three added done-criteria bullets. The eight hard rules and "Never do" are untouched |
@@ -584,6 +584,41 @@ and `definitions_root`
 `sha256:575b7c5f3817c4ed528b8e5dff02bb1fcb6d9024d17e79a79b64b9662635690e`
 unchanged. The recorded snapshot was not re-recorded. The hosted result for this
 round is the run attached to the PR after the push.
+
+## 14. Ninth review round (`a8273e1`)
+
+The ninth review accepted the H0 baseline and the H1 direction and asked for one
+strictness fix and one wording change. No product Rust code changed, and neither
+frozen root moved.
+
+1. **`isinstance(value, int)` accepted JSON booleans.** `bool` subclasses `int`
+   in Python, so `level: false`, `size: true` and `count: true` passed
+   `validate_fresh_artifact()` and `validate_snapshot()`. `True == 1` then let a
+   derived-count comparison accept the value, so a structurally invalid snapshot
+   could be reported as a baseline difference (exit 1) instead of a fault
+   (exit 2). A helper, `is_json_integer(value)`, now requires
+   `type(value) is int`, and every JSON integer check in both validators uses it
+   (`level`, `size`, `definitions.count`, `forms`, `corpus` counts, oracle
+   counts, `artifacts.count`, entry counters, payload `level`/`size`). Seven
+   tests cover bool `level`/`size`, bool counts at three levels, a bool entry
+   level and payload level, and a corrupted snapshot whose `main()` exits 2
+   without calling `snapshot()`. The suite is 74 tests.
+2. **H1 §5 promised too much.** "字段、语义、拒绝规则不动" read as a promise that
+   the new `check_structure`, the full identity comparison, the `page` PC-rule
+   check and the `Internal`/`HostFailure` split would not reject anything new,
+   even though the plan schedules exactly those rejections. The row now says the
+   document format is unchanged, existing legal inputs keep their payloads, and
+   inputs that were previously accepted by mistake, never explicitly rejected,
+   or ended in an internal fault may be tightened; every new rejection,
+   diagnostic change and stage migration must be recorded in the compatibility
+   table and §4.3.
+
+Re-measured after this round: 61 workspace tests (7 characterization), 74
+comparator tests, `payload_root`
+`sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9`
+and `definitions_root`
+`sha256:575b7c5f3817c4ed528b8e5dff02bb1fcb6d9024d17e79a79b64b9662635690e`
+unchanged. The recorded snapshot was not re-recorded.
 
 ## Next
 

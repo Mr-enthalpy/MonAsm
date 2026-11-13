@@ -518,11 +518,12 @@ measured concentration points, one legacy-fingerprint constraint and two
 controls. `ADR-0126` splits the artifact identity into a compared payload
 projection and an uncompared build receipt, and adds the `baseline` job so the
 128 payloads are re-checked on a Linux runner; `tools/test_he1_baseline.py`
-(67 tests) turns the eight manual comparator experiments into a CI gate, a fault
+(74 tests) turns the eight manual comparator experiments into a CI gate, a fault
 now exits 2 rather than sharing exit 1 with a real diff, a document nested too
 deeply for Python's JSON reader (`RecursionError`, not a `ValueError`) is now a
 fault rather than a traceback with exit 1 on every read path — snapshot, anchor,
-fresh plan and materializer stdout — and a structurally
+fresh plan and materializer stdout — a JSON boolean (`false`/`true`) is not an
+integer where `level`, `size` or a count is required, and a structurally
 invalid snapshot is refused before the 128 materializations instead of failing
 inside the comparator. Structural validation is now complete: projections, both
 roots, every entry's envelope, digest types and recomputed roots are checked,
@@ -602,7 +603,20 @@ with a positive control sharing each import path, because `fmp-validate` cannot
 import `fmp-materialize` and the doctest would have stayed green for the wrong
 reason. The plan's two stale "current facts" (only `E-SIZE-001`/`E-BYTE-001`
 fail after encoding; no host failure inside `materialize`) moved to a §1.3
-withdrawn-conclusions table. Two
+withdrawn-conclusions table. The ninth round closes two loose ends. First,
+`isinstance(value, int)` accepted JSON booleans because `bool` subclasses
+`int`: `level: false`, `size: true` and boolean counts passed both validators,
+and `True == 1` let a derived-count comparison agree, so a corrupt snapshot
+could be reported as a baseline difference instead of a fault. `is_json_integer`
+now requires `type(value) is int` and every JSON integer check in
+`validate_fresh_artifact()`/`validate_snapshot()` uses it; seven tests cover the
+bool cases and a corrupted snapshot exits 2 without calling `snapshot()`
+(74 comparator tests total). Second, H1 §5 no longer promises that the fields,
+semantics and rejection rules stay unchanged: it now says the document format is
+unchanged and existing legal payloads stay byte-identical, while inputs
+previously accepted by mistake, never explicitly rejected, or ended in an
+internal fault may be tightened, with every new rejection, diagnostic change and
+stage migration recorded in the compatibility table and §4.3. Two
 limits
 stay open for H1 acceptance rather than being claimed as passed: `FMP_BUILD_ID`
 is `None`, and debug/release payload equality is unmeasured.
