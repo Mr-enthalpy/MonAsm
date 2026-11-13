@@ -101,6 +101,22 @@ jobs:
         working-directory: prototype
         run: cargo +"$RUST_TOOLCHAIN" test --workspace
 
+      # `ADR-0127`: the validator is the dependency floor. A normal edge from
+      # `fmp-validate` to `fmp-materialize` would let the validator reach the
+      # encoder and turn "verified plan" into "verified and emitted". `cargo tree`
+      # with only normal edges ignores dev-dependencies, so a test-only edge is
+      # allowed; the check is on the shipped graph.
+      - name: The validator does not depend on the materializer
+        working-directory: prototype
+        run: |
+          set -euo pipefail
+          cargo +"$RUST_TOOLCHAIN" tree -p fmp-validate --edges normal > "${RUNNER_TEMP}/fmp-validate-deps.txt"
+          if grep -q 'fmp-materialize' "${RUNNER_TEMP}/fmp-validate-deps.txt"; then
+            echo "::error::fmp-validate must not depend on fmp-materialize (ADR-0127)"
+            cat "${RUNNER_TEMP}/fmp-validate-deps.txt"
+            exit 1
+          fi
+
   baseline:
     name: H0 payload baseline
     runs-on: ubuntu-24.04

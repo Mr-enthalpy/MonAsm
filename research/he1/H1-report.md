@@ -1,0 +1,247 @@
+# H1a report — identity closure, core half
+
+Stage: H1a (design §13, `ADR-0125`; decisions in `ADR-0127`)
+Date: 2026-11-13
+Base commit: `0948620f36893d17de56a913f72ced935fe50a98` (merged H0/H1-plan PR)
+Branch: `he1/h1a-identity-core`
+
+H1a is the first half of H1. It closes the executed `Definition`, defines the
+parsed-plan identity, re-checks the parser rules a mutable DTO can bypass, and
+hardens the validator's arithmetic. It does **not** add `ValidatedPlan`, `bind`,
+the new `materialize`, `ExecutionReceipt`, `MaterializationFailure` or the CLI
+failure split; those are H1b and remain unstarted.
+
+## 1. Change scope
+
+Product code changed in `fmp-model`, `fmp-validate`, `fmp-materialize` and the
+CLI call sites. No definition, fixture, schema or `docs/fmp-v0/` byte changed.
+
+| Path | Change | Why |
+|---|---|---|
+| `prototype/crates/fmp-model/src/definition.rs` | `Definition` fields private, `document` deleted, no `Clone`, accessors added; `Registry` stores `Vec<Arc<Definition>>`, `add` takes ownership, `find` returns `Arc<Definition>` | `ADR-0127` §1: a loaded definition is half an execution credential, and a stored digest cannot make mutable facts honest |
+| `prototype/crates/fmp-model/src/identity.rs` | new: `plan-identity/0.1`, `plan_facts`, `ParsedPlanIdentity::of`, exhaustive destructuring, three pinned vectors, 73-row mutation table | `ADR-0127` §2–§3: the identity must cover parsed facts, and a new field must stop the build |
+| `prototype/crates/fmp-model/src/plan.rs` | `Plan.document` → `legacy_document`; new `check_structure` | `ADR-0127` §4/§6: one legacy-only reader for the raw document, and the parser rules a `u32`/`String` cannot hold are re-checked |
+| `prototype/crates/fmp-model/src/lib.rs` | exports `identity`/`ParsedPlanIdentity`; two `compile_fail` doctests and one positive control | the closure is "this cannot be written", not "this returns an error" |
+| `prototype/crates/fmp-validate/src/lib.rs` | `u64`/`u128`/`checked_*` for descriptor sums, overlap math, alignment, range bounds and register width; per-bit loops clipped to `form.bits()`; `page ⇒ pcrel_page` | `ADR-0127` §7: a full `u64` offset and a `u32` width must not overflow or loop; `Page` without `P` must not become an internal fault |
+| `prototype/crates/fmp-materialize/src/lib.rs` | `fingerprint` reads `legacy_document` and accessors; digest comparison reads `definition.digest()`; `lookup` uses `forms()` | keeps the legacy fingerprint byte-identical while the fields close |
+| `prototype/crates/fmp-cli/src/main.rs`, `tests/determinism.rs`, `tests/fixtures.rs`, `tests/planner_api.rs` | borrow `&definition` from `Arc<Definition>` | the registry now shares ownership |
+| `prototype/crates/fmp-cli/tests/he1_identity_characterization.rs` | the in-memory definition-mutation test becomes `a_definition_edit_reloads_to_a_new_digest` | private fields make the old test uncompilable; the property is measured by editing the document and reloading |
+| `prototype/crates/fmp-model/tests/he1_check_structure.rs` | new: 5 test functions, 9 mutations | X86-P71 odd/non-hex `payload_hex`, `align_bits`, `transform_shift`, `lsb`/`width`/`bits` |
+| `prototype/crates/fmp-validate/tests/he1_validation_bounds.rs` | new: 4 test functions | `u32::MAX` width sum, two `u64::MAX`-class offsets, `page` + `none`, 64/128-bit register field |
+| `prototype/crates/fmp-materialize/tests/he1_stage_boundaries.rs` | new: 4 test functions | measures which recorded negatives fail only after encoding |
+| `tools/plan_identity.py` | new | independent Python encoder for the three vectors; `--check` compares them |
+| `docs/adr/0127-execution-identity.md` | new | normative decisions, protocol tables, vectors, 15-row `internal(...)` table, post-encode set, dependency guard |
+| `docs/architecture/he1-h1-plan.md` | header only | draft → accepted (H1a landed, H1b not started); H1b scope untouched |
+| `docs/STATUS.md` | one HE-1 paragraph | H1a status and evidence pointer; no new hand-maintained count |
+| `.github/workflows/gates.yml` | one step | `cargo tree -p fmp-validate --edges normal` must not contain `fmp-materialize` |
+| `research/he1/H1-report.md` | new | this report |
+
+No file under `definitions/`, `fixtures/`, `schema/` or `docs/fmp-v0/` changed.
+
+## 2. Commands actually run
+
+Run from the repository root unless the row says `prototype/`.
+
+```text
+git rev-parse HEAD
+cargo fmt --all -- --check                     # prototype/
+cargo test --workspace                         # prototype/
+python tools/check_ids.py
+python tools/check_definition.py
+python tools/plan_identity.py --check
+python tools/he1_baseline.py --check research/he1/compatibility-results.json
+python tools/oracle/rerun.py --allow-skip-reason manual-derivation
+cargo tree -p fmp-validate --edges normal      # prototype/
+git diff --check
+```
+
+## 3. Results
+
+| Command | Result |
+|---|---|
+| `git rev-parse HEAD` | `0948620f36893d17de56a913f72ced935fe50a98` |
+| `cargo fmt --check` | exit 0 |
+| `cargo test --workspace` | 87 passed, 0 failed (inventory below) |
+| `check_ids.py` | `OK (0 warning(s))`; declared `AC=10, E=48, EC=44, EXP=6, HE-AC=12, HE-T=20, INV=8, N=25, OD=15` |
+| `check_definition.py` | `OK`; 104 documents, newest x86 `0.78.0` (632 forms), AArch64 `0.20.0` (185), RV64 `0.6.0` (24) |
+| `plan_identity.py --check` | three pinned digests match (§5) |
+| `he1_baseline.py --check` | `OK: payload projection identical`; `payload_root sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9`; `definitions_root sha256:575b7c5f3817c4ed528b8e5dff02bb1fcb6d9024d17e79a79b64b9662635690e` |
+| `oracle/rerun.py` | `122/128 re-derived, 6 skipped, 0 failed`; six `manual-derivation` skips |
+| `cargo tree -p fmp-validate --edges normal` | no `fmp-materialize` edge (§8) |
+| `git diff --check` | clean |
+
+The baseline envelope was not compared: the current binary's implementation
+receipt differs from the recording host's, which is the documented `ADR-0126`
+behaviour. Both the recorded and the fresh `envelope_root` are
+`sha256:dfd08fee9844058492138b23448073ec47d8eda42383e3f1b3e567db86a86fef`; the
+gate value is the payload root.
+
+### Test inventory
+
+`cargo test --workspace` runs these binaries and doctests:
+
+| Suite | Tests | What H1a added or changed |
+|---|---|---|
+| `fmp-model` unit | 32 | 3 definition tests (`a_definition_reloads_to_the_same_digest`, `a_canonically_equal_definition_loads_to_the_same_digest`, `the_registry_shares_one_immutable_definition`) and 7 identity tests (below) |
+| `fmp-model` doctests | 3 | two `compile_fail` (field assignment, struct literal) and one positive control |
+| `he1_check_structure` | 5 | `a_data_fragment_with_odd_length_hex_is_rejected_by_check_structure`, `a_data_fragment_with_non_hex_payload_is_rejected_by_check_structure`, `an_alignment_outside_the_parser_bound_is_rejected_by_check_structure`, `a_transform_shift_outside_the_parser_bound_is_rejected_by_check_structure`, `a_field_range_outside_the_parser_bound_is_rejected_by_check_structure` |
+| `he1_validation_bounds` | 4 | `a_descriptor_width_sum_cannot_overflow`, `two_huge_fixup_offsets_do_not_overflow`, `a_page_transform_without_a_page_pc_rule_is_rejected`, `a_wide_register_field_does_not_overflow_the_width_check` |
+| `fmp-materialize` unit | 9 | unchanged |
+| `he1_stage_boundaries` | 4 | `a_digest_mismatch_is_post_encode`, `a_fixup_alignment_failure_is_post_encode`, `a_fixup_range_failure_is_post_encode`, `an_expected_size_mismatch_is_rejected_before_encoding` |
+| `fmp-plan` | 5 | unchanged |
+| `fmp-cli` `determinism` | 6 | accessor migration only |
+| `fmp-cli` `fixtures` | 2 | accessor migration only |
+| `fmp-cli` `he1_identity_characterization` | 7 | one test replaced (see §1); the other six are unchanged in meaning |
+| `fmp-cli` `planner_api` | 10 | accessor migration only |
+
+The seven identity tests are:
+
+- `the_three_protocol_vectors_are_stable`
+- `the_algorithm_name_is_the_domain_separator`
+- `provenance_is_not_part_of_the_identity`
+- `the_legacy_document_is_not_part_of_the_identity`
+- `a_changed_operand_changes_the_identity`
+- `an_unknown_variant_is_payload_carrying_and_distinct`
+- `plan_identity_covers_every_parsed_field` (73 mutations)
+
+## 4. What H1a proves and what it does not
+
+**Proved by a run.** The definition API is closed (both doctests fail to
+compile, the positive control compiles and reads the accessors); a document edit
+reloads to a different digest and the untouched plan is rejected at
+`/definition_identity/digest` with `E-DEF-001`; `check_structure` rejects the
+nine structural mutations with the parser's own code, Pointer and detail keys;
+the validator returns in bounded time for two `u32::MAX` widths and two
+`u64::MAX`-class offsets; `page` without `pcrel_page` is a static
+`E-FIXUP-001`; the identity's three vectors match an independent Python encoder
+and all 73 field/enum mutations move the digest; and the 128 recorded payloads
+still materialize identically.
+
+**Not proved.** H1a is not an execution credential. Until H1b exists, a caller
+can still call the old two-argument `materialize` with any `&Plan` and any
+`&Definition`; `bind` does not exist, so `check_structure` is not yet on the
+product path — the tests call it directly. `ParsedPlanIdentity` is not compared
+against anything in the product yet. The `internal(...)` table is an audit of
+today's code, not a reclassification: twelve branches remain `Internal` in H1b,
+one is closed by §7.2, and two are host-domain failures that H1b must not route
+through `Internal`.
+
+## 5. The three identity vectors
+
+The protocol is normative in `ADR-0127` §3; the full `minimal` facts hex is
+pinned there (376 bytes). The digests are:
+
+| Vector | `sha256` digest | Facts |
+|---|---|---|
+| `minimal` | `sha256:a48faecec39dd1de38f13b4868559f307b575a95a0aa241a01caa325400422c4` | 376 bytes |
+| `data-fragment` | `sha256:9da5a3318e943bcbd5c9c32366708922b68a5e7e7c67a0b3d48a9c7b1a68eec2` | one `.text` section, one `Data("90")` fragment |
+| `unknown-variants` | `sha256:1a07ae98cba50f7ee65b36bbe2bb1684eaa0885f728270b9baa39824a2a4632a` | every `Unknown` variant and every `Some` |
+
+`tools/plan_identity.py --check` rebuilds the three fact trees from the protocol
+text and compares the digests. Rust and Python were written independently from
+the same tables, so agreement catches a transcription error, an implicit length
+or a language-specific layout assumption. It does **not** catch a misreading
+shared by both; the exhaustive destructuring and the 73-row mutation table are
+the controls for that.
+
+## 6. Where the post-encode negatives actually fail
+
+`he1_stage_boundaries.rs` asserts both columns for each recorded negative:
+
+| Fixture | Code | `check` | `materialize` |
+|---|---|---|---|
+| `N13-expected-digest-mismatch` | `E-BYTE-001` | empty | `E-BYTE-001` |
+| `N20-loadlit-fixup-misaligned` | `E-RANGE-003` | empty | `E-RANGE-003` |
+| `N04b-rel32-absolute-out-of-range` | `E-FIXUP-003` | empty | `E-FIXUP-003` |
+| `N04f-absolute-address-in-imm8-field` | `E-FIXUP-003` | empty | `E-FIXUP-003` |
+| `N05-expected-size-mismatch` | `E-SIZE-001` | `E-SIZE-001` | `E-SIZE-001` |
+| `N05b-huge-expected-size` | `E-SIZE-001` + `E-LAYOUT-003` | rejected | rejected |
+
+The measured set is **four fixtures, three codes**. The H0 statement "only
+`E-SIZE-001`/`E-BYTE-001` fail after encoding" counted codes, not fixtures, and
+included a static rejection. Only the four rows above are candidates for the
+value-level snapshots H1b adds; the other negatives keep the
+code + Pointer + detail-key-set gate.
+
+## 7. Numeric hardening and register width
+
+| Site | Before | After |
+|---|---|---|
+| `cover_state` slot end/intersection | `u32` | `u64` |
+| `check_fixup_descriptor` field end, width sum, overlap | `u32` | `u64` |
+| `check_fixup_overlap` absolute bit position | `u64` `offset * 8 + lsb` | `u128` (`u64::MAX * 8 + u32` is representable) |
+| `check_one_writer` / `check_fixup_ownership` bit loops | up to `u32::MAX` bits | clipped to `form.bits()` |
+| register field width | `1u64 << field_bits` (debug panic at 64) | `1u128.checked_shl(field_bits)` |
+| alignment unit and signed/unsigned bounds | unchecked `1i128 << n` | `checked_shl`; an unrepresentable bound no longer panics |
+
+The register-width reproduction builds two synthetic `fmp-def/0.1` tables whose
+`reg_number` slot sums to 64 bits (two 32-bit placements, 8-byte template) and
+128 bits (two 64-bit placements, 16-byte template). `reg_number` slots may not
+declare `range`, and the loader bounds each placement to 64 bits, not the sum,
+so both widths are legal definition facts. Both tables load, and `check` on a
+plan using them returns no `E-OPERAND-004` and does not panic. The fix is the
+`u128` comparison, not a load-time `width_bits` bound: the width is legal, only
+the comparison was unsafe. `definitions/**` is frozen and no shipped slot is
+that wide, so the table is built in the test.
+
+The `u32::MAX` width sum test is a second-line-of-defence proof. Under D13 the
+same input is structurally illegal and must be rejected by `check_structure`
+with `E-PLAN-002` once H1b puts it on the path; H1a calls `check` directly to
+prove the arithmetic terminates.
+
+## 8. Dependency direction
+
+`cargo tree -p fmp-validate --edges normal` on this host:
+
+```text
+fmp-validate v0.0.0
+└── fmp-model v0.0.0
+    └── sha2 v0.10.9
+        └── cfg-if v1.0.4
+        └── cpufeatures v0.2.17
+        └── digest v0.10.7
+            └── block-buffer v0.10.4
+            └── crypto-common v0.1.7
+```
+
+No `fmp-materialize` edge. `.github/workflows/gates.yml` now greps the same
+command and fails the `workspace` job if the edge appears. `--edges normal`
+excludes dev-dependencies on purpose: a test-only edge is allowed, the shipped
+graph is what the check owns.
+
+## 9. Compatibility
+
+- **Payloads:** none moved. `payload_root` is unchanged
+  (`sha256:3f6d177d…ffefad9`), so all 128 positive payloads are byte-identical.
+- **Definitions:** none moved. `definitions_root` is unchanged
+  (`sha256:575b7c5f…35690e`); `check_definition.py` still sees 104 documents.
+- **Negatives:** the 619 code + Pointer + detail-key triples are unchanged; the
+  new rejections (`check_structure`, `page ⇒ pcrel_page`) are not reachable from
+  a legal fixture, and the tests that exercise them assemble the illegal state in
+  memory.
+- **Oracle:** `122/128` re-derived, 6 `manual-derivation` skips, 0 failed — the
+  same split as H0. The encoder and the definition files did not change.
+- **API:** `Definition` no longer implements `Clone`, exposes `document`, or
+  allows field assignment; `Registry::find` returns `Arc<Definition>` instead of
+  `&Definition`. This is a source-level break, deliberately: `ADR-0127` §1 and
+  plan D1 reduce the cost by not renaming the type. The FMP document surface is
+  unchanged.
+- **Tooling:** one new Python script and one new CI step; no error code was
+  added. `E-PLAN-001`, `E-PLAN-002` and `E-FIXUP-001` were already registered.
+
+## 10. Next
+
+H1b (`docs/architecture/he1-h1-plan.md` §3.2–§3.4, §4.2, §6):
+
+- `ValidatedPlan` with private fields and no `Clone`; `bind(Plan, Arc<Definition>)`
+  runs `check_structure`, compares `(namespace, version, digest)`, then `check`;
+- `materialize(&ValidatedPlan)` returns `Materialization { artifact, receipt }`;
+- `MaterializationFailure` splits `PostEncodeAssertion`, `Internal` and
+  `HostFailure`; the two host-domain branches never use `Internal`;
+- the CLI failure split and the deprecated facade that routes through `bind`;
+- the same structural inputs replayed end to end, plus namespace-only,
+  version-only and digest-compatibility mismatches;
+- value-level snapshots only for the four fixtures measured in §6.
+
+H1b is not started. The old `materialize` still re-runs its own digest
+comparison, and a `Plan` can still reach it unbound.

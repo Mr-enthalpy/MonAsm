@@ -71,7 +71,7 @@ fn outcome(path: &Path, registry: &Registry) -> Result<Vec<u8>, Vec<String>> {
     let definition = registry
         .find(&plan.definition.namespace, &plan.definition.version)
         .unwrap_or_else(|error| panic!("{}: {}", path.display(), error.message()));
-    match fmp_materialize::materialize(&plan, definition) {
+    match fmp_materialize::materialize(&plan, &definition) {
         Ok(artifact) => Ok(artifact_identity(&artifact)),
         Err(errors) => Err(errors.iter().map(|error| error.identity()).collect()),
     }
@@ -205,7 +205,7 @@ fn exp_r4_serialization_round_trip_is_identical() {
                 &canonical_plan.definition.version,
             )
             .expect("definition is present");
-        let canonical_artifact = fmp_materialize::materialize(&canonical_plan, definition)
+        let canonical_artifact = fmp_materialize::materialize(&canonical_plan, &definition)
             .expect("canonical plan materializes");
         assert_eq!(
             direct,
@@ -228,7 +228,7 @@ fn exp_r4_serialization_round_trip_is_identical() {
                 &pretty_plan.definition.version,
             )
             .expect("definition is present");
-        let pretty_artifact = fmp_materialize::materialize(&pretty_plan, definition)
+        let pretty_artifact = fmp_materialize::materialize(&pretty_plan, &definition)
             .expect("pretty plan materializes");
         assert_eq!(
             direct,
@@ -263,7 +263,7 @@ fn exp_r5_definition_perturbation_is_loud() {
     let definition = perturbed
         .find(&plan.definition.namespace, &plan.definition.version)
         .expect("the version is unchanged");
-    let errors = fmp_materialize::materialize(&plan, definition)
+    let errors = fmp_materialize::materialize(&plan, &definition)
         .expect_err("a changed rule set must not emit bytes");
     let expected = fmp_model::codes::E_DEF_001;
     assert_eq!(

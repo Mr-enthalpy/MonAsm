@@ -105,7 +105,7 @@ fn run(args: Vec<String>) -> Result<(), Failure> {
     let definition = registry
         .find(&plan.definition.namespace, &plan.definition.version)
         .map_err(|error| Failure::Rejected(vec![error]))?;
-    let artifact = fmp_materialize::materialize(&plan, definition).map_err(Failure::Rejected)?;
+    let artifact = fmp_materialize::materialize(&plan, &definition).map_err(Failure::Rejected)?;
     println!("{}", json::pretty(&artifact.to_json()));
     Ok(())
 }

@@ -346,11 +346,11 @@ pub fn materialize(plan: &Plan, definition: &Definition) -> Result<Artifact, Vec
     // Step 3: the plan's digest must name this definition exactly. A digest
     // mismatch is checked before any rule is applied, because the rules below
     // are the ones the digest vouches for.
-    if plan.definition.digest != definition.digest {
+    if plan.definition.digest != definition.digest() {
         errors.push(
             Diagnostic::new(codes::E_DEF_001, "/definition_identity/digest")
                 .with("declared", plan.definition.digest.as_str())
-                .with("actual", definition.digest.as_str())
+                .with("actual", definition.digest())
                 .with(
                     "reason",
                     "definition digest does not match the loaded definition",
@@ -878,7 +878,10 @@ fn write_bits(bytes: &mut [u8], lsb: u32, width: u32, value: i128) {
 }
 
 fn lookup<'a>(definition: &'a Definition, form_id: &str) -> Option<&'a Form> {
-    definition.forms.iter().find(|form| form.form_id == form_id)
+    definition
+        .forms()
+        .iter()
+        .find(|form| form.form_id == form_id)
 }
 
 fn decode_hex(text: &str) -> Vec<u8> {
@@ -917,14 +920,16 @@ fn internal(invariant: &str) -> Diagnostic {
 
 /// Contract §12's fingerprint, with `provenance` excluded as §12 requires.
 pub fn fingerprint(plan: &Plan, definition: &Definition) -> String {
-    let mut document = plan.document.clone();
+    let mut document = plan.legacy_document.clone();
     if let Json::Object(entries) = &mut document {
         entries.retain(|(key, _)| key != "provenance");
     }
     let canonical = fmp_model::canonical::canonical_bytes(&document);
     let identity = format!(
         "{}/{}\0{}",
-        definition.namespace, definition.version, definition.digest
+        definition.namespace(),
+        definition.version(),
+        definition.digest()
     );
     fmp_model::canonical::sha256_prefixed(&[
         codes::FORMAT_VERSION.as_bytes(),
@@ -1042,7 +1047,7 @@ mod tests {
         let plan = fmp_model::plan::read(plan_source().as_bytes()).unwrap();
         let definition = fmp_model::definition::read(&definition_bytes()).unwrap();
         let first = fingerprint(&plan, &definition);
-        let mut document = plan.document.clone();
+        let mut document = plan.legacy_document.clone();
         if let Json::Object(entries) = &mut document {
             entries.push((
                 "provenance".to_string(),
@@ -1116,7 +1121,7 @@ mod tests {
     #[test]
     fn level_one_without_symbol_table_omits_symbols() {
         let plan = level_one_plan();
-        let mut document = plan.document.clone();
+        let mut document = plan.legacy_document.clone();
         if let Json::Object(entries) = &mut document {
             for (key, value) in entries {
                 if key == "output_contract" {

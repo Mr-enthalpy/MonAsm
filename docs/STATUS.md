@@ -544,8 +544,8 @@ raw-file digest and canonical digest, so a whitespace-only edit followed by
 because it contains `materializer_version`.
 One probe found a real gap rather than a clean result: a 20 000-deep JSON plan
 ends the `fmp` process with `0xC00000FD` (stack overflow), which H4 owes a
-bounded rejection test. Next: H1, identity closure
-(`ADR-0127`). The implementation plan draft is
+bounded rejection test. Next: H1b, the binding half of identity closure
+(`ADR-0127`); H1a has landed (below). The accepted implementation plan is
 `docs/architecture/he1-h1-plan.md`; its sixteen decisions (D1–D16) are recorded,
 with D3/D4/D5/D7 revised after the first review, D11/D12 added after the second
 (identity layering, and keeping `Plan.document` as a legacy-only input), D4
@@ -628,6 +628,32 @@ took the bare-name branch). Two
 limits
 stay open for H1 acceptance rather than being claimed as passed: `FMP_BUILD_ID`
 is `None`, and debug/release payload equality is unmeasured.
+
+**H1a is landed** (2026-11-13, branch `he1/h1a-identity-core`, `ADR-0127`):
+`Definition` is a closed loaded object (private fields, no `document`, no
+`Clone`), `Registry` stores `Vec<Arc<Definition>>` and `find` returns
+`Arc<Definition>`, and the new `fmp_model::identity::ParsedPlanIdentity` defines
+`plan-identity/0.1` over every parsed `Plan` field except `legacy_document` and
+`provenance`, with exhaustive destructuring and a per-field mutation table so a
+new field fails the build until the identity covers it. `Plan.document` is
+renamed `legacy_document` and has exactly one reader, the legacy `fingerprint`.
+`plan::check_structure` re-checks the parser rules the mutable DTO cannot carry
+(`format_version`, `payload_hex`, and the five numeric bounds), and the
+validator's descriptor arithmetic and per-bit loops are hardened
+(`u128`/`u64`/`checked_*`, clipped to `form.bits()`); the `page ⇒ pcrel_page`
+precondition is now static (`E-FIXUP-001`), the register-width overflow is
+reproduced and fixed by comparing in `u128`, and `ADR-0127` carries the 15-row
+`internal(...)` precondition table plus the measured post-encode set (four
+fixtures, three codes; the two `E-SIZE-001` negatives are static). Three fixed
+identity vectors are pinned in `ADR-0127` and recomputed independently by
+`tools/plan_identity.py --check`; `.github/workflows/gates.yml` now fails if
+`cargo tree -p fmp-validate --edges normal` reaches `fmp-materialize`. Neither
+frozen root moved: `payload_root` and `definitions_root` are unchanged, and
+`definitions/`, `fixtures/`, `docs/fmp-v0/` and the 128 payloads are untouched.
+H1a evidence and test names are in `research/he1/H1-report.md`. H1b
+(`ValidatedPlan`, `bind`, the new `materialize`, `ExecutionReceipt`,
+`MaterializationFailure` and the CLI failure split) is next and **not started**;
+the current `materialize` is still the two-argument H0 entry point.
 The phase board above
 stays the v0 record; HE-1 phases
 are reported in `research/he1/`.

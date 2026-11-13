@@ -15,11 +15,18 @@ use crate::codes;
 use crate::diagnostic::Diagnostic;
 use crate::json;
 
-/// A bound plan plus the document it was read from, so the fingerprint can hash
-/// the canonical form of exactly what the planner wrote.
+/// A bound plan plus the raw document it was read from.
+///
+/// `legacy_document` exists for exactly one reader: the legacy
+/// `fmp_materialize::fingerprint()`, which hashes the canonical form of what the
+/// planner wrote so its output stays byte-for-byte unchanged (`ADR-0123`,
+/// `ADR-0127`). It is **not** a source of execution facts: `bind`,
+/// `ParsedPlanIdentity`, and every encoding/layout/fixup decision must read the
+/// parsed fields instead. Deleting it would move the 128 recorded payloads,
+/// because the legacy fingerprint hashes fields the parser drops.
 #[derive(Clone, Debug)]
 pub struct Plan {
-    pub document: json::Json,
+    pub legacy_document: json::Json,
     pub format_version: String,
     pub target: TargetIdentity,
     pub definition: DefinitionIdentity,
@@ -330,7 +337,7 @@ pub fn bind(document: &json::Json) -> Result<Plan, Diagnostic> {
     };
 
     Ok(Plan {
-        document: document.clone(),
+        legacy_document: document.clone(),
         format_version,
         target,
         definition,
@@ -341,6 +348,120 @@ pub fn bind(document: &json::Json) -> Result<Plan, Diagnostic> {
         fixups,
         provenance,
     })
+}
+
+/// Re-check the parser rules the typed DTO cannot express.
+///
+/// `Plan` is a public, mutable DTO by design (`ADR-0127`, D13): the planner API
+/// and the negative tests build illegal states by editing fields after
+/// `plan::read`. Those edits bypass the checks the reader applied but the types
+/// do not carry, so `bind` calls this function before it compares identities or
+/// runs any semantic check, and before any shift or sum that assumes the
+/// parser's domains.
+///
+/// Scope is deliberately narrow — only the rules the type system cannot hold:
+///
+/// 1. `format_version` is `fmp/0.1` (a `String`, so any string is constructible).
+/// 2. Every `FragmentBody::Data` payload is even-length lowercase hex.
+/// 3. The five numeric domains the parser narrows with `bounded_u32`:
+///    `FieldRange.lsb` 0..=127, `FieldRange.width` 1..=64,
+///    `RangeConstraint.bits` 1..=64, `RangeConstraint.align_bits` 0..=12 and
+///    `Fixup.transform_shift` 0..=63.
+///
+/// It does not repeat what the DTO already guarantees (types, closed field sets,
+/// enum strings) and it does not duplicate semantic checks: descriptor width
+/// versus `range_constraint.bits`, payload length versus `fragment.size`, or
+/// overlap/ownership belong to `fmp_validate`. It never reads
+/// `legacy_document`, so a plan edited only in its raw document is not
+/// "rejected" here for a fact this function does not own.
+pub fn check_structure(plan: &Plan) -> Vec<Diagnostic> {
+    let mut errors = Vec::new();
+
+    if plan.format_version != codes::FORMAT_VERSION {
+        errors.push(
+            Diagnostic::new(codes::E_PLAN_001, "/format_version")
+                .with("found", plan.format_version.as_str())
+                .with("supported", codes::FORMAT_VERSION),
+        );
+    }
+
+    for section in &plan.sections {
+        for fragment in &section.fragments {
+            if let FragmentBody::Data(text) = &fragment.body {
+                let well_formed = text.len() % 2 == 0
+                    && text
+                        .bytes()
+                        .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase());
+                if !well_formed {
+                    // Same code, Pointer, and detail keys as `plan::read`.
+                    errors.push(
+                        Diagnostic::new(
+                            codes::E_PLAN_002,
+                            bind::pointer(&fragment.path, "payload_hex"),
+                        )
+                        .with("path_type", "lowercase hex bytes")
+                        .with("found_kind", text.as_str()),
+                    );
+                }
+            }
+        }
+    }
+
+    for fixup in &plan.fixups {
+        for (index, field) in fixup.field_descriptor.iter().enumerate() {
+            let field_path =
+                bind::pointer_index(&bind::pointer(&fixup.path, "field_descriptor"), index);
+            if field.lsb > 127 {
+                errors.push(integer_out_of_domain(
+                    bind::pointer(&field_path, "lsb"),
+                    "u7",
+                    field.lsb,
+                ));
+            }
+            if !(1..=64).contains(&field.width) {
+                errors.push(integer_out_of_domain(
+                    bind::pointer(&field_path, "width"),
+                    "u7",
+                    field.width,
+                ));
+            }
+        }
+        if !(1..=64).contains(&fixup.range_constraint.bits) {
+            errors.push(integer_out_of_domain(
+                bind::pointer(&bind::pointer(&fixup.path, "range_constraint"), "bits"),
+                "u7",
+                fixup.range_constraint.bits,
+            ));
+        }
+        if fixup.range_constraint.align_bits > 12 {
+            errors.push(integer_out_of_domain(
+                bind::pointer(
+                    &bind::pointer(&fixup.path, "range_constraint"),
+                    "align_bits",
+                ),
+                "u4",
+                fixup.range_constraint.align_bits,
+            ));
+        }
+        if let Some(shift) = fixup.transform_shift {
+            if shift > 63 {
+                errors.push(integer_out_of_domain(
+                    bind::pointer(&fixup.path, "transform_shift"),
+                    "u6",
+                    shift,
+                ));
+            }
+        }
+    }
+
+    errors
+}
+
+/// The parser's `E-PLAN-002` shape for a `u7`/`u6`/`u4` domain miss.
+fn integer_out_of_domain(path: String, domain: &'static str, value: u32) -> Diagnostic {
+    Diagnostic::new(codes::E_PLAN_002, path)
+        .with("path_type", domain)
+        .with("found_kind", format!("integer {value}"))
 }
 
 const TARGET_FIELDS: &[&str] = &[
