@@ -1,6 +1,6 @@
 # H2 实施计划：目标包作者层与确定性定义构建
 
-- 状态：**待审提案**（2026-11-14；同日按审计 P1/P2 修订）。规范决策见
+- 状态：**待审提案**（2026-11-14；同日按两轮审计 P1/P2 修订）。规范决策见
   `docs/adr/0128-package-and-bundle-contract.md`，该 ADR 仍为 `proposed`；
   评审合并前本文和 ADR 都不是冻结依据。本文保留为实施计划与验收映射。
   **H2 尚未实现，本文不把任何 H2/H3/H4/H5 项目算作已完成。**
@@ -136,7 +136,7 @@ fmp-cli ---------> 上述运行组件
 - 不新增第六个产品 crate；测试 harness 先用 `fmp-definition` 的 test target，
   只有它长到需要独立发布时才拆 crate。
 
-### 2.4 独立身份与包级用例（审计 P1-1/P1-2）
+### 2.4 独立身份与包级用例（第一轮 P1-1；第二轮 P1-1/P1-2）
 
 `verify --package` 不读 spec，因此不能借用 bundle 的 `namespace`/`version`。
 实现必须调用同一个固定函数 `monasm-standalone/0.1`：
@@ -160,13 +160,26 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
 
 - 含 forms 的包必须有 `tests/cases.json`（`monasm-cases/0.1`），位置固定为包根；
   没有中央用例清单、没有按 ISA 的注册表。
-- 每个导出 form 至少一个 `positive` 和一个 `negative` 用例。
+- 每个 case 带 `form_id`、`instruction_id`、`kind` 和**完整 `fmp/0.1` 计划文档**
+  （不是抽象的 plan facts，也不是另一套 DTO）。计划里 `definition_identity`
+  必须恰好是 `$standalone` 哨兵三字段，harness 在执行前替换成 §2.4 的独立
+  身份，再调用 `fmp_model::plan::read`。
+- 计划只能有一条 instruction；其 `instruction_id`/`form_id` 必须分别等于 case
+  的 `instruction_id`/`form_id`，且 `form_id` 必须由包导出。否则
+  `case-form-mismatch`。这阻止「case 声明 B，计划却执行 A」。
+- 每个导出 form 至少一个 `positive` 和一个 `negative`。负例声明 `stage`、
+  确切的 `fmp/0.1` 错误码和 `path`；观察到的诊断必须与三者完全一致，且 `path`
+  必须是 `/instructions/0` 或以 `/instructions/0/` 开头，否则 `case-error-scope`，
+  不能靠无关的根级错误充数。
 - 每个用例带 `evidence`（`oracle` 或 `manual-derivation`），其 `path`/`sha256`
-  必须与 `evidence/manifest.json` 一致；证据进入 `evidence_digest`。
-- `verify --package` 校验用例 schema、覆盖、排序和证据引用；它不执行
-  `bind`/`materialize`（产品依赖仍只有 `fmp-model`）。
-- `package_conformance` 测试执行所有用例：`fmp-plan` → `bind` →
-  `materialize`，比较机器输出投影；负例断言确切的 `fmp/0.1` 错误码。
+  必须与 `evidence/manifest.json` 一致；可发布包的证据清单还必须列出
+  `tests/cases.json` 本身，因此改用例会改变 `evidence_digest` 和
+  `release_digest`，但不改 `source_package_digest`/`definition_digest`。
+- `verify --package` 校验用例 schema、覆盖、排序、单指令绑定、证据引用和哈希；
+  它不执行 `bind`/`materialize`（产品依赖仍只有 `fmp-model`）。
+- `package_conformance` 测试执行所有用例：替换独立身份 → `plan::read` →
+  `bind` → `materialize`，比较机器输出投影；负例断言确切的 `fmp/0.1` 错误码
+  和错误 path。
 - harness 在测试期枚举 `packages/*/*/package.json`。这是测试发现，不是构建器
   选择；它不能改变任何 bundle 摘要，因此不重新打开 `HE-AC-05`。
 
@@ -242,12 +255,6 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   等于声明的 `id`；交换两个文件不会静默改变归属。
 - `exports.forms` 必须按 `id` 严格升序，重复 `id` 拒绝；这样清单只有一种写法，
   重排不是「另一个合法清单」。
-- `exports.types` / `exports.profiles`：可选的 `{id, path}` 列表，文件和
-  `exports.forms` 一样按 `id` 严格排序，每个文件只放一个 type/profile 对象，
-  其 `type_id`/`profile_id` 必须等于声明的 `id`。它们已进入封闭键集和源摘要，
-  但 H2 不执行也不输出这些资产，非空列表以 `unsupported-asset` 拒绝。缺省与
-  空列表都表示零资产，但它们是不同的清单、得到不同的源摘要；lock 钉住实际
-  发布的那一种写法。
 - `dependencies` 的每项是 `{package_id, version, source_package_digest}`，三项
   都必须精确匹配；数组按 `(package_id, version)` 严格升序。没有 `latest`、没有
   semver 范围、没有隐式升级。
@@ -263,23 +270,34 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   "oracle":{"status","command","skips":[{"case_id","reason"}]},
   "files":[{"path","sha256"}]}`；封闭对象，`sources`/`files` 按 `path` 排序，
   `skips` 按 `case_id` 排序。`sources[].path` 必须也出现在 `files` 中。
-  它只覆盖 README/NOTICE/来源记录/oracle 记录/用例证据；不进入源摘要或定义摘要，
-  只进入 lock 的 `evidence_digest` 和 `release_digest`；列出的文件必须存在、
+  它只覆盖 README/NOTICE/来源记录/oracle 记录/用例证据/`tests/cases.json`；不进入源摘要或
+  定义摘要，只进入 lock 的 `evidence_digest` 和 `release_digest`；列出的文件必须存在、
   位于包内且哈希匹配，否则 `evidence-mismatch`（退出码 1）。
-- 可发布包（被任一已提交 spec 选中，或以 `--release` 校验）还要求：`NOTICE`
-  被 `files` 列出；至少一条 `sources` 记录编码事实的来源（迁移包可指向
-  `legacy_source`，新包必须指向 `evidence/` 下的手册摘录、厂商文档、反汇编或
-  独立汇编器记录）；`oracle.status` 和每个 skip 的理由齐全；每个用例的证据文件
-  都被 `files` 列出。缺项为 `evidence-incomplete`（退出码 1）。
+- 可发布包（被任一已提交 spec 选中，或以 `--release` 校验）还要求：`files`
+  列出 `tests/cases.json`、`NOTICE`、每个用例的证据文件；至少一条 `sources`
+  记录编码事实的来源。`sources[].path` 仍必须是包内已提交的记录（例如
+  `evidence/legacy-source.md` 或手册摘录）；迁移包把 `legacy_source` 写进
+  `note`，新包指向 `evidence/` 下的手册摘录、厂商文档、反汇编或独立汇编器
+  记录；`oracle.status` 和每个 skip 的理由齐全。缺项为 `evidence-incomplete`
+  （退出码 1）。因为
+  `tests/cases.json` 本身被哈希，改用例会改变 `evidence_digest` 和
+  `release_digest`，但不会改变 `source_package_digest` 或 `definition_digest`；
+  改了用例却不更新清单是 `evidence-mismatch`。
 - 含 forms 的包必须有包根 `tests/cases.json`（`monasm-cases/0.1`，封闭对象，
-  `cases` 按 `case_id` 排序）。每个导出 form 至少一个 `positive` 和一个
-  `negative`；正例记录机器输出投影（`format_version`、`level`、
-  `bytes_hex`/`sections`、`symbols`、`fixups`），负例记录 `stage`
-  （`bind`/`materialize`）和确切的 `fmp/0.1` 错误码，禁止通配。每个用例带
-  `evidence`（`kind`、`path`、`sha256`），且该路径必须在
-  `evidence/manifest.json` 中列出。没有文件是 `missing-cases`，有 form 未覆盖
-  是 `uncovered-form`，证据对不上是 `case-evidence-mismatch`（均退出码 1）。
-  这个文件是唯一发现点，不引入中央测试列表。
+  `cases` 按 `case_id` 排序）。每个 case 带 `form_id`、`instruction_id`、
+  `kind` 和完整 `fmp/0.1` 计划文档；计划的 `definition_identity` 是
+  `$standalone` 三字段哨兵，由 harness 在执行前替换成 §2.4 的独立身份。
+  计划只能有一条 instruction，其 `instruction_id`/`form_id` 必须等于 case 的
+  对应字段，否则 `case-form-mismatch`。每个导出 form 至少一个 `positive` 和
+  一个 `negative`；正例记录机器输出投影（`format_version`、`level`、
+  `bytes_hex`/`sections`、`symbols`、`fixups`，`expect` 是这些键的封闭对象，
+  不比 `fingerprint`/`materializer_version`/`size`），负例记录 `stage`
+  （`bind`/`materialize`）、确切 `fmp/0.1` 错误码和 `path`。负例 `path` 必须
+  是 `/instructions/0` 或以 `/instructions/0/` 开头，且观察到的 `stage`/code/path
+  必须完全匹配，否则 `case-error-scope`；禁止通配或根级无关错误。每个用例的 `evidence`（`kind`、`path`、`sha256`）
+  必须与 `evidence/manifest.json` 一致。没有文件是 `missing-cases`，有 form
+  未覆盖是 `uncovered-form`，证据对不上是 `case-evidence-mismatch`（均退出码
+  1）。这个文件是唯一发现点，不引入中央测试列表。
 - `verify --package` 使用 §2.4 的独立身份；包级 conformance 用同一身份执行
   用例。`verify --package` 只校验用例契约，不执行 `bind`/`materialize`；
   执行在 `fmp-definition/tests/` 的 `package_conformance` 中完成。
@@ -351,7 +369,7 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   `requires_extensions`，而 0.1 的 reader 会因未知键拒绝 0.2 行；反之 0.1 行
   放进 0.2 文档会缺必需键。构建器必须让 spec、包自述和行三者互相一致；混合
   格式的闭包直接拒绝，不做隐式转换，显式版本化转换属于 H3。
-- **`enabled_extensions` 是需求，不是完整配置（审计 P1-3）。** 包的列表表示
+- **`enabled_extensions` 是需求，不是完整配置（第一轮 P1-3）。** 包的列表表示
   「这个包的 rows 至少需要哪些扩展」，spec 的列表表示「这个 bundle 选中了哪些
   扩展」。一般规则是包需求 ⊆ bundle 选择；其他目标字段仍相等。这样新增一个
   `rv64c` 包时，`rv64i` 算术包的清单不需要改，源摘要不变，不会把无关包重新
@@ -363,13 +381,14 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   `h2-exact-target`；该规则必须在 H5 并行扩展演练之前生效，否则先修订 ADR，
   不得直接开始 H5。H2 不声称这个等号是最终组合规则。
 - `target.profile_id` 必须与每个包的 `target_profile` 一致，否则构建失败。
-- **form 家族一致性（审计 P1-4）。** 每个导出 form 的 `form_id` 前缀（`:` 前）
-  必须通过 `monasm-package/0.1` 固定的对应表等于包声明的
-  `target_identity.isa_family`：`x86→x86`、`aarch64→aarch64`、
-  `riscv→riscv`。不一致是 `form-family-mismatch`（退出码 1），在调用
-  `read` 之前拒绝。`fmp_model` 的 `check_form_id` 只检查家族属于已知集合，
-  不检查它和 target 的关系；这条规则属于包结构完整性，不是编码知识。未来
-  别名或复杂目标关系由新格式版本声明，不在 H2 增加按目标的 Rust 分支。
+- **form 家族一致性（第二轮 P1-3）。** 每个导出 form 的 `form_id` 前缀（`:` 前）
+  必须等于包声明的 `target_identity.isa_family`。这是一条字符串相等不变量，
+  不是包格式里的 ISA 白名单：H2 的 `fmp_model::definition::read` 仍只认识
+  `x86`/`aarch64`/`riscv`，那是定义读取器已有的检查；H3 增加第四种家族时，
+  只要 `family(form_id) == isa_family`，包格式和构建器都不需要改。真正的别名
+  （两个字符串不同）由版本化 target profile 声明。不一致是
+  `form-family-mismatch`（退出码 1），在调用 `read` 之前拒绝。未来
+  不能通过往构建器里追加 ISA 名单解决。
 - H2 不引入 `target profile` 的中央 Rust 表。目标事实由包清单和 spec 数据共同
   提供，这正是 H3「新目标不改公共白名单」的前置条件。
 - 没有 `legacy_source` 的新包不需要先写进任何 spec：`verify --package` 用包
@@ -436,7 +455,7 @@ profile_id -> package_id + version + source_package_digest     # 已定义键与
 | 摘要 | 输入 | 不包含 | 反例（缺它会怎样） |
 |---|---|---|---|
 | `source_package_digest` | canonical manifest（不含自身摘要）+ 每个声明资产（form/type/profile）的 canonical 摘要，按路径排序，带资产种类域分隔 | README、NOTICE、evidence manifest、测试、作者路径 | 只哈希 manifest：换掉 form 的 template 而清单不变，包摘要不动 |
-| `evidence_digest` | `monasm-evidence/0.1` 域分隔 + canonical `evidence/manifest.json`；文件不存在时省略 | 清单未列出的 README/NOTICE 文字、oracle 日志内容、作者路径 | 直接哈希 README：改一个错字就改变执行身份，规则却没变 |
+| `evidence_digest` | `monasm-evidence/0.1` 域分隔 + canonical `evidence/manifest.json`（可发布包的 `files` 必须含 `tests/cases.json` 的哈希）；文件不存在时省略 | 清单未列出的 README/NOTICE 文字、oracle 日志内容、作者路径 | 不哈希 `tests/cases.json`：改测试计划或期望后发布身份不变，同一 release 对应两套测试集 |
 | `definition_digest` | `fmp_model::definition::read` 对合并文档算出的 canonical 摘要 | builder 版本、构建时间、主机 | 只哈希包集合：两个不同 form 行得到同一 bundle 身份 |
 | `bundle_digest` | `monasm-bundle/0.1` 域分隔 + canonical bundle 元数据（`bundle_id`、`definition_format`、`namespace`、`version`、`target`、排序后的 package 身份、`definition_digest`） | bundle 自身的 `bundle_digest` 字段、builder 版本 | 把自身字段算进去：自引用，永远算不出固定点 |
 | `release_digest` | `monasm-release/0.1` 域分隔 + canonical `{bundle_id, bundle_digest, definition_digest, packages:[{package_id, version, source_package_digest, evidence_digest?}]}`，按包身份排序 | 定义行本身、builder、sealed 字节 | 同一 bundle 的两份发布证据无法区分 |
@@ -478,13 +497,16 @@ profile_id -> package_id + version + source_package_digest     # 已定义键与
 
 | 类 | 例子 | 退出码 |
 |---|---|---|
-| 确定性拒绝 | 清单形状（必需/可选键）、路径越界、依赖缺失/摘要错/环、同一 package ID 双版本、归属冲突、未知 capability、非空 reserved asset、闭包聚合上限、定义被 `read` 拒绝 | 1 |
+| 确定性拒绝 | 清单形状（必需/可选键）、路径越界、依赖缺失/摘要错/环、同一 package ID 双版本、归属冲突、未知 capability、非空 reserved asset、闭包聚合上限、证据不完整/不符、用例缺失/未覆盖、用例与计划/form 绑定、错误范围、无法映射的包路径、定义被 `read` 拒绝、资源上限 | 1 |
 | 宿主/IO/内部 | 文件读失败、锁文件不可写、内部不变量破坏 | 2 |
 | 成功 | 构建或校验通过 | 0 |
 
 `BuildError` 的变体名包括 `unsupported-capability`、`unsupported-asset`、
 `version-conflict`、`aggregate-limit`、`legacy-row-mismatch`、
-`evidence-mismatch`；它们不是 `fmp/0.1` 诊断码。
+`evidence-mismatch`、`evidence-incomplete`、`missing-cases`、`uncovered-form`、
+`case-evidence-mismatch`、`case-plan-identity`、`case-form-mismatch`、
+`case-error-scope`、`form-family-mismatch`、`reserved-identity`、
+`unmapped-package-path`；它们不是 `fmp/0.1` 诊断码。
 
 `fmp` CLI 的 0/1/2 语义不变。H2 不把包构建错误送进 `bind` 的诊断数组。
 
@@ -494,13 +516,19 @@ H2 只加构建器自己的有界输入，不声称解决深层 JSON：
 
 - 单个 manifest ≤ 1 MiB；
 - 单个 form/type/profile 文件 ≤ 1 MiB；
-- 每个包导出 forms ≤ 4096；每个包声明资产 ≤ 4096；
+- 单个 `tests/cases.json` ≤ 1 MiB；单个 `evidence/manifest.json` ≤ 1 MiB；
+  单个 spec 或 lock ≤ 1 MiB；行比较读取的钉住 legacy 定义文件 ≤ 16 MiB；
+- 每个包导出 forms ≤ 4096；每个包声明资产 ≤ 4096；每个包 cases ≤ 4096；
+  每个包证据文件 ≤ 4096；每个包证据总字节 ≤ 16 MiB；
 - 闭包内包数 ≤ 1024；闭包总包字节 ≤ 64 MiB；
-- 闭包内声明资产总数 ≤ 65 536；
+- 闭包内声明资产总数 ≤ 65 536；闭包内 cases 总数 ≤ 65 536；闭包内证据文件
+  总数 ≤ 65 536；
 - 单条路径 ≤ 1024 字节；依赖深度 ≤ 64；
 - manifest/form/type/profile/case/evidence/spec/lock 的 JSON 嵌套深度 ≤ 64。
 
-超限是确定性拒绝（退出码 1）。深度预算必须在解析**之前和解析过程中**生效：
+超限是确定性拒绝（退出码 1）。构建器先从文件元数据检查长度，再打开读取；
+因此一个未被 spec 选中的包也不能靠“没有闭包总字节”绕过 case/证据预算。
+深度预算必须在解析**之前和解析过程中**生效：
 构建器先对字节做迭代扫描（只数字符串外的 `{`/`[`），超过预算就在调用
 `fmp_model::json::parse` 之前拒绝；后者是递归下降，先解析再测深度等于没有
 防护。小于 1 MiB、但嵌套数万层的文档是必需反例，必须在不递归到栈上限的情况下
@@ -550,13 +578,14 @@ H2 每个 ISA 选一个代表性纵向切片，不迁移全部 forms：
   等价无关。aarch64 的 `0.20.0` 目标集合是 `[]`，与 `A64-P1`/`A64-P2` 一致，
   所选行也与 fixture 版本相等，所以可以钉最新。
 - 包的 `enabled_extensions` 是**该包的扩展需求**，不是 bundle 的完整目标
-  （H2-D4、审计 P1-3）。三个 H2 包的格式都是 `fmp-def/0.1`，所以本轮额外
+  （H2-D4、第一轮 P1-3）。三个 H2 包的格式都是 `fmp-def/0.1`，所以本轮额外
   要求需求与 spec 选择完全相等（`h2-exact-target`）；这是过渡检查，不是未来
   组合规则。H3 解除它之前，不得声称不同扩展集合的包可以自由组合；解除后，
   新扩展族只新增自己的包和 spec 选择，不修改既有包清单。
-- form 家族必须与包 `isa_family` 对应（`x86→x86`、`aarch64→aarch64`、
-  `riscv→riscv`，H2-D4、审计 P1-4）。表单前缀与 target 不一致的包在 `read`
-  之前以 `form-family-mismatch` 拒绝。
+- form 家族必须与包 `isa_family` 字符串相等（`family(form_id) ==
+  target_identity.isa_family`，H2-D4、第二轮 P1-3）。这不是包格式里的三 ISA
+  对应表；表单前缀与 target 不一致的包在 `read` 之前以
+  `form-family-mismatch` 拒绝。
 - 钉住的版本写在迁移包的 `legacy_source`（可选清单字段，存在时进入源摘要）；
   构建器只接受该版本的行，不提供「自动跟随最新」。新包没有 `legacy_source`
   时由包自述的 `target_identity`/`definition_format` 校验，不要求 legacy 目录
@@ -619,27 +648,46 @@ H2 每个 ISA 选一个代表性纵向切片，不迁移全部 forms：
 
 - x86 包和 rv64 包各自在临时目录构建，不读取对方的包。
 - 包根 `tests/cases.json` 是唯一用例发现点（`monasm-cases/0.1`），没有中央
-  测试列表。每个用例声明 `case_id`、`form_id`、`kind`
-  （`positive`/`negative`）、由 `fmp-plan` 构造的计划事实、期望结果和
-  `evidence`。正例记录机器输出投影；负例记录 `stage` 和确切 `fmp/0.1` 错误码。
+  测试列表。每个用例声明 `case_id`、`form_id`、`instruction_id`、`kind`
+  （`positive`/`negative`）、完整 `fmp/0.1` 计划文档、期望结果和 `evidence`。
+  计划的 `definition_identity` 是 `$standalone` 哨兵；harness 执行前替换成
+  §2.4 的独立身份，再走 `plan::read`。计划只能有一条 instruction，且其
+  `instruction_id`/`form_id` 必须与 case 一致（`case-form-mismatch`），否则
+  “覆盖 B 却执行 A”会被当成通过。正例记录机器输出投影；负例记录 `stage`、
+  确切 `fmp/0.1` 错误码和 `/instructions/0` 范围内的 `path`，三者必须完全匹配
+  （`case-error-scope`）。
 - 每个导出 form 至少一个正例和一个非法邻域（立即数越界、错误寄存器宽度、
   错误 target type 等，由 `bind` 或 `materialize` 拒绝）。没有用例文件是
   `missing-cases`，有 form 未覆盖是 `uncovered-form`。
 - 每个用例的 `evidence` 必须是 `oracle` 或 `manual-derivation`，其
   `path`/`sha256` 必须与 `evidence/manifest.json` 一致；可发布包还要求
-  `NOTICE`、至少一条 `sources`、完整的 `oracle.status` 和 skip 理由
-  （H2-D2、`--release`）。
+  `files` 列出 `tests/cases.json` 本身、`NOTICE`、至少一条 `sources`、完整的
+  `oracle.status` 和 skip 理由（H2-D2、`--release`）。
+- 修改 `tests/cases.json` 但不更新 evidence manifest：`evidence-mismatch`；
+  更新 manifest 后：`evidence_digest`/`release_digest` 改变，
+  `source_package_digest`/`definition_digest` 不变。这是第二轮 P1-1 的验收测试。
 - 复制一个未发布包到不同目录、改变工作目录，在没有 spec 的情况下运行
   `verify --package`：独立身份（`monasm-standalone/0.1`）、诊断和独立
-  `definition_digest` 必须相同。这是 P1-1 的验收测试。
+  `definition_digest` 必须相同。这是第一轮 P1-1 的验收测试。
 - 构造一个未进入任何 spec 的包，把合法 form 的 opcode 改错但保持 JSON 结构
   合法：`fmp_model::definition::read` 仍通过；`verify --package` 必须通过用例
   覆盖/证据检查暴露它，普通 PR 的 `package_conformance` 必须让正例的字节比较
-  失败。这是 P1-2 的验收测试，也是「read 不是机器码权威」的证明。
+  失败。这是第一轮 P1-2 的验收测试，也是「read 不是机器码权威」的证明。
 - 包级 harness 只按清单/用例数据分派，不按 ISA 名称写执行分支；`HE-T14` 的
   「同一 harness」在 H2 只证明 harness 没有 ISA 分支，不证明三个真实工作流。
 - 构建器不执行 oracle；它验证证据的存在、可追溯和哈希。报告必须说明这一点，
   不能把「记录在案」写成「本机重算」。
+
+H2 报告必须把四种状态分开写，不能合并成「已验证」：
+
+| 状态 | 含义 | 不表示 |
+|---|---|---|
+| 定义结构已验证 | `definition::read` 通过 | opcode/操作数范围正确 |
+| 包级机器码测试通过 | `package_conformance` 与声明期望一致 | 独立 oracle 已运行 |
+| 证据文件可追溯 | 文件存在且摘要一致 | 记录的 oracle 结果真实 |
+| 独立 oracle 已复验 | 本机实际重跑外部工具并核对 | H2 对新包做到这一项 |
+
+前三项不推出第四项。H2 只做前三项加声明的用例执行；报告不得写成「本机重算」。
 
 H2 不提交第二个 x86 真实包；`HE-T16` 的 A+B/B+A 顺序性质用临时测试包证明，
 真实 A/B 工作流留给 H5。
@@ -667,17 +715,22 @@ H2 不提交第二个 x86 真实包；`HE-T16` 的 A+B/B+A 顺序性质用临时
 | `a_package_without_legacy_source_is_verified_from_its_own_target` | 合成包无 `legacy_source` → 按自述目标、`read` 和用例通过，不需要 spec | `H2-D2`、`H2-D4`、§4.1 |
 | `a_file_form_id_must_match_its_export` | 交换两个 form 文件 → 归属不匹配，拒绝 | `H2-D2` |
 | `the_target_profile_must_match_the_spec` | 包的 `target_profile` 与 spec 不一致 → 拒绝 | `H2-D4` |
-| `the_standalone_identity_is_derived_from_the_package` | 复制包到不同目录、换 cwd、无 spec → 同一 `monasm.standalone.*`/`standalone+*` 和同一独立 `definition_digest` | `H2-D5`、§2.4、P1-1 |
+| `the_standalone_identity_is_derived_from_the_package` | 复制包到不同目录、换 cwd、无 spec → 同一 `monasm.standalone.*`/`standalone+*` 和同一独立 `definition_digest` | `H2-D5`、§2.4、第一轮 P1-1 |
 | `a_standalone_identity_cannot_be_written_into_a_spec` | spec 的 `namespace`/`version` 使用保留前缀 → `reserved-identity`，退出 1 | `H2-D5`、§2.4 |
-| `a_form_family_must_match_the_package_target` | `isa_family: aarch64` 的包导出 `x86:*` → `form-family-mismatch`，在 `read` 之前拒绝 | `H2-D4`、P1-4 |
-| `a_package_requirement_is_a_subset_of_the_bundle_target` | `fmp-def/0.2` 合成包需求 `["rv64i"]`、spec 选择 `["rv64i","rv64c"]` → 接受；缺少 `rv64i` → 拒绝 | `H2-D4`、P1-3 |
-| `fmp_def_0_1_keeps_the_transitional_exact_target` | `fmp-def/0.1` 包需求与 spec 选择不等（即使是子集）→ `h2-exact-target`，退出 1 | `H2-D4`、P1-3 |
-| `the_case_file_is_required_and_covers_every_form` | 无 `tests/cases.json` → `missing-cases`；form 无正例或负例 → `uncovered-form` | `H2-D2`、§4.3、P1-2 |
-| `a_case_evidence_must_be_listed_and_hashed` | 用例证据未列入 evidence manifest 或哈希不符 → `case-evidence-mismatch`，退出 1 | `H2-D2`、P1-2 |
-| `the_release_mode_requires_complete_evidence` | 缺 `NOTICE`/`sources`/`oracle.status`/skip 理由 → `evidence-incomplete`，退出 1 | `H2-D2`、`ADR-0128` §7.1、P2 |
-| `a_deep_json_document_is_refused_before_recursion` | ≤1 MiB、数万层嵌套 → 深度扫描在 `json::parse` 前拒绝，不栈溢出 | `H2-D11`、P2 |
-| `the_legacy_source_path_components_are_strict` | `legacy_source.isa`/`version` 含 `../`、`/`、盘符或 scheme → 路径形成前拒绝 | `H2-D3`、P2 |
-| `a_deleted_package_path_is_not_skipped` | 删除 `package.json`/包目录/重命名 → 由 base 树解析；无法映射是 `unmapped-package-path`，不静默跳过 | `H2-D5`、§5.3、P2 |
+| `a_form_family_must_match_the_package_target` | `isa_family: aarch64` 的包导出 `x86:*` → `form-family-mismatch`，在 `read` 之前拒绝 | `H2-D4`、第二轮 P1-3 |
+| `the_family_rule_is_equality_not_a_package_whitelist` | 合成包声明 `isa_family: loongarch` 并导出 `loongarch:*` → 通过包层家族检查，随后只被现有 `definition::read` 的家族集合拒绝；错误来自 reader，不是包格式白名单 | `H2-D4`、第二轮 P1-3 |
+| `a_package_requirement_is_a_subset_of_the_bundle_target` | `fmp-def/0.2` 合成包需求 `["rv64i"]`、spec 选择 `["rv64i","rv64c"]` → 接受；缺少 `rv64i` → 拒绝 | `H2-D4`、第一轮 P1-3 |
+| `fmp_def_0_1_keeps_the_transitional_exact_target` | `fmp-def/0.1` 包需求与 spec 选择不等（即使是子集）→ `h2-exact-target`，退出 1 | `H2-D4`、第一轮 P1-3 |
+| `the_case_file_is_required_and_covers_every_form` | 无 `tests/cases.json` → `missing-cases`；form 无正例或负例 → `uncovered-form` | `H2-D2`、§4.3、第二轮 P1-2 |
+| `a_case_must_bind_its_declared_form_to_the_plan` | case 声明 form B，计划只含 form A、空计划或多于一条 instruction、`instruction_id` 不一致 → `case-form-mismatch`，不进入执行 | `H2-D2`、`ADR-0128` §9.1、第二轮 P1-2 |
+| `a_case_negative_must_target_the_declared_instruction` | 负例 `path` 是根级或 `/sections/...`（例如错误 `format_version`）→ `case-error-scope`，不计为该 form 的覆盖 | `H2-D2`、`ADR-0128` §9.1、第二轮 P1-2 |
+| `a_case_evidence_must_be_listed_and_hashed` | 用例证据未列入 evidence manifest 或哈希不符 → `case-evidence-mismatch`，退出 1 | `H2-D2`、第二轮 P1-2 |
+| `the_case_file_is_part_of_the_release_digest` | 改 `tests/cases.json` 不更新清单 → `evidence-mismatch`；更新清单 → `evidence_digest`/`release_digest` 变，`definition_digest` 不变 | `H2-D8`、§7.1、第二轮 P1-1 |
+| `the_release_mode_requires_complete_evidence` | 缺 `tests/cases.json` 条目、`NOTICE`、`sources`、`oracle.status` 或 skip 理由 → `evidence-incomplete`，退出 1 | `H2-D2`、`ADR-0128` §7.1、第二轮 P2-1 |
+| `a_deep_json_document_is_refused_before_recursion` | ≤1 MiB、数万层嵌套 → 深度扫描在 `json::parse` 前拒绝，不栈溢出 | `H2-D11`、第一轮 P2 |
+| `case_and_evidence_inputs_have_their_own_budget` | `tests/cases.json`/证据清单/spec/lock 超过 1 MiB、cases/证据文件超过 4096、证据总量超过 16 MiB、闭包 cases/证据总数超限、spec 未被引用也先按元数据拒绝 | `H2-D11`、第二轮 P2-2 |
+| `the_legacy_source_path_components_are_strict` | `legacy_source.isa`/`version` 含 `../`、`/`、盘符或 scheme → 路径形成前拒绝 | `H2-D3`、第一轮 P2 |
+| `a_deleted_package_path_is_not_skipped` | 删除 `package.json`/包目录/重命名 → 由 base 树解析；无法映射是 `unmapped-package-path`，不静默跳过 | `H2-D5`、§5.3、第一轮 P2 |
 | `only_executable_inputs_enter_the_source_digest` | 改 README/NOTICE → 源摘要不变；改 form 行 → 变 | `H2-D8` |
 | `evidence_changes_do_not_move_the_definition_digest` | 改 README/NOTICE 并更新 evidence manifest → `evidence_digest`/`release_digest` 变，`definition_digest` 不变 | `H2-D8` |
 | `an_evidence_entry_must_stay_inside_the_package_and_match_its_hash` | evidence manifest 列 `../` 或错误 sha256 → `evidence-mismatch`，退出 1 | `H2-D8` |
@@ -703,11 +756,14 @@ H2 不提交第二个 x86 真实包；`HE-T16` 的 A+B/B+A 顺序性质用临时
 | `packages_build_independently` | x86 与 rv64 各自构建，不读对方目录 | `HE-AC-08`（H2 部分） |
 | `a_package_without_a_spec_is_still_checked` | 新包不写进任何 `bundles/specs/*.json` → `verify --package` 仍给出确定性通过/失败 | `H2-D5`、§5.3 |
 | `a_synthetic_package_without_legacy_source_is_accepted` | 沿用现有 ISA family、form ID 不在 legacy 目录 → 清单/目标/`read` 通过，证明协议不依赖历史定义 | §4.1 |
-| `a_wrong_opcode_in_a_structurally_valid_row_fails_the_package_gate` | 改错 opcode 保持 JSON 合法 → `read` 仍通过，`package_conformance` 的正例字节比较失败 | `HE-T18`、P1-2 |
-| `the_conformance_harness_discovers_packages_without_a_central_list` | 新增包但不动任何中心文件 → harness 自动发现并执行它的 cases | `HE-T14`、P1-2 |
-| `a_copied_package_yields_the_same_standalone_check` | 在不同目录/不同 cwd 对副本跑 `verify --package` → 同一身份、同一诊断、同一独立摘要 | P1-1 |
-| `a_cross_isa_form_is_rejected_before_read` | 包声明 aarch64、导出 x86 form → `form-family-mismatch`，不进入合并文档 | P1-4 |
-| `evidence_digest_tracks_case_evidence` | 改用例证据/证据清单 → `evidence_digest` 和 `release_digest` 变，`definition_digest` 不变 | `H2-D8`、P1-2 |
+| `a_wrong_opcode_in_a_structurally_valid_row_fails_the_package_gate` | 改错 opcode 保持 JSON 合法 → `read` 仍通过，`package_conformance` 的正例字节比较失败 | `HE-T18`、第一轮 P1-2 |
+| `the_conformance_harness_discovers_packages_without_a_central_list` | 新增包但不动任何中心文件 → harness 自动发现并执行它的 cases | `HE-T14`、第一轮 P1-2 |
+| `a_copied_package_yields_the_same_standalone_check` | 在不同目录/不同 cwd 对副本跑 `verify --package` → 同一身份、同一诊断、同一独立摘要 | 第一轮 P1-1 |
+| `a_cross_isa_form_is_rejected_before_read` | 包声明 aarch64、导出 x86 form → `form-family-mismatch`，不进入合并文档 | 第二轮 P1-3 |
+| `a_case_form_claim_is_bound_to_the_executed_plan` | 两个 form 的包里把 case 的 `form_id` 改成 B、计划仍编码 A → `package_conformance` 失败（`case-form-mismatch`），不把 B 记成已覆盖 | `HE-T18`、`ADR-0128` §9.1、第二轮 P1-2 |
+| `an_unrelated_plan_error_does_not_cover_a_form` | 负例只制造错误的 `format_version`、根级错误或不同的 `stage`/code/path → `case-error-scope` 或匹配失败，该 form 仍算未覆盖，不能靠无关错误通过 | `HE-T18`、`ADR-0128` §9.1、第二轮 P1-2 |
+| `editing_cases_json_changes_the_release_identity` | 改用例并更新证据清单 → `evidence_digest`/`release_digest` 变，`definition_digest` 与机器码不变；不更新清单则 `evidence-mismatch` | `H2-D8`、§7.1、第二轮 P1-1 |
+| `evidence_digest_tracks_case_evidence` | 改用例证据/证据清单 → `evidence_digest` 和 `release_digest` 变，`definition_digest` 不变 | `H2-D8`、第二轮 P1-1/P1-2 |
 | `the_three_isa_harness_has_no_isa_branch` | harness 只读清单/用例数据；源码审查 + 测试覆盖三种包 | `HE-T14`（H2 部分） |
 | `a_package_change_does_not_touch_legacy_roots` | `definitions/`、`fixtures/`、`payload_root` 不变 | `HE-AC-10`（H1 已证，H2 复跑） |
 
@@ -742,10 +798,14 @@ cargo run -p fmp-definition -- verify --package --release <changed-package-path>
 cargo test -p fmp-definition --test package_conformance
 ```
 
-`verify --package` 用 `monasm-standalone/0.1` 独立身份，校验清单、路径、导出、
-`read`、自述目标、用例覆盖和证据引用；它不执行 `bind`/`materialize`。
-`package_conformance` 执行每个包的 `tests/cases.json`，比较机器输出投影，
-并断言负例的确切错误码。两者一起才能让「opcode 改错但 JSON 合法」的包失败。
+`verify --package --release` 用 `monasm-standalone/0.1` 独立身份，校验清单、
+路径、导出、`read`、自述目标、用例 schema/覆盖/排序、单指令 `form_id` 绑定、
+负例错误范围、证据引用与哈希，并把 `tests/cases.json` 本身纳入证据清单；它
+不执行 `bind`/`materialize`。改了用例却不更新清单是 `evidence-mismatch`，更新
+清单则 `release_digest` 改变。`package_conformance` 执行每个包的
+`tests/cases.json`：替换独立身份 → `plan::read` → `bind` → `materialize`，
+比较机器输出投影，并断言负例的确切错误码和目标 path。两者一起才能让「opcode
+改错但 JSON 合法」或「声明 form B、实际执行 form A」的包失败。
 
 CI 从 PR diff 提取 `packages/**` 下的所有变更路径，逐个映射包根：
 
@@ -770,11 +830,13 @@ H2 是一个阶段，但按 `ADR-0125` §13.1 拆成两个可回归提交（同�
 
 | 提交 | 内容 | 必过 |
 |---|---|---|
-| H2a | `ADR-0128` 评审通过后接受 + 本文状态更新 + `fmp-definition` crate（manifest、spec、build、digest、error、CLI）+ `monasm-standalone/0.1` 独立身份 + `verify --package --release` 与变更路径门禁（含删除/重命名）+ x86 `mov-register` 包及其 `tests/cases.json`/`evidence` + 无 `legacy_source` 的合成包契约测试 + 错误 opcode 反例 + 构建器单测 + X86-P1 字节等价 + `bundles/` 的 x86 spec/lock/sealed/legacy snapshot + `gates.yml` 的 verify 两步与 conformance | fmt、workspace test（含 `package_conformance`）、`check_ids`、`check_definition`、baseline、whitespace |
-| H2b | aarch64 `add-immediate` + rv64 `integer-alu` + 三 ISA conformance harness + 包级 cases/evidence/NOTICE + `evidence/manifest.json` 的 `sources`/`oracle` 完整性 + release 摘要 + 全部 lock/sealed/legacy snapshot + `research/he1/H2-report.md` + `STATUS.md` 的 H2 记录 | 同上 + oracle |
+| H2a | `ADR-0128` 评审通过后接受 + 本文状态更新 + `fmp-definition` crate（manifest、spec、build、digest、error、CLI）+ `monasm-standalone/0.1` 独立身份 + **完整的单包发布证据与摘要机制**（`tests/cases.json` 入清单、`NOTICE`、`sources`、`oracle.status`/skip、`evidence_digest`/`release_digest`、用例/证据/spec/lock 预算）+ `verify --package --release` 与变更路径门禁（含删除/重命名）+ x86 `mov-register` 包及其 `tests/cases.json`/`evidence` + 无 `legacy_source` 的合成包契约测试 + 错误 opcode 与错误 form 声明反例 + 构建器单测 + X86-P1 字节等价 + `bundles/` 的 x86 spec/lock/sealed/legacy snapshot + `gates.yml` 的 verify 两步与 conformance | fmt、workspace test（含 `package_conformance`）、`check_ids`、`check_definition`、baseline、whitespace |
+| H2b | aarch64 `add-immediate` + rv64 `integer-alu` + 三 ISA conformance harness + 这两个包的 cases/evidence/NOTICE 资产 + 跨 ISA/跨包测试 + 全部 lock/sealed/legacy snapshot + `research/he1/H2-report.md` + `STATUS.md` 的 H2 记录 | 同上 + oracle |
 
-H2a 必须先全绿再开 H2b：先证明一个包的构建、摘要和字节等价，再证明跨 ISA
-与独立包。H2a 不引入 H2b 才需要的多包 harness；H2b 不修改 H1 的身份代码。
+H2a 必须先全绿再开 H2b：先证明一个包的构建、摘要、完整发布证据和字节等价，
+再证明跨 ISA 与独立包。H2a 的 `--release` 必须已经具备完整的来源、`NOTICE`、
+oracle 状态和用例证据校验；H2b 不回头补齐 H2a 的信任边界，只增加 AArch64/RV64
+资产和跨包测试。H2a 不引入 H2b 才需要的多包 harness；H2b 不修改 H1 的身份代码。
 
 `ADR-0128` 目前在 PR #4 中为 `proposed`；评审合并后才写 `accepted`，H2a 也从
 那里开始实现。`ADR-0130` 不在 H2 内，除非 H2b 决定增加 per-package job
@@ -792,11 +854,17 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | 路径逃逸/符号链接 | 打开前 canonicalize + 包根前缀检查；Windows reparse point 拒绝 |
 | 独立身份随目录/cwd 漂移 | 固定 `monasm-standalone/0.1` 函数；复制到不同目录/换 cwd 的摘要相等测试；保留前缀禁止写入 spec |
 | 新包没有机器码证据也能通过 | 每个导出 form 强制正例+负例；`package_conformance` 执行；错误 opcode 反例；`--release` 检查证据完整性 |
+| 用例声明 form B、计划实际执行 A | 计划恰好一条 instruction，`instruction_id`/`form_id` 必须等于 case 字段；不一致 `case-form-mismatch`；正例比较实际执行的 form |
+| 负例被无关错误满足 | 负例必须声明 `stage`、确切错误码和 `/instructions/0` 范围内的 `path`；根级错误是 `case-error-scope`，且该 form 仍算未覆盖 |
+| 改测试集不改变发布身份 | `tests/cases.json` 列入证据清单；未更新清单是 `evidence-mismatch`，更新后 `release_digest` 改变而 `definition_digest` 不变 |
 | 不同扩展集合的包无法组合 | 包 `enabled_extensions` 是需求、spec 是选择；H2 用 `h2-exact-target` 过渡，H3 解除并在 H5 前生效 |
-| form 家族与 target 张冠李戴 | 导出 form 前缀必须等于包 `isa_family`；跨 ISA 注入反例；在 `read` 之前拒绝 |
+| form 家族与 target 张冠李戴 | 规则是 `family(form_id) == isa_family` 字符串相等，不是包格式 ISA 白名单；跨 ISA 注入反例；在 `read` 之前拒绝 |
+| 新增 ISA 被迫改包格式 | 包格式不列家族；H3 的第四种 reader 家族只要自述相等就通过；构建器不追加 ISA 名单 |
+| 包输入预算只覆盖闭包 | `tests/cases.json`/证据清单/spec/lock 各有 1 MiB 上限，cases/证据文件数量和证据总量有上限；读取前按元数据检查，未选中包也受限 |
 | 删除/重命名包逃过路径门禁 | 删除在 base 树解析包根；删除 `package.json`/包目录必须同步改 spec；无法映射是 `unmapped-package-path` |
 | 深 JSON 先解析后测深度 | 迭代扫描在 `json::parse` 之前执行；≤1 MiB 数万层反例不得栈溢出 |
-| 证据完整性只是名义存在 | `--release` 要求 `NOTICE`、`sources`、`oracle.status`、skip 理由；证据清单进入 `evidence_digest` |
+| 证据完整性只是名义存在 | `--release` 要求 `tests/cases.json`、`NOTICE`、`sources`、`oracle.status`、skip 理由；证据清单进入 `evidence_digest` |
+| H2a 的发布校验不完整 | H2a 就交付单包完整证据与摘要机制；H2b 只增加 ISA 资产和跨包测试，不补信任边界 |
 | 包文件改动漏进 legacy | `definitions/` 只读；`payload_root`/`definitions_root` 复跑；PR diff 检查 |
 | lock/sealed 提交后过期 | CI `verify --all --check` 重建；sealed 全字节、lock 除 `builder` 外比较 |
 | 把 H2 做成 H3/H4 | §9 明确排除；`bind` 签名、`fmp/0.2`、profile、深层 JSON 不动 |
@@ -838,7 +906,7 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | O3 | H2 的类型叫 `VerifiedBundle` 还是 `BuiltBundle` | **`VerifiedBundle`**，但文档限定为 H2 的包/闭包/归属验证；运行期能力验证仍属 H3 | `BuiltBundle` 更保守，但与 H1 D1 的命名不一致 |
 | O4 | 包级 harness 放哪里 | **`fmp-definition/tests/` + dev-dependencies**，不新增产品 crate | 独立 `fmp-conformance` crate 边界更干净，但 H2 会增加一个 workspace 成员 |
 | O5 | 开发工具入口 | **`fmp-definition build|verify|digest` 独立 binary**，不改 `fmp` CLI | 加到 `fmp` 子命令更集中，但会扩大 CLI 兼容面 |
-| O6 | 包用例格式 | **legacy fixture 引用 + 包内 `fmp-plan` 计划事实** 两种；H2 等价用前者，新包用后者 | 只做 fixture 引用会把包绑死在 legacy 语料上 |
+| O6 | 包用例格式 | **完整 `fmp/0.1` 文档 + `$standalone` 哨兵**；计划恰好一条 instruction，其 `instruction_id`/`form_id` 必须绑定 case；负例声明 `stage`/code/`/instructions/0` 范围 `path` | 独立 DTO 更短，但会把关键映射留给实现者各自解释；抽象 plan facts 无法证明受测 form |
 | O7 | lock/sealed 是否提交 | **提交**，CI `--check` 重建；它们是发布产物，不是手写计数 | 只在测试里构建更轻，但发布 bundle 无法审计 |
 | O8 | 三个包/forms 是否按 §4 表 | **按表**；已测量：x86 与 rv64 钉 `0.1.0`（前者行漂移，后者目标集合），aarch64 钉 `0.20.0` | 选更多 form 会增加等价面，不增加平台证明力 |
 | O9 | `exports.types`/`profiles` 现在预留还是等新格式版本 | **现在预留**：键、`{id, path}` 形状、排序和摘要都定义；非空在 H2 以 `unsupported-asset` 拒绝 | 版本化延后更少代码，但会同时承诺封闭格式和无缝扩展 |
@@ -847,8 +915,8 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | O12 | `verify --package` 的 Definition namespace/version 从哪来 | **`monasm-standalone/0.1` 固定函数**：`monasm.standalone.<package_id>` / `standalone+<source digest>`；保留前缀禁止进入 spec | 从 spec 借用会碰撞；从目录推导会随 cwd 漂移 |
 | O13 | 包级机器码测试是否强制 | **强制**：每个 form 正例+负例、证据引用、`package_conformance` 执行、`--release` 检查证据完整性 | 只靠 `read` 会放过合法结构里的错误 opcode |
 | O14 | 包 target 与 bundle target 的关系 | **包声明需求、spec 声明选择**；子集校验；`fmp-def/0.1` 用 `h2-exact-target` 过渡，H3 解除 | 逐字段相等会把新增扩展族变成对既有包的强制改版 |
-| O15 | form 家族与 target 的一致性 | **包格式固定对应表** `x86→x86`、`aarch64→aarch64`、`riscv→riscv`；不一致在 `read` 前拒绝 | 只在 `read` 检查会让 target 自述失去隔离力 |
-| O16 | 证据文件是必需还是可选 | **开发包可选、可发布包必需**；`--release`/spec 选中时要求 `NOTICE`、`sources`、`oracle.status`、skip 理由和用例证据 | 永远可选会让 `release_digest` 不代表完整审核证据 |
+| O15 | form 家族与 target 的一致性 | **通用相等规则** `family(form_id) == target_identity.isa_family`；包格式不列 ISA；第四种家族由 H3 的 reader 支持，不需要改包协议 | 三 ISA 对应表实际全是字符串相等，会迫使 H3 再改一次公共格式 |
+| O16 | 证据文件是必需还是可选 | **开发包可选、可发布包必需**；`--release`/spec 选中时要求 `tests/cases.json`、`NOTICE`、`sources`、`oracle.status`、skip 理由和用例证据；`tests/cases.json` 本身被哈希 | 永远可选或只哈希用例证据会让 `release_digest` 不代表完整审核证据 |
 
 ## 10. 证据状态
 
@@ -865,9 +933,12 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | `fmp-plan` 可用于包用例 | `fmp-plan/src/lib.rs` 有 `PlanBuilder` | 高（已读签名） |
 | `check_form_id` 不比较 form 家族与 `target_identity.isa_family` | `fmp-model/src/definition.rs`：`check_form_id` 只匹配已知家族，`bind_target` 独立读取 | 高（已读） |
 | 构建器确定性、摘要分层、行相等、字节相等 | 尚未实现 | **未验证** — H2a/H2b 落地时测量 |
-| 独立身份、包级用例执行、变更路径删除/重命名、保留身份 | 尚未实现 | **未验证** — H2a |
+| 独立身份、包级用例执行、用例与 plan/form 绑定、负例错误范围、变更路径删除/重命名、保留身份 | 尚未实现 | **未验证** — H2a |
+| `tests/cases.json` 进入证据清单、`release_digest` 随用例集改变 | 尚未实现 | **未验证** — H2a |
+| 通用 `family(form_id) == isa_family` 规则（不含 ISA 白名单） | 尚未实现；`check_form_id` 只孤立检查家族 | **未验证** — H2a |
 | 未知能力/保留资产/双版本/聚合上限 | 尚未实现 | **未验证** — H2a |
-| 证据完整性、`evidence_digest` 与 release 摘要分层 | 尚未实现 | **未验证** — H2a/H2b |
+| case/证据/spec/lock 的单文件、数量与总量预算 | 尚未实现 | **未验证** — H2a |
+| 证据完整性、`evidence_digest` 与 release 摘要分层 | 尚未实现 | **未验证** — H2a（机制）；H2b 只增加资产 |
 | 解析前 JSON 深度拒绝 | 尚未实现；H0 探针只证明现有递归解析器会栈溢出 | **未验证** — H2a 加迭代预算 |
 | 深层 JSON 鲁棒性 | H0 探针已测栈溢出；H2 不改 `fmp` 解析器 | **未验证/不在 H2** — H4 |
 | 完整的 per-package CI matrix | 未实现；H2 只做单命令 | **未实现** — `ADR-0130`/H5 |
