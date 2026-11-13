@@ -378,6 +378,61 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("has no string 'payload_sha256'", stderr)
 
+    def test_boolean_counts_in_the_snapshot_are_faults(self):
+        # `True == 1`, so a bool slips through `isinstance(..., int)` and the
+        # derived-count comparison accepts it. It must be a structural fault
+        # (exit 2), not a baseline difference (exit 1).
+        cases = [
+            (("artifacts", "count"), "integer artifacts.count"),
+            (("definitions", "count"), "integer definitions.count"),
+            (("corpus", "positives"), "integer corpus.positives"),
+        ]
+        for path_keys, message in cases:
+            with self.subTest(field=".".join(path_keys)):
+                snapshot = synthetic_snapshot()
+                target = snapshot
+                for key in path_keys[:-1]:
+                    target = target[key]
+                target[path_keys[-1]] = True
+                path = self.write("bool-%s.json" % "-".join(path_keys), snapshot)
+                code, stderr = self.main("--check", path)
+                self.assertEqual(code, 2)
+                self.assertIn(message, stderr)
+
+    def test_a_boolean_entry_level_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        snapshot["artifacts"]["entries"][0]["level"] = False
+        path = self.write("bool-entry-level.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("integer 'level'", stderr)
+
+    def test_a_boolean_entry_size_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        snapshot["artifacts"]["entries"][0]["size"] = True
+        path = self.write("bool-entry-size.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("not an integer or null", stderr)
+
+    def test_a_boolean_payload_level_is_a_fault(self):
+        snapshot = synthetic_snapshot()
+        snapshot["artifacts"]["entries"][0]["payload"]["level"] = True
+        path = self.write("bool-payload-level.json", snapshot)
+        code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("payload has no integer 'level'", stderr)
+
+    def test_a_structural_fault_never_materializes(self):
+        snapshot = synthetic_snapshot()
+        snapshot["artifacts"]["count"] = True
+        path = self.write("bool-before-snapshot.json", snapshot)
+        with mock.patch.object(baseline, "snapshot") as fresh:
+            code, stderr = self.main("--check", path)
+        self.assertEqual(code, 2)
+        self.assertIn("integer artifacts.count", stderr)
+        fresh.assert_not_called()
+
     def test_a_missing_envelope_is_a_fault_even_when_it_would_be_skipped(self):
         # CI's receipt differs from the recorder's, so `--check` would skip the
         # envelope. Deleting it must still be a structural fault: otherwise the
@@ -724,6 +779,22 @@ class FreshArtifactTests(unittest.TestCase):
         with self.assertRaises(baseline.Fault) as caught:
             baseline.validate_fresh_artifact(artifact, "fixture")
         self.assertIn("integer 'level'", str(caught.exception))
+
+    def test_a_boolean_level_is_a_fault(self):
+        # `bool` is a subclass of `int`, so `isinstance(False, int)` passes.
+        # A JSON level is exactly an integer; `false` is not one.
+        artifact = synthetic_artifact()
+        artifact["level"] = False
+        with self.assertRaises(baseline.Fault) as caught:
+            baseline.validate_fresh_artifact(artifact, "fixture")
+        self.assertIn("integer 'level'", str(caught.exception))
+
+    def test_a_boolean_size_is_a_fault(self):
+        artifact = synthetic_artifact()
+        artifact["size"] = True
+        with self.assertRaises(baseline.Fault) as caught:
+            baseline.validate_fresh_artifact(artifact, "fixture")
+        self.assertIn("integer 'size'", str(caught.exception))
 
     def test_a_level_one_artifact_needs_sections_and_symbols(self):
         artifact = {

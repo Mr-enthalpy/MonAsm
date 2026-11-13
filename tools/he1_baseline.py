@@ -311,14 +311,14 @@ def validate_fresh_artifact(artifact, fixture):
     if not is_digest(artifact.get("fingerprint")):
         raise Fault("%s: the fresh artifact fingerprint is not a sha256 digest" % fixture)
     level = artifact.get("level")
-    if not isinstance(level, int):
+    if not is_json_integer(level):
         raise Fault("%s: the fresh artifact has no integer 'level'" % fixture)
     if not isinstance(artifact.get("fixups"), list):
         raise Fault("%s: the fresh artifact has no fixups array" % fixture)
     if level == 0:
         if not isinstance(artifact.get("bytes_hex"), str):
             raise Fault("%s: the fresh level-0 artifact has no string 'bytes_hex'" % fixture)
-        if not isinstance(artifact.get("size"), int):
+        if not is_json_integer(artifact.get("size")):
             raise Fault("%s: the fresh level-0 artifact has no integer 'size'" % fixture)
     elif level == 1:
         for key in ("sections", "symbols"):
@@ -724,6 +724,19 @@ def describe(value):
     return type(value).__name__
 
 
+def is_json_integer(value):
+    """A JSON integer, not a JSON boolean.
+
+    `bool` is a subclass of `int` in Python, so `isinstance(True, int)` is true
+    and `isinstance(value, int)` accepts `false`/`true` where a counter, `level`
+    or `size` is required. The snapshot and the fresh artifact are JSON
+    documents, so their integers are exactly `type(value) is int`; accepting a
+    bool would let a structurally invalid snapshot be reported as a baseline
+    difference instead of a fault (exit 2).
+    """
+    return type(value) is int
+
+
 def is_digest(value):
     """`sha256:` plus 64 lowercase hex digits, the only digest the tool writes."""
     if not isinstance(value, str) or not value.startswith("sha256:"):
@@ -807,7 +820,7 @@ def validate_snapshot(recorded):
             )
 
     definitions = recorded["definitions"]
-    if not isinstance(definitions.get("count"), int):
+    if not is_json_integer(definitions.get("count")):
         raise Fault("the recorded snapshot has no integer definitions.count")
     documents = definitions.get("documents")
     if not isinstance(documents, list):
@@ -834,7 +847,7 @@ def validate_snapshot(recorded):
                 raise Fault(
                     "definitions.documents[%d] has no string %r" % (index, key)
                 )
-        if not isinstance(document.get("forms"), int):
+        if not is_json_integer(document.get("forms")):
             raise Fault(
                 "definitions.documents[%d] has no integer 'forms'" % index
             )
@@ -863,14 +876,14 @@ def validate_snapshot(recorded):
 
     corpus = recorded["corpus"]
     for key in ("positives", "negatives"):
-        if not isinstance(corpus.get(key), int):
+        if not is_json_integer(corpus.get(key)):
             raise Fault("the recorded snapshot has no integer corpus.%s" % key)
     by_isa = corpus.get("by_isa")
     if not isinstance(by_isa, dict):
         raise Fault("the recorded snapshot's corpus.by_isa is not an object")
     for isa, counts in by_isa.items():
         if not isinstance(counts, dict) or not all(
-            isinstance(counts.get(key), int) for key in ("positive", "negative")
+            is_json_integer(counts.get(key)) for key in ("positive", "negative")
         ):
             raise Fault(
                 "the recorded snapshot's corpus.by_isa[%r] has no integer "
@@ -897,7 +910,7 @@ def validate_snapshot(recorded):
             "the recorded snapshot's oracle.manual_derivation is not an array"
         )
     for kind, count in oracle["kinds"].items():
-        if not isinstance(kind, str) or not isinstance(count, int):
+        if not isinstance(kind, str) or not is_json_integer(count):
             raise Fault(
                 "the recorded snapshot's oracle.kinds[%r] is not a string/int "
                 "pair" % (kind,)
@@ -921,7 +934,7 @@ def validate_snapshot(recorded):
         )
 
     artifacts = recorded["artifacts"]
-    if not isinstance(artifacts.get("count"), int):
+    if not is_json_integer(artifacts.get("count")):
         raise Fault("the recorded snapshot has no integer artifacts.count")
     entries = artifacts.get("entries")
     if not isinstance(entries, list):
@@ -961,22 +974,22 @@ def validate_snapshot(recorded):
                     "artifacts.entries[%d] %s is not a sha256 digest"
                     % (index, key)
                 )
-        if not isinstance(entry.get("level"), int):
+        if not is_json_integer(entry.get("level")):
             raise Fault(
                 "artifacts.entries[%d] has no integer 'level'" % index
             )
         size = entry.get("size")
-        if not (size is None or isinstance(size, int)):
+        if not (size is None or is_json_integer(size)):
             raise Fault(
                 "artifacts.entries[%d] size is %s, not an integer or null"
                 % (index, describe(size))
             )
-        if entry["level"] == 0 and not isinstance(size, int):
+        if entry["level"] == 0 and not is_json_integer(size):
             raise Fault(
                 "artifacts.entries[%d] is level 0 but has no integer size" % index
             )
         for key in ("sections", "symbols", "fixup_records"):
-            if not isinstance(entry.get(key), int):
+            if not is_json_integer(entry.get(key)):
                 raise Fault(
                     "artifacts.entries[%d] has no integer %r" % (index, key)
                 )
@@ -1020,7 +1033,7 @@ def validate_snapshot(recorded):
                 "artifacts.entries[%d] payload fingerprint is not a sha256 digest"
                 % index
             )
-        if not isinstance(payload.get("level"), int):
+        if not is_json_integer(payload.get("level")):
             raise Fault(
                 "artifacts.entries[%d] payload has no integer 'level'" % index
             )
@@ -1034,7 +1047,7 @@ def validate_snapshot(recorded):
                     "artifacts.entries[%d] level-0 payload has no string "
                     "'bytes_hex'" % index
                 )
-            if not isinstance(payload.get("size"), int):
+            if not is_json_integer(payload.get("size")):
                 raise Fault(
                     "artifacts.entries[%d] level-0 payload has no integer 'size'"
                     % index
