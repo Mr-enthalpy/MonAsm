@@ -705,10 +705,14 @@ the corpus: the release binary reproduces the same `payload_root`
 (`sha256:3f6d177d…ffefad9`) as the debug-recorded snapshot, with its own binary
 digest. The build label is wired into
 CI: `gates.yml` (`workspace`, `baseline`) and `determinism.yml` (`cross-host`)
-compile with `FMP_BUILD_ID` set to the pull request head SHA (or the pushed
-commit on `main`), so the receipt names the source revision; local builds keep
-`None`. An empty label, or a label present at run time but absent from the
-compiled identity, fails the job; both directions were measured. The run
+set `FMP_BUILD_ID` from the commit they actually checked out
+(`git rev-parse HEAD`) and assert the two agree; on a pull request that is
+GitHub's merge commit, with the PR head recorded separately in the log and job
+summary. The receipt therefore names the built tree, not a head SHA the job did
+not test; local builds keep `None`. An empty label, a label present at run time
+but absent from the compiled identity, or a label that differs from
+`git rev-parse HEAD` fails the job; the first two directions were measured, and
+the third is an exact string comparison. The run
 carrying this wiring is green on `176d396`: `gates` run `43492746429` passes the
 workspace, document and definition, baseline and oracle jobs (its log prints
 `FMP_BUILD_ID=176d396b8dc8080f5c247352b794f18c0ff8d233`), and `determinism` run

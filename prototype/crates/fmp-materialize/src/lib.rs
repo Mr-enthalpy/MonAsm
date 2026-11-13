@@ -499,6 +499,12 @@ impl Materialization {
     /// before persisting or replaying: `false` means the recorded digest was
     /// computed for different bytes. It compares the `payload/0.1` projection;
     /// it does not re-run validation or encoding.
+    ///
+    /// This is a payload-integrity check, not a provenance proof. It does not
+    /// prove that the receipt's `BindIdentity` produced these bytes, and a
+    /// caller that replaces both public fields can make it return `true` again.
+    /// Sealing the pair, or binding it to a trusted pipeline, belongs to the
+    /// stage that persists receipts.
     pub fn verify_receipt(&self) -> bool {
         self.receipt.payload.digest() == payload_digest(&self.artifact)
     }

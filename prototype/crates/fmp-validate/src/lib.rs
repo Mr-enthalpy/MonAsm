@@ -131,6 +131,11 @@ impl<'a> Model<'a> {
 }
 
 /// Run steps 2–7 and return every diagnostic, sorted by `(path, code)`.
+///
+/// This is the semantic half of admission, not the public admission check: it
+/// does not run [`fmp_model::plan::check_structure`] and does not compare the
+/// definition identity. Call [`bind`] for the full validated entry; a plan that
+/// only passed `check` is not a [`ValidatedPlan`].
 pub fn check(plan: &Plan, definition: &Definition) -> Vec<Diagnostic> {
     let model = Model::new(plan, definition);
     let mut errors = Vec::new();

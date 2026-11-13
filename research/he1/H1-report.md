@@ -334,7 +334,7 @@ acceptance result is recorded in §11.8.
 | `prototype/crates/fmp-cli/tests/fixtures.rs`, `planner_api.rs`, `determinism.rs`, `he1_identity_characterization.rs` | routed through `support`; no count changed | parity and determinism gates must exercise the new entry |
 | `prototype/crates/fmp-cli/tests/cli_failure.rs` | 3 process tests: bind rejection exits 1 with the diagnostic array; post-encode N13 assertion exits 1 with `E-BYTE-001` and empty stdout; usage exits 2 without an array | the split is a property of the real binary, not only of `exit_code`; the audit asked for the post-encode path end to end |
 | `docs/architecture/he1-h1-plan.md`, `docs/STATUS.md`, this report | status and evidence | the plan is no longer "H1b not started" |
-| `.github/workflows/gates.yml`, `.github/workflows/determinism.yml` | compile the materializer with `FMP_BUILD_ID` = the PR head SHA (or the pushed commit) | `HE-T20`/`ADR-0127` D9: the receipt must name a source revision when a hosted build makes one |
+| `.github/workflows/gates.yml`, `.github/workflows/determinism.yml` | compile the materializer with `FMP_BUILD_ID` = the checked-out commit (`git rev-parse HEAD`), assert the two agree, and record the PR head separately in the log and job summary | `HE-T20`/`ADR-0127` D9: the receipt must name the tree that was built, not a head SHA the job did not test |
 
 No file under `definitions/`, `fixtures/`, `schema/` or `docs/fmp-v0/` changed.
 `ADR-0127` also did not change: H1b implements §8 and §9 as written. The one
@@ -486,7 +486,8 @@ Proved by a test or a compile-time property:
   are edited;
 - the receipt names `fmp-materialize`, records `build: None` when
   `FMP_BUILD_ID` is absent from the build, and records the injected label when
-  it is present; CI compiles with the PR head SHA and refuses an empty label;
+  it is present; CI labels the checked-out commit, asserts the label equals
+  `git rev-parse HEAD`, and records the PR head separately;
 - the real CLI exits 1 for a `bind` rejection and for the N13 post-encode
   assertion (empty stdout, `E-BYTE-001` at `/instructions/0/expected_digest`),
   and 2 for usage, with different stderr channels.

@@ -28,7 +28,9 @@ facade 都已实现并被测试覆盖；`bind`/`materialize` 的 doctest 把「�
 编译期证据；debug/release 载荷一致性已对语料实测（同一 `payload_root
 sha256:3f6d177d…ffefad9`）；CI 以 PR head SHA 作为 `FMP_BUILD_ID` 编译，receipt
 因此记录构建来源；三主机 CI 在 `7df6f48` 上全绿（`gates` run `43496573107`、
-`determinism` run `43496573111`）。验收只覆盖 H1，H2–H4 仍未开始。
+`determinism` run `43496573111`）。合并前审计把锚点改为实际检出的提交：CI 从
+`git rev-parse HEAD` 生成 `FMP_BUILD_ID` 并断言两者相等，PR head 在日志与 job
+summary 中单独记录（见报告 §11.10）。验收只覆盖 H1，H2–H4 仍未开始。
 
 ---
 
