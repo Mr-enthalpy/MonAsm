@@ -334,6 +334,7 @@ It does **not** claim H1 acceptance: the three-host CI run, a non-empty
 | `prototype/crates/fmp-cli/tests/fixtures.rs`, `planner_api.rs`, `determinism.rs`, `he1_identity_characterization.rs` | routed through `support`; no count changed | parity and determinism gates must exercise the new entry |
 | `prototype/crates/fmp-cli/tests/cli_failure.rs` | 2 process tests: bind rejection exits 1 with the diagnostic array; usage exits 2 without one | the split is a property of the real binary, not only of `exit_code` |
 | `docs/architecture/he1-h1-plan.md`, `docs/STATUS.md`, this report | status and evidence | the plan is no longer "H1b not started" |
+| `.github/workflows/gates.yml`, `.github/workflows/determinism.yml` | compile the materializer with `FMP_BUILD_ID` = the PR head SHA (or the pushed commit) | `HE-T20`/`ADR-0127` D9: the receipt must name a source revision when a hosted build makes one |
 
 No file under `definitions/`, `fixtures/`, `schema/` or `docs/fmp-v0/` changed.
 `ADR-0127` also did not change: H1b implements §8 and §9 as written. The one
@@ -502,6 +503,15 @@ H1 acceptance, in this order:
    `determinism` run `43487662063` passes on ubuntu, macos and windows.
 2. Decide `FMP_BUILD_ID`: either set it in CI and record the receipt, or state
    in the acceptance record that `build: None` is the accepted H1 state.
+   **Decided: set in CI.** `gates.yml` (`workspace`, `baseline`) and
+   `determinism.yml` (`cross-host`) compile with
+   `FMP_BUILD_ID = ${{ github.event.pull_request.head.sha || github.sha }}`, so
+   a PR build names the reviewed commit and a push build names the pushed one;
+   a local build still records `None`. The value is compile-time, and Cargo
+   recompiles when it changes (measured with a scratch test: the receipt and
+   `option_env!` both reported the injected value, then both returned to
+   `None`). `receipt_names_the_build_that_ran` compares the two, so a CI run
+   fails if the label stops reaching the receipt.
 3. Measure debug/release payload equality instead of leaving it unmeasured.
    **Done for the corpus.** `he1_baseline.py --check` against the release build
    reports `OK: payload projection identical`, the same `payload_root` and

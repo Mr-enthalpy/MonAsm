@@ -6,6 +6,10 @@ name: determinism
 # `prototype/crates/fmp-cli/tests/determinism.rs` are compared across OSes.
 # The evidence record is `research/evidence/experiments/EXP-0033-determinism.md`
 # §6; a green run is the second-host observation, not a substitute for it.
+#
+# `HE-T20`: every host is compiled with the same `FMP_BUILD_ID` (the pull
+# request head SHA, or `github.sha` on a push), so a receipt from any host names
+# the same source revision instead of mixing two builds.
 
 on:
   push:
@@ -20,6 +24,10 @@ jobs:
   cross-host:
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    env:
+      # `HE-T20`: every host compiles the same materializer and must record the
+      # same build label, or the cross-host comparison would mix two builds.
+      FMP_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
     strategy:
       fail-fast: false
       matrix:

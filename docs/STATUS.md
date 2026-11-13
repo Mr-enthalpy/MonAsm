@@ -627,8 +627,10 @@ with a local `fmp` and a PATH shadow pins the executed program and the recorded
 digest to the same file (POSIX-only; CI passes a path with a separator and never
 took the bare-name branch). Two
 limits
-stay open for H1 acceptance rather than being claimed as passed: `FMP_BUILD_ID`
-is `None`, and debug/release payload equality is unmeasured.
+were left open for H1 acceptance rather than being claimed as passed:
+`FMP_BUILD_ID` was `None`, and debug/release payload equality was unmeasured.
+H1b settles the second (below) and wires the first into CI, where the receipt
+names the pull request head SHA.
 
 **H1a is landed** (2026-11-13, branch `he1/h1a-identity-core`, `ADR-0127`;
 review amendment 2026-11-14): `Definition` is a closed loaded object (private
@@ -693,8 +695,11 @@ definition, baseline and oracle jobs, and `determinism` run `43487662063` passes
 on ubuntu, macos and windows. Debug/release payload equality is now measured for
 the corpus: the release binary reproduces the same `payload_root`
 (`sha256:3f6d177d…ffefad9`) as the debug-recorded snapshot, with its own binary
-digest. This is still not an H1 acceptance claim: `FMP_BUILD_ID` is `None`, so a
-hosted artifact still cannot name its build.
+digest. The build label is wired into
+CI: `gates.yml` (`workspace`, `baseline`) and `determinism.yml` (`cross-host`)
+compile with `FMP_BUILD_ID` set to the pull request head SHA (or the pushed
+commit on `main`), so the receipt names the source revision; local builds keep
+`None`. H1 acceptance is recorded once the run carrying that wiring is green.
 The phase board above
 stays the v0 record; HE-1 phases
 are reported in `research/he1/`.

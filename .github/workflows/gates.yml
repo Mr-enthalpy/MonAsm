@@ -21,6 +21,12 @@ name: gates
 # legitimately differs from the recording host. Envelope
 # digests are pinned narrowly instead, in `determinism.rs`.
 #
+# `HE-T20`/`ADR-0127` D9: the receipt's `build` field is
+# `option_env!("FMP_BUILD_ID")`, so it only exists when the crate is compiled
+# with the variable. The workspace and baseline jobs compile with the pull
+# request head SHA (or `github.sha` on a push), which makes the receipt name the
+# source revision; a local build keeps `None`.
+#
 # `check_mrs.py` and `check_rv64_source.py` stay local: both read
 # `research/external/`, which is gitignored, so a hosted runner cannot have it.
 # See ADR-0124 for why that is not a hole in the gate.
@@ -96,6 +102,13 @@ jobs:
   workspace:
     name: workspace tests
     runs-on: ubuntu-24.04
+    env:
+      # `HE-T20`/`ADR-0127` D9: the receipt's `build` field is
+      # `option_env!("FMP_BUILD_ID")`, so the value has to exist when the crate
+      # is compiled. A pull request build names its head commit, not the
+      # ephemeral merge commit, so the label links back to the reviewed source.
+      # A push build has no `pull_request` payload and falls back to `github.sha`.
+      FMP_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
 
@@ -141,6 +154,10 @@ jobs:
   baseline:
     name: H0 payload baseline
     runs-on: ubuntu-24.04
+    env:
+      # Same label as the workspace job: the baseline binary is a shipped build,
+      # and its receipt should name the same source revision.
+      FMP_BUILD_ID: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
 
