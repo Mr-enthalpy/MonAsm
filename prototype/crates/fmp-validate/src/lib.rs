@@ -4,10 +4,68 @@
 //! complete set, because §13 and `04_errors.md` §4 require the whole error set
 //! before emission starts. Each function corresponds to one step so the order in
 //! the contract can be read off the call site.
+//!
+//! ## The execution credential (`ADR-0127`, H1b)
+//!
+//! [`ValidatedPlan`] is what [`bind`] produces and the only input the
+//! materializer accepts. Its fields are private, it has no public constructor and
+//! it does not implement `Clone`, so a caller can neither fabricate a validated
+//! plan nor keep a second copy that evolves independently. The negative property
+//! is written as a `compile_fail` doctest:
+//!
+//! ```compile_fail
+//! use fmp_validate::ValidatedPlan;
+//!
+//! let _plan = ValidatedPlan {
+//!     plan: unimplemented!(),
+//!     definition: unimplemented!(),
+//!     identity: unimplemented!(),
+//! };
+//! ```
+//!
+//! ```compile_fail
+//! fn require_clone<T: Clone>() {}
+//! require_clone::<fmp_validate::ValidatedPlan>();
+//! ```
+//!
+//! `BindIdentity` names the plan and the definition only. The implementation
+//! identity belongs to the materializer's receipt (`ADR-0127` D11), so reaching
+//! for it here must not compile:
+//!
+//! ```compile_fail
+//! fn implementation(identity: &fmp_validate::BindIdentity) -> &str {
+//!     identity.implementation()
+//! }
+//! ```
+//!
+//! The positive control uses the same import path through [`bind`] and read-only
+//! accessors, so a broken import cannot make the three failures above pass for
+//! the wrong reason:
+//!
+//! ```
+//! use std::sync::Arc;
+//!
+//! use fmp_model::{Definition, Diagnostic, Plan};
+//! use fmp_validate::{bind, BindIdentity, ValidatedPlan};
+//!
+//! fn run(
+//!     plan: Plan,
+//!     definition: Arc<Definition>,
+//! ) -> Result<ValidatedPlan, Vec<Diagnostic>> {
+//!     bind(plan, definition)
+//! }
+//!
+//! fn digest(identity: &BindIdentity) -> &str {
+//!     identity.definition().digest()
+//! }
+//! ```
+
+use std::sync::Arc;
 
 use fmp_model::codes;
 use fmp_model::definition::{Definition, Form, Slot, SlotFrom};
 use fmp_model::diagnostic::{self, Diagnostic};
+use fmp_model::identity::ParsedPlanIdentity;
 use fmp_model::plan::{
     Artifact, Binding, Fixup, FixupTarget, FragmentBody, Mode, Payload, PcRule, Plan, Section,
     SectionKind, Symbol, SymbolKind, Transform,
@@ -85,6 +143,181 @@ pub fn check(plan: &Plan, definition: &Definition) -> Vec<Diagnostic> {
     check_fixups(&model, &mut errors);
     diagnostic::sort(&mut errors);
     errors
+}
+
+// ---------------------------------------------------------------------------
+// The execution credential: `bind`, `ValidatedPlan`, `BindIdentity`
+// ---------------------------------------------------------------------------
+
+/// The identity of the [`Definition`] a plan was bound to.
+///
+/// This is **not** the plan's `definition_identity` DTO
+/// ([`fmp_model::plan::DefinitionIdentity`]): it holds only the three values that
+/// select a table and it is read from the bound object, never from the plan's
+/// declaration (`ADR-0127` D15). A `source_ref` or a document path belongs to the
+/// plan, not to the table that was executed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DefinitionIdentity {
+    namespace: String,
+    version: String,
+    digest: String,
+}
+
+impl DefinitionIdentity {
+    fn of(definition: &Definition) -> Self {
+        DefinitionIdentity {
+            namespace: definition.namespace().to_string(),
+            version: definition.version().to_string(),
+            digest: definition.digest().to_string(),
+        }
+    }
+
+    pub fn namespace(&self) -> &str {
+        &self.namespace
+    }
+
+    pub fn version(&self) -> &str {
+        &self.version
+    }
+
+    /// `sha256:<64 lowercase hex>`, computed by the loader from the document.
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
+}
+
+/// What a [`ValidatedPlan`] was bound to: parsed plan facts plus a definition
+/// digest.
+///
+/// It deliberately has no implementation identity and no payload digest: those
+/// become knowable only after a build executes the plan (`ADR-0127` D11). It is
+/// also **not** a full-artifact replay key; see `ExecutionReceipt` in
+/// `fmp-materialize`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BindIdentity {
+    plan: ParsedPlanIdentity,
+    definition: DefinitionIdentity,
+}
+
+impl BindIdentity {
+    pub fn plan(&self) -> &ParsedPlanIdentity {
+        &self.plan
+    }
+
+    pub fn definition(&self) -> &DefinitionIdentity {
+        &self.definition
+    }
+}
+
+/// A plan and the definition it was validated against.
+///
+/// The fields are private, there is no `&mut` accessor, no public constructor
+/// and no `Clone` implementation. [`bind`] is the only producer, so "validated"
+/// cannot be claimed by wrapping a mutable [`Plan`] (`ADR-0127` D13).
+#[derive(Debug)]
+pub struct ValidatedPlan {
+    plan: Plan,
+    definition: Arc<Definition>,
+    identity: BindIdentity,
+}
+
+impl ValidatedPlan {
+    pub fn plan(&self) -> &Plan {
+        &self.plan
+    }
+
+    pub fn definition(&self) -> &Definition {
+        &self.definition
+    }
+
+    pub fn identity(&self) -> &BindIdentity {
+        &self.identity
+    }
+}
+
+/// Bind a plan to the definition it names, or return every diagnostic.
+///
+/// The order is fixed (`ADR-0127` D13/D15) and each step only reads the plan:
+///
+/// 1. [`fmp_model::plan::check_structure`] replays the parser rules the mutable
+///    DTO cannot carry (hex payloads, five numeric domains);
+/// 2. `namespace`, `version` and `digest` are compared with the **bound**
+///    definition, because `bind`'s caller need not have gone through
+///    [`fmp_model::Registry::find`];
+/// 3. [`check`] runs steps 2–7.
+///
+/// A structure failure returns before the definition comparison and before any
+/// validator shift or sum; the same input therefore cannot reach the arithmetic
+/// that a malformed DTO would make unsafe.
+pub fn bind(plan: Plan, definition: Arc<Definition>) -> Result<ValidatedPlan, Vec<Diagnostic>> {
+    let mut errors = fmp_model::plan::check_structure(&plan);
+    if !errors.is_empty() {
+        diagnostic::sort(&mut errors);
+        return Err(errors);
+    }
+
+    check_definition_identity(&plan, &definition, &mut errors);
+    if !errors.is_empty() {
+        diagnostic::sort(&mut errors);
+        return Err(errors);
+    }
+
+    let errors = check(&plan, &definition);
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    let identity = BindIdentity {
+        plan: ParsedPlanIdentity::of(&plan),
+        definition: DefinitionIdentity::of(&definition),
+    };
+    Ok(ValidatedPlan {
+        plan,
+        definition,
+        identity,
+    })
+}
+
+/// Compare the plan's declared definition identity with the bound object.
+///
+/// `digest` keeps its historical Pointer and detail keys so the existing
+/// negative stays byte-identical; `namespace` and `version` are new rejections
+/// under the same registered code (`ADR-0127` D15).
+fn check_definition_identity(plan: &Plan, definition: &Definition, errors: &mut Vec<Diagnostic>) {
+    let declared = &plan.definition;
+    if declared.namespace != definition.namespace() {
+        errors.push(
+            Diagnostic::new(codes::E_DEF_001, "/definition_identity/namespace")
+                .with("declared", declared.namespace.as_str())
+                .with("actual", definition.namespace())
+                .with(
+                    "reason",
+                    "definition namespace does not match the bound definition",
+                ),
+        );
+    }
+    if declared.version != definition.version() {
+        errors.push(
+            Diagnostic::new(codes::E_DEF_001, "/definition_identity/version")
+                .with("declared", declared.version.as_str())
+                .with("actual", definition.version())
+                .with(
+                    "reason",
+                    "definition version does not match the bound definition",
+                ),
+        );
+    }
+    if declared.digest != definition.digest() {
+        errors.push(
+            Diagnostic::new(codes::E_DEF_001, "/definition_identity/digest")
+                .with("declared", declared.digest.as_str())
+                .with("actual", definition.digest())
+                .with(
+                    "reason",
+                    "definition digest does not match the loaded definition",
+                ),
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------

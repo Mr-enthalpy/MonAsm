@@ -19,6 +19,8 @@ use fmp_model::json::{self, Json};
 use fmp_model::plan::Plan;
 use fmp_model::Registry;
 
+mod support;
+
 const REPEATS: usize = 100;
 const PROCESS_REPEATS: usize = 4;
 
@@ -71,7 +73,7 @@ fn outcome(path: &Path, registry: &Registry) -> Result<Vec<u8>, Vec<String>> {
     let definition = registry
         .find(&plan.definition.namespace, &plan.definition.version)
         .unwrap_or_else(|error| panic!("{}: {}", path.display(), error.message()));
-    match fmp_materialize::materialize(&plan, &definition) {
+    match support::execute(plan, definition) {
         Ok(artifact) => Ok(artifact_identity(&artifact)),
         Err(errors) => Err(errors.iter().map(|error| error.identity()).collect()),
     }
@@ -205,8 +207,7 @@ fn exp_r4_serialization_round_trip_is_identical() {
                 &canonical_plan.definition.version,
             )
             .expect("definition is present");
-        let canonical_artifact = fmp_materialize::materialize(&canonical_plan, &definition)
-            .expect("canonical plan materializes");
+        let canonical_artifact = support::artifact(canonical_plan, definition);
         assert_eq!(
             direct,
             artifact_identity(&canonical_artifact),
@@ -228,8 +229,7 @@ fn exp_r4_serialization_round_trip_is_identical() {
                 &pretty_plan.definition.version,
             )
             .expect("definition is present");
-        let pretty_artifact = fmp_materialize::materialize(&pretty_plan, &definition)
-            .expect("pretty plan materializes");
+        let pretty_artifact = support::artifact(pretty_plan, definition);
         assert_eq!(
             direct,
             artifact_identity(&pretty_artifact),
@@ -263,8 +263,7 @@ fn exp_r5_definition_perturbation_is_loud() {
     let definition = perturbed
         .find(&plan.definition.namespace, &plan.definition.version)
         .expect("the version is unchanged");
-    let errors = fmp_materialize::materialize(&plan, &definition)
-        .expect_err("a changed rule set must not emit bytes");
+    let errors = support::diagnostics(plan.clone(), definition);
     let expected = fmp_model::codes::E_DEF_001;
     assert_eq!(
         errors.iter().map(|error| error.code()).collect::<Vec<_>>(),

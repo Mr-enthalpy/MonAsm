@@ -1,8 +1,8 @@
 # H1 实施计划：封闭执行对象与身份
 
-- 状态：**已采纳（H1a 已落地，H1b 未开始）**。规范决策在
+- 状态：**已采纳（H1a 与 H1b 已落地；H1 验收待三主机 CI）**。规范决策在
   `docs/adr/0127-execution-identity.md`；本文件保留为实施计划、验收映射和
-  待审问题清单。H1a 的实现范围与实测证据见 `research/he1/H1-report.md`。
+  待审问题清单。H1a/H1b 的实现范围与实测证据见 `research/he1/H1-report.md`。
 - 基线：`d42125d`（H0 已提交，工作树干净）。文中行号均取自该提交；H1a 新增
   代码的行号取自 `he1/h1a-identity-core` 的落地提交。
 - 上游：`ADR-0125`；`ADR-0126`（身份分层与构建收据）；
@@ -17,11 +17,11 @@ H1a（§6 表第一行）已落地并全绿：`Definition` 封闭、`Registry` �
 改名、`plan::check_structure`、validator 的 `u128`/`u64`/`checked_*` 硬化、
 `page ⇒ pcrel_page` 规则、九条直接调用 `check_structure`/`check` 的测试函数
 （计划里的八类反例加寄存器宽度复现）、`internal(...)` 前提表与编码后失败阶段
-实测。H1b（§6 表第二行）**尚未开始**：
-`ValidatedPlan`、`bind`、新的 `materialize`、`ExecutionReceipt`、
-`MaterializationFailure`、CLI 失败分流和 facade 都还不存在。今天的
-`materialize` 仍是 H0 的二参入口，仍自行比对摘要。本文件中凡描述 H1b 的段落
-都是计划，不是现状。
+实测。H1b（§6 表第二行）也已落地：`ValidatedPlan`、`bind`、新的
+`materialize`、`ExecutionReceipt`、`MaterializationFailure`、CLI 失败分流和
+facade 都已实现并被测试覆盖；`bind`/`materialize` 的 doctest 把「只能传
+`ValidatedPlan`」写成编译期负例。H1 的**验收**仍未宣称完成：
+`FMP_BUILD_ID` 仍为 `None`，debug/release 载荷一致性未测，三主机 CI 尚未运行。
 
 ---
 

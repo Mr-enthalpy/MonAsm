@@ -1,31 +1,44 @@
-//! H0 characterization tests: the gaps HE-1 has to close, measured rather than
+//! H0 characterization tests: the gaps HE-1 had to close, measured rather than
 //! asserted from source reading.
 //!
-//! Four of these tests **pass on the current code by documenting a hole**, not by
-//! requiring correct behaviour: a definition can be re-encoded under its original
-//! digest, a parsed operand can change under a stable fingerprint, one unselected
-//! `*.json` breaks the whole load, and a synthetic namespace is rejected by the
-//! loader. One is a **constraint**: the legacy fingerprint hashes the raw
+//! This file is evidence, not a description of the current code. H1a/H1b changed
+//! two of the original four gap tests; the rest stay as the boundary H1 did
+//! **not** change:
+//!
+//! - the definition-mutation test became `a_definition_edit_reloads_to_a_new_digest`,
+//!   which edits the document, reloads it and asserts the untouched plan is
+//!   rejected (`H1a`);
+//! - `a_parsed_operand_can_change_under_a_stable_fingerprint` is kept as the
+//!   **legacy** half of a pair. The fingerprint still does not move; the H1b
+//!   half in `fmp-materialize/tests/he1_execution.rs` asserts that
+//!   `ParsedPlanIdentity` and `ExecutionReceipt` do;
+//! - the unselected-file and synthetic-namespace tests still document loader
+//!   behaviour that the package round (H2) owns, not H1.
+//!
+//! One test remains a **constraint**: the legacy fingerprint hashes the raw
 //! document, so it sees fields the parser drops. Two are controls — a plan naming
 //! another definition's digest, and a plan whose top level is not an object — and
 //! assert the rejection that already happens. They exist so that:
 //!
 //! - H0 can report "reproduced" for the audit risks instead of "inferred"; and
-//! - H1/H3 can flip each gap test into a rejection test, at which point the test
-//!   name and body change and this file shrinks.
+//! - later rounds can flip each gap test into a rejection or identity test, at
+//!   which point the test name and body change and this file shrinks.
 //!
-//! Do not read a green run here as a property of the system. For the four gap
-//! tests the property is the opposite of what they assert. The constraint test
-//! asserts a property H1 must **preserve**, and the two controls assert
+//! Do not read a green run here as a property of the system. For the remaining
+//! gap tests the property is the opposite of what they assert. The constraint
+//! test asserts a property H1 must **preserve**, and the two controls assert
 //! rejections H1 must keep. The deep-JSON finding is **not** in this file: it is
 //! the `deep-json` probe in `tools/he1_baseline.py`, because the crash is inside
 //! the parser and cannot be observed safely in-process.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use fmp_model::codes;
 use fmp_model::plan::Payload;
 use fmp_model::Registry;
+
+mod support;
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
@@ -76,17 +89,13 @@ fn a_definition_edit_reloads_to_a_new_digest() {
         "the digest covers the document content"
     );
 
-    let errors = fmp_materialize::materialize(&plan, &reloaded)
-        .expect_err("the plan still names the old digest");
+    let errors = support::diagnostics(plan.clone(), Arc::new(reloaded));
     assert!(
         errors.iter().any(|error| error.code() == codes::E_DEF_001
             && error.path() == "/definition_identity/digest"),
         "{errors:?}"
     );
-    assert!(
-        fmp_materialize::materialize(&plan, &original).is_ok(),
-        "the original definition still materializes the plan"
-    );
+    support::artifact(plan, Arc::new(original));
 }
 
 /// `HE-T04`: the fingerprint is built from the parsed plan *document*, so a
@@ -94,13 +103,13 @@ fn a_definition_edit_reloads_to_a_new_digest() {
 /// both the fingerprint and the definition identity unchanged.
 #[test]
 fn a_parsed_operand_can_change_under_a_stable_fingerprint() {
-    let definition = fmp_model::definition::read(&definition_bytes("x86_64", "0.1.0"))
-        .expect("the shipped table loads");
+    let definition = Arc::new(
+        fmp_model::definition::read(&definition_bytes("x86_64", "0.1.0"))
+            .expect("the shipped table loads"),
+    );
     let mut plan = positive("X86-P1-mov-r64-both-directions");
     let fingerprint = fmp_materialize::fingerprint(&plan, &definition);
-    let before = fmp_materialize::materialize(&plan, &definition)
-        .expect("the fixture materializes")
-        .bytes;
+    let before = support::artifact(plan.clone(), Arc::clone(&definition)).bytes;
 
     match &mut plan.instructions[0].operands[1].payload {
         Payload::Register(reg) => *reg = 1,
@@ -112,9 +121,7 @@ fn a_parsed_operand_can_change_under_a_stable_fingerprint() {
         fingerprint,
         "the fingerprint covers `plan.document`, not the parsed operands"
     );
-    let after = fmp_materialize::materialize(&plan, &definition)
-        .expect("register 1 is legal in this slot")
-        .bytes;
+    let after = support::artifact(plan, Arc::clone(&definition)).bytes;
     assert_ne!(before, after, "the executed facts changed");
 }
 
@@ -230,8 +237,7 @@ fn a_plan_naming_another_definition_digest_is_rejected() {
     let plan = positive("X86-P1-mov-r64-both-directions");
     let other = fmp_model::definition::read(&definition_bytes("x86_64", "0.2.0"))
         .expect("the shipped table loads");
-    let errors =
-        fmp_materialize::materialize(&plan, &other).expect_err("the plan names the 0.1.0 digest");
+    let errors = support::diagnostics(plan, Arc::new(other));
     assert!(
         errors.iter().any(|error| error.code() == codes::E_DEF_001
             && error.path() == "/definition_identity/digest"),

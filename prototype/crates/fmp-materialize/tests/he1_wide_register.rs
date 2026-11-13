@@ -18,6 +18,7 @@
 use fmp_model::codes;
 use fmp_model::definition::Definition;
 use fmp_model::plan::{self, Plan};
+use std::sync::Arc;
 
 struct Case {
     label: &'static str,
@@ -74,8 +75,11 @@ fn a_wide_register_field_encodes_the_same_bytes_in_every_build() {
         let validation = fmp_validate::check(&plan, &definition);
         assert!(validation.is_empty(), "{}: {validation:#?}", case.label);
 
-        let artifact = fmp_materialize::materialize(&plan, &definition)
+        let validated = fmp_validate::bind(plan, Arc::new(definition))
             .unwrap_or_else(|errors| panic!("{}: {errors:#?}", case.label));
+        let artifact = fmp_materialize::materialize(&validated)
+            .unwrap_or_else(|failure| panic!("{}: {failure:#?}", case.label))
+            .artifact;
         assert_eq!(
             artifact.bytes_hex(),
             case.expected_hex,
