@@ -112,8 +112,12 @@ exhaustively, with no `..`; every enum is matched with every variant and no
 `_` arm. Adding a field or a variant therefore **fails the build** until the
 identity says what it means. `plan_identity_covers_every_parsed_field` is the
 semantic second layer: 73 mutations, one or more per covered field and per enum
-payload shape, each asserting that the digest moves. It proves the encoder uses
-the field; exhaustive destructuring proves the field cannot be forgotten.
+payload shape, each asserting that the digest moves. A variant switch alone does
+not prove the value *inside* a variant is encoded: `same_variant_values_change_the_identity`
+adds eight rows that keep the variant fixed and change only its value (register
+number, symbol id, absolute target, symbol target, `Some` payload, vector
+element, order, count). Together they prove the encoder uses the field's value;
+exhaustive destructuring proves the field cannot be forgotten.
 
 ## 3. The byte protocol
 
@@ -511,12 +515,16 @@ All commands were run from `C:\Users\hanni\Projects\MonAsm` unless the row says
 | Command | Result |
 |---|---|
 | `cargo fmt --all -- --check` (`prototype/`) | exit 0 |
-| `cargo test --workspace` (`prototype/`) | 87 passed, 0 failed: `fmp-model` 32 unit + 5 structure + 3 doctests, `fmp-validate` 4 bounds, `fmp-materialize` 9 unit + 4 stage, `fmp-plan` 5, `fmp-cli` 6 determinism + 2 fixtures + 7 characterization + 10 planner parity |
+| `cargo test --workspace` (`prototype/`) | 89 passed, 0 failed: `fmp-model` 33 unit + 5 structure + 3 doctests, `fmp-validate` 4 bounds, `fmp-materialize` 9 unit + 4 stage + 1 wide, `fmp-plan` 5, `fmp-cli` 6 determinism + 2 fixtures + 7 characterization + 10 planner parity |
+| `cargo test --release -p fmp-validate --test he1_validation_bounds` (`prototype/`) | 4 passed, 0 failed |
+| `cargo test --release -p fmp-materialize --test he1_wide_register` (`prototype/`) | 1 passed, 0 failed |
 | `python tools/check_ids.py` | `OK (0 warning(s))` |
 | `python tools/check_definition.py` | `OK`; 104 documents, newest x86 `0.78.0` (632 forms) |
 | `python tools/plan_identity.py --check` | three pinned digests match (§5) |
 | `python tools/he1_baseline.py --check research/he1/compatibility-results.json` | `OK: payload projection identical`; `payload_root sha256:3f6d177d…ffefad9`; `definitions_root sha256:575b7c5f…35690e` |
 | `cargo tree -p fmp-validate --edges normal` (`prototype/`) | no `fmp-materialize` edge (§10) |
 
-`research/he1/H1-report.md` records the same run with the test names and the
-three vector recomputations. It is evidence, not a build input.
+`research/he1/H1-report.md` records the same run with the test names, the three
+vector recomputations and the run identity (`base_commit` `0948620…`, code
+commit `d2cd7dd…`, `prototype/` tree `e31c88ae…`, CI run/job IDs). It is
+evidence, not a build input.

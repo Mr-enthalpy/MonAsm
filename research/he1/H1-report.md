@@ -4,6 +4,8 @@ Stage: H1a (design §13, `ADR-0125`; decisions in `ADR-0127`)
 Date: 2026-11-13
 Review amendment: 2026-11-14 (H1a review: P1 wide-field encoding, P2 doctest
 counterexample, CI identity and release steps)
+Review follow-up: 2026-11-14 (P2 same-variant identity values; P3 evidence
+counts, encoder wording and run identity)
 Base commit: `0948620f36893d17de56a913f72ced935fe50a98` (merged H0/H1-plan PR)
 Branch: `he1/h1a-identity-core`
 
@@ -21,7 +23,7 @@ CLI call sites. No definition, fixture, schema or `docs/fmp-v0/` byte changed.
 | Path | Change | Why |
 |---|---|---|
 | `prototype/crates/fmp-model/src/definition.rs` | `Definition` fields private, `document` deleted, no `Clone`, accessors added; `Registry` stores `Vec<Arc<Definition>>`, `add` takes ownership, `find` returns `Arc<Definition>` | `ADR-0127` §1: a loaded definition is half an execution credential, and a stored digest cannot make mutable facts honest |
-| `prototype/crates/fmp-model/src/identity.rs` | new: `plan-identity/0.1`, `plan_facts`, `ParsedPlanIdentity::of`, exhaustive destructuring, three pinned vectors, 73-row mutation table | `ADR-0127` §2–§3: the identity must cover parsed facts, and a new field must stop the build |
+| `prototype/crates/fmp-model/src/identity.rs` | new: `plan-identity/0.1`, `plan_facts`, `ParsedPlanIdentity::of`, exhaustive destructuring, three pinned vectors, 73-row mutation table, 8 same-variant value rows | `ADR-0127` §2–§3: the identity must cover parsed facts, a new field must stop the build, and the value inside a variant must move the digest |
 | `prototype/crates/fmp-model/src/plan.rs` | `Plan.document` → `legacy_document`; new `check_structure` | `ADR-0127` §4/§6: one legacy-only reader for the raw document, and the parser rules a `u32`/`String` cannot hold are re-checked |
 | `prototype/crates/fmp-model/src/lib.rs` | exports `identity`/`ParsedPlanIdentity`; two `compile_fail` doctests (the second a complete-field literal) and one positive control | the closure is "this cannot be written", not "this returns an error" |
 | `prototype/crates/fmp-validate/src/lib.rs` | `u64`/`u128`/`checked_*` for descriptor sums, overlap math, alignment, range bounds and register width; per-bit loops clipped to `form.bits()`; `page ⇒ pcrel_page` | `ADR-0127` §7: a full `u64` offset and a `u32` width must not overflow or loop; `Page` without `P` must not become an internal fault |
@@ -47,6 +49,7 @@ Run from the repository root unless the row says `prototype/`.
 
 ```text
 git rev-parse HEAD
+git rev-parse HEAD:prototype
 cargo fmt --all -- --check                     # prototype/
 cargo test --workspace                         # prototype/
 cargo test --release -p fmp-validate --test he1_validation_bounds   # prototype/
@@ -64,9 +67,9 @@ git diff --check
 
 | Command | Result |
 |---|---|
-| `git rev-parse HEAD` | `0948620f36893d17de56a913f72ced935fe50a98` |
+| `git rev-parse HEAD` / `HEAD:prototype` | base `0948620f…`; code commit `d2cd7dd3…`; `prototype/` tree `e31c88ae…` (see *Run identity*) |
 | `cargo fmt --check` | exit 0 |
-| `cargo test --workspace` | 88 passed, 0 failed (inventory below) |
+| `cargo test --workspace` | 89 passed, 0 failed (inventory below) |
 | `cargo test --release -p fmp-validate --test he1_validation_bounds` | 4 passed, 0 failed |
 | `cargo test --release -p fmp-materialize --test he1_wide_register` | 1 passed, 0 failed |
 | `cargo test -p fmp-materialize --test he1_wide_register` (debug) | 1 passed, 0 failed |
@@ -84,13 +87,30 @@ behaviour. Both the recorded and the fresh `envelope_root` are
 `sha256:dfd08fee9844058492138b23448073ec47d8eda42383e3f1b3e567db86a86fef`; the
 gate value is the payload root.
 
+### Run identity
+
+The local numbers above and the hosted runs below refer to one `prototype/`
+tree. This report is docs-only: it adds no product change and leaves that tree
+untouched.
+
+| Field | Value |
+|---|---|
+| `base_commit` | `0948620f36893d17de56a913f72ced935fe50a98` |
+| `tested_commit` | `d2cd7dd3e1b41071d2784fc47bc7ca80b4e8a1d6` (same-variant identity test) |
+| `tested_tree` | `e31c88aef8ca31997dac44e9688fd69ce2485e57` = `git rev-parse d2cd7dd:prototype` |
+| `dirty_worktree` | no: local gates were run on the committed tree, `git status --short` empty |
+| `dirty_patch_digest` | not applicable (no uncommitted change at test time) |
+| CI merge ref | `24adefee57dc933016948311e4337ba267d73bd5` (`refs/pull/2/merge`, head `d2cd7dd`) |
+| `gates` run | [43476855490](https://github.com/Mr-enthalpy/MonAsm/actions/runs/43476855490): documents `132062792336`, workspace `132062791671`, H0 baseline `132062792376`, oracle `132062792280` — all success |
+| `determinism` run | [43476855500](https://github.com/Mr-enthalpy/MonAsm/actions/runs/43476855500): ubuntu `132062792184`, macos `132062791559`, windows `132062791987` — all success |
+
 ### Test inventory
 
 `cargo test --workspace` runs these binaries and doctests:
 
 | Suite | Tests | What H1a added or changed |
 |---|---|---|
-| `fmp-model` unit | 32 | 3 definition tests (`a_definition_reloads_to_the_same_digest`, `a_canonically_equal_definition_loads_to_the_same_digest`, `the_registry_shares_one_immutable_definition`) and 7 identity tests (below) |
+| `fmp-model` unit | 33 | 3 definition tests (`a_definition_reloads_to_the_same_digest`, `a_canonically_equal_definition_loads_to_the_same_digest`, `the_registry_shares_one_immutable_definition`) and 8 identity tests (below) |
 | `fmp-model` doctests | 3 | two `compile_fail` (field assignment, complete-field struct literal) and one positive control |
 | `he1_check_structure` | 5 | `a_data_fragment_with_odd_length_hex_is_rejected_by_check_structure`, `a_data_fragment_with_non_hex_payload_is_rejected_by_check_structure`, `an_alignment_outside_the_parser_bound_is_rejected_by_check_structure`, `a_transform_shift_outside_the_parser_bound_is_rejected_by_check_structure`, `a_field_range_outside_the_parser_bound_is_rejected_by_check_structure` |
 | `he1_validation_bounds` | 4 | `a_descriptor_width_sum_cannot_overflow`, `two_huge_fixup_offsets_do_not_overflow`, `a_page_transform_without_a_page_pc_rule_is_rejected`, `a_wide_register_field_does_not_overflow_the_width_check` |
@@ -103,7 +123,7 @@ gate value is the payload root.
 | `fmp-cli` `he1_identity_characterization` | 7 | one test replaced (see §1); the other six are unchanged in meaning |
 | `fmp-cli` `planner_api` | 10 | accessor migration only |
 
-The seven identity tests are:
+The eight identity tests are:
 
 - `the_three_protocol_vectors_are_stable`
 - `the_algorithm_name_is_the_domain_separator`
@@ -111,6 +131,9 @@ The seven identity tests are:
 - `the_legacy_document_is_not_part_of_the_identity`
 - `a_changed_operand_changes_the_identity`
 - `an_unknown_variant_is_payload_carrying_and_distinct`
+- `same_variant_values_change_the_identity` (8 rows: register number, symbol
+  id, absolute target, symbol target, `Some` payload, vector element, order,
+  count)
 - `plan_identity_covers_every_parsed_field` (73 mutations)
 
 ## 4. What H1a proves and what it does not
@@ -125,9 +148,11 @@ the validator returns in bounded time for two `u32::MAX` widths and two
 `u64::MAX`-class offsets; `page` without `pcrel_page` is a static
 `E-FIXUP-001`; a register field of 64, 127, 128 or 192 bits encodes the exact
 expected bytes with a non-zero register in both debug and release; the
-identity's three vectors match an independent Python encoder and all 73
-field/enum mutations move the digest; and the 128 recorded payloads still
-materialize identically.
+identity's three vectors match an independent Python encoder, all 73
+field/enum mutations and the 8 same-variant value rewrites move the digest, and
+the register row goes red when `Payload::Register(_)` is encoded as a constant
+zero (fault injection, implementation restored); and the 128 recorded payloads
+still materialize identically.
 
 **Not proved.** H1a is not an execution credential. Until H1b exists, a caller
 can still call the old two-argument `materialize` with any `&Plan` and any
@@ -158,8 +183,8 @@ of changing the three frozen vectors.
 text and compares the digests. Rust and Python were written independently from
 the same tables, so agreement catches a transcription error, an implicit length
 or a language-specific layout assumption. It does **not** catch a misreading
-shared by both; the exhaustive destructuring and the 73-row mutation table are
-the controls for that.
+shared by both; the exhaustive destructuring, the 73-row mutation table and the
+8 same-variant value rows are the controls for that.
 
 ## 6. Where the post-encode negatives actually fail
 
@@ -249,7 +274,9 @@ graph is what the check owns.
   a legal fixture, and the tests that exercise them assemble the illegal state in
   memory.
 - **Oracle:** `122/128` re-derived, 6 `manual-derivation` skips, 0 failed — the
-  same split as H0. The encoder and the definition files did not change.
+  same split as H0. The definition files did not change; the encoder did: the
+  wide-field extraction in `write_field` was fixed, and the 128 existing
+  payloads still materialize to the same bytes.
 - **API:** `Definition` no longer implements `Clone`, exposes `document`, or
   allows field assignment; `Registry::find` returns `Arc<Definition>` instead of
   `&Definition`. This is a source-level break, deliberately: `ADR-0127` §1 and
