@@ -353,10 +353,12 @@ cargo test --workspace --doc                                            # protot
 cargo test --release -p fmp-validate --test he1_validation_bounds       # prototype/
 cargo test --release -p fmp-materialize --test he1_wide_register        # prototype/
 cargo build --bin fmp -p fmp-cli                                        # prototype/
+cargo build --release --bin fmp -p fmp-cli                              # prototype/
 python tools/check_ids.py
 python tools/check_definition.py
 python tools/plan_identity.py --check
 python tools/he1_baseline.py --check research/he1/compatibility-results.json
+python tools/he1_baseline.py --check research/he1/compatibility-results.json --binary prototype/target/release/fmp.exe
 python tools/oracle/rerun.py --allow-skip-reason manual-derivation
 git diff --check
 ```
@@ -374,6 +376,7 @@ git diff --check
 | `check_definition.py` | `OK`; 104 documents, newest x86 `0.78.0` (632 forms), AArch64 `0.20.0` (185), RV64 `0.6.0` (24) |
 | `plan_identity.py --check` | exit 0; the three pinned digests still match |
 | `he1_baseline.py --check` | `OK: payload projection identical`; `payload_root sha256:3f6d177d…ffefad9`; `definitions_root sha256:575b7c5f…35690e`; the envelope is skipped because the local binary digest differs from the recorder's |
+| same command with `--binary` on the release build | `OK: payload projection identical`; the same `payload_root` and `definitions_root`; the release binary digest is `edc2c5fde6f9`, so all 128 release payloads equal the debug-recorded snapshot byte for byte |
 | `oracle/rerun.py` | `122/128 re-derived, 6 skipped, 0 failed`; six `manual-derivation` skips |
 | `git diff --check` | exit 0 |
 | CI `gates`, run `43487661759` on `3b26bb1` | `workspace tests`, `document and definition gates`, `H0 payload baseline`, `oracle rerun` — all `success`; the runner reproduced `OK: payload projection identical` with both roots unchanged and `122/128, 6 skipped, 0 failed` |
@@ -474,8 +477,9 @@ Proved by a test or a compile-time property:
 
 Not proved here:
 
-- **H1 acceptance.** `FMP_BUILD_ID` is still `None` and debug/release payload
-  equality is unmeasured. The three-host CI run is green (§11.7 step 1).
+- **H1 acceptance.** `FMP_BUILD_ID` is still `None`, so a hosted artifact still
+  cannot name its build. The three-host CI run is green and debug/release
+  payload equality is measured (§11.7 steps 1 and 3).
 - **A real internal fault.** No test forces one. The `Internal` channel is
   covered by the pure `exit_code`/`classify` unit test and by the runtime
   arm; forcing a fault would require corrupting a validated plan or a test-only
@@ -499,5 +503,10 @@ H1 acceptance, in this order:
 2. Decide `FMP_BUILD_ID`: either set it in CI and record the receipt, or state
    in the acceptance record that `build: None` is the accepted H1 state.
 3. Measure debug/release payload equality instead of leaving it unmeasured.
+   **Done for the corpus.** `he1_baseline.py --check` against the release build
+   reports `OK: payload projection identical`, the same `payload_root` and
+   `definitions_root`, and a distinct binary digest (`edc2c5fde6f9`), so the 128
+   release payloads equal the debug-recorded snapshot. This is corpus equality,
+   not a proof about plans outside the fixtures.
 4. Only then write the H1 acceptance result; H1b being green locally is not that
    result.

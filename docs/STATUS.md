@@ -544,9 +544,9 @@ raw-file digest and canonical digest, so a whitespace-only edit followed by
 because it contains `materializer_version`.
 One probe found a real gap rather than a clean result: a 20 000-deep JSON plan
 ends the `fmp` process with `0xC00000FD` (stack overflow), which H4 owes a
-bounded rejection test. H1b has landed (below); H1 acceptance still owes the
-three-host CI run, a build label and debug/release payload equality. The
-accepted implementation plan is
+bounded rejection test. H1b has landed (below); H1 acceptance still owes a build
+label, now that the three-host CI run is green and debug/release payload equality
+is measured for the corpus. The accepted implementation plan is
 `docs/architecture/he1-h1-plan.md`; its sixteen decisions (D1–D16) are recorded,
 with D3/D4/D5/D7 revised after the first review, D11/D12 added after the second
 (identity layering, and keeping `Plan.document` as a legacy-only input), D4
@@ -690,8 +690,11 @@ release bounds/wide-field, `check_ids`, `check_definition`, `plan_identity`,
 baseline and `git diff --check` gates pass locally. The three-host CI run is
 green on `3b26bb1`: `gates` run `43487661759` passes the workspace, document and
 definition, baseline and oracle jobs, and `determinism` run `43487662063` passes
-on ubuntu, macos and windows. This is still not an H1 acceptance claim:
-`FMP_BUILD_ID` is `None` and debug/release payload equality is unmeasured.
+on ubuntu, macos and windows. Debug/release payload equality is now measured for
+the corpus: the release binary reproduces the same `payload_root`
+(`sha256:3f6d177d…ffefad9`) as the debug-recorded snapshot, with its own binary
+digest. This is still not an H1 acceptance claim: `FMP_BUILD_ID` is `None`, so a
+hosted artifact still cannot name its build.
 The phase board above
 stays the v0 record; HE-1 phases
 are reported in `research/he1/`.

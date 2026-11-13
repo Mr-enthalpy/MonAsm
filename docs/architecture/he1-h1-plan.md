@@ -21,7 +21,8 @@ H1a（§6 表第一行）已落地并全绿：`Definition` 封闭、`Registry` �
 `materialize`、`ExecutionReceipt`、`MaterializationFailure`、CLI 失败分流和
 facade 都已实现并被测试覆盖；`bind`/`materialize` 的 doctest 把「只能传
 `ValidatedPlan`」写成编译期负例。H1 的**验收**仍未宣称完成：
-`FMP_BUILD_ID` 仍为 `None`，debug/release 载荷一致性未测；三主机 CI 已在
+`FMP_BUILD_ID` 仍为 `None`；debug/release 载荷一致性已对语料实测（同一
+`payload_root sha256:3f6d177d…ffefad9`，release 二进制摘要不同）；三主机 CI 已在
 `he1/h1b-validated-plan` 的 `3b26bb1` 上跑绿（`gates` run `43487661759`：
 workspace、document/definition、baseline、oracle 四个 job 全绿；
 `determinism` run `43487662063`：ubuntu、macos、windows 全绿）。
