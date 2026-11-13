@@ -1,16 +1,20 @@
 # ADR-0128: the package and bundle contract, and the H2 definition builder
 
-- Status: accepted
+- Status: proposed
 - Date: 2026-11-14
+- Review: this is a proposal, not a frozen decision. It stays `proposed` until
+  the H2 planning PR is reviewed and merged; `accepted` is written only after
+  that review, and H2a does not start before it.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
   `monasm-lock/0.1` and `monasm-bundle/0.1` formats; the digest layering; package
-  ownership and conflict rules; which legacy definition version a re-homed form
-  is compared against; the builder's error and exit behaviour; and the boundary
-  between H2 and H3/H4
+  target self-description and migration provenance; package ownership and
+  conflict rules; which legacy definition version a re-homed form is compared
+  against; the builder's error and exit behaviour; and the boundary between H2
+  and H3/H4
 - Supersedes: none
 - Superseded by: none
 - Revises: `docs/architecture/he1-h2-plan.md` (adopts `H2-D1`–`H2-D12` with the
-  two measured corrections in decisions 13 and 14)
+  measured corrections in Context and decisions 13 and 14)
 - Confirms: the `packages/` and `bundles/` rows of `AGENTS.md`; they become real
   inputs from H2, still not runtime discovery paths
 - Keeps in force: `ADR-0125` decisions 3 and 4 (a package author layer, a
@@ -66,9 +70,12 @@ ADR cannot simply say "copy the newest row":
   bundle built from `0.6.0` would be rejected at `bind` with
   `E-TARGET-001` before any byte comparison.
 
-aarch64 is the benign case: `A64-P1`, `A64-P2-add-imm12` and
-`A64-P2-add-imm12-lsl12` select rows that are byte-identical in `0.1.0`/`0.2.0`
-and `0.20.0`, and every version declares `enabled_extensions: []`.
+aarch64 is the benign case, with one correction to the earlier draft: the
+`x64-x64-x64-lsl0` and `x64-imm12-lsl0` rows are byte-identical in `0.1.0`,
+`0.2.0` and `0.20.0`; `aarch64:add/x64-imm12-lsl12` does not exist in `0.1.0`
+and is byte-identical in `0.2.0` and `0.20.0`. Every version declares
+`enabled_extensions: []`, so the pinned `0.20.0` rows are the
+fixture-verified rows.
 
 ## Decision
 
@@ -84,6 +91,15 @@ prefix. The manifest is `monasm-package/0.1` and is a closed object:
   "package_id": "monasm.x86.mov-register",
   "version": "0.1.0",
   "target_profile": "monasm.target.x86_64",
+  "definition_format": "fmp-def/0.1",
+  "target_identity": {
+    "isa_family": "x86",
+    "isa_variant": "x86-64",
+    "execution_mode": "64",
+    "enabled_extensions": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
   "legacy_source": { "isa": "x86_64", "version": "0.1.0" },
   "requires_capabilities": ["field-placement/v1"],
   "dependencies": [],
@@ -91,10 +107,18 @@ prefix. The manifest is `monasm-package/0.1` and is a closed object:
     "forms": [
       { "id": "x86:mov/r64-rm/legacy", "path": "forms/mov-r64-rm.json" },
       { "id": "x86:mov/rm-r64/legacy", "path": "forms/mov-rm-r64.json" }
-    ]
+    ],
+    "types": [],
+    "profiles": []
   }
 }
 ```
+
+| Key | Requirement |
+|---|---|
+| `package_format`, `package_id`, `version`, `target_profile`, `definition_format`, `target_identity`, `requires_capabilities`, `dependencies`, `exports.forms` | required |
+| `legacy_source` | optional; migration provenance only |
+| `exports.types`, `exports.profiles` | optional; reserved asset declarations, must be empty in H2 |
 
 | Field | Counterexample when it is missing or unchecked |
 |---|---|
@@ -102,33 +126,64 @@ prefix. The manifest is `monasm-package/0.1` and is a closed object:
 | `package_id` | Ownership has no owner to name; two packages cannot be distinguished in a lock. |
 | `version` | The same package ID with changed content is indistinguishable from the old one; a lock cannot say which was selected. |
 | `target_profile` | An x86 package is merged into an aarch64 target because the spec and the package never compared their target facts. |
-| `legacy_source` | The row-equality test has no fixed reference; "the newest file" silently retargets the comparison and hides a semantic change. |
-| `requires_capabilities` | A package that needs a primitive the core does not execute is built as if it needed nothing; H3 cannot report `unsupported-capability`. |
+| `definition_format` | The builder merges rows with a format the author did not name, so a `fmp-def/0.2` row is read by a `0.1` reader (or the reverse) and the rejection names the wrong fact. |
+| `target_identity` | A package declares no target facts, so a new package has no way to be checked without a legacy file; the spec becomes the only target authority and a package can be merged into a mismatched target. |
+| `legacy_source` | A re-homed package loses the reference for the row-equality test; "the newest file" silently retargets the comparison and hides a semantic change. |
+| `requires_capabilities` | A package that needs a primitive the core does not execute is built as if it needed nothing; the builder cannot reject it before the snapshot is verified. |
 | `dependencies` | A transitive package has to be discovered by scanning, which is the behaviour H3 forbids. |
 | `exports.forms` | A file in the package can be executed without being declared, or an undeclared file is silently included. |
 | `exports.forms[].id` | The file's own `form_id` can differ from the declaration; swapping two files changes ownership without changing the manifest. |
 | `exports.forms[].path` | The manifest cannot say which file holds the row, so the builder must guess or scan. |
+| `exports.types`, `exports.profiles` | A package can declare a type/profile asset that neither the format nor the digest records; H4 cannot add semantics without changing the closed key set. |
 
-Unknown, missing and duplicate keys are rejected (`INV-07`). `exports.forms`
-is sorted strictly by `id`, and `dependencies` strictly by `(package_id,
-version)`; a reordering is a different document and is rejected rather than
-silently canonicalised. Each `forms/*.json` holds exactly one form object; its
-`form_id` must equal the declared `id`.
+Unknown and duplicate keys are rejected (`INV-07`). A missing key is rejected
+when it is required and is legal only for the optional keys in the table above.
+`exports.forms` is sorted strictly by `id`, and `dependencies` strictly by
+`(package_id, version)`; a reordering is a different document and is rejected
+rather than silently canonicalised. Each `forms/*.json` holds exactly one form
+object; its `form_id` must equal the declared `id`. `exports.types` and
+`exports.profiles`, when written, use the same `{id, path}` shape and are sorted
+strictly by `id`; each file holds exactly one type or profile object, whose own
+`type_id`/`profile_id` must equal the declared `id`. They are reserved syntax:
+H2 rejects a non-empty list as `unsupported-asset`. An absent optional list and an empty list are different
+manifests with different source digests, but both declare zero assets; the lock
+pins the spelling that was released.
 
-### 2. `legacy_source` is the pin, and it is inside the digested manifest
+### 2. Target facts are self-declared; `legacy_source` is migration provenance
 
-`legacy_source` names the legacy definition `(isa, version)` that the package's
-rows were copied from. It is part of the manifest, so it enters
-`source_package_digest`; an author cannot retarget the comparison by editing a
-file that is not digested. The builder resolves it to exactly
-`<root>/definitions/<isa>/<version>.json`, where `isa` is the directory name
-(`x86_64`, `aarch64`, `rv64`), not the form family. It does not search, does not
-pick the newest file and does not choose among candidates. It compares every
-exported row against that exact document and fails if the row is absent or not
-byte-equal. Counterexample if it searched: two versions with the same file name
-in different directories would make the comparison depend on traversal order.
+Every package states its own execution target in `definition_format` and
+`target_identity`. Those two fields are required and are part of the manifest,
+so they enter `source_package_digest`; a package cannot inherit a target from a
+central table, from the spec, or from a legacy file. The spec must agree with
+every listed package, and a package that nothing selects can still be checked
+against its own declarations (`verify --package`, §8).
 
-A non-migrating package may omit the field. The three H2 packages must write it.
+`legacy_source` answers a different question. It is optional and records that
+the package's rows were copied from a pinned legacy definition `(isa, version)`;
+it is evidence about migration, not the source of the target identity. When it
+is present it is part of the manifest, so it enters `source_package_digest`; an
+author cannot retarget the comparison by editing a file that is not digested.
+The builder resolves it to exactly `<root>/definitions/<isa>/<version>.json`,
+where `isa` is the directory name (`x86_64`, `aarch64`, `rv64`), not the form
+family. It does not search, does not pick the newest file and does not choose
+among candidates. It compares every exported row against that exact document and
+fails if the row is absent or not byte-equal. Counterexample if it searched: two
+versions with the same file name in different directories would make the
+comparison depend on traversal order.
+
+A package that is not re-homed omits `legacy_source`. It is then checked by the
+declared `target_identity`/`definition_format`, by `fmp_model::definition::read`
+on the merged document, and by its own package tests; there is no legacy row to
+compare, and the builder does not invent one. That is the path a new instruction
+family uses even when no matching file exists in `definitions/`. The three H2
+packages are re-homed, so they must write the field.
+
+`definition_format` is a single value per package. A closure that mixes
+`fmp-def/0.1` and `fmp-def/0.2` packages is rejected, even when their target
+identities are equal: H2 performs no implicit conversion, because converting
+rows would change their semantics and create a second definition authority. An
+explicit, versioned conversion is H3 work; until then the author splits the
+closure or rewrites the row openly.
 
 ### 3. Paths are bounded to the package and the repository root
 
@@ -138,7 +193,8 @@ rejected. Before opening a file, the builder checks that the canonicalised path
 is still under the package root; on Windows it rejects a reparse-point escape.
 The spec's `packages[].path` is checked against `--root` the same way.
 `README.md`, `NOTICE`, `evidence/**` and `tests/**` may exist, but only declared
-form files enter the source digest.
+asset files (`form`, `type`, `profile`) enter the source digest;
+`evidence/manifest.json` enters `evidence_digest` only.
 
 ### 4. The spec lists the full closure; the builder never scans packages
 
@@ -179,21 +235,26 @@ verification edges: every edge must resolve to a listed `(package_id, version)`
 with exactly the listed `source_package_digest`. An edge to a package outside
 the list is a missing-dependency error, never a scan trigger. Two entries with
 the same `(package_id, version)` or the same `path` are rejected even when their
-content is identical; identity is a release fact, not a content comparison. A
-listed package that nothing depends on is a legal root; reachability is not
-required.
+content is identical; identity is a release fact, not a content comparison. At
+most one version of a `package_id` may appear: two versions are rejected even
+when their exports are disjoint, because the lock would record two owners for
+one release identity. A listed package that nothing depends on is a legal root;
+reachability is not required.
 
 `--all` enumerates `bundles/specs/*.json` only. It never enumerates
 `packages/**`, so adding or corrupting an unselected package cannot change an
 old spec's lock or sealed bundle.
 
-The spec's `target.identity` and `definition_format` must match every listed
-package's `legacy_source` definition, and every package's `target_profile` must
-equal `target.profile_id`. A closure whose packages disagree on the target
-identity or definition format is rejected; the builder does not pick a winner.
-The builder writes the identity into the generated definition; it does not
-consult a central Rust target table. That is the H3 precondition "a new target
-does not edit a public whitelist".
+The spec's `target.identity` and `definition_format` must equal every listed
+package's `target_identity` and `definition_format`; they are compared as data,
+not derived from `legacy_source`. Every package's `target_profile` must equal
+`target.profile_id`. A closure whose packages disagree on the target identity or
+definition format is rejected; the builder does not pick a winner and does not
+convert a package. A package with `legacy_source` is additionally checked
+against that pinned row, but the pin never supplies the target facts. The
+builder writes the identity into the generated definition; it does not consult
+a central Rust target table. That is the H3 precondition "a new target does not
+edit a public whitelist".
 
 Counterexamples: without the full list, the builder must discover dependencies
 and an unselected corrupt package can break an old build (`HE-AC-05`); without
@@ -206,15 +267,27 @@ The build creates three read-only ownership tables:
 
 ```text
 form_id    -> package_id + version + source_package_digest
-type_id    -> package_id + version + source_package_digest   # format only in H2
-profile_id -> package_id + version + source_package_digest   # H4 owns the semantics
+type_id    -> package_id + version + source_package_digest   # reserved; non-empty rejected in H2
+profile_id -> package_id + version + source_package_digest   # reserved; H4 owns the semantics
 ```
 
 Two packages exporting the same `form_id` fail the build even when the rows are
 byte-identical (`HE-T07`, `HE-AC-09`). Last-wins would make merge order decide
-which package owns the row. H2 checks only `form_id`; the `type_id` and
-`profile_id` keys are written into the format and digest so H4 can add their
-semantics without a format change.
+which package owns the row. The same-key rule applies to every declared asset
+table.
+
+H2 executes only `form` assets. `exports.types` and `exports.profiles` are
+declared in the closed manifest and enter `source_package_digest`, but a
+non-empty list is rejected as `unsupported-asset`: the builder will not merge an
+asset whose semantics neither this ADR nor `fmp_model::definition::read`
+defines. A package that writes `"types": []` or `"profiles": []` is accepted and
+records zero assets. This is a real reservation: the key, the `{id, path}`
+shape, the ordering rule and the digest input are fixed now, so H4 adds
+semantics without changing the manifest key set. It is not a promise that H2
+executes or emits those assets; a non-empty list fails closed.
+
+Ownership rows for types and profiles are therefore reserved with the same
+`{owner, version, source_package_digest}` shape but are never populated in H2.
 
 ### 6. Canonicalisation is build-time only
 
@@ -230,14 +303,27 @@ the builder sorts the closure by `(package_id, version)` first. Counterexample:
 if spec order entered the digest, A+B and B+A would produce two bundle
 identities for one execution fact (`HE-T16`).
 
-### 7. Four digest layers, each with its own domain separator
+### 7. Digest layers, each with its own domain separator
 
 | Digest | Input | Excludes | Counterexample if it were missing or collapsed |
 |---|---|---|---|
-| `source_package_digest` | `sha256("monasm-package/0.1\0" ++ canonical(manifest) ++ for each export sorted by path: "\0form\0" ++ path ++ "\0" ++ sha256(canonical(form object)))` | README, NOTICE, evidence, tests, author path | Hashing only the manifest: swapping a form's template with the manifest unchanged leaves the package digest still. |
+| `source_package_digest` | `sha256("monasm-package/0.1\0" ++ canonical(manifest) ++ for each declared asset sorted by path: "\0" ++ kind ++ "\0" ++ path ++ "\0" ++ sha256(canonical(asset object)))`, where `kind` is `form`, `type` or `profile` | README, NOTICE, evidence manifest, tests, author path | Hashing only the manifest: swapping a form's template with the manifest unchanged leaves the package digest still. |
+| `evidence_digest` | `sha256("monasm-evidence/0.1\0" ++ canonical(evidence/manifest.json))` when the file exists; absent otherwise | unlisted README/NOTICE text, oracle log contents, author path | Hashing a README directly: a typo fix changes execution identity without changing a rule. |
 | `definition_digest` | `fmp_model::definition::read(merged_document).digest()` | builder version, build time, host, source paths | Hashing only the package set: two different form rows produce the same bundle identity. |
 | `bundle_digest` | `sha256("monasm-bundle/0.1\0" ++ canonical(bundle_metadata))`, where metadata is `{bundle_id, definition_digest, definition_format, namespace, version, target, packages: [{package_id, version, source_package_digest}]}` sorted by package identity | the `bundle_digest` field itself, the builder receipt, package paths | Including the digest in its own preimage: the fixed point does not exist. |
+| `release_digest` | `sha256("monasm-release/0.1\0" ++ canonical(release_metadata))`, where metadata is `{bundle_id, bundle_digest, definition_digest, packages: [{package_id, version, source_package_digest, evidence_digest?}]}` sorted by package identity | the definition rows themselves, the builder receipt, sealed bytes | Two releases that share a definition but ship different evidence have no distinguishing identity. |
 | `builder` | `{name, version, build: Option<String>}`; lock and receipt only | the definition digest | Putting the builder version into `definition_digest`: a builder bump falsely reports definition drift (`HE-T19`). |
+
+`evidence/manifest.json` is optional and has the shape
+`{"evidence_format":"monasm-evidence/0.1","files":[{"path":"NOTICE","sha256":"..."}]}`,
+sorted by `path`. It is a closed object: unknown or duplicate keys, and an entry
+without exactly `path` and `sha256`, are rejected. It covers `README.md`,
+`NOTICE`, oracle records and case evidence; it never covers a form, type or
+profile file. The builder verifies that every listed file exists, stays inside
+the package and matches its recorded hash; a mismatch is `evidence-mismatch`
+(exit 1). Editing a listed file changes `evidence_digest` and `release_digest`
+only when the manifest is updated; that keeps execution identity stable while
+making the audit trail reviewable.
 
 The builder asserts that `definition_format`, `namespace`, `version` and
 `target.identity` in the bundle metadata equal the values in the generated
@@ -251,36 +337,62 @@ release identity and execution identity. Counterexample if the builder derived
 one from the other: a no-op package release would look like an encoding change,
 the same defect `ADR-0126` fixed for artifacts.
 
-### 8. Spec, lock and sealed bundle are three different artifacts
+`release_digest` is the release identity: it moves when the selected package
+set, the definition or the evidenced release files change, while
+`definition_digest` names only the execution rules. The lock records both, so a
+release can be audited without hashing documentation into the machine
+definition.
+
+### 8. Spec, lock, sealed bundle and legacy snapshot are different artifacts
 
 - `bundles/specs/<bundle>.json` — `monasm-bundle-spec/0.1`, the author's
   explicit selection.
 - `bundles/locks/<bundle>.lock.json` — `monasm-lock/0.1`, generated: the full
   bundle metadata (`bundle_id`, `definition_format`, `namespace`, `version`,
-  `target`, `bundle_digest`, `definition_digest`), the sorted package list with
-  `path` and `source_package_digest`, and `builder`.
+  `target`, `bundle_digest`, `definition_digest`, `release_digest`), the sorted
+  package list with `path`, `source_package_digest` and an optional
+  `evidence_digest`, and `builder`.
 - `bundles/sealed/<bundle>.bundle.json` — `monasm-bundle/0.1`, generated:
   `bundle_format`, `bundle_id`, the canonical definition document,
   `bundle_digest`, `definition_digest`, and the sorted `sources` list
   `{package_id, version, source_package_digest}`. It does not contain the builder
-  receipt or author paths.
+  receipt, `release_digest` or author paths.
+- `bundles/legacy/<bundle>/definition.json` — generated: the plain merged
+  definition document, with no bundle envelope, so the existing
+  `fmp materialize <plan> --definitions <dir>` path can load it. It is a
+  development bridge, not a release identity. `Registry::load_dir` recursively
+  reads every `.json` under the directory and calls `definition::read`, so the
+  sealed `.bundle.json` cannot be used here; point `--definitions` at the
+  directory that contains only this snapshot.
 
-The binary has three subcommands: `build` writes the lock and sealed bundle,
-`verify` rebuilds in memory, and `digest <package-path>` prints the computed
-`source_package_digest` so an author can write it into the spec. None of them
-adds a subcommand to `fmp`.
+The binary has three subcommands: `build` writes the lock, sealed bundle and
+legacy snapshot; `verify` rebuilds in memory; and `digest <package-path>` prints
+the computed `source_package_digest` so an author can write it into the spec.
+`verify --all` checks the bundle closures selected by `bundles/specs/*.json`;
+`verify --package <path>` checks one package against its own manifest and does
+not read a spec. The package form checks the closed key set, path bounds,
+declared-vs-actual `form_id`, sorted arrays, reserved-asset emptiness, the
+capability allowlist, the declared `definition_format`/`target_identity` against
+the merged document read by `fmp_model::definition::read`, and the pinned legacy
+row when `legacy_source` is present. It does not check ownership conflicts
+across packages, because that needs a closure. None of these adds a subcommand
+to `fmp`.
 
 Lock and sealed bundle are committed release artifacts. CI runs
 `fmp-definition verify --all --check`, rebuilds each spec in memory, compares the
-sealed bundle byte-for-byte and the lock byte-for-byte **except `builder`**. The
-builder is a receipt: it is shape-checked and printed, not compared, for the
-same reason `ADR-0126` compares `payload/0.1` and not `envelope/0.1` — a correct
-rebuild on a different commit must not fail the gate. Counterexample if the
-builder were compared: the first commit after the lock changes `FMP_BUILD_ID`
-and the gate fails without any definition change. A stale lock or sealed bundle
-in the compared fields is a difference (exit 1), not a silent refresh.
-Counterexample if lock/sealed were test-only: a published bundle could not be
-audited against the source that produced it.
+sealed bundle byte-for-byte and the lock byte-for-byte **except `builder`**. CI
+also extracts every changed path under `packages/**`, maps it to its package root
+(the nearest ancestor with `package.json`) and runs
+`fmp-definition verify --package <directory>` once per package; that list is a CI
+input only and never decides what the builder selects. The builder is a receipt:
+it is shape-checked and printed, not compared, for the same reason `ADR-0126`
+compares `payload/0.1` and not `envelope/0.1` — a correct rebuild on a different
+commit must not fail the gate. Counterexample if the builder were compared: the
+first commit after the lock changes `FMP_BUILD_ID` and the gate fails without any
+definition change. A stale lock or sealed bundle in the compared fields is a
+difference (exit 1), not a silent refresh. Counterexample if lock/sealed were
+test-only: a published bundle could not be audited against the source that
+produced it.
 
 ### 9. The builder generates bytes and lets `fmp_model` read them
 
@@ -291,6 +403,11 @@ fields, slot placement, template length, duplicate IDs and target shape. The
 builder wraps a rejection as its own `BuildError`, preserving the underlying
 diagnostic text. It does not construct `Definition` directly and does not call
 `Registry::load_dir`.
+
+`verify --package` follows the same rule: it merges the declared assets into a
+document with the package's `definition_format`, calls `read`, and compares
+pinned rows only when `legacy_source` is present. It never writes a lock or
+sealed bundle, so a package author can run it before any spec exists.
 
 `fmp-definition`'s product dependency is `fmp-model` only. The package
 conformance harness lives in `fmp-definition/tests/` and uses dev-dependencies
@@ -323,9 +440,14 @@ does not pretend to be `fmp/0.1` diagnostics.
 
 | Class | Examples | Exit |
 |---|---|---|
-| Deterministic rejection | manifest shape, path escape, missing/duplicate/cyclic dependency, digest mismatch, ownership conflict, row mismatch, `read` rejection, resource limit | 1 |
+| Deterministic rejection | manifest shape (required/optional keys), path escape, missing/duplicate/cyclic dependency, two versions of one package ID, digest mismatch, ownership conflict, row mismatch, unknown capability, non-empty reserved asset, evidence mismatch, closure aggregate limit, `read` rejection, resource limit | 1 |
 | Host / I/O / internal | unreadable file, unwritable lock, internal invariant break | 2 |
 | Success | build or verify passed, digest printed | 0 |
+
+The enum names these rejections (`unsupported-capability`, `unsupported-asset`,
+`version-conflict`, `aggregate-limit`, `legacy-row-mismatch`,
+`evidence-mismatch`); they are `BuildError` variants, not `fmp/0.1` diagnostic
+codes.
 
 The `fmp` CLI's 0/1/2 meanings are unchanged. Package-build errors never enter
 `bind`'s diagnostic array.
@@ -335,13 +457,18 @@ The `fmp` CLI's 0/1/2 meanings are unchanged. Package-build errors never enter
 H2 bounds the builder's own inputs; it does not claim to fix deep-JSON
 robustness:
 
-- manifest ≤ 1 MiB; form file ≤ 1 MiB;
-- exported forms per package ≤ 4096; packages per closure ≤ 1024;
-- one path ≤ 1024 bytes; dependency depth ≤ 64.
+- manifest ≤ 1 MiB; form, type or profile file ≤ 1 MiB;
+- exported forms per package ≤ 4096; declared assets per package ≤ 4096;
+- packages per closure ≤ 1024; total package bytes per closure ≤ 64 MiB;
+- total declared assets per closure ≤ 65 536;
+- one path ≤ 1024 bytes; dependency depth ≤ 64;
+- JSON nesting depth ≤ 64 for every manifest, form/type/profile file, spec and
+  lock the builder parses.
 
-An over-limit input is a deterministic rejection (exit 1). A parser stack
-overflow from a 20 000-deep document remains H4 (`HE-T13`); H2's package inputs
-are developer-controlled.
+An over-limit input is a deterministic rejection (exit 1). The depth cap is the
+builder's own parser budget; it is not a claim that `fmp` is robust to deep
+JSON, and a parser stack overflow from a 20 000-deep document remains H4
+(`HE-T13`). H2's package inputs are developer-controlled.
 
 ### 13. The x86 slice is pinned to `0.1.0`, not the newest definition
 
@@ -364,13 +491,15 @@ The rv64 package exports `riscv:add/rd-rs1-rs2` and
 `riscv:addi/rd-rs1-imm12` from `rv64/0.1.0`. `0.6.0` declares
 `["rv64i","rv64c"]`, while `RV-P1`/`RV-P2` declare `["rv64i"]`; `fmp-def/0.1`
 requires set equality, so `0.6.0` would be rejected at `bind` regardless of
-bytes. The aarch64 package exports the three `add` forms from `0.20.0`; the
-rows are equal to the fixture-verified rows and the target set is `[]`.
+bytes. The aarch64 package exports the three `add` forms from `0.20.0`; the two
+`lsl0` rows are equal to `0.1.0`, the `lsl12` row first appears in `0.2.0`, and
+all three are equal in `0.2.0` and `0.20.0`. The target set is `[]`.
 
 The general rule for any future slice: pin the **newest definition version
 whose selected rows are byte-equal to the evidence and whose target identity
 matches the reference plan**. If the newest version fails either test, pin the
-version that passes and record why in the package's `legacy_source` and report.
+version that passes and record why in the package report and, for a migrating
+package, its `legacy_source`.
 
 ### 15. Byte equivalence is a machine-output projection, not `payload/0.1`
 
@@ -395,8 +524,13 @@ comparing the materializer with itself proves the bytes.
 ### 16. What H2 deliberately does not do
 
 - No `fmp/0.2` plan format, namespaced ISA identity or zero-operand form (H3).
-- No runtime bundle reader, unknown-capability rejection or unselected-package
-  isolation at materialisation time (H3).
+- No runtime bundle reader, runtime capability negotiation or unselected-package
+  isolation at materialisation time (H3). H2 rejects unknown capability strings
+  at build time only.
+- No implicit conversion between `fmp-def/0.1` and `fmp-def/0.2`; a mixed
+  closure is rejected, and an explicit versioned conversion is H3 work.
+- No execution or emission of `type`/`profile` assets; a non-empty declaration
+  is rejected (H4).
 - No `bind(VerifiedBundle, ...)` and no `fmp-validate → fmp-definition`
   dependency (H3).
 - No fixup profiles, non-zero addends, Hi/Lo pairing or field-ownership
@@ -407,11 +541,22 @@ comparing the materializer with itself proves the bytes.
 
 ## Consequences
 
-- A new instruction family can land as a package directory plus a spec entry.
-  The builder checks the manifest, the closure, ownership and canonical form,
-  and `read` checks the definition semantics. No central form table is edited;
-  package counts are generated, not hand-copied into `STATUS.md`
+- A new instruction family can land as a package directory plus a spec entry
+  when the publisher selects it; before that, `verify --package` validates the
+  package on its own. The builder checks the manifest, the closure, ownership and
+  canonical form, and `read` checks the definition semantics. No central form
+  table is edited; package counts are generated, not hand-copied into `STATUS.md`
   (`ADR-0125` decision 4).
+- A package is self-describing: `definition_format` and `target_identity` are
+  manifest facts, so a family that never existed in `definitions/` still has a
+  target to be checked against. `legacy_source` remains a migration record, not
+  a prerequisite.
+- `exports.types` and `exports.profiles` are reserved in the closed manifest
+  and source digest; H2 rejects non-empty lists, so the key set does not change
+  when H4 adds semantics.
+- `definition_digest` names execution rules; `release_digest` additionally names
+  the selected packages and their evidence. Documentation edits can move the
+  release identity without moving the machine definition.
 - `definitions/` and `fixtures/` do not move. The 128 payloads, the 104
   definition documents, the `payload_root` and the `definitions_root` keep their
   H1 values; a package build is a separate artifact.
@@ -431,6 +576,19 @@ comparing the materializer with itself proves the bytes.
 - **Let the builder resolve dependencies recursively from IDs.** Rejected: the
   spec would no longer contain the closure, and a missing dependency would
   trigger a scan instead of a rejection.
+- **Derive `definition_format` and `target_identity` from `legacy_source`.**
+  Rejected: a new package has no legacy file, and two compatible targets written
+  in different `fmp-def` versions could not be combined. Target facts are
+  self-declared; the pin only checks migration.
+- **Leave `exports.types`/`profiles` to a later format version.** Rejected: the
+  ADR would claim a closed format and a seamless H4 extension at once. Reserving
+  the syntax and rejecting non-empty lists is the narrower promise.
+- **Treat `requires_capabilities` as a comment in H2.** Rejected: a package
+  needing a primitive the core does not execute could enter a verified bundle.
+  H2 rejects unknown strings at build time; runtime negotiation stays H3.
+- **Use `verify --all` as the only package gate.** Rejected: it enumerates
+  specs, so a package that no publisher has selected would never be checked. The
+  independent `verify --package` path is required.
 - **Copy the newest definition row and compare only bytes.** Rejected: x86
   `0.78.0` rows are not the rows `X86-P1` was verified against; bytes agreeing
   for registers 0 and 3 does not make the rows equal (`HE-AC-11`).
@@ -451,10 +609,13 @@ comparing the materializer with itself proves the bytes.
 | `Definition` is closed and `bind` takes `Arc<Definition>` | `ADR-0127` §1; `fmp-validate/src/lib.rs`; `fmp-model/src/definition.rs` | high (read) |
 | `fmp_model::canonical` is the canonical JSON/digest implementation | `fmp-model/src/canonical.rs` | high (read) |
 | x86 `0.1.0` and `0.78.0` `mov` rows differ | canonical JSON comparison of the two rows; `0.78.0` adds `requires_extensions` and REX placements at bits 0/2 | high (measured on this host; not yet a Rust test) |
-| aarch64 selected rows are equal across the pinned and newest versions | canonical JSON comparison of the three `add` rows | high (measured) |
+| aarch64 selected rows are equal across the pinned and newest versions | canonical JSON comparison: the two `lsl0` rows are equal in `0.1.0`/`0.2.0`/`0.20.0`; `lsl12` is absent in `0.1.0` and equal in `0.2.0`/`0.20.0` | high (measured) |
 | rv64 selected rows are equal, but `0.6.0` target set differs | canonical JSON comparison; `0.6.0` is `["rv64i","rv64c"]`, the plans are `["rv64i"]`, and `check_target` requires equality for `fmp-def/0.1` | high (measured) |
 | `fmp-def/0.2` requires `requires_extensions` and rejects it in `0.1` | `bind_form` selects `FORM_FIELDS_V0_2` and `req`s the key; `FORM_FIELDS` rejects it as unknown | high (read) |
 | Builder determinism, digest reproduction, row equality and byte equality | not implemented | **unverified** — H2a/H2b must measure them |
+| `verify --package` and the changed-path CI gate | not implemented | **unverified** — H2a |
+| Unknown-capability rejection, reserved-asset rejection, version-conflict rule and aggregate limits | not implemented | **unverified** — H2a |
+| Evidence and release digests | not implemented | **unverified** — H2a/H2b |
 | Deep-JSON robustness | H0 probe reproduced a stack overflow; H2 does not change the parser | **unverified / out of H2** — H4 |
 
 ## Review triggers
@@ -475,3 +636,12 @@ comparing the materializer with itself proves the bytes.
 - Someone moves the package conformance harness into a runtime crate or adds a
   product dependency from `fmp-definition` to `fmp-materialize`: stop. That
   creates a second definition authority.
+- Someone makes `legacy_source` required for a package that is not a migration:
+  stop. Target facts are self-declared; requiring a legacy file recreates the
+  dependency this ADR removes.
+- Someone converts `fmp-def/0.1` rows to `0.2` inside the builder: stop. Mixed
+  closures are rejected; conversion is explicit H3 work.
+- Someone accepts a non-empty `exports.types` or `exports.profiles` in H2: stop.
+  H2 does not define their semantics and must fail closed.
+- Someone uses `verify --all` as the only package gate: stop. It enumerates
+  specs, so a new unselected package would never be verified.
