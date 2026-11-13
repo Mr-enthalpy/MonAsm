@@ -1,0 +1,7 @@
+{
+  "schema": "monasm.he1.baseline-anchor/0.2",
+  "payload_root": "sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9",
+  "definitions_root": "sha256:575b7c5f3817c4ed528b8e5dff02bb1fcb6d9024d17e79a79b64b9662635690e",
+  "set_by": "ADR-0126",
+  "note": "Frozen H0 roots. `tools/he1_baseline.py --check` requires the recorded snapshot to equal both values, so re-recording a snapshot cannot silently redefine the baseline. `payload_root` covers the 128 artifact payloads; `definitions_root` covers the sorted definition paths, raw-file digests and canonical digests, which the snapshot's own definition list cannot protect because `--record` rewrites it. Moving either value requires a compatibility ADR; the envelope root is deliberately not anchored because it carries materializer_version."
+}

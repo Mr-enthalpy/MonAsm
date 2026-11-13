@@ -7,6 +7,14 @@ name: gates
 # whitespace gate, and `tools/oracle/rerun.py` against the LLVM version the
 # oracle records pin.
 #
+# `ADR-0126` adds the H0 payload job: it re-materializes all 128 positives with
+# the binary this job just built and compares the payload projection recorded in
+# `research/he1/compatibility-results.json`. It compares payloads, not the
+# envelope: the envelope carries `materializer_version`, and the exact binary
+# digest lives in the separate implementation receipt, so a CI build
+# legitimately differs from the recording host. Envelope
+# digests are pinned narrowly instead, in `determinism.rs`.
+#
 # `check_mrs.py` and `check_rv64_source.py` stay local: both read
 # `research/external/`, which is gitignored, so a hosted runner cannot have it.
 # See ADR-0124 for why that is not a hole in the gate.
@@ -92,6 +100,37 @@ jobs:
       - name: Test the workspace
         working-directory: prototype
         run: cargo +"$RUST_TOOLCHAIN" test --workspace
+
+  baseline:
+    name: H0 payload baseline
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Before the binary exists: these tests do not need it, and a comparator
+      # that had quietly stopped comparing would otherwise stay green.
+      - name: The comparator itself is tested
+        run: python tools/test_he1_baseline.py
+
+      - name: Install the pinned toolchain
+        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
+
+      - name: Build the materializer
+        working-directory: prototype
+        run: cargo +"$RUST_TOOLCHAIN" build --bin fmp -p fmp-cli
+
+      # The binary is named explicitly: the tool would also guess it, but the
+      # job should fail on the build command, not on a search order. Probes are
+      # off — one of them feeds a known stack overflow to the current reader.
+      - name: Payload projection is unchanged
+        run: >
+          python tools/he1_baseline.py
+          --check research/he1/compatibility-results.json
+          --binary prototype/target/debug/fmp
 
   oracle:
     name: oracle rerun

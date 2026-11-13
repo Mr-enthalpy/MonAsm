@@ -505,6 +505,133 @@ digest-checked `llvmorg-23.1.2` release asset. The repaired run `42681104791`
 a hosted runner, so the next action is a new scope ADR before any further
 widening.
 
+**HE-1 is the new scope** (`ADR-0125`, 2026-11-10): the target is a horizontal
+extension base — target packages, an immutable definition bundle, a
+target-agnostic core and package-level conformance — not more coverage. H0 is
+**complete**: the baseline is recorded in
+`research/he1/compatibility-results.json` (`payload_root`
+`sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9`;
+104 definitions, 128 positives, 619 negatives, `122/128` oracle re-derivations
+with the six `manual-derivation` skips), and the seven characterization tests in
+`prototype/crates/fmp-cli/tests/he1_identity_characterization.rs` pin four
+measured concentration points, one legacy-fingerprint constraint and two
+controls. `ADR-0126` splits the artifact identity into a compared payload
+projection and an uncompared build receipt, and adds the `baseline` job so the
+128 payloads are re-checked on a Linux runner; `tools/test_he1_baseline.py`
+(75 tests) turns the eight manual comparator experiments into a CI gate, a fault
+now exits 2 rather than sharing exit 1 with a real diff, a document nested too
+deeply for Python's JSON reader (`RecursionError`, not a `ValueError`) is now a
+fault rather than a traceback with exit 1 on every read path — snapshot, anchor,
+fresh plan and materializer stdout — a JSON boolean (`false`/`true`) is not an
+integer where `level`, `size` or a count is required, and a structurally
+invalid snapshot is refused before the 128 materializations instead of failing
+inside the comparator. Structural validation is now complete: projections, both
+roots, every entry's envelope, digest types and recomputed roots are checked,
+each entry's content is re-hashed into its declared payload and envelope digests,
+and derived counts (`definitions.count`, `by_isa` sums, oracle sums, artifacts vs
+positives) must agree; a failing toolchain subprocess is recorded as
+`unavailable` instead of raising. An entry whose `envelope` was deleted is a
+fault even when the comparison would skip it, and a fresh artifact that loses a
+required member (`materializer_version`, `level`, `fingerprint`, …) is rejected
+before projection. Recording is explicit (`--record`),
+and `research/he1/baseline-anchor.json` pins `payload_root` **and**
+`definitions_root` independently, so re-recording the snapshot cannot silently
+reset either the artifacts or the definition files; a mismatch is a diff
+(exit 1), a malformed anchor is a fault (exit 2), and moving either root needs a
+compatibility ADR. The definitions root covers the sorted definition path,
+raw-file digest and canonical digest, so a whitespace-only edit followed by
+`--record` still fails the anchor. The envelope root is deliberately not anchored
+because it contains `materializer_version`.
+One probe found a real gap rather than a clean result: a 20 000-deep JSON plan
+ends the `fmp` process with `0xC00000FD` (stack overflow), which H4 owes a
+bounded rejection test. Next: H1, identity closure
+(`ADR-0127`). The implementation plan draft is
+`docs/architecture/he1-h1-plan.md`; its sixteen decisions (D1–D16) are recorded,
+with D3/D4/D5/D7 revised after the first review, D11/D12 added after the second
+(identity layering, and keeping `Plan.document` as a legacy-only input), D4
+revised again after the third (allocation failure is
+`MaterializationFailure::HostFailure`, not `Internal` or a plan rejection,
+because `emit` calls `try_reserve_exact` and §8.3 requires the split), and D13
+added after the fourth and expanded after the fifth: `bind` re-runs
+`plan::check_structure` on the public mutable `Plan` before producing
+`ValidatedPlan`, covering not only X86-P71 odd-length and non-hex `payload_hex`
+but all five parser numeric bounds (`lsb` 0–127, `width` 1–64, `bits` 1–64,
+`align_bits` 0–12, `transform_shift` 0–63), with `align_bits=128`,
+`transform_shift=128`, illegal-width and `u32::MAX` width-sum regression tests in
+H1a; the validator's descriptor arithmetic moves to `u64`/`checked_add` as a
+second line of defence. The third round also records that
+`BindIdentity` is not a full-artifact replay key (a `source_trace`-only change
+keeps it equal while `payload_digest` moves) and moves the
+definition-mutability test conversion into H1a; the fourth round routes
+`MaterializationFailure::Internal` to exit 2 through a distinct internal-fault
+channel, so an implementation bug is not reported as a rejected plan. The sixth
+round adds **D14**: `offset` is a full `u64`, so `check_fixup_overlap`'s
+`offset * 8` must use `u128`/checked arithmetic and the per-bit loops in
+`check_one_writer`/`check_fixup_ownership` must be clipped to `form.bits()`;
+H1a tests both from a legally parsed JSON plan in debug and release, and requires
+bounded completion rather than only "no panic". The same round splits the stage
+tests by API (H1a calls `check_structure`/`check` directly; H1b replays the cases
+through `bind`) and records that the old fingerprint test is **not** flipped: the
+legacy `fingerprint` stays stable, and `ParsedPlanIdentity`/`ExecutionReceipt`
+carry the new facts. The seventh round adds **D15** and **D16**: `bind` compares
+the full `(namespace, version, digest)` triple against the bound
+`Arc<Definition>` (the old `materialize` compared only the digest, and
+`Registry::find`'s namespace/version constraint is not on `bind`'s input), with
+H1b tests for namespace-only, version-only, digest-compatibility and the legacy
+facade; and `page` now requires `pcrel_page`, because `Page` + `PcRule::None`
+passed `check_fixup_kind` and fell into `internal(...)` in `emit` — H1a adds the
+static `E-FIXUP-001` rule, H1b replays it through `bind`, and H1a fills a 15-row
+table in `ADR-0127` naming the static precondition of every `internal(...)`
+branch. The round also withdraws the hardcoded "three post-encode failures"
+value-snapshot set: the two `E-SIZE-001` negatives are rejected by `validate`
+before `emit`, so H1a measures the actual stage and the set is decided there. A
+new risk is registered: `reg_number` slots may not declare `range`, so their
+total width can reach 64..127 and `1u64 << field_bits` in the validator
+overflows in debug; H1a reproduces it and either bounds `width_bits` at load or
+compares in `u128`, and "private fields" is explicitly not a discharge. The
+eighth round corrects three local points without changing the direction. First,
+the H1b width counterexample was contradictory: `bind` runs `check_structure`
+first, so the two `u32::MAX` widths must be rejected there with `E-PLAN-002`
+and never reach `check`; H1a's direct `check` call stays as the second-line
+proof, and §4.2's replay row now gives the expected stage per entry point
+instead of reusing one expectation for both. Second, `artifact_entry()` still
+read the fresh plan and the materializer stdout with bare `json.loads`, so a
+deeply nested document on those paths exited 1; both now use `parse_json()` and
+two tests pin it (67 comparator tests total). Third, the `materialize`
+signature `compile_fail` test moves from `fmp-validate` to `fmp-materialize`,
+with a positive control sharing each import path, because `fmp-validate` cannot
+import `fmp-materialize` and the doctest would have stayed green for the wrong
+reason. The plan's two stale "current facts" (only `E-SIZE-001`/`E-BYTE-001`
+fail after encoding; no host failure inside `materialize`) moved to a §1.3
+withdrawn-conclusions table. The ninth round closes two loose ends. First,
+`isinstance(value, int)` accepted JSON booleans because `bool` subclasses
+`int`: `level: false`, `size: true` and boolean counts passed both validators,
+and `True == 1` let a derived-count comparison agree, so a corrupt snapshot
+could be reported as a baseline difference instead of a fault. `is_json_integer`
+now requires `type(value) is int` and every JSON integer check in
+`validate_fresh_artifact()`/`validate_snapshot()` uses it; seven tests cover the
+bool cases and a corrupted snapshot exits 2 without calling `snapshot()`
+(75 comparator tests total). Second, H1 §5 no longer promises that the fields,
+semantics and rejection rules stay unchanged: it now says the document format is
+unchanged and existing legal payloads stay byte-identical, while inputs
+previously accepted by mistake, never explicitly rejected, or ended in an
+internal fault may be tightened, with every new rejection, diagnostic change and
+stage migration recorded in the compatibility table and §4.3. The tenth round
+binds execution to the hashed file: `resolve_binary("./fmp")` normalised to
+`Path("fmp")`, so POSIX `subprocess` searched `PATH` while `sha256_file()` opened
+the local file — a same-named PATH program could run while the implementation
+receipt recorded a different digest. `resolve_binary()` now returns
+`path.resolve()` for explicit and discovered binaries, and a real-subprocess test
+with a local `fmp` and a PATH shadow pins the executed program and the recorded
+digest to the same file (POSIX-only; CI passes a path with a separator and never
+took the bare-name branch). Two
+limits
+stay open for H1 acceptance rather than being claimed as passed: `FMP_BUILD_ID`
+is `None`, and debug/release payload equality is unmeasured.
+The phase board above
+stays the v0 record; HE-1 phases
+are reported in `research/he1/`.
+
 ### Widening backlog
 
 1. Decide the next format question, one ADR each, before widening any table.
