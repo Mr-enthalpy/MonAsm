@@ -145,7 +145,7 @@ invocation, `--check --record`, and `--out` without `--record` are usage faults
 (exit 2), so a routine run cannot rewrite the reference by accident. The anchor
 file is never written by the tool; editing it needs a compatibility ADR.
 
-`tools/test_he1_baseline.py` is the comparator's own gate: 74 tests over
+`tools/test_he1_baseline.py` is the comparator's own gate: 75 tests over
 synthetic snapshots and a synthetic anchor, no Rust binary and no `definitions/`
 scan. It fixes the properties that would otherwise be re-learned in production:
 a payload change fails, a count change fails, a receipt change alone passes,
@@ -160,7 +160,9 @@ even when every payload is unchanged, a fresh artifact missing
 document nested too deeply for Python's JSON reader is a fault on **all four**
 paths — snapshot, anchor, the fresh plan file and the materializer's stdout — a
 JSON boolean is not an integer (`bool` subclasses `int`, so `level: false` and
-`size: true` must be faults, not counts), a
+`size: true` must be faults, not counts), an explicit relative `--binary` is
+resolved before execution so `PATH` cannot substitute another program for the
+one whose digest is recorded, a
 deleted `envelope` is a fault even when `--check` would skip it, a failing
 toolchain subprocess is recorded as `unavailable`, and only `--record` can write
 a snapshot. The receipt bug was the first draft of `ADR-0126`'s split; the
@@ -169,8 +171,9 @@ the first full structure pass were the fourth, digest recomputation plus
 derived-count checks were the fifth, the definitions root plus fresh-artifact
 validation were the sixth, mapping `RecursionError` to a fault on the snapshot
 and anchor paths was the seventh, covering the fresh plan and the
-materializer stdout was the eighth, and rejecting JSON booleans where an integer
-is required was the ninth. CI runs the suite before building `fmp`.
+materializer stdout was the eighth, rejecting JSON booleans where an integer is
+required was the ninth, and resolving an explicit relative `--binary` before
+execution was the tenth. CI runs the suite before building `fmp`.
 
 `--binary` wins over discovery; discovery tries `prototype/target/debug/fmp.exe`
 then `prototype/target/debug/fmp`. If neither exists the tool prints the build

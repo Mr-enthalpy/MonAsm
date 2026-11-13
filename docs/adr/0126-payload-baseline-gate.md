@@ -129,7 +129,7 @@ Two further failures were found while fixing that one:
    each one names the shape it requires, so a comparator bug still raises rather
    than being reported as a fault.
 9. **The comparator is itself tested, in CI, without the binary.**
-   `tools/test_he1_baseline.py` holds 74 tests over synthetic snapshots and a
+   `tools/test_he1_baseline.py` holds 75 tests over synthetic snapshots and a
    synthetic anchor; the `baseline` job runs it before installing the toolchain.
    The eight manual experiments below are kept as history, but a manual
    experiment does not run on the next commit. The tests exist specifically
@@ -152,7 +152,15 @@ Two further failures were found while fixing that one:
    `is_json_integer`, requires `type(value) is int` and every JSON integer check
    in `validate_fresh_artifact()`/`validate_snapshot()` uses it; seven tests pin
    the bool cases, and a corrupted snapshot exits 2 without calling
-   `snapshot()`.
+   `snapshot()`. The tenth round bound execution to the hashed file:
+   `resolve_binary("./fmp")` used to return `Path("fmp")`, so POSIX `subprocess`
+   searched `PATH` while `sha256_file()` opened the local file; a same-named
+   program on `PATH` could execute while the receipt recorded another file's
+   digest. `resolve_binary()` now returns `path.resolve()` for an explicit
+   argument and for a discovered candidate, so execution and the implementation
+   receipt share one absolute file. A real-subprocess test with a local `fmp`
+   and a same-named PATH shadow pins it (POSIX-only, because the lookup failure
+   mode is POSIX-specific).
 10. **Recording is explicit, and a separate anchor makes re-recording visible.**
     A bare `python tools/he1_baseline.py` used to write the frozen snapshot to its
     default path, so a later commit could change an artifact, re-record, and still
@@ -290,9 +298,10 @@ Two further failures were found while fixing that one:
 | The envelope still participates when the receipt matches | tampered `envelope.sha256` with an identical receipt → exit 1 | high (measured) |
 | Skipping the envelope does not skip the payload | `implementation` replaced **and** `payload.bytes_hex` tampered → exit 1 | high (measured) |
 | An unknown schema is refused | schema `…/0.1` → exit 2, no comparison | high (measured) |
-| A fault is not reported as a diff | missing binary, unreadable snapshot, corrupt JSON, old schema, root array/`null`, missing `artifacts`, wrong-typed `implementation`, entry without `payload_sha256`, missing projection, wrong-typed or stale root, deleted envelope, content/digest mismatch, derived-count mismatch, anchor without `definitions_root`, and a fresh artifact missing a required member → exit 2; payload/count/envelope/definitions-root diffs → exit 1 | high (measured, `tools/test_he1_baseline.py` 74 tests, Python 3.8.10 locally; the hosted run is the PR's next `gates` run) |
+| A fault is not reported as a diff | missing binary, unreadable snapshot, corrupt JSON, old schema, root array/`null`, missing `artifacts`, wrong-typed `implementation`, entry without `payload_sha256`, missing projection, wrong-typed or stale root, deleted envelope, content/digest mismatch, derived-count mismatch, anchor without `definitions_root`, and a fresh artifact missing a required member → exit 2; payload/count/envelope/definitions-root diffs → exit 1 | high (measured, `tools/test_he1_baseline.py` 75 tests, Python 3.8.10 locally; the hosted run is the PR's next `gates` run) |
 | A reader limit is not a recorded difference on any read path | a 20 000-level array as the `--check` snapshot or `--anchor` raises `RecursionError`; before the seventh round it escaped as a traceback and exit 1, now `parse_json()` returns `Fault` and the CLI exits 2. The eighth round found the same escape in `artifact_entry()`: the fresh plan file and the materializer stdout were still parsed with bare `json.loads`, so the same input gave exit 1 on those two paths; both now use `parse_json()` and two `ArtifactEntryTests` pin `Fault` with a `nested too deeply … materializer stdout` detail | high (measured, seventh and eighth review rounds) |
 | A JSON boolean is not a JSON integer | `isinstance(True, int)` is true, so `level: false`, `size: true`, `artifacts.count: true`, `definitions.count: true` and `corpus.positives: true` passed the old checks; `True == 1` also satisfied a derived-count comparison, so a corrupt snapshot could surface as a baseline difference. `is_json_integer` (`type(value) is int`) now guards every integer field and seven tests pin the fresh-artifact and snapshot paths; a corrupted snapshot exits 2 without calling `snapshot()` | high (measured, ninth review round) |
+| The executed binary is the hashed binary | with a local `fmp` and a same-named shadow on `PATH`, `--binary ./fmp` used to stringify to `"fmp"`; POSIX `subprocess` executed the shadow while `sha256_file()` hashed the local file. `resolve_binary()` now returns an absolute resolved path for explicit and discovered binaries; a real-subprocess test asserts stdout is the local program and the digest equals the local file, not the shadow | high (measured, tenth review round; POSIX only) |
 | A well-formed but wrong-shaped snapshot is refused before materialization | `[]`, `null`, missing `artifacts`, string `implementation`, entry without `payload_sha256`, missing `projections.payload`, non-digest `payload_root`, `payload_root` not matching the entries, `artifacts.count` ≠ entry count, missing `envelope` → exit 2 with a named fault; the corresponding tests | high (measured) |
 | Content and declared digest cannot disagree | `payload.bytes_hex` edited without `payload_sha256` → exit 2; `envelope.sha256` changed → exit 2; `definitions.count`/`by_isa` sum/oracle sum/manual list mismatch → exit 2 | high (measured, fifth review round) |
 | A broken toolchain read is not a baseline diff | a subprocess exiting 3 with stderr → `unavailable: exit 3: …`; empty stdout → `unavailable: empty stdout`; a non-object definition/oracle record → `Fault` (2) | high (measured) |

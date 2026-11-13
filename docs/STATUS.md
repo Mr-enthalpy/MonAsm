@@ -518,7 +518,7 @@ measured concentration points, one legacy-fingerprint constraint and two
 controls. `ADR-0126` splits the artifact identity into a compared payload
 projection and an uncompared build receipt, and adds the `baseline` job so the
 128 payloads are re-checked on a Linux runner; `tools/test_he1_baseline.py`
-(74 tests) turns the eight manual comparator experiments into a CI gate, a fault
+(75 tests) turns the eight manual comparator experiments into a CI gate, a fault
 now exits 2 rather than sharing exit 1 with a real diff, a document nested too
 deeply for Python's JSON reader (`RecursionError`, not a `ValueError`) is now a
 fault rather than a traceback with exit 1 on every read path — snapshot, anchor,
@@ -611,12 +611,20 @@ could be reported as a baseline difference instead of a fault. `is_json_integer`
 now requires `type(value) is int` and every JSON integer check in
 `validate_fresh_artifact()`/`validate_snapshot()` uses it; seven tests cover the
 bool cases and a corrupted snapshot exits 2 without calling `snapshot()`
-(74 comparator tests total). Second, H1 §5 no longer promises that the fields,
+(75 comparator tests total). Second, H1 §5 no longer promises that the fields,
 semantics and rejection rules stay unchanged: it now says the document format is
 unchanged and existing legal payloads stay byte-identical, while inputs
 previously accepted by mistake, never explicitly rejected, or ended in an
 internal fault may be tightened, with every new rejection, diagnostic change and
-stage migration recorded in the compatibility table and §4.3. Two
+stage migration recorded in the compatibility table and §4.3. The tenth round
+binds execution to the hashed file: `resolve_binary("./fmp")` normalised to
+`Path("fmp")`, so POSIX `subprocess` searched `PATH` while `sha256_file()` opened
+the local file — a same-named PATH program could run while the implementation
+receipt recorded a different digest. `resolve_binary()` now returns
+`path.resolve()` for explicit and discovered binaries, and a real-subprocess test
+with a local `fmp` and a PATH shadow pins the executed program and the recorded
+digest to the same file (POSIX-only; CI passes a path with a separator and never
+took the bare-name branch). Two
 limits
 stay open for H1 acceptance rather than being claimed as passed: `FMP_BUILD_ID`
 is `None`, and debug/release payload equality is unmeasured.

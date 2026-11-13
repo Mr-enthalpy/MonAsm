@@ -17,7 +17,7 @@ Product code: **none**. Nothing under `prototype/crates/*/src/` changed.
 | `research/he1/H0-report.md` | new | This report |
 | `tools/he1_baseline.py` | new | Records and checks the snapshot by running the real `fmp` binary; never a build input |
 | `prototype/crates/fmp-cli/tests/he1_identity_characterization.rs` | new | Seven tests: four assert a hole HE-1/H3/H4 must close, one pins a constraint H1 must preserve (the legacy fingerprint reads a field the parser drops), two are controls (digest mismatch, non-object root). The deep-JSON finding is the Python probe, not a Rust test |
-| `tools/test_he1_baseline.py` | new (§7) | 74 tests over synthetic snapshots: the comparator fails on a payload or count change, passes on a receipt change alone, still compares payloads when the receipt changes, and refuses a structurally invalid snapshot or anchor with exit 2 before materializing (§8–§14). It also recomputes every entry digest and derived count, pins the definition files through a separate anchor root, rejects a fresh artifact that loses a required envelope member, treats a document nested too deeply for Python's JSON reader as a fault (exit 2) on every path including the fresh plan and the materializer stdout, rejects a JSON boolean where an integer is required (`level`, `size`, counts), proves a bare invocation cannot overwrite the frozen baseline, and records a failing toolchain subprocess as `unavailable` rather than raising. No binary needed, so CI runs it first |
+| `tools/test_he1_baseline.py` | new (§7) | 75 tests over synthetic snapshots: the comparator fails on a payload or count change, passes on a receipt change alone, still compares payloads when the receipt changes, and refuses a structurally invalid snapshot or anchor with exit 2 before materializing (§8–§15). It also recomputes every entry digest and derived count, pins the definition files through a separate anchor root, rejects a fresh artifact that loses a required envelope member, treats a document nested too deeply for Python's JSON reader as a fault (exit 2) on every path including the fresh plan and the materializer stdout, rejects a JSON boolean where an integer is required (`level`, `size`, counts), resolves an explicit relative `--binary` so PATH cannot substitute another program, proves a bare invocation cannot overwrite the frozen baseline, and records a failing toolchain subprocess as `unavailable` rather than raising. No binary needed, so CI runs it first; one test is POSIX-only because the PATH-shadowing failure mode is POSIX-specific |
 | `docs/architecture/he1-horizontal-extension.md` | moved from the repository root | Adopts the design document; header now names `ADR-0125` and the `HE-AC`/`HE-T` registry role. Trailing whitespace stripped: 811 lines, no wording removed |
 | `docs/adr/0125-he1-scope.md` | new | The scope decision and the conflict resolution |
 | `AGENTS.md` | edited | Current round, repository map (`docs/fmp-0.2/`, `docs/architecture/`, `packages/`, `bundles/`, `research/he1/`), three added done-criteria bullets. The eight hard rules and "Never do" are untouched |
@@ -614,6 +614,43 @@ frozen root moved.
    table and §4.3.
 
 Re-measured after this round: 61 workspace tests (7 characterization), 74
+comparator tests, `payload_root`
+`sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9`
+and `definitions_root`
+`sha256:575b7c5f3817c4ed528b8e5dff02bb1fcb6d9024d17e79a79b64b9662635690e`
+unchanged. The recorded snapshot was not re-recorded.
+
+## 15. Tenth review round (`211cef8`)
+
+The tenth review found one P2 evidence-binding gap in `resolve_binary()`. No
+product Rust code changed, no test or document outside the comparator moved, and
+neither frozen root changed.
+
+1. **A relative `--binary ./fmp` could execute a different program than it
+   hashed.** `Path("./fmp")` normalises to `Path("fmp")`; `str(binary)` is then
+   the bare name `"fmp"`, and POSIX `subprocess` searches `PATH` for it, while
+   `sha256_file(binary)` opens the file in the current directory. With a
+   same-named program on `PATH`, the materializer run and the recorded
+   `binary_sha256` could describe two different files. That breaks the
+   implementation receipt, and with it the branch that decides whether the
+   envelope may be compared. CI was not affected: it passes
+   `prototype/target/debug/fmp`, which contains a separator and therefore cannot
+   trigger the bare-name lookup.
+2. **The fix resolves the path, once, for execution and hashing.**
+   `resolve_binary()` now returns `path.resolve()` for an explicit argument and
+   for a discovered candidate, so both `run_materialize()` and
+   `implementation_of()` use one absolute file. The existing `Fault` and exit 2
+   classification is unchanged, and a missing binary still names the argument
+   the caller passed. The snapshot, the anchor and the definitions are untouched.
+3. **The regression test runs a real subprocess.** It creates `fmp` in a local
+   directory and a same-named shadow in a temporary `PATH`, passes `./fmp`, and
+   asserts the returned path is absolute, stdout is the local
+   `LOCAL_SELECTED`, and the recorded digest equals the local file and not the
+   shadow. It is skipped on Windows, where the POSIX `PATH` lookup does not
+   occur; the discovery tests still assert the resolved absolute path on every
+   host. The suite is 75 tests.
+
+Re-measured after this round: 61 workspace tests (7 characterization), 75
 comparator tests, `payload_root`
 `sha256:3f6d177d212642fcf6c2e0efbb717fcf8e936698c5f158f359c6965ecffefad9`
 and `definitions_root`
