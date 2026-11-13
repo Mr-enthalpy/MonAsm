@@ -383,6 +383,13 @@ fn target_name(target: &FixupTarget) -> String {
 /// ran. `build` is the compile-time `FMP_BUILD_ID`; when it is absent the
 /// receipt records `None` and does not claim `HE-T20`. Nothing is read from the
 /// environment at run time (`INV-05`).
+///
+/// `build` names a **source revision**, not a binary. Two builds of the same
+/// revision can differ in profile, compiler or target, so a full binary identity
+/// needs a build-manifest or binary digest; the baseline tool records that
+/// digest beside the receipt and `payload_digest` already pins the executed
+/// bytes. Adding the binary digest to this struct is deliberately left to the
+/// stage that persists receipts.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ImplementationIdentity {
     name: &'static str,
@@ -484,6 +491,19 @@ pub struct Materialization {
     pub receipt: ExecutionReceipt,
 }
 
+impl Materialization {
+    /// Whether the receipt still describes `artifact`.
+    ///
+    /// Both fields are public because a caller needs the bytes, so a caller can
+    /// break the pairing by editing the artifact after execution. Call this
+    /// before persisting or replaying: `false` means the recorded digest was
+    /// computed for different bytes. It compares the `payload/0.1` projection;
+    /// it does not re-run validation or encoding.
+    pub fn verify_receipt(&self) -> bool {
+        self.receipt.payload.digest() == payload_digest(&self.artifact)
+    }
+}
+
 /// A host limit, not a plan property and not an invariant break (`ADR-0127` D4).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HostFault {
@@ -492,6 +512,13 @@ pub enum HostFault {
     /// cannot even represent is still reported as a limit rather than as an
     /// internal fault.
     ImageReservation { requested: u64 },
+    /// The allocator returned an image whose length is not the requested one.
+    ///
+    /// [`materialize`] never encodes into it: a short buffer would panic on the
+    /// first fragment write and a long one would emit bytes the frozen plan did
+    /// not declare, so a violated allocator contract is a host failure, not a
+    /// plan rejection and not an internal invariant.
+    ImageLength { requested: u64, actual: u64 },
 }
 
 impl HostFault {
@@ -502,6 +529,9 @@ impl HostFault {
             HostFault::ImageReservation { requested } => {
                 format!("the host could not reserve a {requested}-byte image")
             }
+            HostFault::ImageLength { requested, actual } => format!(
+                "the allocator returned a {actual}-byte image for a {requested}-byte request"
+            ),
         }
     }
 }
@@ -545,6 +575,11 @@ pub fn materialize(validated: &ValidatedPlan) -> Result<Materialization, Materia
 
 /// [`materialize`] with the image allocator injected, so the host-failure path
 /// can be tested without exhausting memory or reading a hidden switch.
+///
+/// The callback must return exactly `size` bytes. That is checked before any
+/// fragment is written: a short buffer would panic on the first write and a long
+/// one would emit bytes the frozen plan did not declare, so either mismatch is
+/// [`HostFault::ImageLength`] and produces no artifact.
 pub fn materialize_with_allocator(
     validated: &ValidatedPlan,
     allocate: impl Fn(u64) -> Result<Vec<u8>, HostFault>,
@@ -586,7 +621,20 @@ fn emit(
             // The validator capped the total at `MAX_IMAGE_BYTES`, so a failed
             // reservation is a host limit, not a plan property. Report it
             // without aborting the process.
-            bytes = allocate(section.declared_size).map_err(MaterializationFailure::HostFailure)?;
+            let image =
+                allocate(section.declared_size).map_err(MaterializationFailure::HostFailure)?;
+            // The frozen size is the one fact this loop must never learn from
+            // the allocator: a shorter buffer panics on the first write and a
+            // longer one would return more bytes than the plan declares.
+            if image.len() as u64 != section.declared_size {
+                return Err(MaterializationFailure::HostFailure(
+                    HostFault::ImageLength {
+                        requested: section.declared_size,
+                        actual: image.len() as u64,
+                    },
+                ));
+            }
+            bytes = image;
             for fragment in &section.fragments {
                 let at = fragment.offset as usize;
                 match &fragment.body {

@@ -392,6 +392,85 @@ fn an_image_reservation_failure_is_a_host_failure() {
     );
 }
 
+/// A short image must be a host failure, not a panic on the first fragment
+/// write. The allocator contract is exact-length, and a violated contract says
+/// nothing about the plan.
+#[test]
+fn a_short_image_is_a_host_failure() {
+    let definition = definition("x86_64", "0.1.0");
+    let validated = bind(
+        positive("x86_64", "X86-P1-mov-r64-both-directions"),
+        definition,
+    )
+    .expect("the fixture binds");
+    let declared = validated.plan().sections[0].declared_size;
+    assert!(declared > 0, "the fixture has an image-backed section");
+
+    let failure = fmp_materialize::materialize_with_allocator(&validated, |size| {
+        Ok(vec![0u8; size.saturating_sub(1) as usize])
+    })
+    .expect_err("a short image is rejected");
+
+    match failure {
+        MaterializationFailure::HostFailure(HostFault::ImageLength { requested, actual }) => {
+            assert_eq!(requested, declared);
+            assert_eq!(actual, declared - 1);
+        }
+        other => panic!("expected a host length failure, got {other:?}"),
+    }
+}
+
+/// A long image must be a host failure too: accepting it would return more
+/// bytes than the frozen plan declares. The check runs before encoding, so no
+/// fragment is written into the surplus.
+#[test]
+fn a_long_image_is_a_host_failure() {
+    let definition = definition("x86_64", "0.1.0");
+    let validated = bind(
+        positive("x86_64", "X86-P1-mov-r64-both-directions"),
+        definition,
+    )
+    .expect("the fixture binds");
+    let declared = validated.plan().sections[0].declared_size;
+
+    let failure = fmp_materialize::materialize_with_allocator(&validated, |size| {
+        Ok(vec![0u8; size as usize + 1])
+    })
+    .expect_err("a long image is rejected");
+
+    match failure {
+        MaterializationFailure::HostFailure(HostFault::ImageLength { requested, actual }) => {
+            assert_eq!(requested, declared);
+            assert_eq!(actual, declared + 1);
+        }
+        other => panic!("expected a host length failure, got {other:?}"),
+    }
+}
+
+/// The artifact stays mutable, so the receipt can go stale; `verify_receipt`
+/// is the documented way to notice before persisting a pair that no longer
+/// describes the bytes.
+#[test]
+fn verify_receipt_notices_an_edited_artifact() {
+    let definition = definition("x86_64", "0.1.0");
+    let mut materialization = fmp_materialize::materialize(
+        &bind(
+            positive("x86_64", "X86-P1-mov-r64-both-directions"),
+            definition,
+        )
+        .expect("the fixture binds"),
+    )
+    .expect("the fixture executes");
+
+    assert!(materialization.verify_receipt(), "a fresh pair must verify");
+    assert!(!materialization.artifact.bytes.is_empty());
+    materialization.artifact.bytes[0] ^= 0xff;
+    assert!(
+        !materialization.verify_receipt(),
+        "the recorded digest no longer names these bytes"
+    );
+}
+
 /// The historical `materialize(&Plan, &Definition)` shape now routes through
 /// `bind`; a digest mismatch is a binding rejection, exactly as before.
 #[test]
