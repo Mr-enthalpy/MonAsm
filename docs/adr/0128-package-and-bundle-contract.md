@@ -155,7 +155,18 @@ when it is required and is legal only for the optional keys in the table above.
 `exports.forms` is sorted strictly by `id`, and `dependencies` strictly by
 `(package_id, version)`; a reordering is a different document and is rejected
 rather than silently canonicalised. Each `forms/*.json` holds exactly one form
-object; its `form_id` must equal the declared `id`. `exports.types` and
+object; its `form_id` must equal the declared `id`.
+
+`exports.forms` must be **non-empty**. `fmp_model::definition::read` rejects an
+empty `forms` array (`fmp-model/src/definition.rs`, `bind_forms`), and
+`monasm-package/0.1` rejects non-empty `exports.types`/`exports.profiles`
+(the reserved-asset rule below), so a zero-form package has no definition the
+H2 builder can produce or
+verify. An empty `exports.forms` is `empty-package` (exit 1), not a legal
+degenerate package. A type-only or profile-only package needs a later package
+format and an explicit reader path; H2 does not pretend such an object is
+buildable, and `oracle.status: "not-applicable"` is therefore rejected in a
+release-ready H2 package (§7.1). `exports.types` and
 `exports.profiles`, when written, use the same `{id, path}` shape and are sorted
 strictly by `id`; each file holds exactly one type or profile object, whose own
 `type_id`/`profile_id` must equal the declared `id`. They are reserved syntax:
@@ -539,7 +550,11 @@ part of `monasm-package/0.1`, not an implementation detail:
   never as 32 raw bytes and never as uppercase hex;
 - the two bare-hash fields — `evidence/manifest.json` `files[].sha256` and a
   case `evidence.sha256` — are 64 lowercase hex characters without a prefix,
-  and are hashed as that text;
+  and are the SHA-256 of the **raw committed file bytes**, including line
+  endings and insignificant whitespace. They are never computed over parsed or
+  canonicalised content. A CRLF/LF change, an indentation change or a trailing
+  newline edit changes the digest; this applies to `NOTICE`, Markdown, oracle
+  text and `tests/cases.json` alike;
 - concatenation is byte concatenation; there are no length prefixes and no
   separators other than the ones written in the row.
 
@@ -584,7 +599,7 @@ is hashed.
 | `evidence_digest` | `sha256(b"monasm-evidence/0.1" ++ 0x00 ++ canonical(evidence/manifest.json))` when the file exists; `files[].sha256` is bare 64-lowercase-hex text per §7.0; its `files` list includes `tests/cases.json` for a release-ready package | unlisted README/NOTICE text, oracle log contents, author path; the case bytes are covered only through their manifest hash | Not hashing `tests/cases.json`: editing a plan or expectation leaves the same release identity covering two test sets. |
 | `definition_digest` | `fmp_model::definition::read(merged_document).digest()`, which is exactly `sha256(canonical(merged_document))` with no domain separator | builder version, build time, host, source paths | Hashing only the package set: two different form rows produce the same bundle identity. |
 | `bundle_digest` | `sha256(b"monasm-bundle/0.1" ++ 0x00 ++ canonical(bundle_metadata))`, where metadata is `{bundle_id, definition_digest, definition_format, namespace, version, target, packages: [{package_id, version, source_package_digest}]}` sorted by package identity; every nested digest is the literal `sha256:` text | the `bundle_digest` field itself, the builder receipt, package paths | Including the digest in its own preimage: the fixed point does not exist. |
-| `release_digest` | `sha256(b"monasm-release/0.1" ++ 0x00 ++ canonical(release_metadata))`, where metadata is `{bundle_id, bundle_digest, definition_digest, packages: [{package_id, version, source_package_digest, evidence_digest?}]}` sorted by package identity; every nested digest is the literal `sha256:` text | the definition rows themselves, the builder receipt, sealed bytes | Two releases that share a definition but ship different evidence have no distinguishing identity. |
+| `release_digest` | `sha256(b"monasm-release/0.1" ++ 0x00 ++ canonical(release_metadata))`, where metadata is `{bundle_id, bundle_digest, definition_digest, packages: [{package_id, version, source_package_digest, evidence_digest}]}` sorted by package identity; every nested digest is the literal `sha256:` text. `evidence_digest` is present for every entry of a committed lock, which is written only for a release-ready closure (§7.1); the metadata shape admits its absence only for a development build, which is not a released identity | the definition rows themselves, the builder receipt, sealed bytes | Two releases that share a definition but ship different evidence have no distinguishing identity. |
 | `builder` | `{name, version, build: Option<String>}`; lock and receipt only | the definition digest | Putting the builder version into `definition_digest`: a builder bump falsely reports definition drift (`HE-T19`). |
 
 `evidence/manifest.json` is optional for a package under development and
@@ -616,10 +631,9 @@ that keeps execution identity stable while making the audit trail reviewable.
 
 #### 7.1 Evidence completeness for a releasable package
 
-A package is **release-ready** when a committed spec lists it or when it is
-checked with `verify --package --release`. The ordinary-extension CI gate uses
-`--release` (§8.1), so a new package is held to this bar before any publisher
-selects it. For a release-ready package the builder requires:
+A package is **release-ready** when a committed spec lists it, when it is
+checked with `verify --package --release`, or when `verify --all --check`
+rebuilds it. For a release-ready package the builder requires:
 
 - `evidence/manifest.json` present and matching the shape above;
 - `files` listing `tests/cases.json`, `NOTICE` (licence and attribution) and
@@ -631,12 +645,29 @@ selects it. For a release-ready package the builder requires:
   its `legacy_source` in `note`, while a new package points at a manual extract,
   vendor document, disassembly or independent assembler record under `evidence/`;
 - `oracle.status` set, with `reproduced` carrying a command,
-  `manual-derivation` carrying a rationale, and `not-applicable` legal only when
-  the package exports no forms; every skip carries a `case_id` and a reason;
+  `manual-derivation` carrying a rationale; `not-applicable` is reserved for a
+  formless package, which `monasm-package/0.1` rejects (§1), so it is not a
+  legal release value in H2; every skip carries a `case_id` and a reason;
 - every positive and negative case in `tests/cases.json` (§9.1) carrying an
   `evidence` reference that resolves to a listed file.
 
-A missing item is `evidence-incomplete` (exit 1). `evidence_digest` covers the
+Each `files[].sha256` is `sha256(raw_file_bytes)` per §7.0: line-ending,
+indentation or trailing-newline edits are real changes, not normalised away. The
+same rule applies to the case-level `evidence.sha256`.
+
+A package that is **not release-ready** may omit `evidence/manifest.json`. In
+that development mode `verify --package` checks each case's `evidence.path`
+exists inside the package and equals the case's own `evidence.sha256`; it
+computes no `evidence_digest`, and does not require `NOTICE`, `sources` or
+`oracle.status`. A manifest that is present is authoritative even in
+development mode: every case evidence must be listed and match, or the package
+is `case-evidence-mismatch`. `--release` with no manifest is
+`evidence-incomplete` (exit 1), never a silent downgrade. Structure, assets,
+`read` and the case contract are identical in the two modes; only this
+release-evidence set differs.
+
+A missing item in a release-ready package is `evidence-incomplete` (exit 1).
+`evidence_digest` covers the
 manifest, so `release_digest` distinguishes an incomplete release from a
 complete one without moving `definition_digest`.
 
@@ -722,27 +753,45 @@ supplies an explicit closure: `verify --all` uses the spec closure, and
 input, a package whose `dependencies` array is empty is trivially
 `dependency_closure: verified` (there is nothing to resolve), while a package
 with a non-empty array is `dependency_closure: unverified`. In `--release` mode
-the latter is `dependency-unverified` (exit 1); a development run may still exit
-0 for the structure claim but prints the unverified status. The standalone
-identity never depends on the closure, so this status cannot change
-`source_package_digest` or the generated `definition_digest`. H2 packages
-declare no dependencies; the split exists so a later shared-type package cannot
-pass `--release` by asserting an edge it never resolved.
+the latter is `dependency-unverified` (exit 1); a development run exits 0 for
+the structure claim but prints the unverified status. The standalone identity
+never depends on the closure, so this status cannot change
+`source_package_digest` or the generated `definition_digest`.
+
+Supplying a closure does not mean trusting the file that names it. For every
+dependency, `verify --package --closure <lock>` opens the lock entry's `path`
+under the same bounds as any package input (§12.1), recomputes that package's
+`source_package_digest` from its actual manifest and assets, and requires the
+recomputed value to equal both the lock entry and the depending package's
+`dependencies[].source_package_digest`. A disagreement is `dependency-mismatch`
+(exit 1). `verify --all --check` performs the same recomputation from the spec
+closure. A hand-written lock or spec digest therefore cannot mint
+`dependency_closure: verified`; only re-reading the bytes can. H2 packages
+declare no dependencies; the split and the re-read rule exist so a later shared
+package cannot pass `--release` by asserting an edge it never resolved.
 
 Lock and sealed bundle are committed release artifacts. CI runs
 `fmp-definition verify --all --check`, rebuilds each spec in memory, compares the
-sealed bundle byte-for-byte and the lock byte-for-byte **except `builder`**. CI
-also extracts every changed path under `packages/**`, maps it to its package root
-and runs `fmp-definition verify --package --release <directory>` once per
-package; that list is a CI input only and never decides what the builder selects.
-The builder is a receipt: it is shape-checked and printed, not compared, for the
-same reason `ADR-0126` compares `payload/0.1` and not `envelope/0.1` — a correct
-rebuild on a different commit must not fail the gate. Counterexample if the
-builder were compared: the first commit after the lock changes `FMP_BUILD_ID`
-and the gate fails without any definition change. A stale lock or sealed bundle
-in the compared fields is a difference (exit 1), not a silent refresh.
-Counterexample if lock/sealed were test-only: a published bundle could not be
-audited against the source that produced it.
+sealed bundle byte-for-byte and the lock byte-for-byte **except `builder`**. The
+changed-path job runs `verify --package <changed>` (structure) for every changed
+package and the `package_conformance` test; a package whose `dependencies` is
+empty also runs `verify --package --release <changed>`, so an ordinary
+independent extension is held to the complete evidence bar before any publisher
+selects it. A package with dependencies is not rejected merely for lacking a
+spec: its release evidence and closure are verified when a spec selects it
+(`--all --check`), or when the author runs `--release --closure <lock>` with an
+explicit local closure. That distinction is what lets an ordinary dependent
+package land without editing a global spec, while no dependent package can be
+called release-verified without a re-read closure. The changed-path list is a CI
+input only and never decides what the builder selects. The builder is a receipt:
+it is shape-checked and printed, not compared, for the same reason `ADR-0126`
+compares `payload/0.1` and not `envelope/0.1` — a correct rebuild on a different
+commit must not fail the gate. Counterexample if the builder were compared: the
+first commit after the lock changes `FMP_BUILD_ID` and the gate fails without any
+definition change. A stale lock or sealed bundle in the compared fields is a
+difference (exit 1), not a silent refresh. Counterexample if lock/sealed were
+test-only: a published bundle could not be audited against the source that
+produced it.
 
 #### 8.1 The changed-path map has explicit deletion and rename rules
 
@@ -778,6 +827,99 @@ their own rules, or a package can leave the gate silently:
 The CI path list remains an input to which packages are checked, never an input
 to what the builder selects. Deleting an unselected package still runs the
 removal check; deleting a selected package fails `verify --all --check`.
+
+#### 8.2 Spec, lock and sealed bundle are closed objects
+
+All three are closed: unknown keys and duplicate keys are rejected (`INV-07`),
+arrays are sorted as stated, and every digest value is the literal
+`sha256:<64 lowercase hex>` text from §7.0. The format key is `bundle_format`
+for the spec and the sealed bundle and `lock_format` for the lock, and each
+carries a distinct format identifier.
+
+**Spec** (`monasm-bundle-spec/0.1`) has exactly `bundle_format`, `bundle_id`,
+`target`, `definition_format`, `namespace`, `version`, `packages`.
+`target` has exactly `profile_id`, `identity`; `identity` has exactly the six
+keys in §4.1. `packages` is non-empty, sorted by `(package_id, version)`, and
+each entry has exactly `package_id`, `version`, `path`, `source_package_digest`.
+
+```json
+{
+  "bundle_format": "monasm-bundle-spec/0.1",
+  "bundle_id": "monasm.bundle.x86.example",
+  "target": {
+    "profile_id": "monasm.target.x86_64",
+    "identity": {
+      "isa_family": "x86",
+      "isa_variant": "x86-64",
+      "execution_mode": "64",
+      "enabled_extensions": [],
+      "byte_order": "little",
+      "address_width": 64
+    }
+  },
+  "definition_format": "fmp-def/0.1",
+  "namespace": "monasm.isa.x86",
+  "version": "0.1.0-h2",
+  "packages": [
+    {
+      "package_id": "monasm.x86.example",
+      "version": "0.1.0",
+      "path": "packages/x86_64/example/0.1.0",
+      "source_package_digest": "sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0"
+    }
+  ]
+}
+```
+
+**Lock** (`monasm-lock/0.1`) has exactly `lock_format`, `bundle_id`,
+`definition_format`, `namespace`, `version`, `target`, `bundle_digest`,
+`definition_digest`, `release_digest`, `packages`, `builder`. Its `target` is
+the same closed object as the spec's. Each package entry
+has exactly `package_id`, `version`, `path`, `source_package_digest` and
+`evidence_digest`; a lock is written only for a release-ready closure, so
+`evidence_digest` is required. `builder` has exactly `name`, `version` and an
+optional `build`; when there is no build identifier the key is **omitted**,
+never written as `null`. The lock drift projection is the canonical bytes of the
+lock after removing `builder`; `builder` is shape-checked and printed, not
+compared.
+
+**Sealed bundle** (`monasm-bundle/0.1`) has exactly `bundle_format`, `bundle_id`,
+`definition_format`, `definition_digest`, `bundle_digest`, `definition`,
+`packages`. `definition` is the merged definition document of §9 (not a second
+envelope), and each `packages` entry has exactly `package_id`, `version`,
+`source_package_digest`. There is no `path`, `builder`, `release_digest` or
+`evidence_digest`, so `verify --check` compares its bytes exactly, with no
+excluded key.
+
+The following fixed vectors pin the bundle and release metadata bytes. They use
+the §7.0 package (`monasm.x86.example`, source digest `sha256:1afee65c…`) and
+the pinned x86 `0.1.0` definition digest from `tools/check_definition.py`
+(`sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad`).
+They fix the metadata shape and the domain separators; they are not a claim
+that this is the final H2 bundle identity.
+
+```text
+bundle metadata canonical =
+{"bundle_id":"monasm.bundle.x86.example","definition_digest":"sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad","definition_format":"fmp-def/0.1","namespace":"monasm.isa.x86","packages":[{"package_id":"monasm.x86.example","source_package_digest":"sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0","version":"0.1.0"}],"target":{"identity":{"address_width":64,"byte_order":"little","enabled_extensions":[],"execution_mode":"64","isa_family":"x86","isa_variant":"x86-64"},"profile_id":"monasm.target.x86_64"},"version":"0.1.0-h2"}
+bundle_digest = sha256:b6d925747e41428db2e6dd31d72d7bd05739ab8d552fb53bcd73402af54931fd
+
+release metadata canonical =
+{"bundle_digest":"sha256:b6d925747e41428db2e6dd31d72d7bd05739ab8d552fb53bcd73402af54931fd","bundle_id":"monasm.bundle.x86.example","definition_digest":"sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad","packages":[{"package_id":"monasm.x86.example","source_package_digest":"sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0","version":"0.1.0"}]}
+release_digest = sha256:4e3d44a86a966b7d1829d823c6aad00f92cc08a567eee7d23e70e4ecfa6bf8cc
+```
+
+Both values were computed with Python `hashlib` over the ASCII domain separator
+(`monasm-bundle/0.1` or `monasm-release/0.1`), one `0x00` byte and the canonical
+bytes shown. A Rust implementation and a Python check must reproduce them; a
+change to the metadata shape or to the `sha256:` text rule is a format-version
+change, not an edit to this vector.
+
+The release vector deliberately omits `evidence_digest` because it uses the
+§7.0 development example, which has no evidence manifest. Every entry of a
+committed lock carries `evidence_digest` (§7.1), so a released bundle's
+`release_digest` includes it and differs from this development-shape value. The
+vector fixes the preimage shape and the omitted-key spelling, not a releasable
+bundle's final identity.
 
 ### 9. The builder generates bytes and lets `fmp_model` read them
 
@@ -1005,9 +1147,12 @@ present, an absent `symbols` is not an empty array, and the harness never
 normalises one into the other. `fingerprint` and `materializer_version` are
 never in the projection, and a case that declares either is `case-expect-shape`.
 Every case carries `evidence` with exactly `kind` (`oracle` or
-`manual-derivation`), `path` and `sha256`; the path must be listed in
-`evidence/manifest.json`, and `tests/cases.json` itself must also be listed
-there (§7.1), so `evidence_digest` covers the case plan and coverage.
+`manual-derivation`), `path` and `sha256`. In a release-ready package the path
+must be listed in `evidence/manifest.json`, and `tests/cases.json` itself must
+also be listed there (§7.1), so `evidence_digest` covers the case plan and
+coverage. In development mode without a manifest, `verify --package` checks the
+case's own `sha256` against the raw file bytes instead; a manifest that is
+present is authoritative in both modes.
 
 **Split of duties.** `verify --package` validates the case document: schema,
 coverage of every exported form by a positive and a `scope: "form"` negative,
@@ -1025,12 +1170,14 @@ bundle digest, so it does not reopen `HE-AC-05`.
 
 **CI.** `cargo test -p fmp-definition --test package_conformance` runs in the
 workspace gate and covers every package, including one no spec selects.
-`cargo run -p fmp-definition -- verify --package --release <changed>` runs for
-the changed-path set (§8.1). A structurally valid row whose opcode was flipped
-fails the positive case's byte comparison even when `read` accepts it. If an
-author also edits the expected bytes, the case must cite independent evidence,
-and §7.1 checks that the evidence is present, listed and hashed; the builder does
-not claim to have re-run the oracle. This limit is stated rather than hidden: the
+`cargo run -p fmp-definition -- verify --package --release <changed>` runs for a
+changed package whose `dependencies` is empty; a dependent package is
+release-verified through `--all --check` or an explicit `--closure` (§8), so the
+author gate does not require a global spec edit. A structurally valid row whose
+opcode was flipped fails the positive case's byte comparison even when `read`
+accepts it. If an author also edits the expected bytes, the case must cite
+independent evidence, and §7.1 checks that the evidence is present, listed and
+hashed; the builder does not claim to have re-run the oracle. This limit is stated rather than hidden: the
 gate blocks accidental and unilateral encoding errors, and the reviewable oracle
 record is what a second party audits.
 
@@ -1060,6 +1207,30 @@ declared cases; it does not claim a fresh oracle run for a new package.
 H2 does not add per-ISA branches to the harness. It dispatches from
 `tests/cases.json` and `package.json` only (`HE-T14`).
 
+#### 9.2 `monasm-cases/0.1` is H2's model, not a universal one
+
+`monasm-cases/0.1` deliberately promises only what H2 can execute: one
+`fmp/0.1` plan, exactly one instruction, and a negative neighbourhood expressed
+as one operand-surface mutation. It does not define:
+
+- `fmp/0.2` plans (H3): a case with an unknown plan `format_version` is
+  rejected, not translated;
+- zero-operand forms (H3): there is no operand pointer to mutate, so the
+  `scope: "form"` rule cannot be satisfied. H2 packages export forms with
+  operands; a zero-operand form needs a new case model, not a plan-scope
+  negative disguised as coverage;
+- multi-instruction plans or paired-fixup scenarios (H4): the one-instruction
+  rule is part of this format, not an implementation shortcut.
+
+The case document declares `cases_format`; the builder rejects any value other
+than `monasm-cases/0.1` with `case-format-unsupported` (exit 1). H3/H4 must add
+`monasm-cases/0.2` (or an explicitly versioned scenario format) with its own
+coverage rule, and a package selects it by version. Reusing `0.1` silently for
+`fmp/0.2` or multi-instruction cases is forbidden. The case-format version is
+independent of `package_format`, so adding that support does not rename packages
+or move `source_package_digest`; it does require a new `tests/cases.json`
+contract and harness path.
+
 ### 10. The legacy bridge is one method, and it is H2-only
 
 `VerifiedBundle` exposes:
@@ -1084,22 +1255,23 @@ does not pretend to be `fmp/0.1` diagnostics.
 
 | Class | Examples | Exit |
 |---|---|---|
-| Deterministic rejection | manifest shape (required/optional keys), path escape, missing/duplicate/cyclic dependency, two versions of one package ID, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, case/plan/form binding, case baseline or mutation, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit | 1 |
+| Deterministic rejection | manifest shape (required/optional keys), empty forms, path escape, missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit | 1 |
 | Host / I/O / internal | unreadable file, unwritable lock, internal invariant break, materializer `Internal`/`HostFailure` during conformance | 2 |
 | Success | build or verify passed, digest printed | 0 |
 
 The enum names these rejections (`unsupported-capability`, `unsupported-asset`,
 `version-conflict`, `aggregate-limit`, `legacy-row-mismatch`,
 `legacy-target-mismatch`, `evidence-mismatch`, `evidence-incomplete`,
-`missing-cases`, `uncovered-form`, `case-evidence-mismatch`,
+`missing-cases`, `uncovered-form`, `empty-package`, `case-evidence-mismatch`,
 `case-plan-identity`, `case-form-mismatch`, `case-error-scope`,
-`case-baseline-invalid`, `case-mutation-mismatch`,
+`case-format-unsupported`, `case-baseline-invalid`, `case-mutation-mismatch`,
 `case-diagnostics-mismatch`, `case-expect-shape`, `form-family-mismatch`,
 `reserved-identity`, `path-version-mismatch`, `published-package-modified`,
-`unmapped-package-path`, `dependency-unverified`); they are `BuildError`
-variants, not `fmp/0.1` diagnostic codes. `case-materialize-fault` is the
-conformance harness's name for an unexpected `Internal`/`HostFailure`; it is
-never a passing case and reports exit 2, the host/internal class.
+`unmapped-package-path`, `dependency-unverified`, `dependency-mismatch`); they
+are `BuildError` variants, not `fmp/0.1` diagnostic codes.
+`case-materialize-fault` is the conformance harness's name for an unexpected
+`Internal`/`HostFailure`; it is never a passing case and reports exit 2, the
+host/internal class.
 
 The `fmp` CLI's 0/1/2 meanings are unchanged. Package-build errors never enter
 `bind`'s diagnostic array.
@@ -1269,6 +1441,9 @@ comparing the materializer with itself proves the bytes.
 - No fixup profiles, non-zero addends, Hi/Lo pairing or field-ownership
   semantics (H4).
 - No deep-JSON fuzzing or full input-robustness programme (H4).
+- No case format beyond `monasm-cases/0.1`: no `fmp/0.2` cases, no zero-operand
+  form coverage and no multi-instruction fixup scenario. Those need an explicitly
+  versioned `monasm-cases/0.2` (H3/H4, §9.2).
 - No real same-ISA A/B packages or parallel workflows (H5).
 - No migration of the 104 definitions or 619 negatives; no bulk form renaming.
 
@@ -1296,6 +1471,17 @@ comparing the materializer with itself proves the bytes.
 - Digest preimages, the Level 0/Level 1 projections and the package budgets are
   frozen at the byte and key level, with a cross-language vector, so a Rust and a
   Python implementation cannot silently disagree.
+- A development package can be structure-verified without `NOTICE`, `sources` or
+  an evidence manifest; `--release` and spec selection still require the complete
+  set, so the weaker mode never becomes a release claim. The case's own hash is
+  checked against raw file bytes in either mode.
+- A package with dependencies is not blocked by the author gate: structure and
+  conformance run without a spec, while release verification requires a spec
+  closure or `--closure <lock>` and re-reads every dependency. Asserting a
+  digest in a hand-written lock is not enough to claim the closure.
+- A zero-form package is rejected as `empty-package`; the manifest never
+  advertises an object that `definition::read` cannot build. Type-only packages
+  wait for a later format version rather than passing as an empty definition.
 - A package is self-describing: `definition_format` and `target_identity` are
   manifest facts, so a family that never existed in `definitions/` still has a
   target to be checked against. `legacy_source` remains a migration record, not
@@ -1355,6 +1541,23 @@ comparing the materializer with itself proves the bytes.
 - **Let `verify --package` claim the dependency closure from manifest shape
   alone.** Rejected: it cannot prove existence or digest equality. The closure
   status stays `unverified` without an explicit closure (§8).
+- **Trust the digests a lock or spec already contains.** Rejected: a hand-written
+  closure could name a dependency that is absent or changed. `--closure` and
+  `--all` re-read each listed package and recompute `source_package_digest`
+  before reporting `dependency_closure: verified` (§8).
+- **Require the full release evidence manifest from every development package.**
+  Rejected: it makes an ordinary author assemble `NOTICE`, sources and oracle
+  status before the package can be structure-checked, while `--release` already
+  enforces the complete set. Development mode checks the case's own hash; a
+  present manifest is still authoritative (§7.1).
+- **Allow a formless package because `definition::read` could be bypassed.**
+  Rejected: `read` is the only definition authority, and it rejects an empty
+  `forms` array. A formless manifest would advertise an object no H2 build can
+  produce; it is `empty-package` (§1).
+- **Reuse `monasm-cases/0.1` for `fmp/0.2`, zero-operand or multi-instruction
+  cases.** Rejected: the one-instruction and operand-mutation rules would be
+  silently reinterpreted. A new case-format version must state its own coverage
+  (§9.2).
 - **Let the builder resolve dependencies recursively from IDs.** Rejected: the
   spec would no longer contain the closure, and a missing dependency would
   trigger a scan instead of a rejection.
@@ -1420,7 +1623,10 @@ comparing the materializer with itself proves the bytes.
 | `fmp_model::canonical` is the canonical JSON/digest implementation | `fmp-model/src/canonical.rs` | high (read) |
 | `definition_digest` is `sha256(canonical(document))` with no domain separator | `fmp-model/src/definition.rs` line 252 calls `canonical::canonical_digest(document)` | high (read) |
 | Level 0 has no `symbols`; Level 1 emits `symbols` only when the table is included | `fmp-materialize/src/lib.rs` `level_zero_json` and `to_json`; the call site sets `symbols` from `plan.output.include_symbol_table` | high (read) |
-| The digest fixed vector is stable across two implementations | the vector in §7.0; Python `hashlib` and .NET `SHA256` both produced `1afee65c…` | high (measured twice) |
+| The digest fixed vector is stable across two implementations | the §7.0 vector; Python `hashlib` and .NET `SHA256` both produced `1afee65c…` | high (measured twice) |
+| The bundle/release vectors follow the frozen domain separators | §8.2; Python `hashlib` recomputed `b6d92574…` and `4e3d44a8…` from the canonical bytes | high (measured) |
+| `definition::read` rejects an empty `forms` array | `fmp-model/src/definition.rs` `bind_forms` returns "a definition must declare at least one form" | high (read) |
+| `files[].sha256` is a raw-byte hash, not a canonical-content hash | §7.0 rule; no parser is involved in the builder's file hashing | high (specified; H2a must test CRLF/whitespace) |
 | x86 `0.1.0` and `0.78.0` `mov` rows differ | canonical JSON comparison of the two rows; `0.78.0` adds `requires_extensions` and REX placements at bits 0/2 | high (measured on this host; not yet a Rust test) |
 | aarch64 selected rows are equal across the pinned and newest versions | canonical JSON comparison: the two `lsl0` rows are equal in `0.1.0`/`0.2.0`/`0.20.0`; `lsl12` is absent in `0.1.0` and equal in `0.2.0`/`0.20.0` | high (measured) |
 | rv64 selected rows are equal, but `0.6.0` target set differs | canonical JSON comparison; `0.6.0` is `["rv64i","rv64c"]`, the plans are `["rv64i"]`, and `check_target` requires equality for `fmp-def/0.1` | high (measured) |
@@ -1430,10 +1636,12 @@ comparing the materializer with itself proves the bytes.
 | `verify --package`, the standalone identity, the case/plan/form binding, the release evidence hash and the changed-path gate (including deletion/rename) | not implemented | **unverified** — H2a |
 | The generic `family(form_id) == isa_family` rule and its cross-ISA negative | not implemented; `check_form_id` only checks the family in isolation | **unverified** — H2a |
 | Unknown-capability rejection, reserved-asset rejection, version-conflict rule and aggregate limits | not implemented | **unverified** — H2a |
-| Evidence completeness, `evidence_digest` and `release_digest` | not implemented | **unverified** — H2a owns the mechanism; H2b adds assets only |
+| Evidence completeness, `evidence_digest` and `release_digest`, including development-mode direct case hashing versus the release manifest | not implemented | **unverified** — H2a owns the mechanism; H2b adds assets only |
 | Case, evidence, spec and lock byte/count budgets, including the cumulative per-package asset budget | not implemented | **unverified** — H2a |
 | Immutable published version directories, legacy target consistency, form-scope mutation coverage, complete diagnostic matching and level-specific projections | not implemented | **unverified** — H2a |
-| Dependency-closure status distinct from package structure | not implemented | **unverified** — H2a |
+| Dependency-closure status distinct from package structure, including re-reading a `--closure` lock and the dependent-package author path | not implemented | **unverified** — H2a |
+| Closed spec/lock/sealed shapes, `builder` omission and the lock drift projection | not implemented | **unverified** — H2a |
+| `empty-package` rejection and the rejection of `monasm-cases/0.1` for `fmp/0.2`/zero-operand cases | not implemented | **unverified** — H2a |
 | Pre-parse JSON depth rejection | not implemented; H0 probe only shows the existing recursive parser can overflow | **unverified** — H2a must add the iterative budget |
 | Deep-JSON robustness | H0 probe reproduced a stack overflow; H2 does not change the parser | **unverified / out of H2** — H4 |
 
@@ -1464,6 +1672,18 @@ comparing the materializer with itself proves the bytes.
   H2 does not define their semantics and must fail closed.
 - Someone uses `verify --all` as the only package gate: stop. It enumerates
   specs, so a new unselected package would never be verified.
+- Someone lets a development package skip its case hash check, or lets
+  `--release` proceed without an evidence manifest: stop. Development mode checks
+  the case's own `sha256`; release mode requires the complete set (§7.1).
+- Someone reports `dependency_closure: verified` from a lock or spec digest
+  without re-reading the dependency bytes: stop. That is the hand-written-lock
+  failure §8 rejects.
+- Someone accepts an empty `exports.forms` because the merged document would
+  "still read": stop. `definition::read` rejects it; the package is
+  `empty-package` (§1).
+- Someone reuses `monasm-cases/0.1` for `fmp/0.2`, a zero-operand form or a
+  multi-instruction fixup scenario: stop. A new case-format version is required
+  (§9.2).
 - Someone derives the standalone namespace/version from the path, the working
   directory or a spec: stop. The `monasm-standalone/0.1` rule must be
   reproducible and distinct from a release identity.
