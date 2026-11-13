@@ -310,14 +310,14 @@ Stage: H1b (`ADR-0125`, `ADR-0127`; plan `docs/architecture/he1-h1-plan.md`
 §3.2–§3.4, §4.2, §5, §6 second row)
 Branch: `he1/h1b-validated-plan`
 Base: `4d3f8de` (merged H1a PR)
-Tree: the branch tip that contains this report; no code change was made after
-the commands below.
+Tree: `176d396` plus this report; the materializer code under test did not
+change after the commands below.
 
 H1b makes `ValidatedPlan` the only executable input, returns the artifact with
 an `ExecutionReceipt`, splits materialization failures by who is at fault, and
 keeps the historical two-argument entry working by routing it through `bind`.
-It does **not** claim H1 acceptance: the three-host CI run, a non-empty
-`FMP_BUILD_ID` and debug/release payload equality are still open (§11.6).
+It closes the last H1 acceptance item (a traceable build label) and the
+acceptance result is recorded in §11.8.
 
 ### 11.1 Change scope
 
@@ -479,9 +479,6 @@ Proved by a test or a compile-time property:
 
 Not proved here:
 
-- **H1 acceptance.** `FMP_BUILD_ID` is still `None`, so a hosted artifact still
-  cannot name its build. The three-host CI run is green and debug/release
-  payload equality is measured (§11.7 steps 1 and 3).
 - **A real internal fault.** No test forces one. The `Internal` channel is
   covered by the pure `exit_code`/`classify` unit test and by the runtime
   arm; forcing a fault would require corrupting a validated plan or a test-only
@@ -491,6 +488,9 @@ Not proved here:
   particular machine's memory.
 - **Byte-identical diagnostic arrays for all 619 negatives.** Only the four
   measured post-encode fixtures have value snapshots.
+- **H2–H4 and plans outside the corpus.** H1 acceptance says nothing about
+  packages, bundles, the horizontal-extension classes, or a plan that is not one
+  of the fixtures.
 
 ### 11.7 Next
 
@@ -524,4 +524,25 @@ H1 acceptance, in this order:
    release payloads equal the debug-recorded snapshot. This is corpus equality,
    not a proof about plans outside the fixtures.
 4. Only then write the H1 acceptance result; H1b being green locally is not that
-   result.
+   result. **Done, below.**
+
+### 11.8 H1 acceptance
+
+H1 is accepted on `176d396` (2026-11-14). The criteria are `HE-AC-06` together
+with `HE-T02`, `HE-T03`, `HE-T04` and the unchanged payload root
+(`docs/architecture/he1-horizontal-extension.md` §13/§14;
+`docs/architecture/he1-h1-plan.md` completion definition):
+
+| Criterion | Evidence |
+|---|---|
+| `HE-AC-06`: a validated definition and plan cannot be changed through public fields, and the output identity names the executed object | `Definition` is closed (`H1a`); `ValidatedPlan` has private fields, no `Clone`, no constructor and one producer (`bind`); three `compile_fail` doctests; `a_mutated_operand_changes_the_plan_identity`; `a_bind_identity_does_not_identify_the_legacy_artifact` |
+| `HE-T02`: modifying the source DTO cannot reuse an existing credential | `he1_bind.rs` replays the mutated inputs; `ValidatedPlan` cannot be rebuilt from one |
+| `HE-T03`: tampered definition content with the declared digest | `a_definition_edit_reloads_to_a_new_digest`; `legacy_facade_rejects_a_digest_mismatch`; `a_definition_identity_mismatch_is_rejected_by_the_legacy_facade` |
+| `HE-T04`: validate A, execute B | not expressible: `materialize` takes only `&ValidatedPlan`, and the plan and definition travel together |
+| Payloads unchanged | `payload_root sha256:3f6d177d…ffefad9`, `definitions_root sha256:575b7c5f…35690e`, `122/128` oracle with six `manual-derivation` skips |
+| Receipt names the build | CI compiles with `FMP_BUILD_ID = 176d396b8dc8080f5c247352b794f18c0ff8d233`; the job log prints it, and `receipt_names_the_build_that_ran` fails when the run-time label is not in the compiled identity |
+| Three hosts | `gates` run `43492746429` (workspace, document/definition, baseline, oracle) and `determinism` run `43492746267` (ubuntu, macos, windows) |
+| Debug/release equality | the release binary reproduces the same `payload_root` as the debug-recorded snapshot |
+
+The acceptance takes effect with this PR; the phase board still shows H2–H4
+open.

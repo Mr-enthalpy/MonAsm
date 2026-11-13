@@ -1,8 +1,9 @@
 # H1 实施计划：封闭执行对象与身份
 
-- 状态：**已采纳（H1a 与 H1b 已落地；H1 验收待三主机 CI）**。规范决策在
-  `docs/adr/0127-execution-identity.md`；本文件保留为实施计划、验收映射和
-  待审问题清单。H1a/H1b 的实现范围与实测证据见 `research/he1/H1-report.md`。
+- 状态：**已采纳（H1a 与 H1b 已落地；H1 已于 2026-11-14 验收，见 §11.8）**。
+  规范决策在 `docs/adr/0127-execution-identity.md`；本文件保留为实施计划、
+  验收映射和待审问题清单。H1a/H1b 的实现范围与实测证据见
+  `research/he1/H1-report.md`。
 - 基线：`d42125d`（H0 已提交，工作树干净）。文中行号均取自该提交；H1a 新增
   代码的行号取自 `he1/h1a-identity-core` 的落地提交。
 - 上游：`ADR-0125`；`ADR-0126`（身份分层与构建收据）；
@@ -20,12 +21,12 @@ H1a（§6 表第一行）已落地并全绿：`Definition` 封闭、`Registry` �
 实测。H1b（§6 表第二行）也已落地：`ValidatedPlan`、`bind`、新的
 `materialize`、`ExecutionReceipt`、`MaterializationFailure`、CLI 失败分流和
 facade 都已实现并被测试覆盖；`bind`/`materialize` 的 doctest 把「只能传
-`ValidatedPlan`」写成编译期负例。H1 的**验收**仍未宣称完成：
-`FMP_BUILD_ID` 仍为 `None`；debug/release 载荷一致性已对语料实测（同一
-`payload_root sha256:3f6d177d…ffefad9`，release 二进制摘要不同）；三主机 CI 已在
-`he1/h1b-validated-plan` 的 `3b26bb1` 上跑绿（`gates` run `43487661759`：
-workspace、document/definition、baseline、oracle 四个 job 全绿；
-`determinism` run `43487662063`：ubuntu、macos、windows 全绿）。
+`ValidatedPlan`」写成编译期负例。H1 **已验收**（2026-11-14，`176d396`）：
+`HE-AC-06` 与 `HE-T02`/`HE-T03`/`HE-T04` 有运行期和编译期证据；debug/release
+载荷一致性已对语料实测（同一 `payload_root sha256:3f6d177d…ffefad9`）；CI 以
+PR head SHA 作为 `FMP_BUILD_ID` 编译，receipt 因此记录构建来源；三主机 CI 在
+`176d396` 上全绿（`gates` run `43492746429`、`determinism` run `43492746267`）。
+验收只覆盖 H1，H2–H4 仍未开始。
 
 ---
 

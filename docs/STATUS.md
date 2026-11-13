@@ -544,9 +544,10 @@ raw-file digest and canonical digest, so a whitespace-only edit followed by
 because it contains `materializer_version`.
 One probe found a real gap rather than a clean result: a 20 000-deep JSON plan
 ends the `fmp` process with `0xC00000FD` (stack overflow), which H4 owes a
-bounded rejection test. H1b has landed (below); H1 acceptance still owes a build
-label, now that the three-host CI run is green and debug/release payload equality
-is measured for the corpus. The accepted implementation plan is
+bounded rejection test. H1b has landed and **H1 is accepted** (below,
+2026-11-14): the three-host run is green, the receipt names its source revision,
+and release payloads equal the debug-recorded snapshot. The accepted
+implementation plan is
 `docs/architecture/he1-h1-plan.md`; its sixteen decisions (D1–D16) are recorded,
 with D3/D4/D5/D7 revised after the first review, D11/D12 added after the second
 (identity layering, and keeping `Plan.document` as a legacy-only input), D4
@@ -699,7 +700,17 @@ digest. The build label is wired into
 CI: `gates.yml` (`workspace`, `baseline`) and `determinism.yml` (`cross-host`)
 compile with `FMP_BUILD_ID` set to the pull request head SHA (or the pushed
 commit on `main`), so the receipt names the source revision; local builds keep
-`None`. H1 acceptance is recorded once the run carrying that wiring is green.
+`None`. An empty label, or a label present at run time but absent from the
+compiled identity, fails the job; both directions were measured. The run
+carrying this wiring is green on `176d396`: `gates` run `43492746429` passes the
+workspace, document and definition, baseline and oracle jobs (its log prints
+`FMP_BUILD_ID=176d396b8dc8080f5c247352b794f18c0ff8d233`), and `determinism` run
+`43492746267` passes on ubuntu, macos and windows. **H1 is therefore accepted**
+(2026-11-14): `HE-AC-06` with `HE-T02`/`HE-T03`/`HE-T04` is proved by the
+compile-time and runtime tests below, the 128 payloads and 104 definitions are
+unchanged, the oracle is still `122/128`, the receipt names its build, and
+debug/release payloads agree. The acceptance covers H1 only; H2–H4 and plans
+outside the fixture corpus stay open.
 The phase board above
 stays the v0 record; HE-1 phases
 are reported in `research/he1/`.
