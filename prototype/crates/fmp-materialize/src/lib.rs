@@ -346,11 +346,11 @@ pub fn materialize(plan: &Plan, definition: &Definition) -> Result<Artifact, Vec
     // Step 3: the plan's digest must name this definition exactly. A digest
     // mismatch is checked before any rule is applied, because the rules below
     // are the ones the digest vouches for.
-    if plan.definition.digest != definition.digest {
+    if plan.definition.digest != definition.digest() {
         errors.push(
             Diagnostic::new(codes::E_DEF_001, "/definition_identity/digest")
                 .with("declared", plan.definition.digest.as_str())
-                .with("actual", definition.digest.as_str())
+                .with("actual", definition.digest())
                 .with(
                     "reason",
                     "definition digest does not match the loaded definition",
@@ -632,17 +632,40 @@ fn encode_instruction(
 /// VEX name their extension bits `B̄`/`R̄`, so a set extension bit is written as
 /// zero. The complement is a constant, not a choice.
 fn write_field(bytes: &mut [u8], slot: &Slot, value: i128) {
-    let total = slot.width_bits;
-    let masked = value & mask(total);
-    let mut remaining = total;
+    // A field may be wider than `i128` (`ADR-0127` §7.1: the loader bounds each
+    // placement to 64 bits, not their sum). Masking the *whole* field and then
+    // shifting would need a `2^width` mask and a shift of `width`, so extract
+    // each placement directly instead.
+    let mut remaining = slot.width_bits;
     for placement in &slot.placements {
         remaining -= placement.width;
-        let mut chunk = (masked >> remaining) & mask(placement.width);
+        let mut chunk = field_bits(value, remaining, placement.width);
         if placement.inverted {
-            chunk ^= mask(placement.width);
+            chunk ^= mask_u128(placement.width);
         }
-        write_bits(bytes, placement.bit_offset, placement.width, chunk);
+        // A placement is at most 64 bits (loader domain `u7`), so the value
+        // always fits the signed writer.
+        write_bits(bytes, placement.bit_offset, placement.width, chunk as i128);
     }
+}
+
+/// Bits `[start, start + width)` of `value`, read as an infinite two's-complement
+/// integer (the field's semantics: a wider field is zero-extended for a
+/// non-negative value and sign-extended for a negative one).
+///
+/// `i128` holds the low 128 bits; every bit above is `value`'s sign bit. The
+/// second sentence is what the old `value & mask(total)` could not express once
+/// `total > 128`.
+fn field_bits(value: i128, start: u32, width: u32) -> u128 {
+    if start >= 128 {
+        return if value < 0 { mask_u128(width) } else { 0 };
+    }
+    let mut chunk = (value as u128) >> start;
+    if value < 0 && start > 0 {
+        // Bits at or above 128 are one; `chunk` is missing those positions.
+        chunk |= u128::MAX << (128 - start);
+    }
+    chunk & mask_u128(width)
 }
 
 /// Apply one fixup to one instruction's bytes, exactly one mode.
@@ -860,6 +883,16 @@ fn mask(width: u32) -> i128 {
     }
 }
 
+/// `mask` for the unsigned chunk arithmetic in [`field_bits`], where a 127-bit
+/// mask must not go through `i128::MIN`.
+fn mask_u128(width: u32) -> u128 {
+    if width >= 128 {
+        u128::MAX
+    } else {
+        (1u128 << width) - 1
+    }
+}
+
 /// Write `width` bits of `value` at `lsb`, in little-endian template numbering
 /// (bit 0 is the least significant bit of byte 0) — the same convention
 /// `definitions/` uses for placements.
@@ -878,7 +911,10 @@ fn write_bits(bytes: &mut [u8], lsb: u32, width: u32, value: i128) {
 }
 
 fn lookup<'a>(definition: &'a Definition, form_id: &str) -> Option<&'a Form> {
-    definition.forms.iter().find(|form| form.form_id == form_id)
+    definition
+        .forms()
+        .iter()
+        .find(|form| form.form_id == form_id)
 }
 
 fn decode_hex(text: &str) -> Vec<u8> {
@@ -917,14 +953,16 @@ fn internal(invariant: &str) -> Diagnostic {
 
 /// Contract §12's fingerprint, with `provenance` excluded as §12 requires.
 pub fn fingerprint(plan: &Plan, definition: &Definition) -> String {
-    let mut document = plan.document.clone();
+    let mut document = plan.legacy_document.clone();
     if let Json::Object(entries) = &mut document {
         entries.retain(|(key, _)| key != "provenance");
     }
     let canonical = fmp_model::canonical::canonical_bytes(&document);
     let identity = format!(
         "{}/{}\0{}",
-        definition.namespace, definition.version, definition.digest
+        definition.namespace(),
+        definition.version(),
+        definition.digest()
     );
     fmp_model::canonical::sha256_prefixed(&[
         codes::FORMAT_VERSION.as_bytes(),
@@ -1042,7 +1080,7 @@ mod tests {
         let plan = fmp_model::plan::read(plan_source().as_bytes()).unwrap();
         let definition = fmp_model::definition::read(&definition_bytes()).unwrap();
         let first = fingerprint(&plan, &definition);
-        let mut document = plan.document.clone();
+        let mut document = plan.legacy_document.clone();
         if let Json::Object(entries) = &mut document {
             entries.push((
                 "provenance".to_string(),
@@ -1116,7 +1154,7 @@ mod tests {
     #[test]
     fn level_one_without_symbol_table_omits_symbols() {
         let plan = level_one_plan();
-        let mut document = plan.document.clone();
+        let mut document = plan.legacy_document.clone();
         if let Json::Object(entries) = &mut document {
             for (key, value) in entries {
                 if key == "output_contract" {

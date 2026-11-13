@@ -57,7 +57,7 @@ impl<'a> Model<'a> {
 
     pub fn form(&self, form_id: &str) -> Option<&'a Form> {
         self.definition
-            .forms
+            .forms()
             .iter()
             .find(|form| form.form_id == form_id)
     }
@@ -93,7 +93,7 @@ pub fn check(plan: &Plan, definition: &Definition) -> Vec<Diagnostic> {
 
 fn check_target(model: &Model, errors: &mut Vec<Diagnostic>) {
     let plan = &model.plan.target;
-    let definition = &model.definition.target;
+    let definition = model.definition.target();
     if !plan.feature_constraints.is_empty() {
         errors.push(
             Diagnostic::new(
@@ -120,7 +120,7 @@ fn check_target(model: &Model, errors: &mut Vec<Diagnostic>) {
     // table's set as the ceiling and requires the plan's set to be a subset
     // (`07_definition_format.md` §2). A per-form requirement is checked later,
     // once the plan names a form (`E-TARGET-003`, step 6).
-    let subset_rule = model.definition.definition_format == codes::DEFINITION_FORMAT_V0_2;
+    let subset_rule = model.definition.definition_format() == codes::DEFINITION_FORMAT_V0_2;
     let plan_extensions: std::collections::BTreeSet<&str> =
         plan.enabled_extensions.iter().map(String::as_str).collect();
     let definition_extensions: std::collections::BTreeSet<&str> = definition
@@ -628,8 +628,8 @@ fn check_instructions(model: &Model, errors: &mut Vec<Diagnostic>) {
                 errors.push(
                     Diagnostic::new(codes::E_FORM_001, instruction.path.clone() + "/form_id")
                         .with("form_id", instruction.form_id.as_str())
-                        .with("namespace", model.definition.namespace.as_str())
-                        .with("version", model.definition.version.as_str()),
+                        .with("namespace", model.definition.namespace())
+                        .with("version", model.definition.version()),
                 );
                 continue;
             }
@@ -638,7 +638,7 @@ fn check_instructions(model: &Model, errors: &mut Vec<Diagnostic>) {
         // must cover it. The first missing name in the row's (sorted) order is
         // reported; the gate skips the operand checks so one instruction yields
         // one diagnostic (`07_definition_format.md` §2, `ADR-0103`).
-        if model.definition.definition_format == codes::DEFINITION_FORMAT_V0_2 {
+        if model.definition.definition_format() == codes::DEFINITION_FORMAT_V0_2 {
             if let Some(missing) = form
                 .requires_extensions
                 .iter()
@@ -772,7 +772,13 @@ fn check_operand(
         SlotFrom::RegNumber => match &operand.payload {
             Payload::Register(register) => {
                 let field_bits = slot.width_bits;
-                if field_bits < 128 && *register >= (1u64 << field_bits) {
+                // `u128` so a 64-bit register still fits `1 << 64`, and
+                // `checked_shl` so a definition that widens a slot past 127
+                // bits cannot make the validator panic (H1a, D14).
+                if 1u128
+                    .checked_shl(field_bits)
+                    .is_some_and(|modulus| u128::from(*register) >= modulus)
+                {
                     errors.push(
                         Diagnostic::new(
                             codes::E_OPERAND_004,
@@ -818,8 +824,15 @@ fn check_operand(
                 }
                 if let Some(range) = slot.range {
                     if range.align_bits > 0 {
-                        let unit = 1i128 << range.align_bits;
-                        if value % unit != 0 {
+                        // A shift of 128 or more is not a multiple of anything
+                        // except zero; `checked_shl` keeps the panic out of a
+                        // path a hand-edited definition can reach (H1a, D14).
+                        let unit = 1i128.checked_shl(range.align_bits);
+                        let misaligned = match unit {
+                            Some(unit) => *value % unit != 0,
+                            None => *value != 0,
+                        };
+                        if misaligned {
                             errors.push(
                                 Diagnostic::new(
                                     codes::E_RANGE_003,
@@ -831,12 +844,15 @@ fn check_operand(
                         }
                     }
                     let (min, max) = if range.signed {
-                        (
-                            -(1i128 << (range.bits - 1)),
-                            (1i128 << (range.bits - 1)) - 1,
-                        )
+                        match 1i128.checked_shl(range.bits.saturating_sub(1)) {
+                            Some(half) => (-half, half - 1),
+                            None => (i128::MIN, i128::MAX),
+                        }
                     } else {
-                        (0, (1i128 << range.bits) - 1)
+                        match 1i128.checked_shl(range.bits) {
+                            Some(limit) => (0, limit - 1),
+                            None => (0, i128::MAX),
+                        }
                     };
                     if *value < min || *value > max {
                         let code = if slot.role == "target" {
@@ -954,20 +970,22 @@ fn cover_state<'a>(slot: &Slot, covers: &[&'a Fixup]) -> CoverState<'a> {
     let mut hits: Vec<&'a str> = Vec::new();
     let mut partial = false;
     for fixup in covers {
-        let mut intersection = 0u32;
+        let mut intersection = 0u64;
         for (offset, width) in slot.owned_bits() {
-            let slot_start = offset;
-            let slot_end = offset + width;
+            // `u64` endpoints: a descriptor entry is plan data, so its
+            // `lsb + width` must not be able to wrap `u32` (H1a, D14).
+            let slot_start = u64::from(offset);
+            let slot_end = slot_start + u64::from(width);
             for field in &fixup.field_descriptor {
-                let start = field.lsb.max(slot_start);
-                let end = (field.lsb + field.width).min(slot_end);
+                let start = u64::from(field.lsb).max(slot_start);
+                let end = (u64::from(field.lsb) + u64::from(field.width)).min(slot_end);
                 if start < end {
                     intersection += end - start;
                 }
             }
         }
         if intersection > 0 {
-            if intersection < slot.width_bits {
+            if intersection < u64::from(slot.width_bits) {
                 partial = true;
             }
             if !hits.contains(&fixup.fixup_id.as_str()) {
@@ -1182,6 +1200,22 @@ fn check_fixup_kind(fixup: &Fixup, errors: &mut Vec<Diagnostic>) {
                 .with("field", "pcrel_lo12 requires pc_reference_rule pcrel_hi"),
         );
     }
+    // `ADR-0127` / `03_fixup_model.md` §7: `page` is `page(S + A) - page(P)`.
+    // Without `pcrel_page` there is no `P` to take the page of, and `apply`
+    // would reach its `internal(...)` arm. Reject the kind here instead.
+    if matches!(fixup.value_transform, Transform::Page)
+        && !matches!(fixup.pc_reference_rule, PcRule::PcrelPage)
+    {
+        errors.push(
+            Diagnostic::new(
+                codes::E_FIXUP_001,
+                fixup.path.clone() + "/pc_reference_rule",
+            )
+            .with("kind", "value_transform:page")
+            .with("form_id", "")
+            .with("field", "page requires pc_reference_rule pcrel_page"),
+        );
+    }
     if matches!(fixup.value_transform, Transform::Hi20)
         && !matches!(fixup.pc_reference_rule, PcRule::None)
     {
@@ -1271,7 +1305,9 @@ fn check_fixup_descriptor(model: &Model, fixup: &Fixup, errors: &mut Vec<Diagnos
             );
         }
         for (offset, width) in &bits {
-            if field.lsb < offset + width && *offset < field.lsb + field.width {
+            let prior_end = u64::from(*offset) + u64::from(*width);
+            let field_end = u64::from(field.lsb) + u64::from(field.width);
+            if u64::from(field.lsb) < prior_end && u64::from(*offset) < field_end {
                 errors.push(
                     Diagnostic::new(codes::E_FIXUP_005, fixup.path.clone() + "/field_descriptor")
                         .with("fixup_id", fixup.fixup_id.as_str())
@@ -1281,8 +1317,14 @@ fn check_fixup_descriptor(model: &Model, fixup: &Fixup, errors: &mut Vec<Diagnos
         }
         bits.push((field.lsb, field.width));
     }
-    let total: u32 = fixup.field_descriptor.iter().map(|field| field.width).sum();
-    if total != fixup.range_constraint.bits {
+    // `u64` sum: two `u32::MAX` widths must yield a diagnostic, not a wrapped
+    // total that happens to equal `range_constraint.bits` (H1a, D14).
+    let total: u64 = fixup
+        .field_descriptor
+        .iter()
+        .map(|field| u64::from(field.width))
+        .sum();
+    if total != u64::from(fixup.range_constraint.bits) {
         errors.push(
             Diagnostic::new(codes::E_FIXUP_001, fixup.path.clone() + "/range_constraint")
                 .with("kind", "field_descriptor")
@@ -1306,10 +1348,12 @@ fn check_fixup_overlap(model: &Model, errors: &mut Vec<Diagnostic>) {
             }
             for a in &fixup.field_descriptor {
                 for b in &other.field_descriptor {
-                    let a_start = fixup.offset * 8 + u64::from(a.lsb);
-                    let a_end = a_start + u64::from(a.width);
-                    let b_start = other.offset * 8 + u64::from(b.lsb);
-                    let b_end = b_start + u64::from(b.width);
+                    // `u128`: `offset * 8` on a `u64::MAX` site would otherwise
+                    // wrap and invent an overlap (H1a, D14).
+                    let a_start = u128::from(fixup.offset) * 8 + u128::from(a.lsb);
+                    let a_end = a_start + u128::from(a.width);
+                    let b_start = u128::from(other.offset) * 8 + u128::from(b.lsb);
+                    let b_end = b_start + u128::from(b.width);
                     if a_start < b_end && b_start < a_end {
                         errors.push(
                             Diagnostic::new(codes::E_FIXUP_006, fixup.path.clone())
@@ -1423,7 +1467,11 @@ fn check_one_writer(model: &Model, errors: &mut Vec<Diagnostic>) {
         // "this fixup writes over a template value", and the bit count is an
         // artefact of how wide the field is.
         'fields: for field in &fixup.field_descriptor {
-            for bit in u64::from(field.lsb)..u64::from(field.lsb) + u64::from(field.width) {
+            // Clamp to the form: a descriptor wider than the instruction must
+            // not turn a diagnostic into ~4e9 iterations (H1a, D14). Bits past
+            // the template end are already `E-FIXUP-005`.
+            let end = (u64::from(field.lsb) + u64::from(field.width)).min(u64::from(form.bits()));
+            for bit in u64::from(field.lsb)..end {
                 let byte = (bit / 8) as usize;
                 if byte >= form.template.len() {
                     continue;
@@ -1472,7 +1520,8 @@ fn check_fixup_ownership(model: &Model, errors: &mut Vec<Diagnostic>) {
                 outside_form = true;
                 continue;
             }
-            for bit in field.lsb..field.lsb + field.width {
+            let end = end.min(u64::from(form.bits()));
+            for bit in u64::from(field.lsb)..end {
                 covered[bit as usize] = true;
             }
         }
@@ -1529,9 +1578,10 @@ fn check_fixup_ownership(model: &Model, errors: &mut Vec<Diagnostic>) {
         let mut out_of_order = false;
         for field in &fixup.field_descriptor {
             let start = field.lsb;
-            let end = start + field.width;
+            let end = u64::from(start) + u64::from(field.width);
             let hit = placements.iter().position(|placement| {
-                start >= placement.bit_offset && end <= placement.bit_offset + placement.width
+                u64::from(start) >= u64::from(placement.bit_offset)
+                    && end <= u64::from(placement.bit_offset) + u64::from(placement.width)
             });
             match hit {
                 Some(index) => {

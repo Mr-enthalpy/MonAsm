@@ -43,47 +43,49 @@ fn positive(name: &str) -> fmp_model::Plan {
         .unwrap_or_else(|error| panic!("{}: {}", path.display(), error.message()))
 }
 
-fn expected_bytes(name: &str) -> Vec<u8> {
-    let path = root().join(format!("fixtures/x86_64/positive/{name}.expected.bin"));
-    std::fs::read(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()))
-}
-
-/// `HE-T03`/`HE-T04`: a loaded definition can be re-encoded in memory while the
-/// digest string — the value a plan names and the materializer compares — stays
-/// untouched. The emitted bytes then come from rules the digest does not cover.
+/// `HE-T03`: the digest is a function of the definition **document**, and a
+/// reload after an edit produces a different digest. This replaces the H0
+/// characterization that wrote `definition.forms[0].template` in memory: H1a
+/// closes the fields (`compile_fail` doctest in `fmp-model`), so the same
+/// property is measured the only way a caller can still express it — by editing
+/// the bytes and loading them again.
+///
+/// The second half is the consequence: the untouched plan still names the old
+/// digest, so the reloaded definition is rejected by the digest comparison that
+/// runs before any rule.
 #[test]
-fn a_loaded_definition_can_be_re_encoded_under_its_original_digest() {
-    let mut definition = fmp_model::definition::read(&definition_bytes("x86_64", "0.1.0"))
-        .expect("the shipped table loads");
-    let digest = definition.digest.clone();
-    for form in &mut definition.forms {
-        form.template = vec![0x90; form.template.len()];
-    }
-    assert_eq!(
-        definition.digest, digest,
-        "the digest is a stored string, not derived from `forms`"
+fn a_definition_edit_reloads_to_a_new_digest() {
+    let bytes = definition_bytes("x86_64", "0.1.0");
+    let original = fmp_model::definition::read(&bytes).expect("the shipped table loads");
+    let plan = positive("X86-P1-mov-r64-both-directions");
+
+    // A one-byte edit inside a template: same shape, same forms, different
+    // content. `"4889c0"` is the legacy `mov r/m64, r64` template.
+    let text = String::from_utf8(bytes).expect("definitions are UTF-8");
+    assert!(
+        text.contains("4889c0"),
+        "the fixture's template is the one this test edits"
+    );
+    let edited = text.replacen("4889c0", "4889c1", 1);
+    let reloaded =
+        fmp_model::definition::read(edited.as_bytes()).expect("the edited table still loads");
+
+    assert_ne!(
+        original.digest(),
+        reloaded.digest(),
+        "the digest covers the document content"
     );
 
-    let plan = positive("X86-P1-mov-r64-both-directions");
-    let fingerprint = fmp_materialize::fingerprint(&plan, &definition);
-    let artifact = fmp_materialize::materialize(&plan, &definition)
-        .expect("the mutated table still validates: the shape did not change");
-    assert_eq!(
-        fmp_materialize::fingerprint(&plan, &definition),
-        fingerprint,
-        "the artifact identity is unchanged"
+    let errors = fmp_materialize::materialize(&plan, &reloaded)
+        .expect_err("the plan still names the old digest");
+    assert!(
+        errors.iter().any(|error| error.code() == codes::E_DEF_001
+            && error.path() == "/definition_identity/digest"),
+        "{errors:?}"
     );
-    let expected = expected_bytes("X86-P1-mov-r64-both-directions");
-    assert_eq!(
-        artifact.bytes.len(),
-        expected.len(),
-        "the mutated templates kept their length"
-    );
-    assert_ne!(
-        artifact.bytes,
-        expected,
-        "emission followed the mutated templates: {}",
-        artifact.bytes_hex()
+    assert!(
+        fmp_materialize::materialize(&plan, &original).is_ok(),
+        "the original definition still materializes the plan"
     );
 }
 

@@ -10,6 +10,7 @@
 //! and belongs to `Registry::find`, not to this module.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crate::bind::{self, Obj};
 use crate::codes;
@@ -18,15 +19,49 @@ use crate::json;
 use crate::plan::Modifier;
 
 /// A loaded, structurally valid definition document.
-#[derive(Clone, Debug)]
+///
+/// H1 (`ADR-0127`): this is one half of an execution credential, so its fields
+/// are private, it has no public constructor, no `&mut` access and no `Clone`.
+/// The only constructor is [`read`]/[`Registry::load_dir`]; sharing is
+/// `Arc<Definition>` from the registry, which hands out shared ownership
+/// without interior mutability. `document` was deleted: it was written once and
+/// never read, and keeping a second copy of the facts would be a second
+/// authority.
+#[derive(Debug)]
 pub struct Definition {
-    pub document: json::Json,
-    pub definition_format: String,
-    pub namespace: String,
-    pub version: String,
-    pub target: DefinitionTarget,
-    pub forms: Vec<Form>,
-    pub digest: String,
+    definition_format: String,
+    namespace: String,
+    version: String,
+    target: DefinitionTarget,
+    forms: Vec<Form>,
+    digest: String,
+}
+
+impl Definition {
+    pub fn definition_format(&self) -> &str {
+        &self.definition_format
+    }
+
+    pub fn namespace(&self) -> &str {
+        &self.namespace
+    }
+
+    pub fn version(&self) -> &str {
+        &self.version
+    }
+
+    pub fn target(&self) -> &DefinitionTarget {
+        &self.target
+    }
+
+    pub fn forms(&self) -> &[Form] {
+        &self.forms
+    }
+
+    /// The canonical digest computed from the document bytes at load time.
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -216,7 +251,6 @@ fn bind_document(document: &json::Json) -> Result<Definition, Diagnostic> {
 
     let digest = crate::canonical::canonical_digest(document);
     Ok(Definition {
-        document: document.clone(),
         definition_format,
         namespace,
         version,
@@ -763,9 +797,13 @@ fn load_error(where_: &str, reason: &str) -> Diagnostic {
 }
 
 /// The set of definitions this materializer can load.
+///
+/// Entries are `Arc<Definition>` so `find` can hand out shared ownership of an
+/// immutable definition: the caller needs the object to outlive the registry
+/// borrow without gaining a way to mutate it (`ADR-0127`).
 #[derive(Clone, Debug, Default)]
 pub struct Registry {
-    definitions: Vec<Definition>,
+    definitions: Vec<Arc<Definition>>,
 }
 
 impl Registry {
@@ -774,10 +812,10 @@ impl Registry {
     }
 
     pub fn add(&mut self, definition: Definition) {
-        self.definitions.push(definition);
+        self.definitions.push(Arc::new(definition));
     }
 
-    pub fn definitions(&self) -> &[Definition] {
+    pub fn definitions(&self) -> &[Arc<Definition>] {
         &self.definitions
     }
 
@@ -804,14 +842,16 @@ impl Registry {
 
     /// `namespace + version` must name exactly one definition (`01_contract.md`
     /// §5). Absent is `E-DEF-002`.
-    pub fn find(&self, namespace: &str, version: &str) -> Result<&Definition, Diagnostic> {
-        let matches: Vec<&Definition> = self
+    pub fn find(&self, namespace: &str, version: &str) -> Result<Arc<Definition>, Diagnostic> {
+        let matches: Vec<&Arc<Definition>> = self
             .definitions
             .iter()
-            .filter(|definition| definition.namespace == namespace && definition.version == version)
+            .filter(|definition| {
+                definition.namespace() == namespace && definition.version() == version
+            })
             .collect();
         match matches.as_slice() {
-            [definition] => Ok(definition),
+            [definition] => Ok(Arc::clone(definition)),
             [] => Err(Diagnostic::new(codes::E_DEF_002, "/definition_identity")
                 .with("namespace", namespace)
                 .with("version", version)),
@@ -1033,8 +1073,11 @@ mod tests {
             r#"["avx"]"#,
         );
         let definition = read(text.as_bytes()).expect("an empty list is legal");
-        assert_eq!(definition.definition_format, codes::DEFINITION_FORMAT_V0_2);
-        assert!(definition.forms[0].requires_extensions.is_empty());
+        assert_eq!(
+            definition.definition_format(),
+            codes::DEFINITION_FORMAT_V0_2
+        );
+        assert!(definition.forms()[0].requires_extensions.is_empty());
     }
 
     /// The positive case: the list is kept in order and the format is recorded.
@@ -1051,8 +1094,56 @@ mod tests {
         );
         let definition = read(text.as_bytes()).expect("a declared requirement loads");
         assert_eq!(
-            definition.forms[0].requires_extensions,
+            definition.forms()[0].requires_extensions,
             vec!["avx".to_string(), "avx512f".to_string()]
         );
+    }
+
+    /// `HE-T03`: the digest is a function of the document bytes, not of the
+    /// object's address or of a caller-supplied string, so two loads of the same
+    /// bytes agree.
+    #[test]
+    fn a_definition_reloads_to_the_same_digest() {
+        let text = document(&form("x86:mov/rm64/legacy", "4889c0", GPR64_SLOT));
+        let first = read(text.as_bytes()).expect("the document loads");
+        let second = read(text.as_bytes()).expect("the document loads again");
+        assert_eq!(first.digest(), second.digest());
+        assert!(first.digest().starts_with("sha256:"));
+    }
+
+    /// Canonical form, not spelling: an extra space between key and colon is not
+    /// part of the document's meaning, so it is not part of its digest.
+    #[test]
+    fn a_canonically_equal_definition_loads_to_the_same_digest() {
+        let base = document(&form("x86:mov/rm64/legacy", "4889c0", GPR64_SLOT));
+        let respaced = base.replacen(
+            r#""definition_format":"fmp-def/0.1","#,
+            r#""definition_format":"fmp-def/0.1", "#,
+            1,
+        );
+        let extra_space = read(respaced.as_bytes()).expect("whitespace is not structure");
+        let unchanged = read(base.as_bytes()).expect("the base document loads");
+        assert_eq!(unchanged.digest(), extra_space.digest());
+    }
+
+    /// `ADR-0127` D13: the registry shares one immutable definition, it does not
+    /// hand out copies. Two `find` calls on the same entry are the same object.
+    #[test]
+    fn the_registry_shares_one_immutable_definition() {
+        let mut registry = Registry::new();
+        registry.add(
+            read(document(&form("x86:mov/rm64/legacy", "4889c0", GPR64_SLOT)).as_bytes())
+                .expect("the document loads"),
+        );
+
+        let first = registry
+            .find("monasm.isa.x86", "test")
+            .expect("the entry is present");
+        let second = registry
+            .find("monasm.isa.x86", "test")
+            .expect("the entry is present twice");
+        assert!(Arc::ptr_eq(&first, &second));
+        assert_eq!(Arc::strong_count(&first), 3);
+        assert_eq!(first.digest(), second.digest());
     }
 }

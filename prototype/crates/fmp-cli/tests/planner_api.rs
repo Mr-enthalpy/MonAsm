@@ -179,7 +179,7 @@ fn positives_reproduce_the_oracle_through_the_builder() {
         let definition = registry
             .find(&plan.definition.namespace, &plan.definition.version)
             .unwrap_or_else(|error| panic!("{name}: {}", error.message()));
-        let artifact = match fmp_materialize::materialize(&plan, definition) {
+        let artifact = match fmp_materialize::materialize(&plan, &definition) {
             Ok(artifact) => artifact,
             Err(errors) => panic!(
                 "{name} was rejected after rebuilding:\n{}",
@@ -232,8 +232,8 @@ fn positives_reproduce_the_oracle_through_the_builder() {
         // fingerprint-identical, not merely byte-identical.
         let original = read_plan(&path);
         assert_eq!(
-            fmp_materialize::fingerprint(&plan, definition),
-            fmp_materialize::fingerprint(&original, definition),
+            fmp_materialize::fingerprint(&plan, &definition),
+            fmp_materialize::fingerprint(&original, &definition),
             "{name}: rebuilding changed the plan fingerprint"
         );
     }
@@ -268,7 +268,7 @@ fn negatives_reject_at_the_same_code_path_and_detail_keys() {
         let definition = registry
             .find(&plan.definition.namespace, &plan.definition.version)
             .unwrap_or_else(|error| panic!("{name}: {}", error.message()));
-        let errors = match fmp_materialize::materialize(&plan, definition) {
+        let errors = match fmp_materialize::materialize(&plan, &definition) {
             Ok(artifact) => panic!(
                 "{name} was accepted after rebuilding and emitted {}",
                 artifact.bytes_hex()
@@ -366,9 +366,9 @@ fn definition(registry: &Registry, namespace: &str, version: &str) -> Definition
         .find(namespace, version)
         .unwrap_or_else(|error| panic!("{namespace}/{version}: {}", error.message()));
     DefinitionIdentity {
-        namespace: definition.namespace.clone(),
-        version: definition.version.clone(),
-        digest: definition.digest.clone(),
+        namespace: definition.namespace().to_string(),
+        version: definition.version().to_string(),
+        digest: definition.digest().to_string(),
     }
 }
 
@@ -800,7 +800,7 @@ fn from_scratch_positives_materialize_to_the_oracle_bytes() {
         let definition = registry
             .find(&plan.definition.namespace, &plan.definition.version)
             .unwrap_or_else(|error| panic!("{name}: {}", error.message()));
-        let artifact = match fmp_materialize::materialize(&plan, definition) {
+        let artifact = match fmp_materialize::materialize(&plan, &definition) {
             Ok(artifact) => artifact,
             Err(errors) => panic!(
                 "{name} built from scratch was rejected:\n{}",
