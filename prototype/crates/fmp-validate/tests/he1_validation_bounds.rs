@@ -138,7 +138,8 @@ fn a_page_transform_without_a_page_pc_rule_is_rejected() {
 /// `definitions/**` is frozen and no shipped slot is that wide, so the table is
 /// built here. This is also why the fix is `u128` rather than a load-time
 /// constraint on `width_bits`: the width is a legal definition fact, only the
-/// comparison was unsafe.
+/// comparison was unsafe. The encoder half of the same width is
+/// `fmp-materialize/tests/he1_wide_register.rs`.
 #[test]
 fn a_wide_register_field_does_not_overflow_the_width_check() {
     let cases = [

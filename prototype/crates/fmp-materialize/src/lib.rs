@@ -632,17 +632,40 @@ fn encode_instruction(
 /// VEX name their extension bits `B̄`/`R̄`, so a set extension bit is written as
 /// zero. The complement is a constant, not a choice.
 fn write_field(bytes: &mut [u8], slot: &Slot, value: i128) {
-    let total = slot.width_bits;
-    let masked = value & mask(total);
-    let mut remaining = total;
+    // A field may be wider than `i128` (`ADR-0127` §7.1: the loader bounds each
+    // placement to 64 bits, not their sum). Masking the *whole* field and then
+    // shifting would need a `2^width` mask and a shift of `width`, so extract
+    // each placement directly instead.
+    let mut remaining = slot.width_bits;
     for placement in &slot.placements {
         remaining -= placement.width;
-        let mut chunk = (masked >> remaining) & mask(placement.width);
+        let mut chunk = field_bits(value, remaining, placement.width);
         if placement.inverted {
-            chunk ^= mask(placement.width);
+            chunk ^= mask_u128(placement.width);
         }
-        write_bits(bytes, placement.bit_offset, placement.width, chunk);
+        // A placement is at most 64 bits (loader domain `u7`), so the value
+        // always fits the signed writer.
+        write_bits(bytes, placement.bit_offset, placement.width, chunk as i128);
     }
+}
+
+/// Bits `[start, start + width)` of `value`, read as an infinite two's-complement
+/// integer (the field's semantics: a wider field is zero-extended for a
+/// non-negative value and sign-extended for a negative one).
+///
+/// `i128` holds the low 128 bits; every bit above is `value`'s sign bit. The
+/// second sentence is what the old `value & mask(total)` could not express once
+/// `total > 128`.
+fn field_bits(value: i128, start: u32, width: u32) -> u128 {
+    if start >= 128 {
+        return if value < 0 { mask_u128(width) } else { 0 };
+    }
+    let mut chunk = (value as u128) >> start;
+    if value < 0 && start > 0 {
+        // Bits at or above 128 are one; `chunk` is missing those positions.
+        chunk |= u128::MAX << (128 - start);
+    }
+    chunk & mask_u128(width)
 }
 
 /// Apply one fixup to one instruction's bytes, exactly one mode.
@@ -857,6 +880,16 @@ fn mask(width: u32) -> i128 {
         -1
     } else {
         (1i128 << width) - 1
+    }
+}
+
+/// `mask` for the unsigned chunk arithmetic in [`field_bits`], where a 127-bit
+/// mask must not go through `i128::MIN`.
+fn mask_u128(width: u32) -> u128 {
+    if width >= 128 {
+        u128::MAX
+    } else {
+        (1u128 << width) - 1
     }
 }
 

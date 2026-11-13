@@ -38,8 +38,19 @@
 //! ```compile_fail
 //! use fmp_model::definition::Definition;
 //!
-//! let _definition = Definition { forms: Vec::new() };
+//! let _definition = Definition {
+//!     definition_format: String::new(),
+//!     namespace: String::new(),
+//!     version: String::new(),
+//!     target: unimplemented!(),
+//!     forms: Vec::new(),
+//!     digest: String::new(),
+//! };
 //! ```
+//!
+//! The literal names every field, so the only reason it can fail is the private
+//! field access. An incomplete literal (`Definition { forms: Vec::new() }`)
+//! would also fail with all fields public, which is why it was not evidence.
 //!
 //! The positive control uses the same import path and the public accessors, so
 //! the two failures above cannot be "the import was wrong":

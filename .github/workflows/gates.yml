@@ -2,10 +2,16 @@ name: gates
 
 # The contract gates a change must pass before it lands (ADR-0124):
 # `check_ids.py` (every ID declared once and referenced), `check_definition.py`
-# (definition shape, form coverage and canonical digests), `cargo fmt --check`,
-# `cargo test --workspace` (fixtures, planner parity, determinism), the
-# whitespace gate, and `tools/oracle/rerun.py` against the LLVM version the
-# oracle records pin.
+# (definition shape, form coverage and canonical digests), `plan_identity.py
+# --check` (the Python reference encoder still reproduces the frozen identity
+# vectors), `cargo fmt --check`, `cargo test --workspace` (fixtures, planner
+# parity, determinism), the whitespace gate, and `tools/oracle/rerun.py` against
+# the LLVM version the oracle records pin.
+#
+# `ADR-0127` also requires the numeric-bound tests in release, because a
+# wrapping shift or subtraction that panics in debug can silently succeed and
+# emit the wrong bytes in release. The workspace job runs that small set with
+# `--release`.
 #
 # `ADR-0126` adds the H0 payload job: it re-materializes all 128 positives with
 # the binary this job just built and compares the payload projection recorded in
@@ -61,6 +67,11 @@ jobs:
       - name: Definitions match the shipped tables
         run: python tools/check_definition.py
 
+      # `ADR-0127` §5: the Rust and Python encoders must agree on the frozen
+      # vectors. This is the only hosted check of the Python reference encoder.
+      - name: Identity vectors reproduce in the Python encoder
+        run: python tools/plan_identity.py --check
+
       - name: Whitespace and line endings
         env:
           PUSH_BEFORE: ${{ github.event.before }}
@@ -100,6 +111,16 @@ jobs:
       - name: Test the workspace
         working-directory: prototype
         run: cargo +"$RUST_TOOLCHAIN" test --workspace
+
+      # `ADR-0127` numeric hardening. A wrapped shift is a panic in debug and a
+      # wrong-but-successful encoding in release, so the small bound/wide-field
+      # set runs under the release optimiser too. The rest of the workspace
+      # stays debug: this is a bounds gate, not a second full suite.
+      - name: Arithmetic bounds in release
+        working-directory: prototype
+        run: |
+          cargo +"$RUST_TOOLCHAIN" test --release -p fmp-validate --test he1_validation_bounds
+          cargo +"$RUST_TOOLCHAIN" test --release -p fmp-materialize --test he1_wide_register
 
       # `ADR-0127`: the validator is the dependency floor. A normal edge from
       # `fmp-validate` to `fmp-materialize` would let the validator reach the

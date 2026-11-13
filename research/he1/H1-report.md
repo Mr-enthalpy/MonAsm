@@ -2,6 +2,8 @@
 
 Stage: H1a (design §13, `ADR-0125`; decisions in `ADR-0127`)
 Date: 2026-11-13
+Review amendment: 2026-11-14 (H1a review: P1 wide-field encoding, P2 doctest
+counterexample, CI identity and release steps)
 Base commit: `0948620f36893d17de56a913f72ced935fe50a98` (merged H0/H1-plan PR)
 Branch: `he1/h1a-identity-core`
 
@@ -21,19 +23,20 @@ CLI call sites. No definition, fixture, schema or `docs/fmp-v0/` byte changed.
 | `prototype/crates/fmp-model/src/definition.rs` | `Definition` fields private, `document` deleted, no `Clone`, accessors added; `Registry` stores `Vec<Arc<Definition>>`, `add` takes ownership, `find` returns `Arc<Definition>` | `ADR-0127` §1: a loaded definition is half an execution credential, and a stored digest cannot make mutable facts honest |
 | `prototype/crates/fmp-model/src/identity.rs` | new: `plan-identity/0.1`, `plan_facts`, `ParsedPlanIdentity::of`, exhaustive destructuring, three pinned vectors, 73-row mutation table | `ADR-0127` §2–§3: the identity must cover parsed facts, and a new field must stop the build |
 | `prototype/crates/fmp-model/src/plan.rs` | `Plan.document` → `legacy_document`; new `check_structure` | `ADR-0127` §4/§6: one legacy-only reader for the raw document, and the parser rules a `u32`/`String` cannot hold are re-checked |
-| `prototype/crates/fmp-model/src/lib.rs` | exports `identity`/`ParsedPlanIdentity`; two `compile_fail` doctests and one positive control | the closure is "this cannot be written", not "this returns an error" |
+| `prototype/crates/fmp-model/src/lib.rs` | exports `identity`/`ParsedPlanIdentity`; two `compile_fail` doctests (the second a complete-field literal) and one positive control | the closure is "this cannot be written", not "this returns an error" |
 | `prototype/crates/fmp-validate/src/lib.rs` | `u64`/`u128`/`checked_*` for descriptor sums, overlap math, alignment, range bounds and register width; per-bit loops clipped to `form.bits()`; `page ⇒ pcrel_page` | `ADR-0127` §7: a full `u64` offset and a `u32` width must not overflow or loop; `Page` without `P` must not become an internal fault |
-| `prototype/crates/fmp-materialize/src/lib.rs` | `fingerprint` reads `legacy_document` and accessors; digest comparison reads `definition.digest()`; `lookup` uses `forms()` | keeps the legacy fingerprint byte-identical while the fields close |
+| `prototype/crates/fmp-materialize/src/lib.rs` | `fingerprint` reads `legacy_document` and accessors; digest comparison reads `definition.digest()`; `lookup` uses `forms()`; `write_field` extracts each placement from `u128` instead of masking the whole field | keeps the legacy fingerprint byte-identical while the fields close, and encodes fields wider than `i128` |
 | `prototype/crates/fmp-cli/src/main.rs`, `tests/determinism.rs`, `tests/fixtures.rs`, `tests/planner_api.rs` | borrow `&definition` from `Arc<Definition>` | the registry now shares ownership |
 | `prototype/crates/fmp-cli/tests/he1_identity_characterization.rs` | the in-memory definition-mutation test becomes `a_definition_edit_reloads_to_a_new_digest` | private fields make the old test uncompilable; the property is measured by editing the document and reloading |
 | `prototype/crates/fmp-model/tests/he1_check_structure.rs` | new: 5 test functions, 9 mutations | X86-P71 odd/non-hex `payload_hex`, `align_bits`, `transform_shift`, `lsb`/`width`/`bits` |
 | `prototype/crates/fmp-validate/tests/he1_validation_bounds.rs` | new: 4 test functions | `u32::MAX` width sum, two `u64::MAX`-class offsets, `page` + `none`, 64/128-bit register field |
+| `prototype/crates/fmp-materialize/tests/he1_wide_register.rs` | new: 1 test function | 64/127/128/192-bit register fields through `materialize`, non-zero registers, exact bytes in debug and release |
 | `prototype/crates/fmp-materialize/tests/he1_stage_boundaries.rs` | new: 4 test functions | measures which recorded negatives fail only after encoding |
 | `tools/plan_identity.py` | new | independent Python encoder for the three vectors; `--check` compares them |
 | `docs/adr/0127-execution-identity.md` | new | normative decisions, protocol tables, vectors, 15-row `internal(...)` table, post-encode set, dependency guard |
-| `docs/architecture/he1-h1-plan.md` | header only | draft → accepted (H1a landed, H1b not started); H1b scope untouched |
+| `docs/architecture/he1-h1-plan.md` | header and one risk row | draft → accepted (H1a landed, H1b not started); wide-field risk records the validator and encoder halves |
 | `docs/STATUS.md` | one HE-1 paragraph | H1a status and evidence pointer; no new hand-maintained count |
-| `.github/workflows/gates.yml` | one step | `cargo tree -p fmp-validate --edges normal` must not contain `fmp-materialize` |
+| `.github/workflows/gates.yml` | new hosted steps | `plan_identity.py --check` in `documents`; release runs of `he1_validation_bounds` and `he1_wide_register` in `workspace`, alongside the existing `cargo tree -p fmp-validate --edges normal` guard |
 | `research/he1/H1-report.md` | new | this report |
 
 No file under `definitions/`, `fixtures/`, `schema/` or `docs/fmp-v0/` changed.
@@ -46,6 +49,8 @@ Run from the repository root unless the row says `prototype/`.
 git rev-parse HEAD
 cargo fmt --all -- --check                     # prototype/
 cargo test --workspace                         # prototype/
+cargo test --release -p fmp-validate --test he1_validation_bounds   # prototype/
+cargo test --release -p fmp-materialize --test he1_wide_register    # prototype/
 python tools/check_ids.py
 python tools/check_definition.py
 python tools/plan_identity.py --check
@@ -61,7 +66,10 @@ git diff --check
 |---|---|
 | `git rev-parse HEAD` | `0948620f36893d17de56a913f72ced935fe50a98` |
 | `cargo fmt --check` | exit 0 |
-| `cargo test --workspace` | 87 passed, 0 failed (inventory below) |
+| `cargo test --workspace` | 88 passed, 0 failed (inventory below) |
+| `cargo test --release -p fmp-validate --test he1_validation_bounds` | 4 passed, 0 failed |
+| `cargo test --release -p fmp-materialize --test he1_wide_register` | 1 passed, 0 failed |
+| `cargo test -p fmp-materialize --test he1_wide_register` (debug) | 1 passed, 0 failed |
 | `check_ids.py` | `OK (0 warning(s))`; declared `AC=10, E=48, EC=44, EXP=6, HE-AC=12, HE-T=20, INV=8, N=25, OD=15` |
 | `check_definition.py` | `OK`; 104 documents, newest x86 `0.78.0` (632 forms), AArch64 `0.20.0` (185), RV64 `0.6.0` (24) |
 | `plan_identity.py --check` | three pinned digests match (§5) |
@@ -83,9 +91,10 @@ gate value is the payload root.
 | Suite | Tests | What H1a added or changed |
 |---|---|---|
 | `fmp-model` unit | 32 | 3 definition tests (`a_definition_reloads_to_the_same_digest`, `a_canonically_equal_definition_loads_to_the_same_digest`, `the_registry_shares_one_immutable_definition`) and 7 identity tests (below) |
-| `fmp-model` doctests | 3 | two `compile_fail` (field assignment, struct literal) and one positive control |
+| `fmp-model` doctests | 3 | two `compile_fail` (field assignment, complete-field struct literal) and one positive control |
 | `he1_check_structure` | 5 | `a_data_fragment_with_odd_length_hex_is_rejected_by_check_structure`, `a_data_fragment_with_non_hex_payload_is_rejected_by_check_structure`, `an_alignment_outside_the_parser_bound_is_rejected_by_check_structure`, `a_transform_shift_outside_the_parser_bound_is_rejected_by_check_structure`, `a_field_range_outside_the_parser_bound_is_rejected_by_check_structure` |
 | `he1_validation_bounds` | 4 | `a_descriptor_width_sum_cannot_overflow`, `two_huge_fixup_offsets_do_not_overflow`, `a_page_transform_without_a_page_pc_rule_is_rejected`, `a_wide_register_field_does_not_overflow_the_width_check` |
+| `he1_wide_register` | 1 | `a_wide_register_field_encodes_the_same_bytes_in_every_build` |
 | `fmp-materialize` unit | 9 | unchanged |
 | `he1_stage_boundaries` | 4 | `a_digest_mismatch_is_post_encode`, `a_fixup_alignment_failure_is_post_encode`, `a_fixup_range_failure_is_post_encode`, `an_expected_size_mismatch_is_rejected_before_encoding` |
 | `fmp-plan` | 5 | unchanged |
@@ -107,15 +116,18 @@ The seven identity tests are:
 ## 4. What H1a proves and what it does not
 
 **Proved by a run.** The definition API is closed (both doctests fail to
-compile, the positive control compiles and reads the accessors); a document edit
-reloads to a different digest and the untouched plan is rejected at
+compile, both turn red when a scratch copy makes all six fields `pub`, and the
+positive control compiles and reads the accessors); a document edit reloads to a
+different digest and the untouched plan is rejected at
 `/definition_identity/digest` with `E-DEF-001`; `check_structure` rejects the
 nine structural mutations with the parser's own code, Pointer and detail keys;
 the validator returns in bounded time for two `u32::MAX` widths and two
 `u64::MAX`-class offsets; `page` without `pcrel_page` is a static
-`E-FIXUP-001`; the identity's three vectors match an independent Python encoder
-and all 73 field/enum mutations move the digest; and the 128 recorded payloads
-still materialize identically.
+`E-FIXUP-001`; a register field of 64, 127, 128 or 192 bits encodes the exact
+expected bytes with a non-zero register in both debug and release; the
+identity's three vectors match an independent Python encoder and all 73
+field/enum mutations move the digest; and the 128 recorded payloads still
+materialize identically.
 
 **Not proved.** H1a is not an execution credential. Until H1b exists, a caller
 can still call the old two-argument `materialize` with any `&Plan` and any
@@ -135,7 +147,12 @@ pinned there (376 bytes). The digests are:
 |---|---|---|
 | `minimal` | `sha256:a48faecec39dd1de38f13b4868559f307b575a95a0aa241a01caa325400422c4` | 376 bytes |
 | `data-fragment` | `sha256:9da5a3318e943bcbd5c9c32366708922b68a5e7e7c67a0b3d48a9c7b1a68eec2` | one `.text` section, one `Data("90")` fragment |
-| `unknown-variants` | `sha256:1a07ae98cba50f7ee65b36bbe2bb1684eaa0885f728270b9baa39824a2a4632a` | every `Unknown` variant and every `Some` |
+| `unknown-variants` | `sha256:1a07ae98cba50f7ee65b36bbe2bb1684eaa0885f728270b9baa39824a2a4632a` | every `Unknown` variant and every covered `Some` **except** `source_ref` (all three vectors use `None`) |
+
+`source_ref = Some(...)` is therefore not in the fixed cross-language set. It is
+covered by the Rust mutation table (`definition.source_ref`), so the branch is
+tested, but only in one implementation. H1a review corrected the claim instead
+of changing the three frozen vectors.
 
 `tools/plan_identity.py --check` rebuilds the three fact trees from the protocol
 text and compares the digests. Rust and Python were written independently from
@@ -172,6 +189,7 @@ code + Pointer + detail-key-set gate.
 | `check_fixup_overlap` absolute bit position | `u64` `offset * 8 + lsb` | `u128` (`u64::MAX * 8 + u32` is representable) |
 | `check_one_writer` / `check_fixup_ownership` bit loops | up to `u32::MAX` bits | clipped to `form.bits()` |
 | register field width | `1u64 << field_bits` (debug panic at 64) | `1u128.checked_shl(field_bits)` |
+| register field encoding (`write_field`) | `value & mask(width_bits)`, then `masked >> remaining` in `i128` | each placement read directly from the low 128 bits of `u128`; higher bits are the value's sign bit |
 | alignment unit and signed/unsigned bounds | unchecked `1i128 << n` | `checked_shl`; an unrepresentable bound no longer panics |
 
 The register-width reproduction builds two synthetic `fmp-def/0.1` tables whose
@@ -180,9 +198,20 @@ The register-width reproduction builds two synthetic `fmp-def/0.1` tables whose
 declare `range`, and the loader bounds each placement to 64 bits, not the sum,
 so both widths are legal definition facts. Both tables load, and `check` on a
 plan using them returns no `E-OPERAND-004` and does not panic. The fix is the
-`u128` comparison, not a load-time `width_bits` bound: the width is legal, only
-the comparison was unsafe. `definitions/**` is frozen and no shipped slot is
-that wide, so the table is built in the test.
+`u128` comparison, not a load-time `width_bits` bound: the width is legal and
+only the comparison was unsafe. `definitions/**` is frozen and no shipped slot
+is that wide, so the table is built in the test.
+
+The H1a review found that this covered only the validator. `write_field` still
+masked the whole field and shifted an `i128`: at 127 bits `(1i128 << 127) - 1`
+panicked in debug, and at 192 bits `>> 128` wrapped in release and wrote the
+value into the **first** 64-bit placement as well as the last. The new
+`a_wide_register_field_encodes_the_same_bytes_in_every_build` reproduces both
+against the reviewed tree and asserts the exact bytes after the fix, for
+64/127/128/192-bit fields with non-zero registers. A zero register would hide
+the release defect, because the wrongly filled chunk is also zero. No
+arbitrary-precision integer is introduced: register values are `u64`, and bits
+above 127 are the value's sign bit.
 
 The `u32::MAX` width sum test is a second-line-of-defence proof. Under D13 the
 same input is structurally illegal and must be rejected by `check_structure`

@@ -545,7 +545,7 @@ fixup 错误归属与 `internal(...)` 前提表也在 H1a 实测后，才冻结
 | 合法解析范围内的数值在 validator 内溢出或无界循环 | `offset` 是解析器允许的完整 `u64`：`check_fixup_overlap` 的 `offset * 8` 可溢出，`check_one_writer` 会按 `u32::MAX` 宽度逐位遍历。H1a 用 `u128`/`checked_*` 计算绝对位位置，并把逐位循环截断到 `form.bits()`；`two_huge_fixup_offsets_do_not_overflow` 从合法 JSON 进入 `check`，debug/release 各跑一次 |
 | 计划声明的 namespace/version 与传入定义不一致 | `bind` 比较三项（D15）；H1b 的 namespace、version 错配与 facade 测试；`BindIdentity.definition` 取自实际绑定的定义，不取计划声明 |
 | 合法计划触发 `Internal`（`page` + `none`） | `check_fixup_kind` 补 `page ⇒ pcrel_page`（D16）；H1a 直接测 `check`，H1b 测 `bind`，`ADR-0127` 记下诊断码与 Pointer；其余 `internal(...)` 由 H1a 的前提表覆盖 |
-| 定义输入让寄存器宽度检查越界移位 | `reg_number` 槽位不允许 `range`（`definition.rs:487-499`），总宽只由 placements 之和决定（单个 ≤64，个数无上限）；`validate` 的 `:775` 用 `1u64 << field_bits`，64..127 在 debug 溢出。H1a 先复现，再选择「加载时约束 `width_bits`」或「比较改用 `u128`」；**不**把「字段已私有化」扩大解释为「加载器接受的定义都已被证明安全」 |
+| 定义输入让寄存器宽度检查越界移位 | `reg_number` 槽位不允许 `range`（`definition.rs:487-499`），总宽只由 placements 之和决定（单个 ≤64，个数无上限）；`validate` 的 `:775` 用 `1u64 << field_bits`，64..127 在 debug 溢出。H1a 先复现，并选择「比较改用 `u128`」而不约束加载；H1a 评审又发现编码端 `write_field` 仍对整个字段做 `i128` 掩码与移位：127 位 debug panic，192 位 release 成功但把值也写进第一个 placement。现已改为逐 placement 从低 128 位提取、高位按符号扩展，`he1_wide_register.rs` 用非零寄存器覆盖 64/127/128/192 位并在 debug/release 断言实际字节；**不**把「字段已私有化」扩大解释为「加载器接受的定义都已被证明安全」 |
 | `Internal` 被误分类成用户计划错误 | `Failure::Internal` 独立变体 + `exit_code` 单测；exit 1 只留给 `Rejected` 与 `PostEncodeAssertion` |
 | 有人继续用二参入口绕过 | facade 内部就是 `bind`；两条测试：摘要不符仍被拒、namespace/version 错配同样被拒（D15） |
 | envelope 意外新增字段 | Level-1 夹具 + `payload_root` |

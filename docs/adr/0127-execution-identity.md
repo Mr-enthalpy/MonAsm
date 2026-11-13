@@ -11,9 +11,10 @@
   `fmp-model/src/definition.rs` (`Definition`, `Registry`),
   `fmp-model/src/plan.rs` (`legacy_document`, `check_structure`),
   `fmp-model/src/identity.rs` (new), `fmp-validate/src/lib.rs` (arithmetic and
-  the `page` rule), `fmp-materialize/src/lib.rs` (fingerprint input and
-  accessors), the H1a tests listed in §9, `.github/workflows/gates.yml` (one
-  dependency-direction step), `research/he1/H1-report.md` (new),
+  the `page` rule), `fmp-materialize/src/lib.rs` (fingerprint input, accessors
+  and wide-field encoding), the H1a tests listed in §9,
+  `.github/workflows/gates.yml` (dependency-direction, identity-vector and
+  release-bound steps), `research/he1/H1-report.md` (new),
   `tools/plan_identity.py` (new)
 - Keeps in force: `ADR-0123` for the artifact envelope; `ADR-0126` for the
   `payload/0.1` projection; `ADR-0125` for the HE-1 scope; the fixup rows of
@@ -56,10 +57,14 @@ the facts is a second authority. Access is read-only:
 `forms[i].template` with `vec![0x90; len]`. Before H1a the digest string did not
 move and `materialize` emitted the mutated bytes under the old digest. After
 H1a the program does not compile; the `compile_fail` doctests in
-`fmp-model/src/lib.rs` assert both spellings (`definition.forms = …` and
-`Definition { forms: … }`), and the positive control reads `namespace()`,
-`version()` and `digest()` through the same import path so a wrong import cannot
-make the two negative doctests green for the wrong reason.
+`fmp-model/src/lib.rs` assert both spellings (`definition.forms = …` and a
+`Definition { … }` literal that names **every** field). The second one can only
+fail on the private-field access: an incomplete literal also fails with all
+fields public, which is why it is not evidence. The positive control reads
+`namespace()`, `version()` and `digest()` through the same import path so a
+wrong import cannot make the two negative doctests green for the wrong reason.
+The fault-injection control is a scratch copy with all six fields `pub`: both
+negative doctests then fail, so neither is green for an unrelated reason.
 
 **Replacement evidence.** `a_definition_edit_reloads_to_a_new_digest` edits a
 template byte in the **document**, reloads, asserts the digest changed, and
@@ -231,7 +236,14 @@ Three plans are pinned. Each digest is asserted by a Rust unit test
 |---|---|---|
 | `minimal` | Empty vectors, no options, `artifact = bytes`, `symbol_order = none` | `sha256:a48faecec39dd1de38f13b4868559f307b575a95a0aa241a01caa325400422c4` |
 | `data-fragment` | One image-backed `.text` section with a one-byte `Data("90")` fragment; `section_order = [".text"]` | `sha256:9da5a3318e943bcbd5c9c32366708922b68a5e7e7c67a0b3d48a9c7b1a68eec2` |
-| `unknown-variants` | Every `Unknown` variant, every `Some`, all three `ModifierValue` payload shapes, one of each covered element | `sha256:1a07ae98cba50f7ee65b36bbe2bb1684eaa0885f728270b9baa39824a2a4632a` |
+| `unknown-variants` | Every `Unknown` variant, all three `ModifierValue` payload shapes, one of each covered element | `sha256:1a07ae98cba50f7ee65b36bbe2bb1684eaa0885f728270b9baa39824a2a4632a` |
+
+`source_ref = Some(...)` is **not** covered by these three vectors: all of them
+use `None`. The field is still covered by the Rust mutation table
+(`plan_identity_covers_every_parsed_field`, row `definition.source_ref`), so the
+encoder is not untested, but the `Some` branch has no fixed cross-language
+vector. H1a review corrected the earlier claim rather than changing the three
+frozen vectors.
 
 The `minimal` facts are 376 bytes and begin with the root `0x08`:
 
@@ -255,7 +267,9 @@ python tools/plan_identity.py --check
 ```
 
 The script prints `name`, `digest` and `facts=<hex>` for all three and exits
-non-zero if a pinned digest does not match.
+non-zero if a pinned digest does not match. The `documents` job of
+`.github/workflows/gates.yml` runs this command, so the Python reference encoder
+is exercised on every hosted run (H1a review).
 
 **What this evidence does and does not prove.** Rust and Python were written
 independently from the tables above, in different languages with different
@@ -320,6 +334,7 @@ exists, and H1b's replay table asserts it.
 | `check_fixup_overlap` absolute bit position | `u64` `offset * 8 + lsb` | `u128` `offset as u128 * 8 + lsb` |
 | `check_one_writer` / `check_fixup_ownership` bit loops | `lsb .. lsb + width` (`u32::MAX` possible) | `lsb .. min(lsb + width, form.bits())` |
 | register field width | `1u64 << field_bits` (panics at 64 in debug) | `1u128.checked_shl(field_bits)` (no panic; a `u64` register fits any field ≥ 64) |
+| register field encoding (`fmp-materialize` `write_field`) | `value & mask(width_bits)`, then `masked >> remaining` in `i128` | each placement is extracted directly from the low 128 bits of a `u128`; every higher bit is `value`'s sign bit |
 | alignment unit | `1i128 << align_bits` | `1i128.checked_shl(align_bits)`; a non-zero value at an unrepresentable alignment is misaligned |
 | signed/unsigned range | `1i128 << (bits - 1)`, `1i128 << bits` | `checked_shl`; an unrepresentable half becomes the open bound instead of a panic |
 
@@ -342,7 +357,17 @@ The exact counterexamples:
   debug. Both definitions load and `check` accepts register `0` without a panic
   or a spurious `E-OPERAND-004`. The fix is the `u128` comparison, not a
   load-time bound: a wide field is a legal definition fact, only the comparison
-  was unsafe.
+  was unsafe. This test uses register `0` and stops at `check`; it is not
+  encoding evidence.
+- `a_wide_register_field_encodes_the_same_bytes_in_every_build`
+  (`fmp-materialize/tests/he1_wide_register.rs`) closes the other half. It
+  builds 64-, 127-, 128- and 192-bit fields with **non-zero** registers and
+  asserts the exact bytes from `materialize` after `check_structure` and
+  `check` are empty. Before the fix the 127-bit case panicked in debug
+  (`(1i128 << 127) - 1`) and the 192-bit case succeeded in release while also
+  writing the value into the *first* 64-bit placement (`>> 128` wrapped). The
+  test runs in debug and release, locally and in CI (§10); a zero register
+  would have hidden the release defect because the wrong chunk is also zero.
 
 **Entry boundary.** Two `width = u32::MAX` entries are **structurally** illegal
 under D13. Once `bind` exists they must be rejected by `check_structure` with

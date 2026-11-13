@@ -629,27 +629,35 @@ limits
 stay open for H1 acceptance rather than being claimed as passed: `FMP_BUILD_ID`
 is `None`, and debug/release payload equality is unmeasured.
 
-**H1a is landed** (2026-11-13, branch `he1/h1a-identity-core`, `ADR-0127`):
-`Definition` is a closed loaded object (private fields, no `document`, no
-`Clone`), `Registry` stores `Vec<Arc<Definition>>` and `find` returns
-`Arc<Definition>`, and the new `fmp_model::identity::ParsedPlanIdentity` defines
-`plan-identity/0.1` over every parsed `Plan` field except `legacy_document` and
-`provenance`, with exhaustive destructuring and a per-field mutation table so a
-new field fails the build until the identity covers it. `Plan.document` is
-renamed `legacy_document` and has exactly one reader, the legacy `fingerprint`.
-`plan::check_structure` re-checks the parser rules the mutable DTO cannot carry
-(`format_version`, `payload_hex`, and the five numeric bounds), and the
-validator's descriptor arithmetic and per-bit loops are hardened
-(`u128`/`u64`/`checked_*`, clipped to `form.bits()`); the `page ⇒ pcrel_page`
-precondition is now static (`E-FIXUP-001`), the register-width overflow is
-reproduced and fixed by comparing in `u128`, and `ADR-0127` carries the 15-row
-`internal(...)` precondition table plus the measured post-encode set (four
-fixtures, three codes; the two `E-SIZE-001` negatives are static). Three fixed
-identity vectors are pinned in `ADR-0127` and recomputed independently by
-`tools/plan_identity.py --check`; `.github/workflows/gates.yml` now fails if
-`cargo tree -p fmp-validate --edges normal` reaches `fmp-materialize`. Neither
-frozen root moved: `payload_root` and `definitions_root` are unchanged, and
-`definitions/`, `fixtures/`, `docs/fmp-v0/` and the 128 payloads are untouched.
+**H1a is landed** (2026-11-13, branch `he1/h1a-identity-core`, `ADR-0127`;
+review amendment 2026-11-14): `Definition` is a closed loaded object (private
+fields, no `document`, no `Clone`), `Registry` stores `Vec<Arc<Definition>>` and
+`find` returns `Arc<Definition>`, and the new
+`fmp_model::identity::ParsedPlanIdentity` defines `plan-identity/0.1` over every
+parsed `Plan` field except `legacy_document` and `provenance`, with exhaustive
+destructuring and a per-field mutation table so a new field fails the build
+until the identity covers it. `Plan.document` is renamed `legacy_document` and
+has exactly one reader, the legacy `fingerprint`. `plan::check_structure`
+re-checks the parser rules the mutable DTO cannot carry (`format_version`,
+`payload_hex`, and the five numeric bounds), and the validator's descriptor
+arithmetic and per-bit loops are hardened (`u128`/`u64`/`checked_*`, clipped to
+`form.bits()`); the `page ⇒ pcrel_page` precondition is now static
+(`E-FIXUP-001`), the register-width overflow is reproduced and fixed by
+comparing in `u128`, and `write_field` now extracts each placement from the low
+128 bits, so 64/127/128/192-bit register fields encode the expected bytes with a
+non-zero register in debug and release (the reviewed tree panicked at 127 in
+debug and filled the first placement at 192 in release).
+`ADR-0127` carries the 15-row `internal(...)` precondition table plus the
+measured post-encode set (four fixtures, three codes; the two `E-SIZE-001`
+negatives are static). Three fixed identity vectors are pinned in `ADR-0127`
+and recomputed independently by `tools/plan_identity.py --check`, which the
+`documents` CI job now runs; the `workspace` job runs the release bound and
+wide-field tests, and still fails if `cargo tree -p fmp-validate --edges normal`
+reaches `fmp-materialize`. The second `compile_fail` doctest names every
+`Definition` field, so it fails only on private access; making all six fields
+`pub` in a scratch copy turns both negative doctests red. Neither frozen root
+moved: `payload_root` and `definitions_root` are unchanged, and `definitions/`,
+`fixtures/`, `docs/fmp-v0/` and the 128 payloads are untouched.
 H1a evidence and test names are in `research/he1/H1-report.md`. H1b
 (`ValidatedPlan`, `bind`, the new `materialize`, `ExecutionReceipt`,
 `MaterializationFailure` and the CLI failure split) is next and **not started**;
