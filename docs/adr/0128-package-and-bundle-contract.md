@@ -5,19 +5,25 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: sixth revision, 2026-11-16, after the publication-lifecycle audit:
-  immutability is keyed on the **base** registry so a version can be created and
-  first published in one PR; the registry makes `(package_id, version)` globally
-  unique and permanently binds it to its first path and source digest; spec
-  `bundle_id` and definition identity are unique across specs; package reads
-  never follow a link; and publication-history auditing is a separate command
-  from bundle verification. The fifth revision's form-scope, registry-survival,
-  spec-order, transitive-closure and evidence rules remain in force.
+- Revision: seventh revision, 2026-11-16, after the identity and path-trust
+  audit: the no-follow path bound is a property of the **open**, so a metadata
+  pre-check followed by a path-based open does not satisfy it; a published
+  `(namespace, version)` permanently binds its `definition_digest`, while
+  `bundle_id` is an explicitly movable release-line name; the registry records
+  that definition history; `requires_capabilities` must cover the capabilities
+  the rows actually use; the release metadata has a fixed vector with
+  `evidence_digest` present; and the case-diff pointer has one specified
+  algorithm. The sixth revision's base/head publication split, global package
+  identity binding, no-follow, cross-spec uniqueness and separate publication
+  audit remain in force.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
   `monasm-lock/0.1`, `monasm-bundle/0.1` and `monasm-published/0.1` formats;
   immutable published package version directories and their append-only
-  registry, including global `(package_id, version)` identity binding and the
-  separate publication-history audit; the digest layering and its byte-level
+  registry, including global `(package_id, version)` identity binding, the
+  permanent `(namespace, version)` → `definition_digest` history, the movable
+  `bundle_id` release line, and the separate publication-history audit; the
+  declared-versus-derived capability set; the release-shaped digest vector; the
+  recursive case-diff rule; the digest layering and its byte-level
   preimages; package
   target self-description and migration provenance, including legacy target
   consistency; the standalone definition identity used by `verify --package`; the
@@ -149,7 +155,7 @@ that component. A mismatch is `path-version-mismatch` (exit 1). The manifest is
 | `definition_format` | The builder merges rows with a format the author did not name, so a `fmp-def/0.2` row is read by a `0.1` reader (or the reverse) and the rejection names the wrong fact. |
 | `target_identity` | A package declares no target facts, so a new package has no way to be checked without a legacy file; the spec becomes the only target authority and a package can be merged into a mismatched target. |
 | `legacy_source` | A re-homed package loses the reference for the row-equality test, and a copied row can claim a different execution target; "the newest file" silently retargets the comparison and hides a semantic change. |
-| `requires_capabilities` | A package that needs a primitive the core does not execute is built as if it needed nothing; the builder cannot reject it before the snapshot is verified. |
+| `requires_capabilities` | A package that needs a primitive the core does not execute is built as if it needed nothing; the builder cannot reject it before the snapshot is verified. A declared set that omits a capability the rows use, or lists one they do not, is `capability-mismatch` (§1.2). |
 | `dependencies` | A transitive package has to be discovered by scanning, which is the behaviour H3 forbids. |
 | `exports.forms` | A file in the package can be executed without being declared, or an undeclared file is silently included. |
 | `exports.forms[].id` | The file's own `form_id` can differ from the declaration; swapping two files changes ownership without changing the manifest. |
@@ -248,6 +254,35 @@ implement. The §6.2 manifest sketch also predates this contract: its bare-path
 `exports.forms` and its missing `definition_format`/`target_identity` are
 superseded by the closed manifest in §1, which is the only H2 shape.
 
+#### 1.2 The declared capability set must equal the derived one
+
+`requires_capabilities` is a claim about what the exported rows need, so a
+whitelist alone is not enough: a package that declares nothing while its rows
+use a primitive makes the field a comment, and a later consumer that trusts it
+under-estimates the requirement. H2 therefore derives the set from the rows and
+requires equality:
+
+| Capability | Derived as required when |
+|---|---|
+| `field-placement/v1` | some exported form has at least one `slots[]` entry with a non-empty `placements` array — the row places a value at a `bit_offset`/`width` inside the template unit |
+| `integer-domain/v1` | some slot has `from: "operand_value"`, i.e. the row encodes an integer operand under its `range` (`signed`, `bits`, `align_bits`) instead of a register or fixed field |
+
+A form with no slots (for example `{"form_id":"x86:example/form","template":"90"}`)
+derives the empty set. A declared set that differs from the derived set is
+`capability-mismatch` (exit 1), in both directions: an undeclared requirement
+lets H3 under-provision, and an unused declaration turns the field into a wish
+list that a reader cannot distinguish from a real requirement. Both worked
+examples already satisfy the rule — the §1 manifest declares
+`field-placement/v1` over two register forms, and the §7.0 example declares `[]`
+over a slotless form — so the rule states the intent those examples already
+encode rather than adding a new burden.
+
+The derivation is over `fmp-def/0.1` structure that H2 already parses, so it is
+a total function of the read document, not a heuristic. H3 may extend the table
+for new primitives; it may not weaken the equality, and a future capability it
+cannot derive is a new format version, not an exemption. `unsupported-capability`
+still rejects an unknown string before the derivation runs.
+
 ### 2. Target facts are self-declared; `legacy_source` is migration provenance
 
 Every package states its own execution target in `definition_format` and
@@ -344,18 +379,42 @@ bundle.
 
 Every manifest path is a normalised relative path using `/`. Absolute paths,
 `..`, empty segments, `.`, backslashes, NUL, URL schemes and drive letters are
-rejected. The bound holds for the whole read, not at a single instant: no
+rejected. The bound is a property of the **open**, not of a moment before it: no
 component on the path from `--root` to an opened file may be a symlink or
-reparse point, and the builder never follows one. H2 package inputs contain no
-such links on that path; a package that has one is `path-escape` (exit 1). An
-implementation may enforce this by checking every component with
-non-following metadata before opening it, or by opening each component relative
-to an already-open directory handle with no-follow semantics. Canonicalise-then-
-open is **not** sufficient: the filesystem can replace the target between the
-check and the open, so the two-step sequence is a time-of-check/time-of-use gap,
-not an invariant. The spec's `packages[].path` and the `--root` resolution obey
-the same rule; `--root` may be canonicalised once to establish the base, but no
-component below it is followed. `legacy_source.isa` and `legacy_source.version`
+reparse point, and the builder never traverses one. H2 package inputs contain no
+such links on that path; a package that has one is `path-escape` (exit 1).
+
+A metadata pre-check is **not** sufficient, even a non-following one.
+`symlink_metadata()` can report `forms/` as a real directory, another process can
+replace it with a link, and the following `read()` on the ordinary path then
+traverses that link. That is the same check-then-use gap as
+`canonicalize()`-then-`open()`, with one fewer step:
+
+1. `symlink_metadata("pkg/forms")` → directory, check passes;
+2. `forms/` is replaced by a link to a directory outside `--root`;
+3. `open("pkg/forms/example.json")` follows the link and reads the outside file.
+
+The contract therefore names the mechanism by its guarantee, not by a helper
+call:
+
+- each component is opened relative to an already-open directory handle with
+  no-follow semantics, and the next step uses that handle rather than a
+  re-derived path string; or
+- the open itself carries a flag that makes the platform refuse to follow a link
+  or reparse point, and the builder reads from the returned handle.
+
+Either way the guarantee is about the object actually opened: the builder must
+not re-open the same path afterwards "to read the bytes". A platform on which
+the builder cannot express a no-follow open rejects the package with
+`path-escape` instead of silently degrading to a following open. The format also
+forbids links outright, so a link whose target is *inside* `--root` is still
+`path-escape`; the builder does not resolve it and call the result bounded. H2
+does not claim protection against an attacker who can rewrite the worktree after
+a successful build, nor against a hostile `--root` itself; it does claim that a
+successful build opened exactly the objects the checks describe. The spec's
+`packages[].path` and the `--root` resolution obey the same rule; `--root` may be
+canonicalised once to establish the base, but no component below it is opened
+through a followed link. `legacy_source.isa` and `legacy_source.version`
 are path components before they are concatenated into
 `<root>/definitions/<isa>/<version>.json`, so they receive the same treatment:
 `isa` must match `^[a-z0-9_]+$` and `version` must match
@@ -861,6 +920,36 @@ overwrites the other and directory iteration order decides the survivor
 (`INV-05`). For `(namespace, version)`, two specs can each verify individually
 yet produce two definitions that `Registry::find` cannot distinguish.
 
+**A definition identity is permanent; a bundle ID is a movable release line.**
+The two names answer different questions and must not be conflated:
+
+- `(namespace, version)` names a definition. Once a merged bundle has published
+  it, the pair is permanently bound to that `definition_digest`, recorded in the
+  registry (§8.3). A later spec may reuse the pair only with the identical
+  digest, which in practice means republishing the same bytes; a different
+  digest is `definition-identity-conflict` (exit 1), even after every spec that
+  first used the pair has retired.
+- `bundle_id` names a release line: a movable pointer to the current
+  lock/sealed pair. Publishing `monasm.bundle.x86.example` at `0.1.0-h2` and
+  later re-selecting a new package version under the same `bundle_id` is the
+  ordinary publisher workflow. At most one live spec may carry the ID (§8), but
+  the ID is not a content identity. The immutable release identity is the pair
+  `(bundle_id, bundle_digest)`; its record is the committed lock and sealed
+  bundle, which git history preserves and `verify --all --check` rebuilds at the
+  commit that wrote them. A consumer that must have "the release I built" pins
+  the digest, not the name.
+
+Counterexample if `(namespace, version)` were treated as movable: commit A
+publishes `monasm.isa.x86` / `0.1.0-h2` with digest D1 and later retires it;
+commit C publishes the same pair with D2 and no live spec conflicts, so a
+current-spec-only check passes. Executing an old document is still safe, because
+H1 binds the digest, but two different byte strings now both answer to "the
+`0.1.0-h2` release", a replay of A and C cannot say which one the name meant, and
+H3's runtime bundle selection would have to reopen an H2-frozen identity. The
+registry makes C `definition-identity-conflict`. Reusing the *bundle* ID is not
+the same case: that is the intended way to advance a release line, which is why
+the immutable label is `(bundle_id, bundle_digest)` and not `bundle_id` alone.
+
 Lock and sealed bundle are committed release artifacts. CI runs
 `fmp-definition verify --all --check`, rebuilds each spec in memory, compares the
 sealed bundle byte-for-byte and the lock byte-for-byte **except `builder`**. It
@@ -1060,11 +1149,50 @@ committed lock carries `evidence_digest` (§7.1), so a released bundle's
 vector fixes the preimage shape and the omitted-key spelling, not a releasable
 bundle's final identity.
 
+A second vector fixes the **release-shaped** metadata, where every package entry
+carries `evidence_digest` because that is what a committed lock holds. It uses
+the same package, definition and bundle, so `bundle_digest` is unchanged —
+bundle metadata never contains evidence. The evidence manifest's four file
+hashes are the raw-byte hashes of these fixtures:
+
+```text
+NOTICE                    5743f7fcbdc81aa8600dca2f8bb33dd2eca8b401fbe27a015d88d746864c46c3
+  = sha256("MonAsm example package. SPDX-License-Identifier: Apache-2.0\n")
+evidence/legacy-source.md 520113bc00bd2912112e819e0338a65192ba25802986a691021a27cf7b38088c
+  = sha256("x86_64/0.1.0: x86:mov/rm-r64/legacy, x86:mov/r64-rm/legacy\n")
+tests/cases.json          fa00a63d0185a6087c8cffd3ba5e232575222d7651b13caf068c8aafc0afcc10
+  = sha256("{\"cases_format\":\"monasm-cases/0.1\",\"cases\":[]}\n")
+evidence/case-1.json      1200459233341d292198e50574e7690b0bb3b5ed6bc5f0d3553dffe3571df469
+  = sha256("{\"case_id\":\"x86-example-pos\",\"oracle\":\"llvm-mc\"}\n")
+```
+
+The `tests/cases.json` fixture is a two-field byte string used only as a digest
+input; a real release needs a case per exported form (§9.1), and this vector does
+not claim that fixture is one. What it pins is the layering: the manifest bytes,
+the `evidence_digest` preimage, and the release metadata with the key present.
+
+```text
+evidence manifest canonical =
+{"evidence_format":"monasm-evidence/0.1","files":[{"path":"NOTICE","sha256":"5743f7fcbdc81aa8600dca2f8bb33dd2eca8b401fbe27a015d88d746864c46c3"},{"path":"evidence/case-1.json","sha256":"1200459233341d292198e50574e7690b0bb3b5ed6bc5f0d3553dffe3571df469"},{"path":"evidence/legacy-source.md","sha256":"520113bc00bd2912112e819e0338a65192ba25802986a691021a27cf7b38088c"},{"path":"tests/cases.json","sha256":"fa00a63d0185a6087c8cffd3ba5e232575222d7651b13caf068c8aafc0afcc10"}],"oracle":{"command":"tools/oracle/rerun.py --case X86-P1","skips":[],"status":"reproduced"},"sources":[{"note":"x86_64/0.1.0 rows","path":"evidence/legacy-source.md"}]}
+evidence_digest = sha256:e94738716ffc56d6f1a865c463fee4afae03835d51ef234bff2c213e321f931a
+
+release metadata canonical =
+{"bundle_digest":"sha256:b6d925747e41428db2e6dd31d72d7bd05739ab8d552fb53bcd73402af54931fd","bundle_id":"monasm.bundle.x86.example","definition_digest":"sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad","packages":[{"evidence_digest":"sha256:e94738716ffc56d6f1a865c463fee4afae03835d51ef234bff2c213e321f931a","package_id":"monasm.x86.example","source_package_digest":"sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0","version":"0.1.0"}]}
+release_digest = sha256:ba60e8bab8f15ae57972ee24510798fc7721430fa4508dc810011a753a8d3235
+```
+
+Both implementations must reproduce the development vector and this one. The
+difference between them is exactly whether the package entry carries
+`evidence_digest`, so a tool that writes the development shape into a committed
+lock fails on bytes rather than silently releasing a bundle whose evidence is
+outside its release identity.
+
 #### 8.3 The published-version registry is the permanent immutability record
 
 `bundles/published.json` is a closed, append-only registry. It is maintained by
 the release process, not by an ordinary package author, and it is the permanent
-answer to "was this version ever published?", independent of the current specs.
+answer to "was this version ever published?", and "which definition did this
+identity name?", independent of the current specs.
 
 ```json
 {
@@ -1076,14 +1204,23 @@ answer to "was this version ever published?", independent of the current specs.
       "version": "0.1.0",
       "source_package_digest": "sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0"
     }
+  ],
+  "identities": [
+    {
+      "definition_digest": "sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad",
+      "namespace": "monasm.isa.x86",
+      "version": "0.1.0-h2"
+    }
   ]
 }
 ```
 
-The object has exactly `published_format` and `published`. Each entry has
-exactly `path`, `package_id`, `version` and `source_package_digest`; entries are
-sorted strictly by `path`. Three uniqueness rules hold across the whole registry,
-not only within one bundle closure:
+The object has exactly `published_format`, `published` and `identities`. Each
+`published` entry has exactly `path`, `package_id`, `version` and
+`source_package_digest`, sorted strictly by `path`; each `identities` entry has
+exactly `definition_digest`, `namespace` and `version`, sorted strictly by
+`(namespace, version)`. Either array may be empty. Three uniqueness rules hold
+across the whole registry, not only within one bundle closure:
 
 - `path` is unique;
 - `(package_id, version)` is unique;
@@ -1095,8 +1232,33 @@ not only within one bundle closure:
 
 A spec may reference an existing entry by the same `path` and
 `source_package_digest` in any number of bundles; that is one published version
-selected by several bundles, not two publications. `published` may be empty.
-Unknown or duplicate keys are rejected (`INV-07`).
+selected by several bundles, not two publications. Unknown or duplicate keys are
+rejected (`INV-07`).
+
+The `identities` array is the matching history for definition names, because the
+package registry cannot answer "was `monasm.isa.x86` / `0.1.0-h2` ever published,
+and with which bytes?" after its spec retires:
+
+- the pair `(namespace, version)` is unique in the array, and its first **merged**
+  entry permanently binds the name to that `definition_digest`; a later bundle
+  that declares the same pair with a different digest is
+  `definition-identity-conflict` (exit 1), even though no live spec still uses
+  the pair;
+- re-publishing the identical `definition_digest` under the same pair is legal
+  and adds no second entry — byte-identical definitions are one identity, so a
+  retired-and-reintroduced bundle needs no new row;
+- a spec that publishes a bundle must have its `(namespace, version)` registered
+  with the digest the merged document actually produces; a missing row is
+  `published-registry-incomplete` (exit 1) and a digest disagreement is
+  `definition-identity-conflict` (exit 1);
+- both arrays follow the same append-only rules: inserting a new row in sorted
+  position is the only legal change to a base registry, and removing, editing,
+  reordering or replacing a base row is `published-registry-modified` (exit 1).
+  A head-only row may be withdrawn when no head spec publishes that identity;
+- `bundle_id` deliberately has no table. It is a movable release-line name
+  (§8), so recording it would assert an immutability the contract does not
+  claim. The immutable label is `(bundle_id, bundle_digest)`, carried by the
+  committed lock and sealed bundle.
 
 - A version is **published** once its entry is in the registry of a merged
   commit. The current spec set does not decide publication after the fact.
@@ -1113,14 +1275,17 @@ Unknown or duplicate keys are rejected (`INV-07`).
   `published-registry-modified` (exit 1). A new entry must be selected by at
   least one head spec and must match the package at its `path`; otherwise it is
   `published-registry-invalid` (exit 1). A head-only entry may be removed in the
-  same PR only when no head spec selects its path.
+  same PR only when no head spec selects its path. The `identities` rows follow
+  the same rules, with `definition-identity-conflict` for a reused name and a
+  different digest.
 - Each entry's `source_package_digest` must equal the digest recomputed from the
   package at `path`. A mismatch is `published-registry-invalid` (exit 1), and
   any byte change under a base-published path is also
   `published-package-modified` (exit 1).
-- The registry is a publication fact, not a selection input. It does not enter
+- The registry is a publication fact, not a selection input. Neither array enters
   `source_package_digest`, `definition_digest`, `bundle_digest` or
-  `release_digest`, and it can never add a package to a bundle.
+  `release_digest`, and it can never add a package to a bundle. The `identities`
+  digest is checked against the built definition, never fed into it.
 - Retiring a release removes a spec but never removes the snapshot or its
   registry entry. Deleting both in one PR is `published-registry-modified`, not
   a legal retirement.
@@ -1139,6 +1304,17 @@ adds the files after the entry — which the digest check forbids. The base-only
 rule lets one PR create and register the version, and the head validation makes
 the merged bytes the immutable ones.
 
+Counterexample if only packaged versions were registered: A publishes
+`monasm.isa.x86` / `0.1.0-h2` with D1, B retires the spec, C publishes the same
+pair with D2. B removed the only spec, so a current-spec check in C sees no
+collision; the package registry is untouched because no package changed. Without
+the `identities` row, two byte strings are both "the `0.1.0-h2` release", and a
+replay of A and C cannot be told apart by the name the format published. With
+the row, C's build fails `definition-identity-conflict`. Registering the
+`bundle_id` instead would not help: the same ID is expected to advance to a new
+definition when the publisher selects a new package version, so the conflict
+would fire on the normal workflow.
+
 #### 8.4 Bundle verification and publication history are separate commands
 
 Two questions must not be conflated:
@@ -1155,14 +1331,19 @@ Two questions must not be conflated:
   checks the closed shape, sorted order, unique `path`, unique
   `(package_id, version)`, the identity binding, that the path exists and is a
   version directory, that the manifest's `package_id`/`version` match the entry,
-  and that the recomputed `source_package_digest` equals the recorded one. A
-  mismatch is `published-registry-invalid` (exit 1); a directory/manifest
-  version disagreement is `path-version-mismatch` (exit 1). The audit never
-  selects a package into a bundle and never changes a lock or sealed bundle. The
-  changed-path gate (§8.1) reports the underlying file edit as
-  `published-package-modified`; the audit reports the registry effect, not the
-  file edit. The audit applies the §12 per-package byte and count budgets to each
-  entry it re-reads; it has no closure aggregate because it is not a bundle.
+  and that the recomputed `source_package_digest` equals the recorded one. It
+  also checks the `identities` rows: unique and sorted `(namespace, version)`,
+  one digest per name, and — for a name that a current spec still publishes —
+  agreement with the digest the current build produces; disagreement is
+  `definition-identity-conflict` (exit 1), a missing row for a published spec is
+  `published-registry-incomplete` (exit 1). A package-entry mismatch is
+  `published-registry-invalid` (exit 1); a directory/manifest version disagreement
+  is `path-version-mismatch` (exit 1). The audit never selects a package into a
+  bundle and never changes a lock or sealed bundle. The changed-path gate (§8.1)
+  reports the underlying file edit as `published-package-modified`; the audit
+  reports the registry effect, not the file edit. The audit applies the §12
+  per-package byte and count budgets to each entry it re-reads; it has no closure
+  aggregate because it is not a bundle.
 
 CI runs both. If only `--all --check` ran, a retired version with no selecting
 spec would never be re-hashed. If the audit were folded into `--all`, every
@@ -1345,8 +1526,25 @@ projection is compared after `materialize`.
   not a form-neighbourhood test; it must use `scope: "plan"` or is
   `case-mutation-mismatch` (exit 1).
 - The harness compares the baseline plan and the case plan as canonical JSON
-  trees. The set of differing JSON Pointers must be exactly `{mutates}`; any
-  other difference, a no-op mutation, or a mutation that changes `form_id` is
+  trees and computes the difference with one specified recursive function, so two
+  implementations report the same pointer for the same edit:
+  1. two scalars, or two values of different JSON kinds, that differ → the
+     pointer of that position;
+  2. two objects → the pointer of every key present in only one of them (the
+     whole value is the difference), plus the recursive result for every key in
+     both;
+  3. two arrays of different length → the pointer of the array itself, because
+     the shape changed rather than one element; equal length → the recursive
+     result for each index;
+  4. equal values produce no pointer.
+
+  Adding or removing an object member, or changing an array length, therefore
+  reports the **container** pointer and never a guessed child. The result is a
+  property of the two documents, not of a diff library's traversal order. A
+  fixed vector pins the rule: replacing `operands/2/payload` wholesale reports
+  `/instructions/0/operands/2/payload`, not a pointer to a member inside it.
+- The set of differing JSON Pointers must be exactly `{mutates}`; any other
+  difference, a no-op mutation, or a mutation that changes `form_id` is
   `case-mutation-mismatch` (exit 1). This stops an author from changing half the
   plan and calling the result a form test.
 - A `scope: "form"` case must be rejected by **`bind`**, so its
@@ -1533,11 +1731,12 @@ does not pretend to be `fmp/0.1` diagnostics.
 
 | Class | Examples | Exit |
 |---|---|---|
-| Deterministic rejection | manifest shape (required/optional keys), empty forms, path escape or a symlink/reparse point on a package path, missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, form-scope materialize stage, form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit | 1 |
+| Deterministic rejection | manifest shape (required/optional keys), empty forms, path escape or a symlink/reparse point on a package path, declared-vs-derived capability mismatch, missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, form-scope materialize stage, form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit | 1 |
 | Host / I/O / internal | unreadable file, unwritable lock, internal invariant break, materializer `Internal`/`HostFailure` during conformance | 2 |
 | Success | build or verify passed, digest printed | 0 |
 
-The enum names these rejections (`unsupported-capability`, `unsupported-asset`,
+The enum names these rejections (`unsupported-capability`, `capability-mismatch`,
+`unsupported-asset`,
 `version-conflict`, `aggregate-limit`, `legacy-row-mismatch`,
 `legacy-target-mismatch`, `evidence-mismatch`, `evidence-incomplete`,
 `missing-cases`, `uncovered-form`, `empty-package`, `case-evidence-mismatch`,
@@ -1763,9 +1962,18 @@ comparing the materializer with itself proves the bytes.
   silently take over the other's job.
 - The spec set has one `bundle_id` and one `(namespace, version)` per release
   identity. Two specs cannot collide on a lock path or produce two definitions
-  that `Registry::find` cannot distinguish.
-- Package reads never follow a symlink or reparse point, so the path bound is a
-  property of the read rather than a check that a concurrent rename can defeat.
+  that `Registry::find` cannot distinguish. A retired definition name cannot be
+  recycled under different bytes: the registry keeps the `(namespace, version)`
+  history, while `bundle_id` stays a movable release line whose immutable label
+  is `(bundle_id, bundle_digest)`.
+- Package reads never follow a symlink or reparse point, and the rule is stated
+  as a property of the open rather than of a preceding metadata check, so a
+  concurrent replacement cannot make the builder read a file that none of the
+  checks described.
+- `requires_capabilities` is a checked fact, not a comment: the builder derives
+  the set from the row structure and rejects a declaration that differs in either
+  direction, so a later consumer cannot under-provision a package that silently
+  omitted a primitive.
 - Digest preimages, the Level 0/Level 1 projections and the package budgets are
   frozen at the byte and key level, with a cross-language vector, so a Rust and a
   Python implementation cannot silently disagree.
@@ -1844,6 +2052,28 @@ comparing the materializer with itself proves the bytes.
   replace a component between the two calls. The package format forbids links and
   reparse points inside a version directory, and a read may instead be
   handle-relative with no-follow semantics (§3).
+- **Check each component with non-following metadata, then open by path.**
+  Rejected for the same reason at one step earlier: `symlink_metadata()` can
+  report a real directory that is replaced by a link before `open()`, so the two
+  calls are still a check-then-use gap. The contract names the open's guarantee
+  instead (§3).
+- **Keep definition identity unique only among the current specs.** Rejected:
+  retiring a spec would let a later PR republish the same `(namespace, version)`
+  with different bytes, so one release name would answer to two definitions and a
+  replay could not say which was meant. The registry keeps the identity history
+  (§8.3) while `bundle_id` stays a movable release line.
+- **Record `bundle_id` in the registry as an immutable identity.** Rejected: the
+  publisher is expected to advance `monasm.bundle.x86_64-mov` to a new definition
+  when a new package version is selected, so the entry would reject the normal
+  workflow. The immutable label is `(bundle_id, bundle_digest)` (§8, §8.3).
+- **Whitelist `requires_capabilities` without deriving it.** Rejected: a package
+  that omits a capability its rows use passes the whitelist and understates its
+  requirements to H3. The declared set must equal the derived set (§1.2).
+- **Let a JSON library decide which pointer a case mutation differs at.**
+  Rejected: replacing a subtree, adding an object member and changing an array
+  length are reported at different levels by different libraries, so two
+  implementations could accept different case files. §9.1 fixes the recursive
+  rule and the container-pointer convention.
 - **Fold the publication-history audit into `verify --all`.** Rejected: every
   bundle build would touch every retired package, so an unrelated old package
   could break a current spec. The audit is its own command and never selects a
@@ -1896,7 +2126,8 @@ comparing the materializer with itself proves the bytes.
   the syntax and rejecting non-empty lists is the narrower promise.
 - **Treat `requires_capabilities` as a comment in H2.** Rejected: a package
   needing a primitive the core does not execute could enter a verified bundle.
-  H2 rejects unknown strings at build time; runtime negotiation stays H3.
+  H2 rejects unknown strings at build time, derives the set from the rows and
+  rejects a declaration that differs (§1.2); runtime negotiation stays H3.
 - **Use `verify --all` as the only package gate.** Rejected: it enumerates
   specs, so a package that no publisher has selected would never be checked. The
   independent `verify --package` path is required.
@@ -1969,8 +2200,12 @@ comparing the materializer with itself proves the bytes.
 | First publication in the creating PR, with base-only immutability | specified; the old base-or-head rule would have rejected the creating PR | **specified, not implemented** — H2a |
 | Global `(package_id, version)` uniqueness and the permanent path/digest binding | specified; per-closure uniqueness cannot exclude two paths for one logical version | **specified, not implemented** — H2a |
 | Cross-spec `bundle_id` and `(namespace, version)` uniqueness | `Registry::find` returns `E-DEF-001` when two definitions share `(namespace, version)` (`fmp-model/src/definition.rs` 843–865); the builder does not yet reject the pair at spec level | **unverified** — H2a |
-| No-follow package reads (no symlink or reparse point on the resolved path under `--root`) | specified; canonicalise-then-open would be a TOCTOU check, and the current implementation has no package reader at all | **specified, not implemented** — H2a |
+| No-follow package reads (no symlink or reparse point on the resolved path under `--root`) | specified as a property of the open: a metadata pre-check followed by a path open is explicitly insufficient, and the implementation has no package reader yet | **specified, not implemented** — H2a |
 | Publication-history audit separate from `verify --all --check` | specified; no command exists | **unverified** — H2a |
+| Definition-identity history in the registry (`identities`) and permanent `(namespace, version)` → `definition_digest` binding | specified; no registry exists | **specified, not implemented** — H2a |
+| `requires_capabilities` derived from row structure and required to equal the declaration | specified; both worked examples already satisfy it, no implementation | **specified, not implemented** — H2a |
+| Release-shaped fixed vector with `evidence_digest` present (`evidence_digest` `e9473871…`, `release_digest` `ba60e8ba…`) | computed with Python over the bytes shown, not yet reproduced by a Rust implementation | **unverified on the Rust side** — H2a |
+| Recursive case-diff rule with container pointers | specified; no harness | **specified, not implemented** — H2a |
 | Form-scope negatives are `bind`-only and point at the mutated operand | specified; `fmp-materialize/src/lib.rs` emits `E-BYTE-001` at `/instructions/0/expected_digest` after encoding, so the counterexample is real | **specified, not implemented** — H2a |
 | Dependency-closure status distinct from package structure, including transitive re-reading of a `--closure` lock, cycles and the dependent-package author path | not implemented | **unverified** — H2a |
 | Release evidence as a separate `--release-evidence` gate | not implemented | **unverified** — H2a |
@@ -2016,6 +2251,19 @@ comparing the materializer with itself proves the bytes.
 - Someone decides "published" from the current specs instead of
   `bundles/published.json`: stop. The two-step retirement bypass is the
   counterexample (§8.3).
+- Someone verifies a path by calling `symlink_metadata()` and then opening the
+  same path string, or treats a canonicalise/check step as the guarantee: stop.
+  The no-follow property belongs to the open, not to a preceding check (§3).
+- Someone lets a retired `(namespace, version)` come back with a different
+  `definition_digest`, or treats `bundle_id` as an immutable release identity:
+  stop. The definition name is permanent and the bundle ID is a movable release
+  line labelled by `(bundle_id, bundle_digest)` (§8, §8.3).
+- Someone accepts `requires_capabilities` as written without deriving the set
+  from the rows, or adds a capability H2 cannot derive: stop. Declared must equal
+  derived; a new primitive is a new format version (§1.2).
+- Someone lets a diff library pick the case-mutation pointer level: stop. The
+  recursive rule and its container-pointer convention are part of the case
+  contract (§9.1).
 - Someone counts an `E-BYTE-001`/`E-SIZE-001` materialize failure, or any
   diagnostic not on the mutated operand, as form coverage: stop. Form-scope
   negatives are `bind` rejections at the mutated operand surface (§9.1).
