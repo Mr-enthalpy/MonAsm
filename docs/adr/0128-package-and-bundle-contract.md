@@ -5,12 +5,20 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: eighth revision, 2026-11-16, after the cross-history and
+- Revision: ninth revision, 2026-11-17, after the portability and lifecycle
+  audit: identifiers, path segments and artifact file names get an ASCII grammar
+  with case-fold, trailing-dot/space and Windows device-name rejection; the
+  digest, legacy comparison, per-package `read` and merge consume one loaded
+  package value; first publication has a cycle-free build → append → check order
+  and `build` validates every output in memory before replacing a file; and
+  `enabled_extensions` is stated as a conservative declared cover rather than a
+  minimum, so over-declaration is legal.
+- Prior revision: eighth revision, 2026-11-16, after the cross-history and
   composition audit: the case diff is defined over the two **final values**, so
   a member addition reports the member and only a kind change reports the
   container; an H2 definition name may not collide with a frozen legacy
   `definitions/` identity; every exported form's extension requirement must be
-  inside the package requirement, and the package inside the bundle, with a
+  inside the package's declared cover, and the cover inside the bundle, with a
   per-package `read` before the merge; the slotless form in §7.0 is labelled as
   a digest preimage rather than a legal Definition; the publication audit's
   guarantee is narrowed to the executable assets and identity; the digest
@@ -32,7 +40,10 @@
   consistency; the standalone definition identity used by `verify --package`; the
   mandatory package case and evidence gate with `bind`-only form-scope mutation
   and complete diagnostic sets; exact Level 0/Level 1 machine-output projections;
-  package target requirements versus bundle target selection; package/form
+  portable identifier, path-segment and artifact-filename lexical rules; the
+  single loaded-package value shared by digest, comparison, `read` and merge; the
+  cycle-free first-publication order and in-memory output validation; package
+  target covers versus bundle target selection; package/form
   ISA-family consistency; package ownership and conflict rules; which legacy
   definition version a re-homed form is compared against; transitive dependency
   closure and release-evidence status; the builder's error and exit behaviour;
@@ -109,10 +120,11 @@ fixture-verified rows.
 
 `packages/<target>/<package>/<version>/package.json` is the only entry point.
 The target directory is a path component (`x86_64`, `aarch64`, `rv64`), not a
-form-ID prefix. The `<version>` component is exactly the manifest's `version`
-string; the spec's `packages[].path` and `packages[].version` must agree with
-that component. A mismatch is `path-version-mismatch` (exit 1). The manifest is
-`monasm-package/0.1` and is a closed object:
+form-ID prefix; its lexical form and the mapping from `package_id` to
+`<package>` are §1.3. The `<version>` component is exactly the manifest's
+`version` string; the spec's `packages[].path` and `packages[].version` must
+agree with that component. A mismatch is `path-version-mismatch` (exit 1). The
+manifest is `monasm-package/0.1` and is a closed object:
 
 ```json
 {
@@ -308,6 +320,96 @@ capability it cannot derive is a new format version, not an exemption.
 `unsupported-capability` still rejects an unknown string before the derivation
 runs.
 
+#### 1.3 Identifiers, path segments and file names are ASCII and portable
+
+§3 bounds *where* a file may be; it does not yet say which strings may name one.
+Leaving that to the filesystem makes the same package produce different digests,
+or a different class of diagnostic, on ext4, APFS and NTFS. Four grammars are
+therefore fixed, and every identifier and path in a manifest, spec, lock or
+registry is checked against them before any file is opened:
+
+```text
+ident    = ^[a-z][a-z0-9]*(\.[a-z][a-z0-9_-]*)+$
+version  = ^(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){2,}(-[a-z0-9]+([.-][a-z0-9]+)*)?$
+pseg     = ^[a-z0-9_][a-z0-9_.-]*$
+path     = pseg "/" ... "/" pseg
+```
+
+- `package_id`, `bundle_id`, `namespace`, `target_profile` and `profile_id` use
+  `ident`: at least two segments, each starting with a lowercase letter, with
+  `-`/`_` allowed inside a segment. `monasm.x86.mov-register`,
+  `monasm.bundle.x86_64-mov` and `monasm.target.x86_64` are legal;
+  `Monasm.X86.Mov`, `monasm..x86`, `monasm.x86.` and `..x86` are
+  `identifier-lexical` (exit 1).
+- An author-written `version` uses `version`: `0.1.0`, `0.2.0` and `0.1.0-h2`
+  are legal; `0.1`, `01.0`, `0.1.0-H2` and `0.1.0-` are not. Three numeric
+  components are required and a component may not carry a leading zero. The
+  derived standalone version `standalone+<hex>` (§2.1) is outside this grammar
+  and never appears in a manifest, spec, lock or path; a spec carrying it is
+  already `reserved-identity`. `legacy_source.version` keeps the stricter
+  numeric-only form of §3.
+- Every declared path — `exports.forms[].path`, `exports.types[].path`,
+  `exports.profiles[].path`, a spec's `packages[].path` and the `legacy_source`
+  components — uses `path`; `legacy_source.isa` and `legacy_source.version` are
+  further restricted by the component forms of §3. A path listed in
+  `evidence/manifest.json` uses the same grammar, except that the fixed names
+  `README.md` and `NOTICE` keep their uppercase spelling. No segment may be `.`
+  or `..`, contain `..`, end with `.` or a space, or be a Windows device name
+  (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`,
+  case-insensitively, with or without an extension). A violation is
+  `path-lexical` (exit 1), raised on the string before the file is opened.
+- Declared paths are compared under ASCII case folding (`A`–`Z` → `a`–`z`). Two
+  declared paths in one package, or in one closure, that fold to the same string
+  are `path-lexical`. The grammar already admits only lowercase, so a legal
+  document cannot trigger the fold rule; it exists because the builder does not
+  assume every manifest it is handed came from this grammar, and because the
+  fold — not "the file happened to open" — must be the stated reason.
+  Documentation files (`README.md`, `NOTICE`) are not declared paths and are not
+  covered by the lowercase rule.
+- Paths are matched exactly as written. The builder never lowercases, trims a
+  trailing dot or space, or resolves an 8.3 alias; a path that matches only after
+  such a repair is `path-lexical`, not a successful open.
+- `bundles/specs/<file>.json` is the spec, `bundles/locks/<file>.lock.json` the
+  lock and `bundles/sealed/<file>.bundle.json` the sealed bundle, with `<file>`
+  equal to the document's `bundle_id` in each case. A file whose `<file>`
+  component does not equal the `bundle_id` it contains is
+  `bundle-file-mismatch` (exit 1), so `--all` has exactly one filename per
+  identity and renaming a spec cannot attach it to a different release. The
+  legacy snapshot is `bundles/legacy/<bundle_id>/definition.json`.
+- `packages/<target>/<package>/<version>/` requires `<package>` to equal the last
+  dot-separated segment of `package_id` and `<version>` to equal the manifest's
+  `version`. A `<package>` mismatch is `path-lexical`; a `<version>` mismatch is
+  the `path-version-mismatch` of §1. `<target>` is a directory label only:
+  it must satisfy `pseg`, but the builder does not compare it to `isa_family`,
+  `target_profile` or a central table, because target facts are self-declared
+  (§2) and a fourth H3 family must not need a directory mapping.
+
+Counterexamples:
+
+- A package declares both `forms/Add.json` and `forms/add.json`. On ext4 both
+  exist and the source digest covers two files; on a case-insensitive APFS or
+  NTFS volume the second write replaces the first, so the manifest names two
+  paths but one file exists and `source_package_digest` differs by platform. The
+  fold rule rejects the manifest everywhere with one `path-lexical`.
+- `forms/NUL.json` or `forms/aux` opens a device on Windows, or fails with an I/O
+  error (exit 2), while another platform creates an ordinary file. The grammar
+  rejects the name before the open, so the same document is a format rejection
+  on every platform.
+- `forms/add.json.` or a segment ending in a space is silently trimmed by
+  Windows and aliases `forms/add.json`; the format forbids the trailing
+  character instead of relying on the open to disagree.
+- `bundles/specs/mov.json` containing
+  `bundle_id: "monasm.bundle.x86.mov"`: the file and the document disagree, so
+  `--all` cannot say which identity the file belongs to. `bundle-file-mismatch`
+  makes the filename a checked fact rather than a convention.
+- `packages/x86_64/mov/0.1.0` containing
+  `package_id: "monasm.x86.mov-register"`: `verify --package <path>` and the
+  spec's `(package_id, path)` describe different owners. The last-segment rule
+  ties them without a central package table.
+- A `package_id` of `monasm.x86.` yields an empty final segment, so the version
+  directory would be `packages/x86_64//0.1.0`; `identifier-lexical` rejects the
+  ID before a path is formed.
+
 ### 2. Target facts are self-declared; `legacy_source` is migration provenance
 
 Every package states its own execution target in `definition_format` and
@@ -402,8 +504,10 @@ bundle.
 
 ### 3. Paths are bounded to the package and the repository root
 
-Every manifest path is a normalised relative path using `/`. Absolute paths,
-`..`, empty segments, `.`, backslashes, NUL, URL schemes and drive letters are
+The lexical rules for identifiers, path segments and artifact file names are
+§1.3; this section bounds the resolution of an already-legal path. Every
+manifest path is a normalised relative path using `/`. Absolute paths, `..`,
+empty segments, `.`, backslashes, NUL, URL schemes and drive letters are
 rejected. The bound is a property of the **open**, not of a moment before it: no
 component on the path from `--root` to an opened file may be a symlink or
 reparse point, and the builder never traverses one. H2 package inputs contain no
@@ -443,7 +547,7 @@ through a followed link. `legacy_source.isa` and `legacy_source.version`
 are path components before they are concatenated into
 `<root>/definitions/<isa>/<version>.json`, so they receive the same treatment:
 `isa` must match `^[a-z0-9_]+$` and `version` must match
-`^[0-9]+(\.[0-9]+)+$`. A value containing `/`, `\`, `..`, `.` as a whole
+`^(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){2,}$`. A value containing `/`, `\`, `..`, `.` as a whole
 component, a drive letter, a URL scheme or NUL is rejected before the path is
 formed; the builder does not normalise a value into legality.
 `README.md`, `NOTICE`, `evidence/**` and `tests/**` may exist, but only declared
@@ -466,7 +570,7 @@ package on Windows is a failed H2a gate, not a passing one.
 
 ### 4. The spec lists the full closure; the builder never scans packages
 
-`bundles/specs/<bundle>.json` is `monasm-bundle-spec/0.1`:
+`bundles/specs/<bundle_id>.json` is `monasm-bundle-spec/0.1`:
 
 ```json
 {
@@ -524,9 +628,9 @@ The spec's `target.identity` and `definition_format` must agree with every
 listed package's declarations; they are compared as data, not derived from
 `legacy_source`. `definition_format`, `target_profile`, `isa_family`,
 `isa_variant`, `execution_mode`, `byte_order` and `address_width` must be equal.
-`enabled_extensions` is different: a package's list is a requirement and the
-bundle's list is the selected target, so the package list must be a subset of
-the bundle list (§4.1). Every package's `target_profile` must equal
+`enabled_extensions` is different: a package's list is its declared cover and
+the bundle's list is the selected target, so the package list must be a subset
+of the bundle list, without a minimality claim (§4.1). Every package's `target_profile` must equal
 `target.profile_id`. A closure whose packages disagree on the structural target
 fields or on `definition_format` is rejected; the builder does not pick a winner
 and does not convert a package. A package with `legacy_source` is additionally
@@ -540,7 +644,7 @@ and an unselected corrupt package can break an old build (`HE-AC-05`); without
 exact IDs, "latest" or a range picks a version the author did not name
 (`HE-AC-04`, `HE-T08`); without paths, the builder must scan to find a package.
 
-#### 4.1 A package declares a target requirement; the bundle selects the target
+#### 4.1 A package declares a target cover; the bundle selects the target
 
 The composition problem is concrete. Package A (`rv64i` arithmetic) declares
 `enabled_extensions: ["rv64i"]`; package B (`rv64c` compressed) declares
@@ -555,16 +659,35 @@ The contract therefore separates the two facts:
 
 | Fact | Declared by | Meaning |
 |---|---|---|
-| package `target_identity.enabled_extensions` | each package | the minimum extension set the package's rows require |
+| package `target_identity.enabled_extensions` | each package | the author's conservative declared cover: a set containing every exported row's requirement |
 | bundle `target.identity.enabled_extensions` | the spec | the complete set selected for this bundle |
 
-The builder requires every package's requirement to be a subset of the selected
-bundle set, and requires the other target fields to be equal. A package is not
-edited when a new, disjoint extension family joins the bundle; the new package
-declares its own larger requirement and the spec selects the union.
+The declared set is a **cover, not a minimum**. The author asserts "a bundle
+that selects this package must provide at least these extensions"; the builder
+proves that the cover contains every row's requirement and fits inside the bundle
+selection. It does not prove that the cover equals the union of the row
+requirements, because it cannot: `fmp-def/0.1` forms carry no
+`requires_extensions`, and even a `0.2` form's list is not defined to include the
+base ISA or every profile fact. An equality rule would have to invent the missing
+requirement.
 
-That subset rule alone is not enough, because a bundle's wider selection can
-hide a package that under-declares itself. The full rule is per exported form:
+Over-declaration is therefore legal, and it has a real effect: it narrows the
+set of bundles that may select the package. A package whose rows all need only
+`rv64i` but whose manifest declares `["rv64i","rv64c"]` cannot be selected by a
+bundle whose target is `["rv64i"]`, even though every row would pass there. The
+builder does not trim the declaration to the derived union, because that would
+make `source_package_digest` describe a requirement the author did not write and
+would let the package become selectable without an edit. A publisher who wants
+the narrower requirement publishes a new package version that declares it.
+
+The builder requires every package's declared cover to be a subset of the
+selected bundle set, and requires the other target fields to be equal. A package
+is not edited when a new, disjoint extension family joins the bundle; the new
+package declares its own larger cover and the spec selects the union.
+
+Under-declaration remains an error, and the form-to-package check is what
+catches it. A bundle's wider selection cannot hide a package that under-declares
+itself. The full rule is per exported form:
 
 ```text
 E_form(f) ⊆ E_package ⊆ E_bundle      for every selected package P and f ∈ P.forms
@@ -573,9 +696,11 @@ E_form(f) ⊆ E_package ⊆ E_bundle      for every selected package P and f ∈
 `E_form(f)` is `form.requires_extensions` for `fmp-def/0.2`; it is `∅` for
 `fmp-def/0.1`, whose form object has no such key (`FORM_FIELDS` rejects it).
 `E_package` is `target_identity.enabled_extensions`; `E_bundle` is the spec's
-`target.identity.enabled_extensions`. The builder computes the union of
+`target.identity.enabled_extensions`. The equation says the declared cover
+contains every form's proven requirement and the bundle contains the
+declaration; neither inclusion is an equality. The builder computes the union of
 `E_form(f)` over the package's exported rows and rejects a package whose union
-is not a subset of its own declaration (`form-extension-mismatch`, exit 1),
+is not covered by its own declaration (`form-extension-mismatch`, exit 1),
 before it looks at the bundle. The package-to-bundle subset is then checked as
 above.
 
@@ -600,12 +725,22 @@ is impossible to express at the form level, which is why the H2a test uses a
 0.2 fixture for this rule and does not infer the rule from the three 0.1
 packages.
 
+Counterexample for the opposite direction: every row of a package requires only
+`rv64i`, the manifest declares `["rv64i","rv64c"]`, and the spec selects
+`["rv64i","rv64c"]`. Every check passes and the package is legal, but it cannot
+be selected by an `rv64i`-only bundle. A reader that treated
+`enabled_extensions` as "exactly what the rows need" would either trim the
+declaration — changing the author's `source_package_digest` and making the
+package selectable without an edit — or reject a bundle the author deliberately
+covered. The contract keeps the declaration as the author's cover and states
+that over-declaration only narrows selectability.
+
 **H2 transition.** `fmp-def/0.1` plans compare `enabled_extensions` for set
 equality at `bind` (`check_target`), so an H2 bundle that selected a superset
 would reject the existing reference plans. While `definition_format` is
-`fmp-def/0.1`, H2 additionally requires the package requirement to equal the
-bundle selection exactly; this is the transitional `h2-exact-target` check, not
-a permanent package-contract rule. `fmp-def/0.2` already applies the subset
+`fmp-def/0.1`, H2 additionally requires the package's declared cover to equal
+the bundle selection exactly; this is the transitional `h2-exact-target` check,
+not a permanent package-contract rule. `fmp-def/0.2` already applies the subset
 rule, and a future `fmp/0.2` plan format must make the same distinction on the
 plan side.
 
@@ -618,11 +753,11 @@ equality is the final composition rule, and it does not freeze a package
 manifest that must be edited for every new extension family.
 
 No `monasm-package/0.1` bump is required to lift the transition: the package
-field already means "the extensions these rows require", and the builder already
-checks the subset. H3 changes the *plan-side* comparison (and the reference
-plans' target sets), not the meaning of the package manifest. A new package
-format version is needed only if a future target relationship is not expressible
-as a subset of the same extension vocabulary.
+field already means "a cover of the extensions these rows require", and the
+builder already checks the subset. H3 changes the *plan-side* comparison (and
+the reference plans' target sets), not the meaning of the package manifest. A new
+package format version is needed only if a future target relationship is not
+expressible as a subset of the same extension vocabulary.
 
 Counterexample if the requirement were stored as the bundle selection: adding
 `rv64c` changes package A's source digest although A's rows did not change, and
@@ -903,19 +1038,19 @@ definition.
 
 ### 8. Spec, lock, sealed bundle and legacy snapshot are different artifacts
 
-- `bundles/specs/<bundle>.json` — `monasm-bundle-spec/0.1`, the author's
+- `bundles/specs/<bundle_id>.json` — `monasm-bundle-spec/0.1`, the author's
   explicit selection.
-- `bundles/locks/<bundle>.lock.json` — `monasm-lock/0.1`, generated: the full
+- `bundles/locks/<bundle_id>.lock.json` — `monasm-lock/0.1`, generated: the full
   bundle metadata (`bundle_id`, `definition_format`, `namespace`, `version`,
   `target`, `bundle_digest`, `definition_digest`, `release_digest`), the sorted
   package list with `path`, `source_package_digest` and `evidence_digest`
   (present for a release-ready package, §7.1), and `builder`.
-- `bundles/sealed/<bundle>.bundle.json` — `monasm-bundle/0.1`, generated:
+- `bundles/sealed/<bundle_id>.bundle.json` — `monasm-bundle/0.1`, generated:
   `bundle_format`, `bundle_id`, the canonical definition document,
   `bundle_digest`, `definition_digest`, and the sorted `sources` list
   `{package_id, version, source_package_digest}`. It does not contain the builder
   receipt, `release_digest` or author paths.
-- `bundles/legacy/<bundle>/definition.json` — generated: the plain merged
+- `bundles/legacy/<bundle_id>/definition.json` — generated: the plain merged
   definition document, with no bundle envelope, so the existing
   `fmp materialize <plan> --definitions <dir>` path can load it. It is a
   development bridge, not a release identity. `Registry::load_dir` recursively
@@ -1398,9 +1533,9 @@ and with which bytes?" after its spec retires:
   and adds no second entry — byte-identical definitions are one identity, so a
   retired-and-reintroduced bundle needs no new row;
 - a spec that publishes a bundle must have its `(namespace, version)` registered
-  with the digest the merged document actually produces; a missing row is
-  `published-registry-incomplete` (exit 1) and a digest disagreement is
-  `definition-identity-conflict` (exit 1);
+  by the time `verify --all --check` runs, with the digest the merged document
+  actually produces; a missing row is `published-registry-incomplete` (exit 1)
+  and a digest disagreement is `definition-identity-conflict` (exit 1);
 - a row may not name a pair in the reserved legacy set (§8); a row that does is
   `reserved-identity` (exit 1), because a legacy name was never H2's to bind and
   a registry entry would assert an ownership H2 does not have;
@@ -1443,6 +1578,54 @@ and with which bytes?" after its spec retires:
 - Retiring a release removes a spec but never removes the snapshot or its
   registry entry. Deleting both in one PR is `published-registry-modified`, not
   a legal retirement.
+
+**First publication has no registry cycle.** A registry row for a definition
+needs the `definition_digest`, which only a build produces; requiring the row
+before the build would make the first publication impossible. The order is
+therefore fixed:
+
+```text
+author writes the candidate <version>/ directory
+  -> digest / verify --package computes source_package_digest
+  -> author writes the spec with that digest
+  -> build <spec> writes the candidate lock / sealed / legacy from the new bytes
+  -> publisher appends the published row and the identities row
+  -> verify --all --check and verify --published --check
+  -> commit
+```
+
+`build` does not require a registry row for the path it builds. It consults the
+registry only as a guard — a base-published path with changed bytes is still
+`published-package-modified` — and it prints the `definition_digest` the
+publisher needs for the `identities` row. It never writes the registry. The
+requirement that every head-selected path has a head row belongs to
+`verify --all --check`, which runs after the append; first publication is
+therefore `build` first and `verify --check` second, not a fixed point. A build
+that failed cannot publish, because the registry row is a separate, later
+action.
+
+**`build` validates every output in memory and only then replaces files.** It
+computes the lock, sealed bundle, legacy snapshot and every digest in memory, and
+runs `read` and the byte comparison there, before it creates any output file. It
+then writes each output to a temporary sibling in the destination directory,
+flushes it, and renames it over the destination. A deterministic rejection
+(exit 1) happens before the first temporary file, so it writes nothing. An I/O or
+internal failure during the write phase (exit 2) may leave a temporary file or a
+partially replaced set, but never a set that `--check` accepts as current: the
+lock and sealed bundle record the same `bundle_digest` and `definition_digest`, so
+a new lock with an old sealed bundle (or the reverse) is a comparison failure.
+The legacy snapshot is a development bridge rebuilt by the next successful build,
+not a release artifact. The registry row is written by the publisher after a
+successful build and a passing `--check`, so no failed build leaves a *published*
+partial artifact. Git supplies repository-level atomicity; `build` supplies
+"exit 0 means every output was validated before any was written".
+
+Counterexample if `build` required its own registry row: the row needs
+`definition_digest`, which needs the build, so a first publication could never
+start. Counterexample if `build` wrote outputs as it computed them: a failure
+after the lock but before the sealed bundle leaves a lock that names a
+`bundle_digest` no current sealed file has, and a reader that trusted the exit
+code or the lock alone would report a release that was never built.
 
 Counterexample if the registry were replaced by "the current specs": PR A
 removes the last spec that selects `0.1.0/`, then PR B modifies that directory.
@@ -1549,6 +1732,26 @@ diagnostic text. It does not construct `Definition` directly and does not call
 document with the package's `definition_format`, calls `read`, and compares
 pinned rows only when `legacy_source` is present. It never writes a lock or
 sealed bundle, so a package author can run it before any spec exists.
+
+**Every digest and every consumer sees one loaded package.** A package is read
+once, through the no-follow opens of §3, into one immutable in-memory value:
+the canonical manifest, the declared asset bytes and their per-file hashes. That
+value is the sole input to `source_package_digest`, to the `legacy_source` row
+and target comparison, to the per-package `read` of §4.1, and to the merge that
+produces the definition. The builder does not re-open a path after hashing it,
+does not hash one buffer and merge another, and does not read a package once for
+`verify --package` and again for the bundle. The pinned legacy definition is
+loaded once in the same way, and both the target comparison and the row
+comparison consume that one value.
+
+Counterexample: the builder reads `forms/mov.json` as A and computes
+`source_package_digest = D0`, then an editor or build script replaces the file
+with B before the merge. A second open reads B, the merged definition contains
+B's opcode, and the lock records D0. The lock now attests a source digest for
+bytes the definition never contained; replaying from the published bytes gives
+D1 and cannot reproduce the bundle. With one loaded value the second read does
+not exist: a change before the read is part of the bytes that are hashed and
+merged, and a change after it cannot be observed by this build.
 
 `fmp-definition`'s product dependencies are `fmp-model` and at most one pinned
 path-safety layer whose only job is the no-follow open of §3. It does not depend
@@ -1937,7 +2140,7 @@ does not pretend to be `fmp/0.1` diagnostics.
 
 | Class | Examples | Exit |
 |---|---|---|
-| Deterministic rejection | manifest shape (required/optional keys), empty forms, path escape or a symlink/reparse point on a package path, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, form-scope materialize stage, form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit | 1 |
+| Deterministic rejection | manifest shape (required/optional keys), identifier/path lexical violation, artifact filename mismatch, empty forms, path escape or a symlink/reparse point on a package path, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, form-scope materialize stage, form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit | 1 |
 | Host / I/O / internal | unreadable file, unwritable lock, internal invariant break, materializer `Internal`/`HostFailure` during conformance | 2 |
 | Success | build or verify passed, digest printed | 0 |
 
@@ -1950,7 +2153,7 @@ The enum names these rejections (`unsupported-capability`, `capability-mismatch`
 `case-format-unsupported`, `case-baseline-invalid`, `case-mutation-mismatch`,
 `case-diagnostics-mismatch`, `case-expect-shape`, `form-family-mismatch`,
 `form-extension-mismatch`, `reserved-identity`, `path-version-mismatch`,
-`path-escape`,
+`path-escape`, `identifier-lexical`, `path-lexical`, `bundle-file-mismatch`,
 `published-package-modified`, `published-registry-modified`,
 `published-registry-incomplete`, `published-registry-invalid`,
 `bundle-id-conflict`, `definition-identity-conflict`, `unmapped-package-path`,
@@ -2183,6 +2386,24 @@ comparing the materializer with itself proves the bytes.
   concurrent replacement cannot make the builder read a file that none of the
   checks described. The mechanism is a platform capability, so H2a's first gate
   proves it on Linux, macOS and Windows rather than assuming a portable call.
+- Identifiers, path segments and artifact file names are ASCII, lowercase and
+  portable, and are checked before any open. A name that one filesystem aliases,
+  folds, trims or maps to a device is a deterministic format rejection on every
+  platform, not an I/O failure on one of them (§1.3).
+- A package is read once into one immutable value; the source digest, the
+  legacy row and target comparison, the per-package `read` and the merge all
+  consume that value. A recorded digest therefore cannot describe bytes the
+  definition did not use, and a file changed between stages cannot produce a
+  bundle that fails to replay (§9).
+- First publication is cycle-free: `build` emits the digests, the publisher
+  appends the registry rows, and only the later `--check` requires them.
+  `build` validates every output in memory before replacing a file and never
+  writes the registry, so a failed build leaves no published partial artifact
+  (§8.3).
+- A package's `enabled_extensions` is a conservative declared cover, not a
+  minimal set. Over-declaration is legal and only narrows which bundles may
+  select the package; under-declaration is `form-extension-mismatch`, and
+  trimming the declaration to the derived union is not allowed (§4.1).
 - A form's extension requirement must already be inside its own package's
   declaration, and the package inside the bundle's selection. A wider bundle
   cannot make an under-declared package legal: the package is read under its own
@@ -2399,6 +2620,24 @@ comparing the materializer with itself proves the bytes.
   Rejected: adding one extension family would force every already-published
   package to edit its manifest and re-release, reintroducing cross-package
   synchronisation (§4.1).
+- **Require `enabled_extensions` to equal the union of the form requirements.**
+  Rejected: `fmp-def/0.1` forms carry no requirement key and a `0.2` form's list
+  is not a complete target, so equality would fabricate a base-ISA rule or reject
+  legal conservative declarations. H2 proves `⋃E_form ⊆ E_package ⊆ E_bundle`;
+  exactness needs a later versioned definition of a complete requirement (§4.1).
+- **Let the builder normalise a name the host filesystem accepts.** Rejected:
+  lowercasing, trimming a trailing dot or space, or resolving an 8.3 alias would
+  make the accepted name depend on the platform. §1.3 rejects the string and
+  keeps the digest identical everywhere.
+- **Re-open a package path after hashing it, or hash and merge from different
+  buffers.** Rejected: a file changed between the two stages yields a lock whose
+  source digest describes bytes the merged definition never contained. One loaded
+  value feeds both (§9).
+- **Let `build` require the registry row it helps create, or write that row.**
+  Rejected: the row needs the `definition_digest` the build produces, so the
+  first publication would deadlock; and a builder-written registry would mix
+  generation with publication. `build` then append then `--check` is the
+  cycle-free order (§8.3).
 - **Measure JSON depth after parsing.** Rejected: the parser recurses, so a
   20 000-deep document overflows before the measurement runs. The budget is
   enforced iteratively before `fmp_model::json::parse` is called (§12).
@@ -2467,6 +2706,10 @@ comparing the materializer with itself proves the bytes.
 | Reserved legacy definition names from `definitions/*/*.json` | specified; the index is readable today, the builder has no reserved-set check | **specified, not implemented** — H2a |
 | The publication audit's guarantee is bounded to executable assets and identity | specified; whole-directory immutability is enforced by the changed-path gate, not by the audit | **specified, not implemented** — H2a |
 | The no-follow open is achievable on Linux, macOS and Windows | not proved; `std::fs` has no portable no-follow open, so H2a N1 must measure a path layer on all three platforms | **unverified** — H2a N1 gate |
+| Identifier, path-segment and artifact-filename rules are format rejections before any open | specified; the builder has no package reader | **unverified** — H2a |
+| One loaded package value feeds the source digest, row/target comparison, per-package `read` and merge | specified; no reader exists | **unverified** — H2a |
+| First publication bootstraps without a registry cycle, and `build` validates every output before writing | specified; no builder exists | **unverified** — H2a |
+| `enabled_extensions` is a conservative declared cover, not a minimal required set | specified; `fmp-def/0.1` forms have no requirement key and no builder exists | **unverified** — H2a |
 | Form-scope negatives are `bind`-only and point at the mutated operand | specified; `fmp-materialize/src/lib.rs` emits `E-BYTE-001` at `/instructions/0/expected_digest` after encoding, so the counterexample is real | **specified, not implemented** — H2a |
 | Dependency-closure status distinct from package structure, including transitive re-reading of a `--closure` lock, cycles and the dependent-package author path | not implemented | **unverified** — H2a |
 | Release evidence as a separate `--release-evidence` gate | not implemented | **unverified** — H2a |
@@ -2515,6 +2758,18 @@ comparing the materializer with itself proves the bytes.
 - Someone verifies a path by calling `symlink_metadata()` and then opening the
   same path string, or treats a canonicalise/check step as the guarantee: stop.
   The no-follow property belongs to the open, not to a preceding check (§3).
+- Someone compares declared paths only case-sensitively, or lets a trailing
+  dot/space, a Windows device name or a non-ASCII segment reach an open: stop.
+  §1.3 makes the name a format rule with one diagnostic on every platform.
+- Someone re-opens a package path after computing its digest, or hashes one
+  buffer and merges another: stop. One loaded value feeds the digest, the row
+  comparison, the per-package `read` and the merge (§9).
+- Someone makes `build` require the registry row it helps create, or lets
+  `build` write the registry: stop. First publication is build, then append,
+  then `--check` (§8.3).
+- Someone treats `enabled_extensions` as exactly the union of the form
+  requirements, or trims an over-declared cover: stop. The declared set is a
+  conservative cover and exactness is a later format (§4.1).
 - Someone lets a retired `(namespace, version)` come back with a different
   `definition_digest`, or treats `bundle_id` as an immutable release identity:
   stop. The definition name is permanent and the bundle ID is a movable release

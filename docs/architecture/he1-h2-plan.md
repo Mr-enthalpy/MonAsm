@@ -1,6 +1,7 @@
 # H2 实施计划：目标包作者层与确定性定义构建
 
-- 状态：**待审提案**（2026-11-16；同日按八轮审计 P1/P2 修订）。规范决策见
+- 状态：**待审提案**（2026-11-16；同日按八轮审计 P1/P2 修订，2026-11-17 按
+  第九轮审计修订）。规范决策见
   `docs/adr/0128-package-and-bundle-contract.md`，该 ADR 仍为 `proposed`；
   评审合并前本文和 ADR 都不是冻结依据。本文保留为实施计划与验收映射。
   **H2 尚未实现，本文不把任何 H2/H3/H4/H5 项目算作已完成。**
@@ -86,9 +87,9 @@ packages/<target>/<package>/<version>/
           |
           |  fmp-definition build --spec <spec> --root <repo-root>
           v
-bundles/specs/<bundle>.json          # 显式选择，不是扫描结果
-bundles/locks/<bundle>.lock.json     # 精确闭包 + 摘要
-bundles/sealed/<bundle>.bundle.json  # 扁平化定义快照
+bundles/specs/<bundle_id>.json         # 显式选择，不是扫描结果
+bundles/locks/<bundle_id>.lock.json    # 精确闭包 + 摘要
+bundles/sealed/<bundle_id>.bundle.json # 扁平化定义快照
 
 执行期（H2 不改）
   plan + Arc<Definition> -> bind -> ValidatedPlan -> materialize
@@ -214,8 +215,42 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
 ### H2-D1 目录与显式输入
 
 - 叶包路径：`packages/<target>/<package>/<version>/`，`target` 是目录名
-  （`x86_64`、`aarch64`、`rv64`），不是 form ID 前缀；`<version>` 必须等于
-  清单 `version` 和 spec 的 `packages[].version`，否则 `path-version-mismatch`。
+  （`x86_64`、`aarch64`、`rv64`），不是 form ID 前缀；`<package>` 必须等于
+  `package_id` 最后一个点分段（`monasm.x86.mov-register` → `mov-register`），
+  `<version>` 必须等于清单 `version` 和 spec 的 `packages[].version`；不一致
+  分别是 `path-lexical` 和 `path-version-mismatch`。`target` 只是目录标签：只
+  校验词法，不与 `isa_family`、`target_profile` 或中心表比较，因为目标事实由
+  包自述（H2-D2），H3 的第四种家族不能被迫增加目录映射。
+- **身份、路径段和产物文件名是 ASCII 且跨平台可移植（第九轮 P2-1，
+  `ADR-0128` §1.3）。** 以下规则在打开任何文件之前校验：
+  - `package_id`、`bundle_id`、`namespace`、`target_profile`、`profile_id`
+    匹配 `^[a-z][a-z0-9]*(\.[a-z][a-z0-9_-]*)+$`；非法是
+    `identifier-lexical`（退出码 1）。`monasm.x86.`、`Monasm.X86.Mov`、
+    `monasm..x86` 都拒绝。
+  - 作者写的 `version` 匹配
+    `^(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){2,}(-[a-z0-9]+([.-][a-z0-9]+)*)?$`：
+    至少三段数字、无前导零；`0.1.0`、`0.2.0`、`0.1.0-h2` 合法，`0.1`、`01.0`、
+    `0.1.0-H2` 不是。派生的
+    `standalone+<hex>` 只用于独立身份，不写进 manifest/spec/lock/路径；写进
+    spec 时已由保留前缀判为 `reserved-identity`。
+  - 声明路径（`exports.forms/types/profiles[].path`、spec 的
+    `packages[].path`、证据清单中的路径、`legacy_source` 组件）的每一段匹配
+    `^[a-z0-9_][a-z0-9_.-]*$`，且不得是 `.`/`..`、不得含 `..`、不得以 `.`
+    或空格结尾、不得是 Windows 设备名（`CON`、`NUL`、`PRN`、`AUX`、
+    `COM1`–`COM9`、`LPT1`–`LPT9`，大小写不敏感，带扩展名也算）；非法是
+    `path-lexical`（退出码 1），不是「某个平台打开失败」（退出码 2）。证据
+    清单中的固定名 `README.md`/`NOTICE` 保留大写，不受小写规则约束。
+  - 声明路径按 ASCII 大小写折叠比较；同包或同闭包内两条折叠后相同的路径是
+    `path-lexical`。语法本身只允许小写，因此合法文档不会触发；这条规则把拒绝
+    理由固定为折叠，而不是「文件刚好能打开」。`README.md`/`NOTICE` 不是声明
+    路径，不受小写规则约束。
+  - 路径按字面匹配，不小写化、不去尾点/空格、不解析 8.3 别名；只有修补后才
+    匹配的路径是 `path-lexical`。
+  - `bundles/specs/<file>.json`、`bundles/locks/<file>.lock.json`、
+    `bundles/sealed/<file>.bundle.json` 的 `<file>` 必须等于文档里的
+    `bundle_id`，否则 `bundle-file-mismatch`（退出码 1）；legacy 快照固定为
+    `bundles/legacy/<bundle_id>/definition.json`。`--all` 因此每个身份只有
+    一个文件名，重命名 spec 不能把它挂到另一个发布上。
 - 版本目录是**已发布快照的不可变边界**。发布事实记录在
   `bundles/published.json`（`monasm-published/0.1`，§8.3）：发布者在第一次把
   版本写进 spec 的同一 PR 里追加登记项；之后即使删除 spec，登记项也永久保留。
@@ -477,11 +512,14 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
 
 ### H2-D3 路径边界
 
-- 所有清单路径必须是包内规范化相对路径，使用 `/`。
+- 所有清单路径必须是包内规范化相对路径，使用 `/`；身份、路径段和文件名的
+  词法规则见 H2-D1（`ADR-0128` §1.3），在打开前以 `identifier-lexical`/
+  `path-lexical`/`bundle-file-mismatch` 拒绝。
 - spec 的 `packages[].path` 相对于 `--root`；解析后仍必须位于 `--root` 之下。
 - `legacy_source.isa` 和 `legacy_source.version` 在拼成
   `<root>/definitions/<isa>/<version>.json` 之前也按路径组件校验：`isa` 匹配
-  `^[a-z0-9_]+$`，`version` 匹配 `^[0-9]+(\.[0-9]+)+$`；含 `/`、`\`、`..`、
+  `^[a-z0-9_]+$`，`version` 匹配
+  `^(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){2,}$`；含 `/`、`\`、`..`、
   整段 `.`、盘符、URL scheme 或 NUL 的值直接拒绝，不做「规范化后合法」的修补。
 - 拒绝绝对路径、`..`、空段、`.`、反斜杠、NUL、URL scheme、盘符。
 - 路径边界是整个读取过程的不变量，不是打开前的一次检查：从 `--root` 到被打开
@@ -551,11 +589,19 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   `requires_extensions`，而 0.1 的 reader 会因未知键拒绝 0.2 行；反之 0.1 行
   放进 0.2 文档会缺必需键。构建器必须让 spec、包自述和行三者互相一致；混合
   格式的闭包直接拒绝，不做隐式转换，显式版本化转换属于 H3。
-- **`enabled_extensions` 是需求，不是完整配置（第一轮 P1-3）。** 包的列表表示
-  「这个包的 rows 至少需要哪些扩展」，spec 的列表表示「这个 bundle 选中了哪些
-  扩展」。一般规则是包需求 ⊆ bundle 选择；其他目标字段仍相等。这样新增一个
-  `rv64c` 包时，`rv64i` 算术包的清单不需要改，源摘要不变，不会把无关包重新
-  发布一次。
+- **`enabled_extensions` 是保守声明覆盖，不是最小集合（第一轮 P1-3，第九轮
+  P2-4）。** 包的列表是作者声明的覆盖：它包含所有行的需求，并且是选择该包的
+  bundle 必须至少提供的集合；它不是「恰好等于行并集」的最小集合。spec 的列表
+  表示「这个 bundle 选中了哪些扩展」。构建器证明的是
+  「并集 ⊆ 包声明 ⊆ bundle 选择」，不证明包声明等于行的并集：`fmp-def/0.1`
+  的 form 没有 `requires_extensions`，`fmp-def/0.2` 的 form 列表也不是完整
+  目标（不含基础 ISA/profile 事实），等式规则只能凭空补一个需求。因此高报
+  合法且有实际效果：行的需求只有 `rv64i`、但包声明 `["rv64i","rv64c"]` 时，
+  它不能被只选 `rv64i` 的 bundle 选中——这是作者的选择，不是不一致。构建器
+  不把声明裁剪成并集，否则 `source_package_digest` 描述的需求与作者写下的
+  不同，包也会在没有编辑的情况下变得可选；要更窄的需求就发布声明更窄的新
+  版本。低报仍然是错误，由 form ⊆ 包检查拒绝。这样新增一个 `rv64c` 包时，
+  `rv64i` 算术包的清单不需要改，源摘要不变，不会把无关包重新发布一次。
 - **子集规则按 form、包、bundle 三层逐包检查（第八轮 P1-3）。** 只查
   「包 ⊆ bundle」不够：bundle 更宽的扩展集合会替一个欠声明的包放行。完整规则是
 
@@ -565,10 +611,12 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
 
   `E_form(f)` 在 `fmp-def/0.2` 下是 `form.requires_extensions`，在
   `fmp-def/0.1` 下是空集（该格式的 form 对象没有这个键，`FORM_FIELDS` 会拒绝）。
-  `E_package` 是包的 `target_identity.enabled_extensions`，`E_bundle` 是 spec 的
-  `target.identity.enabled_extensions`。构建器先对每个包求所有导出 form 的
-  `E_form` 并集，若该并集不是包自身声明的子集，以 `form-extension-mismatch`
-  （退出码 1）拒绝；随后才检查包 ⊆ bundle。
+  `E_package` 是包声明的**保守覆盖集** `target_identity.enabled_extensions`，
+  `E_bundle` 是 spec 的 `target.identity.enabled_extensions`。这个式子只表示
+  包含关系，不表示相等：并集 ⊆ 声明 ⊆ 选择。构建器先对每个包求所有导出 form
+  的 `E_form` 并集，若该并集不被包自身声明覆盖，以 `form-extension-mismatch`
+  （退出码 1）拒绝；随后才检查声明 ⊆ bundle。高报合法，只缩小该包可被哪些
+  bundle 选中；构建器不把声明裁剪成并集。
 - **每个选中包先按自己的目标 `read`（第八轮 P1-3）。** `read` 把 form 的
   `requires_extensions` 与**生成文档**的目标集合比较，而生成文档带的是 bundle
   的目标。因此一个包可能只在合并后才合法，而 `verify --package` 按包自己的目标
@@ -581,13 +629,19 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   加进清单，而不是靠更大的 bundle 让行变合法。H2 的三个包都是 `0.1`，无法在
   form 层表达这个错误，所以 H2a 用 `0.2` fixture 测这条规则，不从三个 `0.1`
   包反推。
+- **高报扩展是合法的，不可被裁剪（第九轮 P2-4）。** 反例：一个包的所有行只需
+  `rv64i`，清单声明 `["rv64i","rv64c"]`，spec 选中 `["rv64i","rv64c"]`；所有
+  检查通过，包合法，但它不能被只选 `rv64i` 的 bundle 选中。把声明当作「恰好
+  等于行的并集」的实现会裁剪声明（改变作者的 `source_package_digest`，并让包
+  在没有编辑的情况下变得可选），或错误拒绝作者故意覆盖的 bundle。H2 保留作者
+  声明，高报只缩小可选范围；精确性需要后续版本化规则定义完整需求。
 - H2 的过渡规则：`fmp-def/0.1` 的 `bind` 仍按集合相等比较
   `enabled_extensions`，所以 `definition_format == fmp-def/0.1` 时额外要求
-  包需求与 spec 选择**完全相等**（`h2-exact-target`）。这不是永久包契约；
-  `fmp-def/0.2` 已按子集处理。H3 必须在计划侧定义同样的兼容规则，才能解除
-  `h2-exact-target`；该规则必须在 H5 并行扩展演练之前生效，否则先修订 ADR，
-  不得直接开始 H5。H2 不声称这个等号是最终组合规则。`h2-exact-target` 与
-  上面的 form ⊆ 包检查互不替代：前者比较包与 bundle，后者比较行与包。
+  包的声明覆盖与 spec 选择**完全相等**（`h2-exact-target`）。这不是永久包
+  契约；`fmp-def/0.2` 已按子集处理。H3 必须在计划侧定义同样的兼容规则，才能
+  解除 `h2-exact-target`；该规则必须在 H5 并行扩展演练之前生效，否则先修订
+  ADR，不得直接开始 H5。H2 不声称这个等号是最终组合规则。`h2-exact-target`
+  与上面的 form ⊆ 包检查互不替代：前者比较包与 bundle，后者比较行与包。
 - `target.profile_id` 必须与每个包的 `target_profile` 一致，否则构建失败。
 - **form 家族一致性（第二轮 P1-3）。** 每个导出 form 的 `form_id` 前缀（`:` 前）
   必须等于包声明的 `target_identity.isa_family`。这是一条字符串相等不变量，
@@ -761,12 +815,17 @@ Rust 与 Python 都必须复现开发向量和发布向量这两个值。差别�
 
 ### H2-D9 spec、lock、sealed bundle、published registry
 
-- `bundles/specs/<bundle>.json`：发布者写的显式选择（`monasm-bundle-spec/0.1`）。
+- `bundles/specs/<bundle_id>.json`：发布者写的显式选择（`monasm-bundle-spec/0.1`）。
   封闭键恰好是 `bundle_format`、`bundle_id`、`target`、`definition_format`、
   `namespace`、`version`、`packages`；`target` 恰好 `profile_id`/`identity`，
   `packages` 每项恰好 `package_id`/`version`/`path`/`source_package_digest`，
   且整个数组按 `(package_id, version)` 严格排序、无重复；逆序或重复是拒绝，
   不是被静默重排。
+- 产物文件名是身份的一部分（第九轮 P2-1，`ADR-0128` §1.3）：
+  `bundles/specs/<bundle_id>.json`、`bundles/locks/<bundle_id>.lock.json`、
+  `bundles/sealed/<bundle_id>.bundle.json`、`bundles/legacy/<bundle_id>/definition.json`。
+  `<file>` 与文档 `bundle_id` 不一致是 `bundle-file-mismatch`（退出码 1），
+  `--all` 不靠目录约定猜归属。
 - 整个 spec 集合按 `bundle_id` 和 `(namespace, version)` 全局唯一：两个 spec
   共用 `bundle_id` 是 `bundle-id-conflict`，共用定义身份是
   `definition-identity-conflict`（均退出 1），即使 `definition_digest` 相同也
@@ -776,14 +835,14 @@ Rust 与 Python 都必须复现开发向量和发布向量这两个值。差别�
   变标签是 `(bundle_id, bundle_digest)`。定义身份是 `Registry::find` 的唯一键，
   现有 reader 对两份同身份定义返回 `E-DEF-001`。三个 H2 spec 使用不同身份，
   H2 不引入共享身份的映射。
-- `bundles/locks/<bundle>.lock.json`：构建器生成的 `monasm-lock/0.1`。封闭键
+- `bundles/locks/<bundle_id>.lock.json`：构建器生成的 `monasm-lock/0.1`。封闭键
   恰好是 `lock_format`、`bundle_id`、`definition_format`、`namespace`、
   `version`、`target`、`bundle_digest`、`definition_digest`、`release_digest`、
   `packages`、`builder`；包项恰好 `package_id`/`version`/`path`/
   `source_package_digest`/`evidence_digest`。`builder` 恰好 `name`/`version`
   和可选 `build`，没有 build 标识时省略键，绝不写 `null`。`--check` 比较
   **去掉 `builder` 后的 canonical 字节**；builder 只做形状检查和打印。
-- `bundles/sealed/<bundle>.bundle.json`：扁平化的 `monasm-bundle/0.1`，封闭键
+- `bundles/sealed/<bundle_id>.bundle.json`：扁平化的 `monasm-bundle/0.1`，封闭键
   恰好 `bundle_format`、`bundle_id`、`definition_format`、`definition_digest`、
   `bundle_digest`、`definition`、`packages`；`definition` 是 §9 的合并定义
   文档，包项恰好 `package_id`/`version`/`source_package_digest`。没有 `path`、
@@ -798,13 +857,30 @@ Rust 与 Python 都必须复现开发向量和发布向量这两个值。差别�
   `definition_digest`/`namespace`/`version`，按 `(namespace, version)` 严格排序；
   首次合并登记永久绑定该定义名与摘要（细节见 H2-D1）。两个数组都可为空。
   它是**只追加的发布登记**：base 条目不得删除、改写或重排；删除/改写是
-  `published-registry-modified`，spec 选中但未登记是
+  `published-registry-modified`，`verify --all --check` 时 spec 选中但未登记是
   `published-registry-incomplete`，登记与包摘要不符、新增项
   未被任何 head spec 选中，或同名版本换路径/摘要再次登记是
   `published-registry-invalid`；定义名换摘要是 `definition-identity-conflict`。
   同一 PR 首次创建并登记版本是合法的首次发布：只保护 base 条目，head 条目在
   合并前按最终快照校验。它不进入 bundle/release 摘要，也不是选择输入；删除 spec
   不删除登记项。这是 `ADR-0128` §8.3 的 H2 形状。
+- **首次发布无登记循环；`build` 先内存校验再替换文件（第九轮 P2-3）。** 顺序
+  是：候选 `<version>/` 目录 → 计算 `source_package_digest` → 写 spec →
+  `build` 生成候选 lock/sealed/legacy → 追加 `published` 与 `identities` 行 →
+  `verify --all --check` 与 `verify --published --check` → 提交。`build` 不要求
+  它正在构建的路径已有登记项，只把 registry 当防护（base 已发布路径被改仍是
+  `published-package-modified`），并打印 publisher 写 `identities` 所需的
+  `definition_digest`；它从不写 registry。「每个 head spec 选中的路径都必须有
+  head 登记项」属于追加之后的 `verify --all --check`，因此首次发布是
+  `build` → 追加 → `--check`，不是不动点。`build` 先在内存中算出并校验全部
+  输出（lock/sealed/legacy、摘要、`read`、字节比较），再写同目录临时文件并
+  重命名覆盖；确定性拒绝（退出 1）发生在第一个临时文件之前，不写任何文件。
+  写阶段的 I/O/内部失败（退出 2）可能留下临时文件或部分替换，但不会留下
+  `--check` 认可的当前集合：lock 与 sealed 记录同一 `bundle_digest`/
+  `definition_digest`，一新一旧必然比较失败；legacy 快照是下一次成功构建重建
+  的开发桥，不是发布产物。registry 由 publisher 在成功构建和 `--check` 之后
+  写入，所以失败的构建不会留下**已发布**的部分产物。Git 提供仓库级原子性，
+  `build` 提供「退出 0 表示每个输出在写任何文件之前都已校验」。
 - `verify --published --check` 是独立的历史审计：读取 `bundles/published.json`
   的每一项和每个 `identities` 行（包括已退役、无 spec 选中的版本），检查封闭
   形状、排序、`path` 与 `(package_id, version)` 及 `(namespace, version)` 唯一、
@@ -813,7 +889,7 @@ Rust 与 Python 都必须复现开发向量和发布向量这两个值。差别�
   `definition-identity-conflict` 或 `published-registry-incomplete`，退出 1。它不
   选择任何包，也不改写 lock/sealed。`verify --all --check` 只读当前 spec 的精确
   闭包，两者都由 CI 运行（`ADR-0128` §8.4）。
-- `bundles/legacy/<bundle>/definition.json`：构建器额外输出的纯定义文档，供
+- `bundles/legacy/<bundle_id>/definition.json`：构建器额外输出的纯定义文档，供
   现有 `fmp materialize <plan> --definitions <dir>` 读取。它不是 sealed
   bundle：`Registry::load_dir` 会递归读取目录下所有 `.json` 并调用
   `definition::read`，sealed 的 bundle 信封会被拒绝。这个快照是开发期桥，
@@ -830,7 +906,7 @@ Rust 与 Python 都必须复现开发向量和发布向量这两个值。差别�
 
 | 类 | 例子 | 退出码 |
 |---|---|---|
-| 确定性拒绝 | 清单形状（必需/可选键）、空 forms、路径越界或路径上出现链接/reparse point、版本目录与版本不符、已发布快照被改、发布登记被改/缺失/不符/重名版本、跨 spec 的 `bundle_id` 或定义身份冲突、声明与推导的 capability 不符、form 需求超出包声明（`form-extension-mismatch`）、复用保留的 legacy 定义名、依赖缺失/摘要错/环、同一 package ID 双版本、归属冲突、未知 capability、非空 reserved asset、闭包聚合上限、证据不完整/不符、用例缺失/未覆盖、用例格式不支持、用例与计划/form 绑定、基线或变异不符、form 负例用 `materialize`、form 诊断不在变异操作数上、完整诊断集不符、投影键集错误、legacy 目标不一致、无法映射的包路径、定义被 `read` 拒绝、资源上限 | 1 |
+| 确定性拒绝 | 清单形状（必需/可选键）、身份/路径词法违规、产物文件名不符、空 forms、路径越界或路径上出现链接/reparse point、版本目录与版本不符、已发布快照被改、发布登记被改/缺失/不符/重名版本、跨 spec 的 `bundle_id` 或定义身份冲突、声明与推导的 capability 不符、form 需求超出包声明（`form-extension-mismatch`）、复用保留的 legacy 定义名、依赖缺失/摘要错/环、同一 package ID 双版本、归属冲突、未知 capability、非空 reserved asset、闭包聚合上限、证据不完整/不符、用例缺失/未覆盖、用例格式不支持、用例与计划/form 绑定、基线或变异不符、form 负例用 `materialize`、form 诊断不在变异操作数上、完整诊断集不符、投影键集错误、legacy 目标不一致、无法映射的包路径、定义被 `read` 拒绝、资源上限 | 1 |
 | 宿主/IO/内部 | 文件读失败、锁文件不可写、内部不变量破坏、conformance 遇到 `Internal`/`HostFailure` | 2 |
 | 成功 | 构建或校验通过 | 0 |
 
@@ -843,7 +919,7 @@ Rust 与 Python 都必须复现开发向量和发布向量这两个值。差别�
 `case-format-unsupported`、`case-baseline-invalid`、`case-mutation-mismatch`、
 `case-diagnostics-mismatch`、`case-expect-shape`、`form-family-mismatch`、
 `form-extension-mismatch`、`reserved-identity`、`path-version-mismatch`、
-`path-escape`、
+`path-escape`、`identifier-lexical`、`path-lexical`、`bundle-file-mismatch`、
 `published-package-modified`、`published-registry-modified`、
 `published-registry-incomplete`、`published-registry-invalid`、
 `bundle-id-conflict`、`definition-identity-conflict`、`unmapped-package-path`、
@@ -902,7 +978,7 @@ reparse point 也可能报告不同大小。读到剩余预算为止，短读或
   `Plan` + `Arc<Definition>`。
 - `Definition`、`Registry`、`check_form_id`、`load_dir` 不改；H2 的 bundle
   构建不经过 `Registry`。
-- `fmp` CLI 不改；构建器额外输出 `bundles/legacy/<bundle>/definition.json`，
+- `fmp` CLI 不改；构建器额外输出 `bundles/legacy/<bundle_id>/definition.json`，
   现有 `--definitions <dir>` 可以读取它；sealed bundle 本身不是定义文档。
 - `fmp-def/0.1` 行不在构建器里隐式转换成 `0.2`；混合格式闭包拒绝，显式
   版本化转换属于 H3。
@@ -937,9 +1013,10 @@ H2 每个 ISA 选一个代表性纵向切片，不迁移全部 forms：
   的 `bind` 按集合相等比较，选 `0.6.0` 会直接以 `E-TARGET-001` 拒绝，与字节
   等价无关。aarch64 的 `0.20.0` 目标集合是 `[]`，与 `A64-P1`/`A64-P2` 一致，
   所选行也与 fixture 版本相等，所以可以钉最新。
-- 包的 `enabled_extensions` 是**该包的扩展需求**，不是 bundle 的完整目标
-  （H2-D4、第一轮 P1-3）。三个 H2 包的格式都是 `fmp-def/0.1`，所以本轮额外
-  要求需求与 spec 选择完全相等（`h2-exact-target`）；这是过渡检查，不是未来
+- 包的 `enabled_extensions` 是**该包的保守扩展覆盖**（覆盖其所有行的需求），
+  不是 bundle 的完整目标，也不是最小需求集合（H2-D4、第一轮 P1-3、第九轮
+  P2-4）。三个 H2 包的格式都是 `fmp-def/0.1`，所以本轮额外
+  要求该覆盖与 spec 选择完全相等（`h2-exact-target`）；这是过渡检查，不是未来
   组合规则。H3 解除它之前，不得声称不同扩展集合的包可以自由组合；解除后，
   新扩展族只新增自己的包和 spec 选择，不修改既有包清单。
 - form 家族必须与包 `isa_family` 字符串相等（`family(form_id) ==
@@ -1095,6 +1172,7 @@ A/B 工作流合并留给 H5。
 | 测试（拟名） | 断言 | 对应 |
 |---|---|---|
 | `the_same_inputs_build_to_the_same_bundle_digest` | 两次构建、两个临时目录、不同创建顺序 → 同一 `bundle_digest` 和同一 sealed 字节 | `HE-T05` |
+| `a_file_change_between_digest_and_merge_is_not_observed` | 故障注入：包读取/摘要计算后、合并前替换一个 form 文件 → 构建使用加载时的同一份字节（摘要与合并一致），或在加载阶段失败；不允许摘要来自 A、合并来自 B。重放生成的 bundle 得到同一 `definition_digest` | 第九轮 P2-2、`ADR-0128` §9、`H2-D9` |
 | `an_unsorted_spec_is_rejected` | spec 的 `packages` 逆序或非严格排序 → 确定性拒绝，不静默重排 | `HE-T16`、`ADR-0128` §8.2 |
 | `package_discovery_order_does_not_change_the_bundle` | 同一合法 spec，改变临时目录创建顺序、文件读取顺序和内部集合迭代顺序 → 同一 `bundle_digest` 和同一 sealed 字节 | `HE-T05`、`HE-T16`（H2 部分） |
 | `an_unselected_package_does_not_change_an_old_bundle` | 包根新增一个未列出的包（即使其清单损坏）→ 旧 spec 的 lock/bundle 不变；构建器从未打开它 | `HE-AC-05`（构建期部分） |
@@ -1105,6 +1183,7 @@ A/B 工作流合并留给 H5。
 | `the_same_dependency_reached_twice_is_loaded_once` | 菱形闭包 → 共享包在 spec 中只列一次，两条依赖边都校验通过，归属表无重复 | `HE-AC-04` |
 | `two_packages_exporting_the_same_form_conflict` | 两包同一 `form_id`，内容相同也失败 | `HE-T07`、`HE-AC-09` |
 | `a_package_path_cannot_escape_its_root` | `../`、绝对路径、从 `--root` 到文件的任一段是符号链接/reparse point → 拒绝（`path-escape`）；检查到实际读取之间替换目标也不跟随，不能只靠 `canonicalize()` | `H2-D3`、第六轮 P2-2 |
+| `identifier_and_path_lexical_rules_are_platform_independent` | `package_id`/`bundle_id` 含大写、空段、尾点 → `identifier-lexical`；form 路径 `forms/Add.json` 与 `forms/add.json` 并存、`forms/NUL.json`、尾点/空格、`..` 段 → `path-lexical`；在 Linux/macOS/Windows 上都是同一格式拒绝（退出 1），不是某平台 I/O 失败或成功打开 | 第九轮 P2-1、`ADR-0128` §1.3、`H2-D1` |
 | `the_manifest_is_closed` | 未知键、必需键缺失、重复键 → 拒绝；可选键缺失 → 接受 | `INV-07` |
 | `an_empty_forms_list_is_refused` | `exports.forms: []` → `empty-package`，在合并文档交给 `read` 前拒绝；类型/profile-only 包不走 H2 | `ADR-0128` §1、第四轮 P2-3 |
 | `an_unknown_case_format_is_refused` | `cases_format: "monasm-cases/0.2"` 或其他值 → `case-format-unsupported`；`0.1` 只接受单指令、有操作数的 `fmp/0.1` 计划 | `ADR-0128` §9.2、第四轮 P2-1 |
@@ -1121,9 +1200,10 @@ A/B 工作流合并留给 H5。
 | `a_frozen_legacy_definition_name_cannot_be_reused` | spec 用 `monasm.isa.x86`/`0.1.0` 只导出两条 mov 行 → 即使当前 spec 集合无冲突、登记表无行，仍是 `reserved-identity`；改用 H2 自己的 `0.1.0-h2` → 通过。`identities` 登记 `monasm.isa.riscv`/`0.1.0` → 同样 `reserved-identity`。保留集合读自 `<root>/definitions/*/*.json` 的 `namespace`/`version`，不进入任何摘要 | 第八轮 P1-2、`ADR-0128` §8 |
 | `a_form_family_must_match_the_package_target` | `isa_family: aarch64` 的包导出 `x86:*` → `form-family-mismatch`，在 `read` 之前拒绝 | `H2-D4`、第二轮 P1-3 |
 | `the_family_rule_is_equality_not_a_package_whitelist` | 合成包声明 `isa_family: loongarch` 并导出 `loongarch:*` → 通过包层家族检查，随后只被现有 `definition::read` 的家族集合拒绝；错误来自 reader，不是包格式白名单 | `H2-D4`、第二轮 P1-3 |
-| `a_package_requirement_is_a_subset_of_the_bundle_target` | `fmp-def/0.2` 合成包需求 `["rv64i"]`、spec 选择 `["rv64i","rv64c"]` → 接受；缺少 `rv64i` → 拒绝 | `H2-D4`、第一轮 P1-3 |
+| `a_package_cover_is_a_subset_of_the_bundle_target` | `fmp-def/0.2` 合成包声明 `["rv64i"]`、spec 选择 `["rv64i","rv64c"]` → 接受；缺少 `rv64i` → 拒绝 | `H2-D4`、第一轮 P1-3、第九轮 P2-4 |
 | `a_form_requirement_must_be_inside_its_own_package` | `fmp-def/0.2` 包声明 `["rv64i"]`、一条 form 的 `requires_extensions` 是 `["rv64c"]`，spec 选中 `["rv64i","rv64c"]` → `form-extension-mismatch`（退出 1），在包 ⊆ bundle 检查之前；把 `rv64c` 加进包声明后通过，且合并文档与包自己的 `read` 结论一致。`fmp-def/0.1` 下同一错误无法表达（`E_form = ∅`） | 第八轮 P1-3、`ADR-0128` §4.1 |
-| `fmp_def_0_1_keeps_the_transitional_exact_target` | `fmp-def/0.1` 包需求与 spec 选择不等（即使是子集）→ `h2-exact-target`，退出 1 | `H2-D4`、第一轮 P1-3 |
+| `an_over_declared_extension_cover_is_legal_but_narrower` | 所有行只需 `rv64i`、包声明 `["rv64i","rv64c"]`、spec 选 `["rv64i","rv64c"]` → 通过，且 `source_package_digest` 保留作者声明；只选 `rv64i` 的 spec → 包 ⊆ bundle 失败；构建器不把声明裁剪成并集，也不因高报报错 | 第九轮 P2-4、`ADR-0128` §4.1、`H2-D4` |
+| `fmp_def_0_1_keeps_the_transitional_exact_target` | `fmp-def/0.1` 包的声明覆盖与 spec 选择不等（即使是子集）→ `h2-exact-target`，退出 1 | `H2-D4`、第一轮 P1-3 |
 | `the_case_file_is_required_and_covers_every_form` | 无 `tests/cases.json` → `missing-cases`；form 无正例或无 `scope:"form"` 负例 → `uncovered-form` | `H2-D2`、§4.3、第二轮 P1-2 |
 | `a_case_must_bind_its_declared_form_to_the_plan` | case 声明 form B，计划只含 form A、空计划或多于一条 instruction、`instruction_id` 不一致 → `case-form-mismatch`，不进入执行 | `H2-D2`、`ADR-0128` §9.1、第二轮 P1-2 |
 | `a_case_negative_must_target_the_declared_instruction` | 负例 `path` 是根级或 `/sections/...`（例如错误 `format_version`）→ `case-error-scope`；`scope:"form"` 的 `mutates` 指向 `expected_digest`、多改一个字段或没有实际改动 → `case-mutation-mismatch`；两者都不计为该 form 的覆盖 | `H2-D2`、`ADR-0128` §9.1、第三轮 P1-3 |
@@ -1143,17 +1223,20 @@ A/B 工作流合并留给 H5。
 | `evidence_changes_do_not_move_the_definition_digest` | 在未发布候选包上改 README/NOTICE 并更新 evidence manifest → `evidence_digest`/`release_digest` 变，`definition_digest` 不变 | `H2-D8` |
 | `an_evidence_entry_must_stay_inside_the_package_and_match_its_hash` | evidence manifest 列 `../` 或错误 sha256 → `evidence-mismatch`，退出 1 | `H2-D8` |
 | `release_digest_tracks_the_release_not_the_builder` | 同 bundle 不同证据 → release 摘要不同；builder 版本变化 → release 摘要不变 | `H2-D8` |
-| `the_legacy_snapshot_is_readable_by_load_dir` | 生成 `bundles/legacy/<bundle>/definition.json` → `Registry::load_dir` 可读；sealed bundle 放入定义目录被拒绝 | `H2-D9`、`H2-D12` |
+| `the_legacy_snapshot_is_readable_by_load_dir` | 生成 `bundles/legacy/<bundle_id>/definition.json` → `Registry::load_dir` 可读；sealed bundle 放入定义目录被拒绝 | `H2-D9`、`H2-D12` |
 | `changing_the_legacy_source_changes_the_source_digest` | `legacy_source` 从 `0.1.0` 改成 `0.78.0` → 源摘要变化；行未改时行相等测试失败 | `H2-D8`、`HE-AC-11` |
 | `the_builder_identity_is_not_part_of_the_definition_digest` | 两个 builder 版本 → 同 definition/bundle 摘要，lock 的 builder 不同；`verify --check` 不把 builder 差异算作失败 | `HE-T19` |
 | `the_generated_definition_is_read_by_fmp_model` | 坏 form 行 → `fmp_model::definition::read` 拒绝，构建器包装该拒绝 | `H2-D12` |
 | `the_output_is_canonical_json` | lock/sealed 无空白、键排序、无尾随换行；与 Python canonical 一致 | `H2-D7` |
 | `the_spec_lock_and_sealed_shapes_are_closed` | 三者的未知键/重复键被拒；`builder.build` 缺省时键省略而不是 `null`；lock 去掉 `builder` 后比较，sealed 逐字节比较 | `ADR-0128` §8.2、第四轮 P2-2 |
+| `the_artifact_filename_matches_its_bundle_id` | `bundles/specs/mov.json` 的 `bundle_id` 是 `monasm.bundle.x86.mov` → `bundle-file-mismatch`；lock/sealed/legacy 同样检查；改成 `<bundle_id>.json` 后通过 | 第九轮 P2-1、`ADR-0128` §1.3、`H2-D9` |
 | `the_bundle_and_release_vectors_match` | `ADR-0128` §8.2 的 metadata 在 Rust 与 Python 中都得到 `b6d92574…`/`4e3d44a8…`；改域分隔或把嵌套摘要写成原始字节 → 不匹配 | 第四轮 P2-2/P2-3 |
 | `the_release_shaped_vector_matches` | 包项带 `evidence_digest` 时 Rust 与 Python 都得到 `evidence_digest = e9473871…`、`release_digest = ba60e8ba…`；漏写 `evidence_digest` 会退化成 `4e3d44a8…`，因此提交 lock 不能写成开发形状 | 第七轮 P2-3、`ADR-0128` §8.2 |
 | `resource_limits_are_enforced` | 超文件数/大小/路径/依赖深度/闭包总字节/资产总数/嵌套深度/单包累计资产字节 → 拒绝 | `H2-D11` |
 | `the_published_version_directory_is_immutable` | base registry 已登记 `0.1.0`；作者新增 `0.2.0/` 并只改自有路径 → 旧 spec `verify --all --check` 仍绿，新包 `--package --release` 通过；原地改 `0.1.0` 的 form 或 `evidence/`/`tests/cases.json` → `published-package-modified` | 第三轮 P1-1、第五轮 P2-3、§5.3 |
 | `a_first_publication_may_be_created_and_registered_in_one_pr` | 同一 PR 新增 `packages/.../0.1.0/`、spec、lock、sealed 和首个 registry 条目 → 通过；条目与最终 path/version/摘要不一致或未被 head spec 选中 → `published-registry-invalid`；合并后下一 PR 改同一目录 → `published-package-modified` | 第六轮 P1-1、`ADR-0128` §1.1/§8.1/§8.3 |
+| `first_publication_bootstraps_without_registry_cycle` | 新包/新 spec 尚无 registry 行：`build` 成功并打印 `definition_digest`（不要求该行）；追加 `published` 与 `identities` 后 `verify --all --check` 与 `verify --published --check` 通过；`build` 从不写 registry | 第九轮 P2-3、`ADR-0128` §8.3、`H2-D9` |
+| `failed_build_leaves_no_published_partial_artifact` | 注入写阶段 I/O 失败 → 退出 2，registry 未改，未报告成功；lock/sealed 一新一旧时 `--check` 失败；修复后重建并通过。确定性拒绝发生在写任何文件之前 | 第九轮 P2-3、`ADR-0128` §8.3、`H2-D9` |
 | `a_base_published_version_cannot_be_edited_with_a_registry_change` | base 已登记 `0.1.0`；同一 PR 改 `0.1.0/` 的 form 并同时改写/删除/替换该登记项 → 包改动是 `published-package-modified`，登记改动是 `published-registry-modified`，退出 1 | 第六轮 P1-1、`ADR-0128` §8.1/§8.3 |
 | `a_retired_published_version_is_still_immutable` | PR A 删除最后一个引用 `0.1.0` 的 spec，但保留 registry 条目；PR B 只改旧 `0.1.0/` 目录 → 按 base registry 判为已发布，`published-package-modified` | 第五轮 P1-2、`ADR-0128` §1.1/§8.3 |
 | `the_published_registry_is_append_only` | 删除、改写、重排或替换 base 条目 → `published-registry-modified`；head spec 选中但无条目 → `published-registry-incomplete`；新条目未被任何 head spec 选中或摘要不符 → `published-registry-invalid`；仅追加合法条目通过；head-only 条目在无 spec 选中时可撤销 | 第五轮 P1-2、第六轮 P1-1、`ADR-0128` §8.3 |
@@ -1313,22 +1396,30 @@ H2a 的阶段边界不变，但按五个可独立 review 的回归节点推进�
    「检查后替换」场景证明所选路径层能在**打开动作本身**拒绝跟随；任一平台
    只能以跟随打开通过，或以「拒绝所有包读取」通过，N1 即失败，H2a 停止，不
    把失败改成降级。门禁通过后再做 manifest/spec/lock/published 封闭形状、
-   路径/版本一致、`capability-mismatch` 推导、`source_package_digest`、
-   `evidence_digest` 与开发/发布两个跨语言向量。
+   路径/版本一致、标识符/路径段/产物文件名词法（`identifier-lexical`/
+   `path-lexical`/`bundle-file-mismatch`）、单一 `LoadedPackage` 生命周期
+   （摘要、legacy 行/目标比较、逐包 `read` 与合并都消费同一份已加载值）、
+   `capability-mismatch` 推导、`source_package_digest`、`evidence_digest` 与
+   开发/发布两个跨语言向量。
 2. **N2 闭包与 sealed**：严格排序、显式闭包、依赖边、归属冲突、spec 集合的
    `bundle_id` 与定义身份唯一、保留的 legacy 定义名（`reserved-identity`）、
-   form ⊆ 包 ⊆ bundle 的逐包检查与合并前逐包 `read`（`form-extension-mismatch`）、
+   form ⊆ 包 ⊆ bundle 的逐包检查（`form-extension-mismatch`）、保守覆盖语义
+   （高报合法、不裁剪）、合并前逐包 `read` 且合并消费同一 `LoadedPackage`、
    lock/sealed 字节和 `builder` 投影。
 3. **N3 独立身份与 conformance**：`monasm-standalone/0.1`、`verify --package`、
    cases/证据、值定义差分指针、Level 0/1 投影、错误 opcode 与错误 form 声明反例。
 4. **N4 发布生命周期**：base/head 登记、首次发布、全局身份唯一、`identities`
    定义名历史（永久摘要绑定、保留名不得登记、追加与撤销规则）、append-only、
-   退役不可变、`verify --published --check` 的有界断言（可执行资产与身份，
+   退役不可变、首次发布无登记循环（`build` 不要求其行、从不写 registry）、
+   `build` 先内存校验再替换输出（失败不留已发布部分产物）、
+   `verify --published --check` 的有界断言（可执行资产与身份，
    不含 README/NOTICE/证据用例字节）。
 5. **N5 门禁与 x86 包**：变更路径 CI、x86 包与 bundles、`gates.yml`、H2a 报告。
 
-这只是 H2a 内部的审查顺序，不改变 H2a/H2b 的交付边界；N4 的发布门禁不能推迟
-到 H2b。
+每个节点是一个可独立回归、可独立回滚的提交（或子 PR），各自带失败反例和
+门禁，不是实施者内部的检查清单；前一个节点全绿才进入下一个，尤其不能在 N1 的
+no-follow 可行性未证明前开始大量资产迁移。N1–N5 不改变 H2a/H2b 的交付边界；
+N4 的发布门禁不能推迟到 H2b。
 
 `ADR-0128` 目前在 PR #4 中为 `proposed`；评审合并后才写 `accepted`，H2a 也从
 那里开始实现。`ADR-0130` 不在 H2 内，除非 H2b 决定增加 per-package job
@@ -1341,20 +1432,24 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | 构建器变成第二套定义权威 | 构建器只做清单/闭包/归属/合并/摘要；form 结构一律交给 `fmp_model::definition::read` |
 | canonical 实现漂移 | 复用 `fmp_model::canonical`；与 Python `check_definition.py` 的 canonical 对照测试 |
 | 包顺序、spec 顺序或目录顺序影响摘要 | spec 的 `packages` 按 `(package_id, version)` 严格排序，逆序是拒绝而不是第二种写法；显式列出完整闭包与 `path`；合并后按 `form_id` 排序；从不扫描 `packages/`；同一合法 spec 在不同创建/读取/集合迭代顺序下必须得到同一摘要与 sealed 字节 |
+| 摘要来自 A、合并来自 B（同一路径被重读） | 每个包只读取一次为不可变 `LoadedPackage`；`source_package_digest`、legacy 行/目标比较、逐包 `read` 和合并消费同一份值；禁止摘要后按路径重开；故障注入测试覆盖两次阶段之间的文件替换 |
 | 把 form 排序误当程序布局排序 | 文档与测试分开「包集合规范化」和「指令/节/fixup 顺序」；后者不由构建器触碰 |
 | 归属冲突被 last-wins 吞掉 | 构建期唯一归属表；相同内容也失败；`HE-T07` |
 | 路径逃逸/符号链接 | 从 `--root` 到实际读取的每一段都 no-follow；链接或 reparse point 是 `path-escape`；不用 canonicalize-then-open，也不接受「先 non-follow 预检、再按路径打开」；打开动作本身必须拒绝跟随 |
+| 同一非法名字在某平台成功、在另一平台 I/O 失败 | 标识符/路径段/产物文件名按 `ADR-0128` §1.3 的词法在打开前校验；大小写折叠冲突、尾点/空格、Windows 设备名都是 `path-lexical`，`package_id`/`bundle_id` 违规是 `identifier-lexical`，产物名与 `bundle_id` 不符是 `bundle-file-mismatch`；三平台测试同一退出码 |
 | 独立身份随目录/cwd 漂移 | 固定 `monasm-standalone/0.1` 函数；复制到不同目录/换 cwd 的摘要相等测试；保留前缀禁止写入 spec |
 | 新包没有机器码证据也能通过 | 每个导出 form 强制正例+负例；`package_conformance` 执行；错误 opcode 反例；`--release-evidence` 检查证据完整性，`--release` 再加闭包 |
 | 用例声明 form B、计划实际执行 A | 计划恰好一条 instruction，`instruction_id`/`form_id` 必须等于 case 字段；不一致 `case-form-mismatch`；正例比较实际执行的 form |
 | 负例被无关错误满足 | 只有 `scope:"form"` 计入覆盖；它必须绑定同 form 的正例、只改一个操作数指针、由 `bind` 拒绝，并匹配完整 `(code, path)` 集合；至少一条诊断必须落在变异操作数或其父对象上；`expected_digest`/`E-BYTE-001`/`E-SIZE-001` 只能作为 `scope:"plan"` |
 | 已发布包被原地改写，旧 spec 无法重建 | 版本目录是发布快照；`bundles/published.json` 永久登记已发布路径；只有 base 条目在 PR 内不可变，同一 PR 首次创建并登记合法；旧目录禁止修改/删除；新版本用同级新目录；CI 按 base registry 判 `published-package-modified`，删除 spec 不清除登记；删除 base 条目本身是 `published-registry-modified` |
+| 首次发布被登记顺序卡死，或写失败留下半成品 | `build` 不要求它帮助创建的 registry 行，只打印 `definition_digest`；registry 由 publisher 在成功构建后追加，之后才跑 `--all --check`/`--published --check`；`build` 先内存校验全部输出，再写临时文件并重命名，确定性拒绝不写文件，写阶段失败退出 2 且不写 registry；lock/sealed 一新一旧必被 `--check` 拒绝；`build` 从不写 registry |
 | 同一逻辑包版本有两个内容 | registry 的 `(package_id, version)` 全局唯一，首次登记永久绑定 path 和摘要；多个 spec 只能引用同一项；第二项换 path/摘要是 `published-registry-invalid` |
 | 两个 spec 共用产物或定义身份 | 同时存活的 spec 不能共用 `bundle_id`（`bundle-id-conflict`），也不能共用 `(namespace, version)`（`definition-identity-conflict`）；不以摘要相同为由接受 |
 | 退役后同名定义被换成不同字节 | `identities` 永久绑定 `(namespace, version)` 与 `definition_digest`；退役 spec 不删除该行；换摘要即 `definition-identity-conflict`，同摘要重发合法且不新增行 |
 | 发布线推进被误当成身份冲突 | `bundle_id` 是可移动的发布线，退役后可由新 spec 推进到新定义；不可变的 bundle 内容标签是 `(bundle_id, bundle_digest)`，由 lock/sealed 与 git 历史记录；证据完备的发布身份是 `release_digest` |
 | 复用冻结 `definitions/` 的名字产生第二份同名定义 | 构建器把 `<root>/definitions/*/*.json` 的 `(namespace, version)` 作为只读保留集合；spec 或 `identities` 命中即 `reserved-identity`；H2 自己的 bundle 用 `0.1.0-h2`，不占用旧名 |
 | 更宽的 bundle 让欠声明的包变合法 | 每个包先按自己的 `target_identity` 生成文档并 `read`，再合并；form 需求超出包声明是 `form-extension-mismatch`；`verify --package` 与 `verify --all` 对同一包结论一致 |
+| 把保守覆盖当成最小集合，或擅自裁剪声明 | 契约只证明 `⋃E_form ⊆ E_package ⊆ E_bundle`；高报合法且只缩小可选 bundle 范围；构建器不裁剪声明（否则 `source_package_digest` 与作者写的不同，包会无编辑变可选）；精确性留待后续版本化规则 |
 | 路径层在某个平台没有 no-follow 打开 | H2a N1 是三平台可行性门禁：中间目录链接、末段链接、reparse point、检查后替换都必须被拒绝；某平台做不到就停止 H2a，不以「拒绝所有读取」或「跟随打开」通过 |
 | 审计被当成整目录不可变证明 | `verify --published --check` 只证明清单、可执行资产和身份；README/NOTICE/证据/用例字节由变更路径门禁与 git 历史承担，文档写明边界，不新增 `snapshot_digest` |
 | 差分指针随 JSON 库或编辑操作漂移 | 差分定义在两个最终值上：成员增删→成员指针，kind 变化→该位置，数组长度→数组；两成员改动是两个差异因此拒绝；改写整体对象与改一个成员不可区分，格式不尝试区分 |
@@ -1387,7 +1482,7 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | 发布审计被当成整目录证明 | 审计只覆盖清单、可执行资产与身份；README/NOTICE/证据/用例字节由变更路径门禁与 git 历史承担 |
 | 不同定义格式被隐式混用 | 闭包要求所有包 `definition_format` 一致；混合即拒绝，不转换 |
 | 证据改动改变执行身份 | 证据只进 `evidence_digest`/`release_digest`，不进 `definition_digest` |
-| 旧定义快照无法被旧入口读取 | 额外输出 `bundles/legacy/<bundle>/definition.json`；sealed 不是定义文档 |
+| 旧定义快照无法被旧入口读取 | 额外输出 `bundles/legacy/<bundle_id>/definition.json`；sealed 不是定义文档 |
 
 **回滚分两种，两种都不能删除已发布的历史。**
 
@@ -1428,6 +1523,7 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 - 新增指令覆盖；`unsupported-capability` 的运行时路径（H3/H4）。
 - 发布任何 `fmp-def/0.2` 包；form ⊆ 包规则用 H2a 的合成 0.2 fixture 测，三个实际包仍是 `0.1`。
 - 为发布审计新增 `snapshot_digest` 或等价的全目录摘要；H2 只声称清单、可执行资产与身份，整目录不可变由变更路径门禁与 git 历史承担。
+- 从 form 行推导完整、精确的 `enabled_extensions` 需求集合；H2 只证明保守覆盖的包含关系（`⋃E_form ⊆ E_package ⊆ E_bundle`），精确性需要版本化规则，不让构建器凭空补基础 ISA 需求。
 - 把路径层做成可携带的 `std::fs` 调用：no-follow 打开必须由显式路径层或平台原生调用在三平台证明，做不到就停止而非降级。
 
 ## 9. 待审决策
@@ -1447,7 +1543,7 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | O11 | 新包没有 `legacy_source` 时如何验证 | **包自述 `target_identity`/`definition_format` + 独立身份 + `read` + 包用例**；用一个合成包证明不依赖历史定义 | 强制新包也写 legacy 来源会永久绑定旧目录 |
 | O12 | `verify --package` 的 Definition namespace/version 从哪来 | **`monasm-standalone/0.1` 固定函数**：`monasm.standalone.<package_id>` / `standalone+<source digest>`；保留前缀禁止进入 spec | 从 spec 借用会碰撞；从目录推导会随 cwd 漂移 |
 | O13 | 包级机器码测试是否强制 | **强制**：每个 form 正例+负例、证据引用、`package_conformance` 执行、`--release-evidence` 检查证据完整性，`--release` 再加闭包 | 只靠 `read` 会放过合法结构里的错误 opcode |
-| O14 | 包 target 与 bundle target 的关系 | **包声明需求、spec 声明选择**；子集校验；`fmp-def/0.1` 用 `h2-exact-target` 过渡，H3 解除 | 逐字段相等会把新增扩展族变成对既有包的强制改版 |
+| O14 | 包 target 与 bundle target 的关系 | **包声明保守覆盖、spec 声明选择**；只证明 `⋃E_form ⊆ E_package ⊆ E_bundle`，高报合法且只缩小可选范围，不裁剪声明；`fmp-def/0.1` 用 `h2-exact-target` 过渡，H3 解除 | 逐字段相等会把新增扩展族变成对既有包的强制改版；把声明当最小并集会改变作者摘要或错误拒绝合法 bundle |
 | O15 | form 家族与 target 的一致性 | **通用相等规则** `family(form_id) == target_identity.isa_family`；包格式不列 ISA；第四种家族由 H3 的 reader 支持，不需要改包协议 | 三 ISA 对应表实际全是字符串相等，会迫使 H3 再改一次公共格式 |
 | O16 | 证据文件是必需还是可选 | **开发包可选、可发布包必需**；`--release-evidence`/`--release`/spec 选中时要求 `tests/cases.json`、`NOTICE`、`sources`、`oracle.status`、skip 理由和用例证据；`tests/cases.json` 本身被哈希 | 永远可选或只哈希用例证据会让 `release_digest` 不代表完整审核证据 |
 | O17 | 已发布包与定义名如何继续演进 | **版本目录是不可变快照**：`packages/<target>/<package>/<version>/`；发布路径记入只追加的 `bundles/published.json`，`(package_id, version)` 全局唯一且永久绑定首次 path/摘要；`identities` 永久绑定 `(namespace, version)` 与 `definition_digest`，退役后仍拒绝换字节重发；`bundle_id` 是可移动发布线，不可变的 bundle 内容标签是 `(bundle_id, bundle_digest)`，证据完备的发布身份是 `release_digest`；只有 base 条目在 PR 内不可变，同一 PR 首次创建并登记合法；退役 spec 不删除登记；更新创建同级新目录；旧 spec 未改时旧 lock 原样重建，退役后旧快照/lock 仍可由旧提交重放；发布者另行选择新版本 | 原地覆盖会迫使作者改旧 spec；仅按当前 spec 判断会让退役后的旧目录和旧定义名失去保护；把 `bundle_id` 当不可变身份会拒绝正常的版本推进 |
@@ -1484,6 +1580,10 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | `bundles/published.json` 追加登记、首次发布、全局 `(package_id, version)` 唯一、退役后仍不可变、三个 registry 错误 | 尚未实现 | **未验证** — H2a |
 | 跨 spec `bundle_id`/定义身份唯一 | 尚未实现；`Registry::find` 对两份同 `(namespace, version)` 定义返回 `E-DEF-001`（`fmp-model/src/definition.rs` 843–865） | **未验证** — H2a |
 | 无链接/reparse point 的读取边界（打开动作本身 no-follow） | 尚未实现；文字已规定「元数据预检 + 按路径打开」不算满足；`std::fs` 无可携带的 no-follow 打开，三平台可行性未测 | **未验证** — H2a N1 平台门禁 |
+| 标识符/路径段/产物文件名词法在打开前以格式拒绝 | 尚未实现；规则见 `ADR-0128` §1.3，构建器还没有包读取器 | **未验证** — H2a |
+| 单一 `LoadedPackage` 贯穿摘要、行/目标比较、逐包 `read` 与合并 | 尚未实现；当前没有包读取路径 | **未验证** — H2a |
+| 首次发布无 registry 循环，`build` 先内存校验再写文件且从不写 registry | 尚未实现；只有文档规则 | **未验证** — H2a |
+| `enabled_extensions` 是保守覆盖而非最小集合 | 尚未实现；`fmp-def/0.1` form 没有需求键，构建器不存在 | **未验证** — H2a |
 | `identities` 定义名历史、永久摘要绑定与 `definition-identity-conflict` | 尚未实现 | **未验证** — H2a |
 | 保留的 legacy 定义名（`definitions/*/*.json` 的 `(namespace, version)`）与 `reserved-identity` | 尚未实现；保留集合可从现有 104 个文件读出，实际是 `monasm.isa.{x86,aarch64,riscv}` 系列 | **未验证** — H2a |
 | `requires_capabilities` 的推导等式与 `capability-mismatch` | 尚未实现；`bind_forms` 要求非空 `slots`、`bind_slot` 要求非空 `placements`，因此每个合法 `fmp-def/0.1` form 都推导出 `field-placement/v1`；§7.0 的无 slot 字节是摘要预映像，`read` 会先拒绝，不能作为「空集合法」的样例 | **未验证** — H2a |
