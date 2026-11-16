@@ -5,17 +5,20 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: fifth revision, 2026-11-16, after a further P1/P2 audit:
-  form-scope negatives are `bind`-only and must name the mutated operand; the
-  published-version registry is a permanent append-only record so retirement
-  cannot erase immutability; spec package order is strictly validated; closure
-  verification is transitive; release evidence is a separate
-  `--release-evidence` gate; and evidence edits after publication require a new
-  version.
+- Revision: sixth revision, 2026-11-16, after the publication-lifecycle audit:
+  immutability is keyed on the **base** registry so a version can be created and
+  first published in one PR; the registry makes `(package_id, version)` globally
+  unique and permanently binds it to its first path and source digest; spec
+  `bundle_id` and definition identity are unique across specs; package reads
+  never follow a link; and publication-history auditing is a separate command
+  from bundle verification. The fifth revision's form-scope, registry-survival,
+  spec-order, transitive-closure and evidence rules remain in force.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
   `monasm-lock/0.1`, `monasm-bundle/0.1` and `monasm-published/0.1` formats;
   immutable published package version directories and their append-only
-  registry; the digest layering and its byte-level preimages; package
+  registry, including global `(package_id, version)` identity binding and the
+  separate publication-history audit; the digest layering and its byte-level
+  preimages; package
   target self-description and migration provenance, including legacy target
   consistency; the standalone definition identity used by `verify --package`; the
   mandatory package case and evidence gate with `bind`-only form-scope mutation
@@ -184,10 +187,12 @@ names can change afterwards. The layout therefore makes the version component
 the immutability boundary:
 
 - a `packages/<target>/<package>/<version>/` directory is a **source snapshot**;
-- a version is **published** when its entry is committed to
-  `bundles/published.json` (§8.3). The publisher adds that entry in the same PR
-  that first selects the version in a `bundles/specs/*.json`; the registry entry,
-  not the current spec set, is the permanent record;
+- a version is **published** when its entry exists in the registry of a merged
+  commit. The publisher adds that entry in the same PR that first selects the
+  version in a `bundles/specs/*.json`; the registry entry, not the current spec
+  set, is the permanent record. The PR that first adds the entry may still create
+  and adjust the candidate directory: the new entry is validated against that
+  PR's final head snapshot, and only the merged snapshot is immutable;
 - after publication, no file under that directory may be added, modified,
   renamed or deleted — including `README`, `NOTICE`, `evidence/` and
   `tests/cases.json`. A change is `published-package-modified` (exit 1);
@@ -207,13 +212,17 @@ the immutability boundary:
   bytes themselves needs a later ADR.
 
 The CI changed-path gate resolves each `packages/**` change in the head tree and,
-for a deletion, in the base tree. It then asks the **published registry** (§8.3),
-not the current spec set, whether that snapshot is published. If so, any changed
-file fails the gate before `verify --package` runs (§8.1). Deleting or renaming a
-published version directory is the same rejection, not a silent package removal.
-This closes the two-step bypass: a first PR may retire the last spec, but the
-registry entry remains, so a later PR that edits the old directory is still
-rejected.
+for a deletion, in the base tree. It then asks the **base published registry**
+(§8.3) whether that snapshot was already published. If so, any changed file fails
+the gate before `verify --package` runs (§8.1). A version whose entry exists only
+in the head registry is a **first publication**: it is a candidate during this PR
+and is validated against the final snapshot instead of being rejected. Deleting
+or renaming a base-published version directory is the same rejection, not a
+silent package removal. This closes the two-step bypass: a first PR may retire
+the last spec, but the registry entry becomes a base entry, so a later PR that
+edits the old directory is still rejected. Deleting the base registry entry to
+escape is itself `published-registry-modified` (§8.3), so the split cannot be
+used to unpublish.
 
 Evidence is part of the snapshot. Before publication, editing `tests/cases.json`
 or a listed evidence file moves `evidence_digest` and `release_digest` while
@@ -335,12 +344,21 @@ bundle.
 
 Every manifest path is a normalised relative path using `/`. Absolute paths,
 `..`, empty segments, `.`, backslashes, NUL, URL schemes and drive letters are
-rejected. Before opening a file, the builder checks that the canonicalised path
-is still under the package root; on Windows it rejects a reparse-point escape.
-The spec's `packages[].path` is checked against `--root` the same way.
-`legacy_source.isa` and `legacy_source.version` are path components before they
-are concatenated into `<root>/definitions/<isa>/<version>.json`, so they receive
-the same treatment: `isa` must match `^[a-z0-9_]+$` and `version` must match
+rejected. The bound holds for the whole read, not at a single instant: no
+component on the path from `--root` to an opened file may be a symlink or
+reparse point, and the builder never follows one. H2 package inputs contain no
+such links on that path; a package that has one is `path-escape` (exit 1). An
+implementation may enforce this by checking every component with
+non-following metadata before opening it, or by opening each component relative
+to an already-open directory handle with no-follow semantics. Canonicalise-then-
+open is **not** sufficient: the filesystem can replace the target between the
+check and the open, so the two-step sequence is a time-of-check/time-of-use gap,
+not an invariant. The spec's `packages[].path` and the `--root` resolution obey
+the same rule; `--root` may be canonicalised once to establish the base, but no
+component below it is followed. `legacy_source.isa` and `legacy_source.version`
+are path components before they are concatenated into
+`<root>/definitions/<isa>/<version>.json`, so they receive the same treatment:
+`isa` must match `^[a-z0-9_]+$` and `version` must match
 `^[0-9]+(\.[0-9]+)+$`. A value containing `/`, `\`, `..`, `.` as a whole
 component, a drive letter, a URL scheme or NUL is rejected before the path is
 formed; the builder does not normalise a value into legality.
@@ -763,8 +781,10 @@ The binary has three subcommands: `build` writes the lock, sealed bundle and
 legacy snapshot; `verify` rebuilds in memory; and `digest <package-path>` prints
 the computed `source_package_digest` so an author can write it into the spec.
 `verify --all` checks the bundle closures selected by `bundles/specs/*.json`;
-`verify --package <path>` checks one package against its own manifest and does
-not read a spec, using the standalone identity in §2.1. The package form checks
+`verify --published --check` audits the entire published registry without
+selecting any package (§8.4); `verify --package <path>` checks one package
+against its own manifest and does not read a spec, using the standalone identity
+in §2.1. The package form checks
 that `path` ends at the manifest's `version` directory, the closed key set, path
 bounds, declared-vs-actual `form_id`, the form-family match (§4.2), sorted
 arrays, reserved-asset emptiness, the capability allowlist, the declared
@@ -819,9 +839,33 @@ can. H2 packages declare no dependencies; the split and the re-read rule exist s
 a later shared package cannot pass `--release` by asserting an edge it never
 resolved.
 
+**Cross-spec identity is unique.** `verify --all --check` treats the whole spec
+set as one identity namespace. Two specs may not share a `bundle_id`
+(`bundle-id-conflict`, exit 1) and may not share a `(namespace, version)` pair
+(`definition-identity-conflict`, exit 1), even when their generated
+`definition_digest` values would be equal. The reason is the existing execution
+rule: `Registry::find()` requires `(namespace, version)` to name exactly one
+definition and rejects two with `E-DEF-001`; two specs that both declare
+`monasm.isa.x86` / `0.1.0-h2` would make a combined `Registry` ambiguous.
+Identity is a release name, not a content comparison, so identical bytes do not
+make the second declaration legal. H2's three specs use distinct bundle IDs and
+identities. A later stage that wants two bundles to share a definition identity
+must add an explicit mapping and a Registry change; H2 does not infer one.
+
+Counterexample if only per-spec shape were checked: `a.json` and `b.json` both
+declare `bundle_id: monasm.bundle.x86.example` but select different packages.
+Both locks carry the same `bundle_id` with different `bundle_digest` and
+`definition_digest`, so a consumer that resolves a bundle by ID cannot tell which
+release it holds; if the artifact name derives from `bundle_id`, one file
+overwrites the other and directory iteration order decides the survivor
+(`INV-05`). For `(namespace, version)`, two specs can each verify individually
+yet produce two definitions that `Registry::find` cannot distinguish.
+
 Lock and sealed bundle are committed release artifacts. CI runs
 `fmp-definition verify --all --check`, rebuilds each spec in memory, compares the
-sealed bundle byte-for-byte and the lock byte-for-byte **except `builder`**. The
+sealed bundle byte-for-byte and the lock byte-for-byte **except `builder`**. It
+also runs `verify --published --check` (§8.4), which re-hashes every registry
+entry including retired versions without selecting any package. The
 changed-path job runs `verify --package <changed>` (structure) for every changed
 package, `verify --package --release-evidence <changed>` for every changed
 package, and the `package_conformance` test. A package whose `dependencies` is
@@ -847,41 +891,75 @@ produced it.
 
 Mapping a changed file to "the nearest ancestor with `package.json`" is only
 defined when that file still exists in the PR head. Deletion and rename need
-their own rules, or a package can leave the gate silently:
+their own rules, or a package can leave the gate silently. The gate distinguishes
+the **base registry** (entries already published at the merge base) from the
+**head registry** (the entries this PR proposes). Only a base entry makes a
+snapshot immutable during this PR; a head-only entry is a **first publication**
+and is validated, not rejected.
 
 - **Modified or added file:** resolve the nearest ancestor `package.json` in the
   head tree. Its directory must be a version directory whose name equals the
   manifest's `version`; a mismatch is `path-version-mismatch` (exit 1). If none
   exists, fail with `unmapped-package-path` (exit 1); do not skip the path. If
-  the version directory appears in the **base or head published registry**
-  (§8.3), the snapshot is published and any modification is
-  `published-package-modified` (exit 1). A spec that no longer lists the path
-  does not clear this check.
+  the version directory is in the **base registry**, it is already published and
+  any modification is `published-package-modified` (exit 1). If it is absent
+  from the base registry, it is a candidate: creating or editing it is legal, and
+  adding its first registry entry in this same PR is also legal, provided that
+  entry is sorted, selected by a head spec, and matches the final head `path`,
+  `version` and recomputed `source_package_digest`; otherwise
+  `published-registry-invalid` (exit 1). The final head bytes are the snapshot
+  that becomes immutable when this PR merges. A spec that no longer lists the
+  path does not clear this check.
 - **Deleted file or directory:** resolve the version directory in the **base**
-  tree. If that directory is in the base or head registry, any deletion inside
-  it — including `package.json`, `NOTICE`, `tests/cases.json` or a form — is
+  tree. If that directory is in the base registry, any deletion inside it —
+  including `package.json`, `NOTICE`, `tests/cases.json` or a form — is
   `published-package-modified` (exit 1); it is never a silent removal. If it is
-  unpublished, the deletion is allowed only when the same PR removes or updates
-  every spec that lists it, and `verify --all --check` proves no live reference
-  remains. A deletion of an unpublished root that a spec still lists fails the
-  build.
-- **Rename or move:** check both the old and the new root. Moving a published
-  version directory is `published-package-modified` (exit 1); a new version is a
-  new sibling directory, not a move. Moving an unpublished package directory
-  without changing `package_id` changes its `path`, so the spec entry must change
-  too if it is later selected; moving a package across target directories must
-  also keep §4.2 satisfied. A rename that changes `package_id` is a new release
-  identity, not a free move, and the old identity must be removed from every
-  spec.
+  not in the base registry, the deletion is allowed only when the same PR removes
+  or updates every spec that lists it, and `verify --all --check` proves no live
+  reference remains. A deletion of an unpublished root that a spec still lists
+  fails the build. A head-only registry entry whose path no longer resolves is
+  `published-registry-invalid`; removing that head-only entry in the same PR is
+  legal because it was never published in the base.
+- **Rename or move:** check both the old and the new root. Moving a version
+  directory that is in the base registry is `published-package-modified`
+  (exit 1); a new version is a new sibling directory, not a move. Moving a
+  candidate that is not in the base registry is legal only when its spec entry
+  and any head registry entry use the final path, and §4.2 still holds. A rename
+  that changes `package_id` is a new release identity, not a free move, and the
+  old identity must be removed from every spec.
 - **A `packages/**` change that produces no package root** (for example a stray
   file directly under `packages/`, or a deletion whose base root cannot be
   found) is `unmapped-package-path`, exit 1. It is never silently ignored.
 - **A `bundles/published.json` change** is checked against the base registry:
-  removing, editing, reordering or replacing an entry is
-  `published-registry-modified` (exit 1); appending an entry is legal only when
-  it is sorted, selected by a head spec and matches the package, otherwise
-  `published-registry-invalid` (exit 1). A selected head path without an entry
-  is `published-registry-incomplete` (exit 1).
+  removing, editing, reordering or replacing a **base** entry is
+  `published-registry-modified` (exit 1). Inserting a new entry is legal only
+  when the resulting array is sorted by `path`, the entry is selected by a head
+  spec, and it matches the package at its `path` and the recomputed digest;
+  otherwise `published-registry-invalid` (exit 1). An entry that exists only in the head
+  registry is this PR's first publication; it is validated against the head
+  snapshot, and the merge makes it a base entry for the next PR. Removing a
+  head-only entry is legal only when no head spec selects its path. A new entry
+  that repeats another entry's `(package_id, version)` under a different `path`
+  or digest is `published-registry-invalid` (§8.3). A selected head path without
+  an entry is `published-registry-incomplete` (exit 1).
+
+Counterexample for the base/head split: the PR that creates
+`packages/x86_64/mov-register/0.1.0/` must also add its registry entry. If the
+gate treated any head entry as immutability, the entry would forbid the very
+files it registers and no package could ever be born. If the gate ignored the
+head registry instead, a PR could add an entry plus a mismatched directory in one
+step; the path/digest validation above is what rejects that. Deleting a base
+entry to escape is already `published-registry-modified`, so the split does not
+reopen the retirement bypass.
+
+Counterexample for global uniqueness: spec A selects `monasm.x86.mov` `0.1.0`
+at `packages/x86_64/mov-a/0.1.0` with digest D₁, and spec B selects the same
+`package_id`/`version` at `packages/x86_64/mov-b/0.1.0` with digest D₂. Each
+closure is internally consistent and each path is unique, so a path-only registry
+accepts both rows. The same logical version now has two published contents, and a
+reader naming `monasm.x86.mov`/`0.1.0` can get either definition depending on
+which bundle was loaded. The `(package_id, version)` rule in §8.3 rejects the
+second entry.
 
 The CI path list remains an input to which packages are checked, never an input
 to what the builder selects. Deleting an unselected package still runs the
@@ -1004,24 +1082,42 @@ answer to "was this version ever published?", independent of the current specs.
 
 The object has exactly `published_format` and `published`. Each entry has
 exactly `path`, `package_id`, `version` and `source_package_digest`; entries are
-sorted strictly by `path` and unique. `published` may be empty. Unknown or
-duplicate keys are rejected (`INV-07`).
+sorted strictly by `path`. Three uniqueness rules hold across the whole registry,
+not only within one bundle closure:
 
-- A version is **published** iff its `path` is in the head registry. The current
-  spec set does not decide publication after the fact.
+- `path` is unique;
+- `(package_id, version)` is unique;
+- the first **merged** entry for a `(package_id, version)` permanently binds that
+  identity to its `path` and `source_package_digest`. A later merged entry that
+  reuses the pair with a different `path` or a different digest is
+  `published-registry-invalid` (exit 1), never a second release of the same
+  logical version.
+
+A spec may reference an existing entry by the same `path` and
+`source_package_digest` in any number of bundles; that is one published version
+selected by several bundles, not two publications. `published` may be empty.
+Unknown or duplicate keys are rejected (`INV-07`).
+
+- A version is **published** once its entry is in the registry of a merged
+  commit. The current spec set does not decide publication after the fact.
 - A publisher adds the registry entry in the same PR that first selects the
-  version in a spec. `verify --all --check` requires every head-selected path to
-  have a head entry; a missing entry is `published-registry-incomplete`
-  (exit 1). An entry present in the base tree may remain after every spec
-  retires, and must remain.
+  version in a spec. During that PR the entry is a **candidate first
+  publication**: the gate does not treat it as immutability for the files the
+  same PR creates, but it must validate against the final head snapshot. After
+  merge it is a base entry and the snapshot is immutable.
+- `verify --all --check` requires every head-selected path to have a head entry;
+  a missing entry is `published-registry-incomplete` (exit 1). An entry present
+  in the base tree may remain after every spec retires, and must remain.
 - A base entry may not be removed, edited, reordered or replaced. Any change to
-  the registry other than appending a new entry in sorted position is
+  the base registry other than inserting a new entry in sorted position is
   `published-registry-modified` (exit 1). A new entry must be selected by at
   least one head spec and must match the package at its `path`; otherwise it is
-  `published-registry-invalid` (exit 1).
+  `published-registry-invalid` (exit 1). A head-only entry may be removed in the
+  same PR only when no head spec selects its path.
 - Each entry's `source_package_digest` must equal the digest recomputed from the
   package at `path`. A mismatch is `published-registry-invalid` (exit 1), and
-  any byte change under that path is also `published-package-modified` (exit 1).
+  any byte change under a base-published path is also
+  `published-package-modified` (exit 1).
 - The registry is a publication fact, not a selection input. It does not enter
   `source_package_digest`, `definition_digest`, `bundle_digest` or
   `release_digest`, and it can never add a package to a bundle.
@@ -1034,6 +1130,44 @@ removes the last spec that selects `0.1.0/`, then PR B modifies that directory.
 Both the base and head trees of PR B contain no selecting spec, so a spec-only
 check would call the snapshot unpublished and accept the edit. The registry
 entry survives PR A, so PR B still fails `published-package-modified`.
+
+Counterexample if first publication were treated as immutability: the H2a PR
+creates `packages/x86_64/mov-register/0.1.0/` and its first registry entry
+together. A rule that rejects any file under a head-registered path rejects the
+package's own creation, so the format could only be published by a second PR that
+adds the files after the entry — which the digest check forbids. The base-only
+rule lets one PR create and register the version, and the head validation makes
+the merged bytes the immutable ones.
+
+#### 8.4 Bundle verification and publication history are separate commands
+
+Two questions must not be conflated:
+
+- **Bundle verification** (`verify --all --check`) answers "does each current
+  spec rebuild its committed lock and sealed bundle from the exact selected
+  closure?" It reads only the paths selected by `bundles/specs/*.json`, plus the
+  registry facts needed to decide publication and validity for those paths. It
+  never opens an unselected package, so an unselected package cannot change its
+  result (`HE-AC-05`).
+- **Publication-history audit** (`verify --published --check`) answers "is every
+  published entry still valid?" It reads every entry in
+  `bundles/published.json`, including versions that no current spec selects, and
+  checks the closed shape, sorted order, unique `path`, unique
+  `(package_id, version)`, the identity binding, that the path exists and is a
+  version directory, that the manifest's `package_id`/`version` match the entry,
+  and that the recomputed `source_package_digest` equals the recorded one. A
+  mismatch is `published-registry-invalid` (exit 1); a directory/manifest
+  version disagreement is `path-version-mismatch` (exit 1). The audit never
+  selects a package into a bundle and never changes a lock or sealed bundle. The
+  changed-path gate (§8.1) reports the underlying file edit as
+  `published-package-modified`; the audit reports the registry effect, not the
+  file edit. The audit applies the §12 per-package byte and count budgets to each
+  entry it re-reads; it has no closure aggregate because it is not a bundle.
+
+CI runs both. If only `--all --check` ran, a retired version with no selecting
+spec would never be re-hashed. If the audit were folded into `--all`, every
+bundle build would read every historical package and an unrelated retired package
+could break an old spec, which is the discovery coupling H2 removes.
 
 ### 9. The builder generates bytes and lets `fmp_model` read them
 
@@ -1399,7 +1533,7 @@ does not pretend to be `fmp/0.1` diagnostics.
 
 | Class | Examples | Exit |
 |---|---|---|
-| Deterministic rejection | manifest shape (required/optional keys), empty forms, path escape, missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, form-scope materialize stage, form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit | 1 |
+| Deterministic rejection | manifest shape (required/optional keys), empty forms, path escape or a symlink/reparse point on a package path, missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, form-scope materialize stage, form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit | 1 |
 | Host / I/O / internal | unreadable file, unwritable lock, internal invariant break, materializer `Internal`/`HostFailure` during conformance | 2 |
 | Success | build or verify passed, digest printed | 0 |
 
@@ -1410,10 +1544,11 @@ The enum names these rejections (`unsupported-capability`, `unsupported-asset`,
 `case-plan-identity`, `case-form-mismatch`, `case-error-scope`,
 `case-format-unsupported`, `case-baseline-invalid`, `case-mutation-mismatch`,
 `case-diagnostics-mismatch`, `case-expect-shape`, `form-family-mismatch`,
-`reserved-identity`, `path-version-mismatch`, `published-package-modified`,
-`published-registry-modified`, `published-registry-incomplete`,
-`published-registry-invalid`, `unmapped-package-path`, `dependency-unverified`,
-`dependency-mismatch`); they
+`reserved-identity`, `path-version-mismatch`, `path-escape`,
+`published-package-modified`, `published-registry-modified`,
+`published-registry-incomplete`, `published-registry-invalid`,
+`bundle-id-conflict`, `definition-identity-conflict`, `unmapped-package-path`,
+`dependency-unverified`, `dependency-mismatch`); they
 are `BuildError` variants, not `fmp/0.1` diagnostic codes.
 `case-materialize-fault` is the conformance harness's name for an unexpected
 `Internal`/`HostFailure`; it is never a passing case and reports exit 2, the
@@ -1617,7 +1752,20 @@ comparing the materializer with itself proves the bytes.
   be a plan-scope test but cannot cover a form.
 - Publication is recorded in an append-only registry, so a version remains
   immutable after its last spec retires. A later PR cannot reclassify an old
-  snapshot as unpublished by deleting a spec.
+  snapshot as unpublished by deleting a spec. A version can be created and first
+  published in one PR, because only base entries make it immutable, but the
+  merged snapshot is validated against the entry. A `(package_id, version)`
+  names one path and one source digest forever, so two bundles cannot publish
+  two different contents under the same logical version.
+- Bundle verification and publication-history auditing are separate commands.
+  `verify --all --check` keeps unselected packages out of a bundle build, while
+  `verify --published --check` still re-hashes retired versions. Neither can
+  silently take over the other's job.
+- The spec set has one `bundle_id` and one `(namespace, version)` per release
+  identity. Two specs cannot collide on a lock path or produce two definitions
+  that `Registry::find` cannot distinguish.
+- Package reads never follow a symlink or reparse point, so the path bound is a
+  property of the read rather than a check that a concurrent rename can defeat.
 - Digest preimages, the Level 0/Level 1 projections and the package budgets are
   frozen at the byte and key level, with a cross-language vector, so a Rust and a
   Python implementation cannot silently disagree.
@@ -1682,6 +1830,28 @@ comparing the materializer with itself proves the bytes.
   last spec would erase the evidence that a version was published, so a later PR
   could edit the old snapshot. §8.3 keeps an append-only registry that survives
   retirement.
+- **Treat any registry entry as immutability, including one added by this PR.**
+  Rejected: a version could never be created and first published in the same PR,
+  and the alternative — add the entry in a later PR — makes the entry unprovable
+  because its digest has no package yet. §8.1 protects base entries and validates
+  head-only first publications instead.
+- **Require `(package_id, version)` uniqueness only inside a bundle closure.**
+  Rejected: two internally valid specs could publish the same logical version at
+  different paths with different digests, so a plan naming the version would get
+  two different definitions depending on which bundle was loaded. The registry
+  enforces global uniqueness and a permanent path/digest binding (§8.3).
+- **Canonicalise then open each package file.** Rejected: the filesystem can
+  replace a component between the two calls. The package format forbids links and
+  reparse points inside a version directory, and a read may instead be
+  handle-relative with no-follow semantics (§3).
+- **Fold the publication-history audit into `verify --all`.** Rejected: every
+  bundle build would touch every retired package, so an unrelated old package
+  could break a current spec. The audit is its own command and never selects a
+  package (§8.4).
+- **Allow two specs to share a `bundle_id` or `(namespace, version)`.**
+  Rejected: the lock path would collide, and `Registry::find` already rejects two
+  definitions with one identity. H2 keeps release identities distinct and leaves
+  any future sharing to an explicit mapping (§8).
 - **Content-address the package directory by `source_package_digest`.** Rejected
   for H2: an author cannot know the path before writing the files, the spec
   becomes unreadable, and a digest-named path still needs a version for review.
@@ -1796,6 +1966,11 @@ comparing the materializer with itself proves the bytes.
 | Case, evidence, spec and lock byte/count budgets, including the cumulative per-package asset budget | not implemented | **unverified** — H2a |
 | Immutable published version directories, legacy target consistency, form-scope mutation coverage, complete diagnostic matching and level-specific projections | not implemented | **unverified** — H2a |
 | Published-version registry, retirement survival and registry edit detection | not implemented | **unverified** — H2a |
+| First publication in the creating PR, with base-only immutability | specified; the old base-or-head rule would have rejected the creating PR | **specified, not implemented** — H2a |
+| Global `(package_id, version)` uniqueness and the permanent path/digest binding | specified; per-closure uniqueness cannot exclude two paths for one logical version | **specified, not implemented** — H2a |
+| Cross-spec `bundle_id` and `(namespace, version)` uniqueness | `Registry::find` returns `E-DEF-001` when two definitions share `(namespace, version)` (`fmp-model/src/definition.rs` 843–865); the builder does not yet reject the pair at spec level | **unverified** — H2a |
+| No-follow package reads (no symlink or reparse point on the resolved path under `--root`) | specified; canonicalise-then-open would be a TOCTOU check, and the current implementation has no package reader at all | **specified, not implemented** — H2a |
+| Publication-history audit separate from `verify --all --check` | specified; no command exists | **unverified** — H2a |
 | Form-scope negatives are `bind`-only and point at the mutated operand | specified; `fmp-materialize/src/lib.rs` emits `E-BYTE-001` at `/instructions/0/expected_digest` after encoding, so the counterexample is real | **specified, not implemented** — H2a |
 | Dependency-closure status distinct from package structure, including transitive re-reading of a `--closure` lock, cycles and the dependent-package author path | not implemented | **unverified** — H2a |
 | Release evidence as a separate `--release-evidence` gate | not implemented | **unverified** — H2a |
@@ -1873,9 +2048,25 @@ comparing the materializer with itself proves the bytes.
 - Someone adds an `x86`/`aarch64`/`riscv` allowlist to the package builder:
   stop. The rule is `family(form_id) == isa_family`; the definition reader owns
   the set of families it can parse.
-- Someone edits a file inside a version directory already listed by a committed
-  spec: stop. That is `published-package-modified`; the author must add a sibling
-  version and the publisher selects it separately.
+- Someone edits a file inside a version directory in the **base** published
+  registry: stop. That is `published-package-modified`; the author must add a
+  sibling version and the publisher selects it separately.
+- Someone treats a head-only registry entry as immutability for the PR that adds
+  it: stop. A version must be creatable and first-publishable in one PR; only
+  base entries are frozen, and the head entry is validated against the final
+  snapshot (§8.1).
+- Someone enforces `(package_id, version)` uniqueness only inside a closure, or
+  lets a second entry reuse the pair at another path or digest: stop. The
+  registry identity is global and permanently bound to its first entry (§8.3).
+- Someone lets two specs share a `bundle_id` or a `(namespace, version)`: stop.
+  The lock path collides and `Registry::find` cannot distinguish the definitions
+  (§8).
+- Someone canonicalises then opens a package file, or accepts a symlink or
+  reparse point on the path from `--root` to the opened file: stop. The no-follow
+  bound must hold for the whole read (§3).
+- Someone audits only spec-selected entries, or folds the publication-history
+  audit into `verify --all --check`: stop. Retired versions must stay checked
+  without entering a bundle closure (§8.4).
 - Someone compares only form rows when `legacy_source` is present: stop. The
   package's `definition_format` and full `target_identity` must equal the pinned
   document, or the migration is not proven.
