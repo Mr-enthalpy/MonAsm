@@ -5,23 +5,26 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: third revision, 2026-11-14, after a further P1/P2 audit:
-  immutable published version directories, legacy target consistency, form-scope
-  negative coverage with a complete diagnostic set, a cumulative per-package
-  asset budget, aligned form/case limits, frozen digest preimage bytes with a
-  cross-language vector, exact Level 0/Level 1 projections, and a dependency
-  closure status separate from package structure.
+- Revision: fifth revision, 2026-11-16, after a further P1/P2 audit:
+  form-scope negatives are `bind`-only and must name the mutated operand; the
+  published-version registry is a permanent append-only record so retirement
+  cannot erase immutability; spec package order is strictly validated; closure
+  verification is transitive; release evidence is a separate
+  `--release-evidence` gate; and evidence edits after publication require a new
+  version.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
-  `monasm-lock/0.1` and `monasm-bundle/0.1` formats; immutable published package
-  version directories; the digest layering and its byte-level preimages; package
+  `monasm-lock/0.1`, `monasm-bundle/0.1` and `monasm-published/0.1` formats;
+  immutable published package version directories and their append-only
+  registry; the digest layering and its byte-level preimages; package
   target self-description and migration provenance, including legacy target
   consistency; the standalone definition identity used by `verify --package`; the
-  mandatory package case and evidence gate with form-scope mutation and complete
-  diagnostic sets; exact Level 0/Level 1 machine-output projections; package
-  target requirements versus bundle target selection; package/form ISA-family
-  consistency; package ownership and conflict rules; which legacy definition
-  version a re-homed form is compared against; the builder's error and exit
-  behaviour; and the boundary between H2 and H3/H4
+  mandatory package case and evidence gate with `bind`-only form-scope mutation
+  and complete diagnostic sets; exact Level 0/Level 1 machine-output projections;
+  package target requirements versus bundle target selection; package/form
+  ISA-family consistency; package ownership and conflict rules; which legacy
+  definition version a re-homed form is compared against; transitive dependency
+  closure and release-evidence status; the builder's error and exit behaviour;
+  and the boundary between H2 and H3/H4
 - Supersedes: none
 - Superseded by: none
 - Revises: `docs/architecture/he1-h2-plan.md` (adopts `H2-D1`–`H2-D12` with the
@@ -181,27 +184,43 @@ names can change afterwards. The layout therefore makes the version component
 the immutability boundary:
 
 - a `packages/<target>/<package>/<version>/` directory is a **source snapshot**;
-- once any committed `bundles/specs/*.json` lists that path, the snapshot is
-  **published**;
+- a version is **published** when its entry is committed to
+  `bundles/published.json` (§8.3). The publisher adds that entry in the same PR
+  that first selects the version in a `bundles/specs/*.json`; the registry entry,
+  not the current spec set, is the permanent record;
 - after publication, no file under that directory may be added, modified,
-  renamed or deleted — including `README`, `NOTICE` and `evidence/`. A change is
-  `published-package-modified` (exit 1);
+  renamed or deleted — including `README`, `NOTICE`, `evidence/` and
+  `tests/cases.json`. A change is `published-package-modified` (exit 1);
 - new forms, fixed encodings or new evidence require a new sibling directory
   `packages/<target>/<package>/<new-version>/`, with its own manifest version and
-  digest. The old directory stays byte-for-byte in place, so every old lock and
-  sealed bundle can still be rebuilt by `verify --all --check`;
-- updating a spec to select the new version, and regenerating its lock/sealed
-  bundle, is a separate publisher decision. An ordinary package change does not
-  edit any spec, lock or sealed bundle;
-- removing a spec retires a release but does not delete the snapshot. H2 does not
-  add an archival or deletion tool; retiring the bytes themselves needs a later
-  ADR.
+  digest. The old directory stays byte-for-byte in place: while its selecting
+  spec remains in the head tree, `verify --all --check` still rebuilds the old
+  lock and sealed bundle; after the last spec is retired, the snapshot, lock and
+  sealed bundle remain committed and replayable at the old commit, but the
+  head-tree `--all` run no longer has a selection for them;
+- updating a spec to select the new version, adding the new registry entry and
+  regenerating its lock/sealed bundle is a separate publisher decision. An
+  ordinary package change does not edit any spec, lock, sealed bundle or
+  registry entry;
+- removing a spec retires a release but deletes neither the snapshot nor its
+  registry entry. H2 does not add an archival or deletion tool; retiring the
+  bytes themselves needs a later ADR.
 
 The CI changed-path gate resolves each `packages/**` change in the head tree and,
-for a deletion, in the base tree. If the resolved snapshot is published and any
-of its files changed, the gate fails before `verify --package` runs (§8.1).
-Deleting or renaming a published version directory is the same rejection, not a
-silent package removal.
+for a deletion, in the base tree. It then asks the **published registry** (§8.3),
+not the current spec set, whether that snapshot is published. If so, any changed
+file fails the gate before `verify --package` runs (§8.1). Deleting or renaming a
+published version directory is the same rejection, not a silent package removal.
+This closes the two-step bypass: a first PR may retire the last spec, but the
+registry entry remains, so a later PR that edits the old directory is still
+rejected.
+
+Evidence is part of the snapshot. Before publication, editing `tests/cases.json`
+or a listed evidence file moves `evidence_digest` and `release_digest` while
+leaving `definition_digest` alone (§7.1). After publication, the same edit is a
+snapshot change (`published-package-modified`) and requires a new version, with
+its own manifest and source digest. The "evidence-only" test therefore applies
+to an unpublished candidate, never to a published directory.
 
 Counterexample if this rule were absent: a package version `0.1.0` with digest
 `D0` is selected by an old spec. An author adds a form in place and moves the
@@ -367,13 +386,16 @@ asset files (`form`, `type`, `profile`) enter the source digest;
   before opening the manifest (`path-version-mismatch`).
 
 `packages` **is the full closure**, not a set of roots. The builder opens
-exactly these paths and nothing else. Each package's `dependencies` are
-verification edges: every edge must resolve to a listed `(package_id, version)`
-with exactly the listed `source_package_digest`. An edge to a package outside
-the list is a missing-dependency error, never a scan trigger. Two entries with
-the same `(package_id, version)` or the same `path` are rejected even when their
-content is identical; identity is a release fact, not a content comparison. At
-most one version of a `package_id` may appear: two versions are rejected even
+exactly these paths and nothing else. The array is strictly ordered by
+`(package_id, version)`; a reversed or duplicate entry is rejected before any
+manifest is opened, never normalised into an equivalent spec. Each package's
+`dependencies` are verification edges: every edge must resolve to a listed
+`(package_id, version)` with exactly the listed `source_package_digest`. An edge
+to a package outside the list is a missing-dependency error, never a scan
+trigger. Two entries with the same `(package_id, version)` or the same `path` are
+rejected even when their content is identical; identity is a release fact, not a
+content comparison. At most one version of a `package_id` may appear: two
+versions are rejected even
 when their exports are disjoint, because the lock would record two owners for
 one release identity. A listed package that nothing depends on is a legal root;
 reachability is not required.
@@ -528,10 +550,19 @@ order inside a row is preserved: that order carries bit-field meaning, and the
 builder must not reorder it. This is **package-set normalisation**, not program
 layout: instruction, fragment, section and fixup order stay the plan's.
 
-The spec's package order and directory-discovery order never enter the digest;
-the builder sorts the closure by `(package_id, version)` first. Counterexample:
-if spec order entered the digest, A+B and B+A would produce two bundle
-identities for one execution fact (`HE-T16`).
+The spec is a closed document whose `packages` array is already sorted by
+`(package_id, version)` (§8.2). A different order is a different, invalid
+document and is rejected; the builder never accepts and re-sorts an alternate
+spelling. Directory-discovery order and internal set iteration never enter the
+digest: the builder validates the declared order and hashes the sorted closure.
+Counterexample: if a reversed spec were accepted as an equivalent input, the
+format would have two legal spellings for one closure (`HE-T16`). H2 proves
+order-independence by building the same legal spec under different creation and
+read orders, not by accepting B+A as a second spec.
+
+A published package version is also recorded in the append-only registry of
+§8.3, so moving or reordering registry entries is rejected rather than treated
+as another way to name the same release.
 
 ### 7. Digest layers, each with its own domain separator
 
@@ -633,7 +664,9 @@ that keeps execution identity stable while making the audit trail reviewable.
 
 A package is **release-ready** when a committed spec lists it, when it is
 checked with `verify --package --release`, or when `verify --all --check`
-rebuilds it. For a release-ready package the builder requires:
+rebuilds it. `verify --package --release-evidence` enforces exactly this section
+without claiming the dependency closure; `--release` adds the closure check of
+§8. For a release-ready package the builder requires:
 
 - `evidence/manifest.json` present and matching the shape above;
 - `files` listing `tests/cases.json`, `NOTICE` (licence and attribution) and
@@ -661,8 +694,8 @@ exists inside the package and equals the case's own `evidence.sha256`; it
 computes no `evidence_digest`, and does not require `NOTICE`, `sources` or
 `oracle.status`. A manifest that is present is authoritative even in
 development mode: every case evidence must be listed and match, or the package
-is `case-evidence-mismatch`. `--release` with no manifest is
-`evidence-incomplete` (exit 1), never a silent downgrade. Structure, assets,
+is `case-evidence-mismatch`. `--release-evidence` or `--release` with no manifest
+is `evidence-incomplete` (exit 1), never a silent downgrade. Structure, assets,
 `read` and the case contract are identical in the two modes; only this
 release-evidence set differs.
 
@@ -741,44 +774,61 @@ arrays, reserved-asset emptiness, the capability allowlist, the declared
 `tests/cases.json` contract (§9.1). It does not execute the cases; the
 conformance harness does. It does not check ownership conflicts across packages,
 because that needs a closure. It does not prove that a published snapshot is
-unchanged; that is the changed-path gate in §8.1. `--release` additionally
-enforces §7.1. None of these adds a subcommand to `fmp`.
+unchanged; that is the changed-path gate in §8.1. `--release-evidence` and
+`--release` additionally enforce §7.1. None of these adds a subcommand to `fmp`.
 
-**Structure and dependency closure are separate statuses.** Every
-`verify --package` run reports both `structure` and `dependency_closure`.
+**Structure, release evidence and dependency closure are separate statuses.**
+Every `verify --package` run reports both `structure` and `dependency_closure`.
 `structure: verified` means the manifest, assets, `read`, cases and evidence
 passed. `dependency_closure: verified` is possible only when the invocation also
 supplies an explicit closure: `verify --all` uses the spec closure, and
 `verify --package --closure <lock>` reads one selected lock. With no closure
 input, a package whose `dependencies` array is empty is trivially
 `dependency_closure: verified` (there is nothing to resolve), while a package
-with a non-empty array is `dependency_closure: unverified`. In `--release` mode
-the latter is `dependency-unverified` (exit 1); a development run exits 0 for
-the structure claim but prints the unverified status. The standalone identity
-never depends on the closure, so this status cannot change
-`source_package_digest` or the generated `definition_digest`.
+with a non-empty array is `dependency_closure: unverified`.
 
-Supplying a closure does not mean trusting the file that names it. For every
-dependency, `verify --package --closure <lock>` opens the lock entry's `path`
-under the same bounds as any package input (§12.1), recomputes that package's
-`source_package_digest` from its actual manifest and assets, and requires the
-recomputed value to equal both the lock entry and the depending package's
-`dependencies[].source_package_digest`. A disagreement is `dependency-mismatch`
-(exit 1). `verify --all --check` performs the same recomputation from the spec
-closure. A hand-written lock or spec digest therefore cannot mint
-`dependency_closure: verified`; only re-reading the bytes can. H2 packages
-declare no dependencies; the split and the re-read rule exist so a later shared
-package cannot pass `--release` by asserting an edge it never resolved.
+Release evidence is orthogonal. `verify --package --release-evidence` enforces
+the complete §7.1 set (`NOTICE`, sources, oracle status, hashed case evidence and
+`tests/cases.json`) without claiming a dependency closure. `--release` means
+`--release-evidence` plus a verified closure: for a non-empty dependency array,
+`--release` without `--closure` is `dependency-unverified` (exit 1), while
+`--release-evidence` still exits 0 and prints `dependency_closure: unverified`.
+A plain development run checks the case's own hashes (§7.1) and may also exit 0.
+The standalone identity never depends on the closure, so neither status can
+change `source_package_digest` or the generated `definition_digest`.
+
+Supplying a closure does not mean trusting the file that names it. Closure
+verification is **transitive**, not a direct-dependency check. Starting from the
+selected package, for every `dependencies` entry, the verifier:
+
+1. resolves the exact `(package_id, version)` entry in the lock or spec closure;
+2. opens that entry's `path` under the same bounds as any package input (§12.1);
+3. recomputes the package's `source_package_digest` from its manifest and
+   assets, and requires equality with the closure entry and the depending
+   package's declared digest;
+4. recurses into that package's own `dependencies`, repeating until every
+   reached package has been checked.
+
+The lock or spec must therefore contain the whole transitive closure, not just
+the direct edges. A missing entry, a package absent from `path`, a duplicate
+identity with a different digest, a cycle, or any digest disagreement is
+`dependency-mismatch` (exit 1). `verify --all --check` performs the same
+recursive recomputation from the spec closure. A hand-written lock or spec digest
+therefore cannot mint `dependency_closure: verified`; only re-reading the bytes
+can. H2 packages declare no dependencies; the split and the re-read rule exist so
+a later shared package cannot pass `--release` by asserting an edge it never
+resolved.
 
 Lock and sealed bundle are committed release artifacts. CI runs
 `fmp-definition verify --all --check`, rebuilds each spec in memory, compares the
 sealed bundle byte-for-byte and the lock byte-for-byte **except `builder`**. The
 changed-path job runs `verify --package <changed>` (structure) for every changed
-package and the `package_conformance` test; a package whose `dependencies` is
+package, `verify --package --release-evidence <changed>` for every changed
+package, and the `package_conformance` test. A package whose `dependencies` is
 empty also runs `verify --package --release <changed>`, so an ordinary
 independent extension is held to the complete evidence bar before any publisher
-selects it. A package with dependencies is not rejected merely for lacking a
-spec: its release evidence and closure are verified when a spec selects it
+selects it. A package with dependencies still gets the full evidence gate
+through `--release-evidence`; its closure is verified when a spec selects it
 (`--all --check`), or when the author runs `--release --closure <lock>` with an
 explicit local closure. That distinction is what lets an ordinary dependent
 package land without editing a global spec, while no dependent package can be
@@ -802,16 +852,19 @@ their own rules, or a package can leave the gate silently:
 - **Modified or added file:** resolve the nearest ancestor `package.json` in the
   head tree. Its directory must be a version directory whose name equals the
   manifest's `version`; a mismatch is `path-version-mismatch` (exit 1). If none
-  exists, fail with `unmapped-package-path` (exit 1); do not skip the path. If the
-  base tree has the same version directory and any spec lists it, the snapshot is
-  published and any modification is `published-package-modified` (exit 1).
+  exists, fail with `unmapped-package-path` (exit 1); do not skip the path. If
+  the version directory appears in the **base or head published registry**
+  (§8.3), the snapshot is published and any modification is
+  `published-package-modified` (exit 1). A spec that no longer lists the path
+  does not clear this check.
 - **Deleted file or directory:** resolve the version directory in the **base**
-  tree. If that directory is published, any deletion inside it — including
-  `package.json`, `NOTICE` or a form — is `published-package-modified` (exit 1);
-  it is never a silent removal. If it is unpublished, the deletion is allowed
-  only when the same PR removes or updates every spec that lists it, and
-  `verify --all --check` proves no live reference remains. A deletion of an
-  unpublished root that a spec still lists fails the build.
+  tree. If that directory is in the base or head registry, any deletion inside
+  it — including `package.json`, `NOTICE`, `tests/cases.json` or a form — is
+  `published-package-modified` (exit 1); it is never a silent removal. If it is
+  unpublished, the deletion is allowed only when the same PR removes or updates
+  every spec that lists it, and `verify --all --check` proves no live reference
+  remains. A deletion of an unpublished root that a spec still lists fails the
+  build.
 - **Rename or move:** check both the old and the new root. Moving a published
   version directory is `published-package-modified` (exit 1); a new version is a
   new sibling directory, not a move. Moving an unpublished package directory
@@ -823,6 +876,12 @@ their own rules, or a package can leave the gate silently:
 - **A `packages/**` change that produces no package root** (for example a stray
   file directly under `packages/`, or a deletion whose base root cannot be
   found) is `unmapped-package-path`, exit 1. It is never silently ignored.
+- **A `bundles/published.json` change** is checked against the base registry:
+  removing, editing, reordering or replacing an entry is
+  `published-registry-modified` (exit 1); appending an entry is legal only when
+  it is sorted, selected by a head spec and matches the package, otherwise
+  `published-registry-invalid` (exit 1). A selected head path without an entry
+  is `published-registry-incomplete` (exit 1).
 
 The CI path list remains an input to which packages are checked, never an input
 to what the builder selects. Deleting an unselected package still runs the
@@ -839,8 +898,10 @@ carries a distinct format identifier.
 **Spec** (`monasm-bundle-spec/0.1`) has exactly `bundle_format`, `bundle_id`,
 `target`, `definition_format`, `namespace`, `version`, `packages`.
 `target` has exactly `profile_id`, `identity`; `identity` has exactly the six
-keys in §4.1. `packages` is non-empty, sorted by `(package_id, version)`, and
-each entry has exactly `package_id`, `version`, `path`, `source_package_digest`.
+keys in §4.1. `packages` is non-empty, strictly sorted by `(package_id,
+version)` with no duplicates, and each entry has exactly `package_id`, `version`,
+`path`, `source_package_digest`. A reversed or equal-key entry is rejected; the
+builder never re-sorts an alternate spelling.
 
 ```json
 {
@@ -920,6 +981,59 @@ committed lock carries `evidence_digest` (§7.1), so a released bundle's
 `release_digest` includes it and differs from this development-shape value. The
 vector fixes the preimage shape and the omitted-key spelling, not a releasable
 bundle's final identity.
+
+#### 8.3 The published-version registry is the permanent immutability record
+
+`bundles/published.json` is a closed, append-only registry. It is maintained by
+the release process, not by an ordinary package author, and it is the permanent
+answer to "was this version ever published?", independent of the current specs.
+
+```json
+{
+  "published_format": "monasm-published/0.1",
+  "published": [
+    {
+      "path": "packages/x86_64/example/0.1.0",
+      "package_id": "monasm.x86.example",
+      "version": "0.1.0",
+      "source_package_digest": "sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0"
+    }
+  ]
+}
+```
+
+The object has exactly `published_format` and `published`. Each entry has
+exactly `path`, `package_id`, `version` and `source_package_digest`; entries are
+sorted strictly by `path` and unique. `published` may be empty. Unknown or
+duplicate keys are rejected (`INV-07`).
+
+- A version is **published** iff its `path` is in the head registry. The current
+  spec set does not decide publication after the fact.
+- A publisher adds the registry entry in the same PR that first selects the
+  version in a spec. `verify --all --check` requires every head-selected path to
+  have a head entry; a missing entry is `published-registry-incomplete`
+  (exit 1). An entry present in the base tree may remain after every spec
+  retires, and must remain.
+- A base entry may not be removed, edited, reordered or replaced. Any change to
+  the registry other than appending a new entry in sorted position is
+  `published-registry-modified` (exit 1). A new entry must be selected by at
+  least one head spec and must match the package at its `path`; otherwise it is
+  `published-registry-invalid` (exit 1).
+- Each entry's `source_package_digest` must equal the digest recomputed from the
+  package at `path`. A mismatch is `published-registry-invalid` (exit 1), and
+  any byte change under that path is also `published-package-modified` (exit 1).
+- The registry is a publication fact, not a selection input. It does not enter
+  `source_package_digest`, `definition_digest`, `bundle_digest` or
+  `release_digest`, and it can never add a package to a bundle.
+- Retiring a release removes a spec but never removes the snapshot or its
+  registry entry. Deleting both in one PR is `published-registry-modified`, not
+  a legal retirement.
+
+Counterexample if the registry were replaced by "the current specs": PR A
+removes the last spec that selects `0.1.0/`, then PR B modifies that directory.
+Both the base and head trees of PR B contain no selecting spec, so a spec-only
+check would call the snapshot unpublished and accept the edit. The registry
+entry survives PR A, so PR B still fails `published-package-modified`.
 
 ### 9. The builder generates bytes and lets `fmp_model` read them
 
@@ -1101,6 +1215,25 @@ projection is compared after `materialize`.
   other difference, a no-op mutation, or a mutation that changes `form_id` is
   `case-mutation-mismatch` (exit 1). This stops an author from changing half the
   plan and calling the result a form test.
+- A `scope: "form"` case must be rejected by **`bind`**, so its
+  `expect_error.stage` must be `bind`. `stage: "materialize"` on a form-scope
+  case is `case-error-scope` (exit 1). Post-encode assertions are not
+  operand-legality evidence.
+- At least one declared `(code, path)` must point at the mutated operand
+  surface: `path` equals `mutates`, or is a prefix of `mutates` bounded at a `/`
+  and no shorter than `/instructions/0/operands/<n>` (the operand object, its
+  payload object or its modifiers array). A diagnostic only at
+  `/instructions/0/expected_digest`, `/expected_size`, `/definition_identity` or
+  another instruction field is `case-error-scope` (exit 1) and does not count as
+  form coverage.
+- A form-scope case may not declare `E-BYTE-001` or `E-SIZE-001`. Those check
+  emitted bytes or size, not whether an operand is legal. The concrete
+  counterexample is a legal `reg = 0` → `reg = 1` mutation that leaves the old
+  `expected_digest`: `bind` accepts it, encoding produces different bytes and
+  materialization returns `E-BYTE-001` at
+  `/instructions/0/expected_digest` (`fmp-materialize/src/lib.rs`,
+  `expected_digest` check). Such a case is `scope: "plan"` or invalid as
+  form-scope; it must not satisfy `uncovered-form`.
 
 `expect_error` is a closed object over exactly `stage` and `diagnostics`:
 
@@ -1127,15 +1260,19 @@ The observed set is the full array returned for that stage:
   diagnostics. Any array, including an empty one, is compared as-is.
 - `stage: "materialize"`: `bind` must return zero diagnostics. Only
   `PostEncodeAssertion(diagnostics)` can satisfy the case; `Internal` or
-  `HostFailure` is `case-materialize-fault` (exit 2), never a pass.
+  `HostFailure` is `case-materialize-fault` (exit 2), never a pass. This stage is
+  legal only for `scope: "plan"`; a form-scope case using it is
+  `case-error-scope` (exit 1).
 
 For `scope: "form"`, every declared and observed path must be `/instructions/0`
 or start with `/instructions/0/`; any other path is `case-error-scope` (exit 1).
-For `scope: "plan"` any path is allowed. A wildcard, "any error", or a root-level
-error such as a wrong `format_version` therefore cannot satisfy a form's
-negative coverage. Coverage is counted only from `scope: "form"` negatives:
-every exported form needs at least one positive and at least one such negative,
-or the package is `uncovered-form`.
+In addition, the required set must contain at least one path on the mutated
+operand surface as defined above. A wildcard, "any error", a root-level error
+such as a wrong `format_version`, or an `E-BYTE-001`/`E-SIZE-001` artifact
+assertion therefore cannot satisfy a form's negative coverage. For
+`scope: "plan"` any path is allowed. Coverage is counted only from `scope:
+"form"` negatives: every exported form needs at least one positive and at least
+one such negative, or the package is `uncovered-form`.
 
 A positive case records the exact machine-output projection defined in §15:
 Level 0 is `{format_version, level, bytes_hex, size, fixups}`; Level 1 is
@@ -1170,10 +1307,12 @@ bundle digest, so it does not reopen `HE-AC-05`.
 
 **CI.** `cargo test -p fmp-definition --test package_conformance` runs in the
 workspace gate and covers every package, including one no spec selects.
-`cargo run -p fmp-definition -- verify --package --release <changed>` runs for a
-changed package whose `dependencies` is empty; a dependent package is
-release-verified through `--all --check` or an explicit `--closure` (§8), so the
-author gate does not require a global spec edit. A structurally valid row whose
+`cargo run -p fmp-definition -- verify --package --release-evidence <changed>`
+runs for every changed package, so a dependent package still gets the complete
+evidence bar. A package whose `dependencies` is empty also runs
+`--release <changed>`; a dependent package is release-verified through
+`--all --check` or an explicit `--closure` (§8), so the author gate does not
+require a global spec edit. A structurally valid row whose
 opcode was flipped fails the positive case's byte comparison even when `read`
 accepts it. If an author also edits the expected bytes, the case must cite
 independent evidence, and §7.1 checks that the evidence is present, listed and
@@ -1183,7 +1322,8 @@ record is what a second party audits.
 
 `verify --package` alone checks structure, manifest, cases and evidence; it does
 not encode, so it cannot by itself distinguish two opcodes. The merge gate is the
-**pair**: `verify --package --release` and `package_conformance` on the same
+**pair**: `verify --package --release-evidence` and `package_conformance` on the
+same
 changed package. A package that passes the first and fails the second does not
 pass the gate, and the ordinary-extension CI job fails. This split is what keeps
 the product binary's dependency graph at `fmp-model` only; it is not a weaker
@@ -1220,7 +1360,11 @@ as one operand-surface mutation. It does not define:
   operands; a zero-operand form needs a new case model, not a plan-scope
   negative disguised as coverage;
 - multi-instruction plans or paired-fixup scenarios (H4): the one-instruction
-  rule is part of this format, not an implementation shortcut.
+  rule is part of this format, not an implementation shortcut;
+- post-encode artifact assertions (H4): a form-scope negative must be a `bind`
+  rejection at the mutated operand; `E-BYTE-001`/`E-SIZE-001` and fixup
+  assertions are plan-scope evidence or need a later scenario model, never form
+  coverage.
 
 The case document declares `cases_format`; the builder rejects any value other
 than `monasm-cases/0.1` with `case-format-unsupported` (exit 1). H3/H4 must add
@@ -1255,7 +1399,7 @@ does not pretend to be `fmp/0.1` diagnostics.
 
 | Class | Examples | Exit |
 |---|---|---|
-| Deterministic rejection | manifest shape (required/optional keys), empty forms, path escape, missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit | 1 |
+| Deterministic rejection | manifest shape (required/optional keys), empty forms, path escape, missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, form-scope materialize stage, form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit | 1 |
 | Host / I/O / internal | unreadable file, unwritable lock, internal invariant break, materializer `Internal`/`HostFailure` during conformance | 2 |
 | Success | build or verify passed, digest printed | 0 |
 
@@ -1267,7 +1411,9 @@ The enum names these rejections (`unsupported-capability`, `unsupported-asset`,
 `case-format-unsupported`, `case-baseline-invalid`, `case-mutation-mismatch`,
 `case-diagnostics-mismatch`, `case-expect-shape`, `form-family-mismatch`,
 `reserved-identity`, `path-version-mismatch`, `published-package-modified`,
-`unmapped-package-path`, `dependency-unverified`, `dependency-mismatch`); they
+`published-registry-modified`, `published-registry-incomplete`,
+`published-registry-invalid`, `unmapped-package-path`, `dependency-unverified`,
+`dependency-mismatch`); they
 are `BuildError` variants, not `fmp/0.1` diagnostic codes.
 `case-materialize-fault` is the conformance harness's name for an unexpected
 `Internal`/`HostFailure`; it is never a passing case and reports exit 2, the
@@ -1284,7 +1430,7 @@ robustness:
 - manifest ≤ 1 MiB; form, type or profile file ≤ 1 MiB;
 - `tests/cases.json` ≤ 16 MiB; `evidence/manifest.json` ≤ 1 MiB; a spec or lock
   ≤ 1 MiB each; the pinned legacy definition file read for row comparison
-  ≤ 16 MiB;
+  ≤ 16 MiB; `bundles/published.json` ≤ 16 MiB and ≤ 65 536 entries;
 - exported forms per package ≤ 1024; declared assets per package ≤ 2048; cases
   per package ≤ 4096; evidence files per package ≤ 4096;
 - manifest plus declared asset bytes per package ≤ 16 MiB, enforced by the
@@ -1295,7 +1441,7 @@ robustness:
   total evidence files per closure ≤ 65 536;
 - one path ≤ 1024 bytes; dependency depth ≤ 64;
 - JSON nesting depth ≤ 64 for every manifest, form/type/profile file, case file,
-  evidence manifest, spec and lock the builder parses.
+  evidence manifest, spec, lock and the published registry the builder parses.
 
 The form/case counts are aligned: 1024 forms need at least 2048 cases (one
 positive and one `scope: "form"` negative each), and the 4096-case limit leaves
@@ -1465,19 +1611,24 @@ comparing the materializer with itself proves the bytes.
   pinned legacy document's. A deliberately retargeted package is rejected rather
   than inferred from matching rows.
 - Form coverage is an illegal-neighbourhood claim, not a count. A negative case
-  must name a positive baseline, mutate exactly one operand field, and match the
-  complete observed `(code, path)` set; a wrong `expected_digest` may be a
-  plan-scope test but cannot cover a form.
+  must name a positive baseline, mutate exactly one operand field, be rejected by
+  `bind`, and name a diagnostic on the mutated operand or its parent object. A
+  wrong `expected_digest` or an `E-BYTE-001`/`E-SIZE-001` artifact assertion may
+  be a plan-scope test but cannot cover a form.
+- Publication is recorded in an append-only registry, so a version remains
+  immutable after its last spec retires. A later PR cannot reclassify an old
+  snapshot as unpublished by deleting a spec.
 - Digest preimages, the Level 0/Level 1 projections and the package budgets are
   frozen at the byte and key level, with a cross-language vector, so a Rust and a
   Python implementation cannot silently disagree.
 - A development package can be structure-verified without `NOTICE`, `sources` or
-  an evidence manifest; `--release` and spec selection still require the complete
-  set, so the weaker mode never becomes a release claim. The case's own hash is
-  checked against raw file bytes in either mode.
-- A package with dependencies is not blocked by the author gate: structure and
-  conformance run without a spec, while release verification requires a spec
-  closure or `--closure <lock>` and re-reads every dependency. Asserting a
+  an evidence manifest; `--release-evidence`, `--release` and spec selection
+  require the complete set, so the weaker mode never becomes a release claim.
+  The case's own hash is checked against raw file bytes in either mode.
+- A package with dependencies is not blocked by the author gate: structure,
+  conformance and the full evidence set run without a spec, while release
+  verification additionally requires a spec closure or `--closure <lock>` and
+  re-reads the whole transitive dependency graph. Asserting a
   digest in a hand-written lock is not enough to claim the closure.
 - A zero-form package is rejected as `empty-package`; the manifest never
   advertises an object that `definition::read` cannot build. Type-only packages
@@ -1527,14 +1678,19 @@ comparing the materializer with itself proves the bytes.
   package change.** Rejected: an ordinary author would again edit global specs and
   locks, which is the coordination H2 exists to remove. The version directory is
   the immutability boundary.
+- **Use the current spec set as the publication record.** Rejected: retiring the
+  last spec would erase the evidence that a version was published, so a later PR
+  could edit the old snapshot. §8.3 keeps an append-only registry that survives
+  retirement.
 - **Content-address the package directory by `source_package_digest`.** Rejected
   for H2: an author cannot know the path before writing the files, the spec
   becomes unreadable, and a digest-named path still needs a version for review.
   The version directory pins the same snapshot with a human-reviewable name.
 - **Accept any negative error as form coverage.** Rejected: a wrong
-  `expected_digest` or a root-level format error would satisfy the count without
-  touching an operand or modifier. Coverage requires a baseline mutation and
-  `scope: "form"` (§9.1).
+  `expected_digest`, an `E-SIZE-001` at `expected_size`, or a root-level format
+  error would satisfy the count without touching an operand or modifier.
+  Coverage requires a baseline mutation, a `bind` rejection and a diagnostic on
+  the mutated operand surface (§9.1).
 - **Treat an absent `symbols` key as `[]`.** Rejected: it hides whether
   `include_symbol_table` was honoured and makes the harness normalise two
   different artifacts into one (§15).
@@ -1547,9 +1703,9 @@ comparing the materializer with itself proves the bytes.
   before reporting `dependency_closure: verified` (§8).
 - **Require the full release evidence manifest from every development package.**
   Rejected: it makes an ordinary author assemble `NOTICE`, sources and oracle
-  status before the package can be structure-checked, while `--release` already
-  enforces the complete set. Development mode checks the case's own hash; a
-  present manifest is still authoritative (§7.1).
+  status before the package can be structure-checked, while `--release-evidence`
+  (and `--release`) already enforces the complete set. Development mode checks
+  the case's own hash; a present manifest is still authoritative (§7.1).
 - **Allow a formless package because `definition::read` could be bypassed.**
   Rejected: `read` is the only definition authority, and it rejects an empty
   `forms` array. A formless manifest would advertise an object no H2 build can
@@ -1639,7 +1795,10 @@ comparing the materializer with itself proves the bytes.
 | Evidence completeness, `evidence_digest` and `release_digest`, including development-mode direct case hashing versus the release manifest | not implemented | **unverified** — H2a owns the mechanism; H2b adds assets only |
 | Case, evidence, spec and lock byte/count budgets, including the cumulative per-package asset budget | not implemented | **unverified** — H2a |
 | Immutable published version directories, legacy target consistency, form-scope mutation coverage, complete diagnostic matching and level-specific projections | not implemented | **unverified** — H2a |
-| Dependency-closure status distinct from package structure, including re-reading a `--closure` lock and the dependent-package author path | not implemented | **unverified** — H2a |
+| Published-version registry, retirement survival and registry edit detection | not implemented | **unverified** — H2a |
+| Form-scope negatives are `bind`-only and point at the mutated operand | specified; `fmp-materialize/src/lib.rs` emits `E-BYTE-001` at `/instructions/0/expected_digest` after encoding, so the counterexample is real | **specified, not implemented** — H2a |
+| Dependency-closure status distinct from package structure, including transitive re-reading of a `--closure` lock, cycles and the dependent-package author path | not implemented | **unverified** — H2a |
+| Release evidence as a separate `--release-evidence` gate | not implemented | **unverified** — H2a |
 | Closed spec/lock/sealed shapes, `builder` omission and the lock drift projection | not implemented | **unverified** — H2a |
 | `empty-package` rejection and the rejection of `monasm-cases/0.1` for `fmp/0.2`/zero-operand cases | not implemented | **unverified** — H2a |
 | Pre-parse JSON depth rejection | not implemented; H0 probe only shows the existing recursive parser can overflow | **unverified** — H2a must add the iterative budget |
@@ -1673,11 +1832,18 @@ comparing the materializer with itself proves the bytes.
 - Someone uses `verify --all` as the only package gate: stop. It enumerates
   specs, so a new unselected package would never be verified.
 - Someone lets a development package skip its case hash check, or lets
-  `--release` proceed without an evidence manifest: stop. Development mode checks
-  the case's own `sha256`; release mode requires the complete set (§7.1).
+  `--release-evidence`/`--release` proceed without an evidence manifest: stop.
+  Development mode checks the case's own `sha256`; the release gates require the
+  complete set (§7.1).
 - Someone reports `dependency_closure: verified` from a lock or spec digest
-  without re-reading the dependency bytes: stop. That is the hand-written-lock
-  failure §8 rejects.
+  without re-reading the dependency bytes, or checks only direct dependencies:
+  stop. §8 requires a transitive re-read.
+- Someone decides "published" from the current specs instead of
+  `bundles/published.json`: stop. The two-step retirement bypass is the
+  counterexample (§8.3).
+- Someone counts an `E-BYTE-001`/`E-SIZE-001` materialize failure, or any
+  diagnostic not on the mutated operand, as form coverage: stop. Form-scope
+  negatives are `bind` rejections at the mutated operand surface (§9.1).
 - Someone accepts an empty `exports.forms` because the merged document would
   "still read": stop. `definition::read` rejects it; the package is
   `empty-package` (§1).
