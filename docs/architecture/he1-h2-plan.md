@@ -1,7 +1,7 @@
 # H2 实施计划：目标包作者层与确定性定义构建
 
 - 状态：**待审提案**（2026-11-16；同日按八轮审计 P1/P2 修订，2026-11-17 按
-  第九轮审计修订）。规范决策见
+  第九轮、第十轮审计修订）。规范决策见
   `docs/adr/0128-package-and-bundle-contract.md`，该 ADR 仍为 `proposed`；
   评审合并前本文和 ADR 都不是冻结依据。本文保留为实施计划与验收映射。
   **H2 尚未实现，本文不把任何 H2/H3/H4/H5 项目算作已完成。**
@@ -240,12 +240,27 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
     `COM1`–`COM9`、`LPT1`–`LPT9`，大小写不敏感，带扩展名也算）；非法是
     `path-lexical`（退出码 1），不是「某个平台打开失败」（退出码 2）。证据
     清单中的固定名 `README.md`/`NOTICE` 保留大写，不受小写规则约束。
-  - 声明路径按 ASCII 大小写折叠比较；同包或同闭包内两条折叠后相同的路径是
-    `path-lexical`。语法本身只允许小写，因此合法文档不会触发；这条规则把拒绝
-    理由固定为折叠，而不是「文件刚好能打开」。`README.md`/`NOTICE` 不是声明
-    路径，不受小写规则约束。
+  - 声明路径的冲突比较有**两个命名空间**（第十轮 P1-1）。包内资产与证据路径
+    相对于各自的 `packages/<target>/<package>/<version>/`：同包内按**相对字符串**
+    ASCII 大小写折叠比较；跨闭包只按 `packages[].path` 与该相对路径拼接后的
+    **仓库根相对路径**比较。不同包根下的同名相对路径不冲突，是合法组合：
+    `packages/x86_64/alu/0.1.0/forms/add.json` 与
+    `packages/x86_64/vector/0.1.0/forms/add.json` 是两个文件，规范固定位置的
+    `tests/cases.json` 同理。只有两个被选中的包根折叠成同一仓库路径（如
+    `packages/x86_64/alu/0.1.0` 与 `packages/x86_64/ALU/0.1.0`）或同一 `path`
+    被列两次才是 `path-lexical`。语法本身只允许小写，因此合法文档不会触发折叠；
+    这条规则把拒绝理由固定为折叠，而不是「文件刚好能打开」。`README.md`/`NOTICE`
+    不是声明路径，不受小写规则约束。
   - 路径按字面匹配，不小写化、不去尾点/空格、不解析 8.3 别名；只有修补后才
     匹配的路径是 `path-lexical`。
+  - **磁盘目录项必须与声明逐字节同名（第十轮 P1-2）。** 声明 `forms/add.json`
+    只有在已打开的 `forms` 句柄中确实存在名为 `add.json` 的目录项时才成立。大小写
+    不敏感的 APFS/NTFS 会用它打开 `Add.json`；那不是成功，而是 `path-lexical`
+    （退出码 1），ext4 上结论相同。检查在**已打开的父句柄**上完成：枚举该句柄，
+    找逐字节相等的名字，再相对同一句柄按 no-follow 规则打开该目录项；不得比较
+    绝对路径字符串，也不得在打开前另做一次探测。中间目录与最终文件都适用。平台
+    无法对已打开句柄做精确名字查找时，N1 门禁失败；不得接受别名名字，也不得退回
+    跟随打开。这与「声明 `forms/Add.json`」的非法词法测试是两回事，不能互相替代。
   - `bundles/specs/<file>.json`、`bundles/locks/<file>.lock.json`、
     `bundles/sealed/<file>.bundle.json` 的 `<file>` 必须等于文档里的
     `bundle_id`，否则 `bundle-file-mismatch`（退出码 1）；legacy 快照固定为
@@ -534,6 +549,12 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   `packages[].path` 和 `legacy_source` 的读取同样适用。H2 不声称抵御构建成功后
   重写工作树的攻击者，也不声称 `--root` 本身可信；它声称一次成功的构建打开的
   正是各项检查所描述的那些对象。
+- **逐段精确同名是同一个打开不变量（第十轮 P1-2）。** 相对父句柄枚举目录项并
+  要求名字与声明段逐字节相等，是在同一次 no-follow 打开里完成的，不是打开前的
+  `stat`、不是绝对路径字符串比较，也不是「宿主能解析就算通过」。声明小写合法而
+  磁盘目录项大小写不同（中间目录 `Forms/` 或最终文件 `Add.json`）在任何平台上
+  都是 `path-lexical`，构建结论不随文件系统大小写敏感性变化（`INV-05`）。平台
+  能力不足时 N1 失败并停止，不降级为跟随打开或按路径重开。
 - **路径层是显式依赖，不是可携带的 `std::fs` 调用。** `File::open` 只会跟随
   链接；`OpenOptionsExt::custom_flags` 只影响最后一段。`fmp-definition` 的产品
   依赖因此是 `fmp-model` 加上至多一个固定的路径安全层，它只负责 no-follow 打开，
@@ -638,9 +659,13 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
 - H2 的过渡规则：`fmp-def/0.1` 的 `bind` 仍按集合相等比较
   `enabled_extensions`，所以 `definition_format == fmp-def/0.1` 时额外要求
   包的声明覆盖与 spec 选择**完全相等**（`h2-exact-target`）。这不是永久包
-  契约；`fmp-def/0.2` 已按子集处理。H3 必须在计划侧定义同样的兼容规则，才能
-  解除 `h2-exact-target`；该规则必须在 H5 并行扩展演练之前生效，否则先修订
-  ADR，不得直接开始 H5。H2 不声称这个等号是最终组合规则。`h2-exact-target`
+  契约；`fmp-def/0.2` 已按子集处理。**解除是按协议能力、不是删检查（第十轮
+  P2-1）**：只有新的计划/定义协议定义了计划到定义的目标兼容关系时，才允许
+  以子集规则接受 bundle；已有 `fmp/0.1` 计划保持今天的精确集合 `bind` 结论，
+  构建选项不能改变它。H3 必须用同一包、不同扩展集合在**新旧协议下各跑一次**：
+  旧协议给出精确结果，新协议只在新规则允许处接受子集；「删掉检查后能构建成功」
+  不是新规则的证据。该规则必须在 H5 并行扩展演练之前生效，否则先修订 ADR，
+  不得直接开始 H5。H2 不声称这个等号是最终组合规则。`h2-exact-target`
   与上面的 form ⊆ 包检查互不替代：前者比较包与 bundle，后者比较行与包。
 - `target.profile_id` 必须与每个包的 `target_profile` 一致，否则构建失败。
 - **form 家族一致性（第二轮 P1-3）。** 每个导出 form 的 `form_id` 前缀（`:` 前）
@@ -1125,6 +1150,15 @@ H2 每个 ISA 选一个代表性纵向切片，不迁移全部 forms：
 - 每个导出 form 至少一个正例和一个 `scope:"form"` 的非法邻域（立即数越界、
   错误寄存器宽度、错误 target type、非法 modifier 等，必须由 `bind` 拒绝）。
   没有用例文件是 `missing-cases`，没有 form 邻域负例是 `uncovered-form`。
+- **代表性 form 带边界证据（第十轮 P2-2）。** 一个正例加一个非法邻域只证明
+  该 form 存在，不证明操作数取值域。H2a/H2b 实际交付的、带立即编码或有界操作数
+  的 form（`imm12`、寄存器编号宽度、modifier 索引）还必须包含：合法最小值、
+  合法最大值、以及两侧相邻的非法值。边界负例沿用同一条
+  `scope:"form"`/`bind`/完整诊断集契约，非法值必须在被改动的操作数处被拒绝；
+  若观察到的诊断带明细，用例引用的证据文件记录相关 `min`/`max`/`value` 字段。
+  通过条件仍是 `(code, path)` 集合，`monasm-cases/0.1` 的比较规则不变，明细键
+  不进入比较。缺少边界用例使该切片验收失败，但不新增覆盖错误码。这是 H2 实际
+  切片的证据，不是「整个 ISA 边界已被证明」。
 - 每个用例的 `evidence` 必须是 `oracle` 或 `manual-derivation`。没有证据清单
   的开发包直接核对 case 自带的 `sha256` 与原始文件字节；清单存在时以清单为准；
   可发布包还要求 `files` 列出 `tests/cases.json` 本身、`NOTICE`、每个用例证据、
@@ -1184,6 +1218,9 @@ A/B 工作流合并留给 H5。
 | `two_packages_exporting_the_same_form_conflict` | 两包同一 `form_id`，内容相同也失败 | `HE-T07`、`HE-AC-09` |
 | `a_package_path_cannot_escape_its_root` | `../`、绝对路径、从 `--root` 到文件的任一段是符号链接/reparse point → 拒绝（`path-escape`）；检查到实际读取之间替换目标也不跟随，不能只靠 `canonicalize()` | `H2-D3`、第六轮 P2-2 |
 | `identifier_and_path_lexical_rules_are_platform_independent` | `package_id`/`bundle_id` 含大写、空段、尾点 → `identifier-lexical`；form 路径 `forms/Add.json` 与 `forms/add.json` 并存、`forms/NUL.json`、尾点/空格、`..` 段 → `path-lexical`；在 Linux/macOS/Windows 上都是同一格式拒绝（退出 1），不是某平台 I/O 失败或成功打开 | 第九轮 P2-1、`ADR-0128` §1.3、`H2-D1` |
+| `the_same_relative_path_in_two_packages_is_legal` | 闭包同时选中 `packages/x86_64/alu/0.1.0` 与 `packages/x86_64/vector/0.1.0`，两包各带 `forms/add.json` 与 `tests/cases.json` → 构建通过；每个包按自己的根读取该文件，摘要覆盖各自字节。只比较裸相对字符串的实现会错误拒绝这个合法组合 | 第十轮 P1-1、`ADR-0128` §1.3、`H2-D1` |
+| `a_cross_package_path_alias_is_rejected` | spec 分别选中 `packages/x86_64/alu/0.1.0` 和 `packages/x86_64/ALU/0.1.0`，两个根折叠成同一仓库路径；或同一 `packages[].path` 被列两次 → `path-lexical`（退出 1），不是两个恰好大小写不同的目录 | 第十轮 P1-1、`ADR-0128` §1.3、`H2-D1` |
+| `a_case_different_on_disk_name_is_rejected` | 声明小写合法的 `forms/add.json`，磁盘只有 `forms/Add.json`；以及磁盘目录是 `Forms/` 而声明 `forms/` → Linux/macOS/Windows 上都是 `path-lexical`（退出 1），不是 ext4 的缺文件（退出 2）或大小写不敏感卷的成功打开（退出 0）。精确名字查找在已打开父句柄上完成，与声明 `forms/Add.json` 的词法拒绝测试不同 | 第十轮 P1-2、`ADR-0128` §1.3/§3、`H2-D1`/`H2-D3` |
 | `the_manifest_is_closed` | 未知键、必需键缺失、重复键 → 拒绝；可选键缺失 → 接受 | `INV-07` |
 | `an_empty_forms_list_is_refused` | `exports.forms: []` → `empty-package`，在合并文档交给 `read` 前拒绝；类型/profile-only 包不走 H2 | `ADR-0128` §1、第四轮 P2-3 |
 | `an_unknown_case_format_is_refused` | `cases_format: "monasm-cases/0.2"` 或其他值 → `case-format-unsupported`；`0.1` 只接受单指令、有操作数的 `fmp/0.1` 计划 | `ADR-0128` §9.2、第四轮 P2-1 |
@@ -1246,7 +1283,7 @@ A/B 工作流合并留给 H5。
 | `two_specs_cannot_share_a_bundle_or_definition_identity` | 两个 spec 共用 `bundle_id` → `bundle-id-conflict`；共用 `(namespace, version)` 但 `definition_digest` 不同或相同 → `definition-identity-conflict`；三项都合法后 `verify --all --check` 通过 | 第六轮 P2-1、`ADR-0128` §8 |
 | `the_publication_audit_reads_retired_entries` | 退役 spec 后 `verify --all --check` 不读旧包；`verify --published --check` 仍检查旧条目，改旧目录或写错摘要 → `published-registry-invalid`；审计不进入 lock/bundle，未选中包不影响 `--all` | 第六轮 P2-3、`ADR-0128` §8.4 |
 | `the_publication_audit_covers_executable_assets_not_auxiliary_bytes` | 已退役版本改 `package.json` 或 form 资产且不同步登记 → 审计 `published-registry-invalid`；只把 `README.md`/`NOTICE`/`tests/cases.json` 改字节并同步 evidence 清单 → 审计仍通过，因为 `source_package_digest` 不含这些字节。该变更由变更路径门禁 `published-package-modified` 和 git 历史承担，文档不声称审计能证明整目录不可变 | 第八轮 P2-2、`ADR-0128` §8.4 |
-| `the_no_follow_open_is_proved_on_three_platforms` | H2a N1：Linux/macOS/Windows 各跑中间目录链接、末段文件链接、Windows reparse point、以及检查与打开之间替换目标 → 打开拒绝并报 `path-escape`。某平台无法表达 no-follow 打开时该平台以 `path-escape` 拒绝，且 H2a 判定失败，不降级为跟随打开；一个只在 Linux 通过的门禁不算通过 | 第八轮 P2-4、`ADR-0128` §3/§9、N1 |
+| `the_no_follow_open_is_proved_on_three_platforms` | H2a N1：Linux/macOS/Windows 各跑中间目录链接、末段文件链接、Windows reparse point、以及检查与打开之间替换目标 → 打开拒绝并报 `path-escape`。同一门禁还跑两条精确拼写负例：声明 `forms/add.json` 而中间目录是 `Forms/`，以及最终文件是 `Add.json` → 三平台都报 `path-lexical`，大小写不敏感卷不得成功打开。某平台无法表达 no-follow 打开或已打开句柄上的精确名字查找时该平台失败，且 H2a 判定失败，不降级为跟随打开；一个只在 Linux 通过的门禁不算通过 | 第八轮 P2-4、第十轮 P1-2、`ADR-0128` §3/§9、N1 |
 | `a_published_version_cannot_change_evidence_in_place` | base 已登记 `0.1.0` 的 `tests/cases.json` 改动并同步 manifest → 仍然是 `published-package-modified`；新版本 `0.2.0/` 才允许 `evidence_digest`/`release_digest` 变化 | 第五轮 P2-3、`ADR-0128` §1.1/§7.1 |
 | `a_package_update_does_not_edit_an_old_spec` | 只新增版本目录、不动 spec/lock；旧 lock 字节不变 | 第三轮 P1-1、`HE-AC-05` |
 | `a_legacy_package_target_must_match_its_source` | 复制 x86 行不变、把 `execution_mode` 改成 `"32"` 或 `address_width` 改成 32 → `legacy-target-mismatch`，在 `read` 前拒绝 | 第三轮 P1-2 |
@@ -1263,6 +1300,7 @@ A/B 工作流合并留给 H5。
 | `every_package_form_equals_the_pinned_legacy_row` | 三个包逐 form canonical JSON 相等，比较对象是钉住版本 | `HE-AC-03`、`HE-AC-11` |
 | `a_form_row_is_compared_against_its_pinned_version_not_the_newest_file` | 把钉住版本换成最新版本 → x86 行被判定不等；构建器不自动改用最新 | `H2-D8`、`HE-AC-11` |
 | `the_package_export_set_is_exact` | 导出集合 = 清单声明集合；没有隐藏 form | `HE-AC-03` |
+| `a_representative_form_proves_its_bounded_operand_domain` | 对 H2a/H2b 实际交付的有界操作数 form（aarch64 `imm12`、rv64 `addi imm12`、x86 寄存器编号宽度）各给合法最小值、合法最大值、min−1、max+1 → 两个边界正例通过，两个相邻非法值由 `bind` 在被改动的操作数处拒绝；证据记录诊断中的 `min`/`max`/`value`。pass 条件仍是 `(code, path)` 集合，明细键不进入比较 | 第十轮 P2-2、`ADR-0128` §9.1、§4.3 |
 | `the_x86_package_reproduces_legacy_machine_output` | X86-P1 的 §4.2.1 精确投影相等 | `HE-T18`（H2 部分） |
 | `the_aarch64_package_reproduces_legacy_machine_output` | A64-P1、A64-P2 的 §4.2.1 精确投影相等 | `HE-T18`（H2 部分） |
 | `the_rv64_package_reproduces_legacy_machine_output` | RV-P1、RV-P2 的 §4.2.1 精确投影相等 | `HE-T18`（H2 部分） |
@@ -1393,14 +1431,17 @@ H2a 的阶段边界不变，但按五个可独立 review 的回归节点推进�
 
 1. **N1 解析、路径门禁与摘要**：先做**平台可行性门禁**——在 Linux、macOS、
    Windows 上分别用中间目录链接、末段文件链接、Windows reparse point 和
-   「检查后替换」场景证明所选路径层能在**打开动作本身**拒绝跟随；任一平台
-   只能以跟随打开通过，或以「拒绝所有包读取」通过，N1 即失败，H2a 停止，不
-   把失败改成降级。门禁通过后再做 manifest/spec/lock/published 封闭形状、
-   路径/版本一致、标识符/路径段/产物文件名词法（`identifier-lexical`/
-   `path-lexical`/`bundle-file-mismatch`）、单一 `LoadedPackage` 生命周期
-   （摘要、legacy 行/目标比较、逐包 `read` 与合并都消费同一份已加载值）、
-   `capability-mismatch` 推导、`source_package_digest`、`evidence_digest` 与
-   开发/发布两个跨语言向量。
+   「检查后替换」场景证明所选路径层能在**打开动作本身**拒绝跟随；同一门禁还要
+   证明已打开父句柄上的**逐字节精确名字查找**：声明 `forms/add.json` 而中间
+   目录是 `Forms/` 或最终文件是 `Add.json` 时，三平台都报 `path-lexical`，
+   大小写不敏感卷不得成功打开。任一平台只能以跟随打开通过、以「拒绝所有包
+   读取」通过或无法做精确名字查找，N1 即失败，H2a 停止，不把失败改成降级。
+   门禁通过后再做 manifest/spec/lock/published 封闭形状、路径/版本一致、
+   标识符/路径段/产物文件名词法（`identifier-lexical`/`path-lexical`/
+   `bundle-file-mismatch`）、包内相对路径与闭包仓库根相对路径两个冲突域、
+   单一 `LoadedPackage` 生命周期（摘要、legacy 行/目标比较、逐包 `read` 与
+   合并都消费同一份已加载值）、`capability-mismatch` 推导、
+   `source_package_digest`、`evidence_digest` 与开发/发布两个跨语言向量。
 2. **N2 闭包与 sealed**：严格排序、显式闭包、依赖边、归属冲突、spec 集合的
    `bundle_id` 与定义身份唯一、保留的 legacy 定义名（`reserved-identity`）、
    form ⊆ 包 ⊆ bundle 的逐包检查（`form-extension-mismatch`）、保守覆盖语义
@@ -1437,6 +1478,10 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | 归属冲突被 last-wins 吞掉 | 构建期唯一归属表；相同内容也失败；`HE-T07` |
 | 路径逃逸/符号链接 | 从 `--root` 到实际读取的每一段都 no-follow；链接或 reparse point 是 `path-escape`；不用 canonicalize-then-open，也不接受「先 non-follow 预检、再按路径打开」；打开动作本身必须拒绝跟随 |
 | 同一非法名字在某平台成功、在另一平台 I/O 失败 | 标识符/路径段/产物文件名按 `ADR-0128` §1.3 的词法在打开前校验；大小写折叠冲突、尾点/空格、Windows 设备名都是 `path-lexical`，`package_id`/`bundle_id` 违规是 `identifier-lexical`，产物名与 `bundle_id` 不符是 `bundle-file-mismatch`；三平台测试同一退出码 |
+| 跨包同名相对路径被误判冲突 | 冲突比较域随根而定：包内按相对字符串，闭包按 `packages[].path` 拼接后的仓库根相对路径；不同包根下的 `forms/add.json`/`tests/cases.json` 合法共存；只有折叠后相同的包根或重复 `path` 是 `path-lexical`；两个验收向量分别证明合法组合与根别名拒绝 |
+| 声明小写合法，磁盘目录项大小写不同 | 精确名字查找在已打开的父句柄上完成，中间目录和最终文件都要求逐字节同名；大小写不敏感卷上的 `Add.json` 打开是 `path-lexical`，不是成功；N1 三平台门禁包含这两条负例，与 `forms/Add.json` 的声明词法测试分开 |
+| 解除 `h2-exact-target` 变成静默放宽 | 只有新计划/定义协议定义了计划到定义的目标兼容关系才允许子集接受；`fmp/0.1` 计划保持精确集合 `bind` 结论，构建选项不能绕过；H3 必须在新旧协议下各跑同一包与不同扩展集合的组合 |
+| 一个非法邻域被当成完整操作数域 | H2a/H2b 交付的有界 form（`imm12`、寄存器编号、modifier 索引）必须带 min/max/min−1/max+1 用例；非法值在被改动操作数处拒绝；证据记录 `min`/`max`/`value`，但 pass 条件仍是 `(code, path)` 集合，不引入新错误码 |
 | 独立身份随目录/cwd 漂移 | 固定 `monasm-standalone/0.1` 函数；复制到不同目录/换 cwd 的摘要相等测试；保留前缀禁止写入 spec |
 | 新包没有机器码证据也能通过 | 每个导出 form 强制正例+负例；`package_conformance` 执行；错误 opcode 反例；`--release-evidence` 检查证据完整性，`--release` 再加闭包 |
 | 用例声明 form B、计划实际执行 A | 计划恰好一条 instruction，`instruction_id`/`form_id` 必须等于 case 字段；不一致 `case-form-mismatch`；正例比较实际执行的 form |
@@ -1460,7 +1505,7 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | 缺失键被 harness 归一化成空数组 | Level 0/1 投影键集固定；缺 `symbols` 与 `symbols: []` 不等价；由 `case-expect-shape` 拒绝 |
 | 单包验证声称依赖已证明 | 分别报告 `structure`、`--release-evidence` 和 `dependency_closure`；无显式闭包时非空依赖是 `unverified`，`--release` 退出 1；闭包验证递归重读所有可达依赖 |
 | 改测试集不改变发布身份 | `tests/cases.json` 列入证据清单；未发布候选上未更新清单是 `evidence-mismatch`，更新后 `release_digest` 改变而 `definition_digest` 不变；已发布目录改证据是 `published-package-modified` |
-| 不同扩展集合的包无法组合 | 包 `enabled_extensions` 是需求、spec 是选择；H2 用 `h2-exact-target` 过渡，H3 解除并在 H5 前生效 |
+| 不同扩展集合的包无法组合 | 包 `enabled_extensions` 是需求、spec 是选择；H2 用 `h2-exact-target` 过渡，H3 用新的计划/定义协议解除并在 H5 前生效；旧 `fmp/0.1` 计划保持精确集合结论 |
 | form 家族与 target 张冠李戴 | 规则是 `family(form_id) == isa_family` 字符串相等，不是包格式 ISA 白名单；跨 ISA 注入反例；在 `read` 之前拒绝 |
 | 新增 ISA 被迫改包格式 | 包格式不列家族；H3 的第四种 reader 家族只要自述相等就通过；构建器不追加 ISA 名单 |
 | 包输入预算只覆盖闭包 | `tests/cases.json` ≤ 16 MiB，证据清单/spec/lock 各 ≤ 1 MiB；forms ≤ 1024、assets ≤ 2048、cases/证据文件 ≤ 4096；单包 manifest+资产累计 ≤ 16 MiB，按实际读取累加；未选中包也受限 |
@@ -1514,6 +1559,9 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
   外层身份、排序、摘要输入和拒绝语义，不冻结其内部语义。
 - `bind` 接受 `VerifiedBundle`、`fmp-validate → fmp-definition` 依赖（H3）。
 - 解除 `h2-exact-target` 的 H3 计划侧目标兼容；H2 只声明过渡限制和退出门槛。
+  H3 的解除必须是新计划/定义协议的一部分，且用新旧协议各跑同一包与不同扩展
+  集合的组合（拟名 `lifting_the_exact_target_requires_a_new_protocol`）；
+  不能靠删除构建器里的相等检查或增加构建选项完成。
 - 对新增包实际重跑或联网调用外部 oracle；H2 只校验证据记录、来源、哈希和
   用例执行，fixtures 的 `rerun.py` 仍只覆盖 legacy 语料（H3/H4 可扩展）。
 - fixup profile、非零 addend、Hi/Lo 配对、范围/字段所有权语义（H4）。
@@ -1543,7 +1591,7 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | O11 | 新包没有 `legacy_source` 时如何验证 | **包自述 `target_identity`/`definition_format` + 独立身份 + `read` + 包用例**；用一个合成包证明不依赖历史定义 | 强制新包也写 legacy 来源会永久绑定旧目录 |
 | O12 | `verify --package` 的 Definition namespace/version 从哪来 | **`monasm-standalone/0.1` 固定函数**：`monasm.standalone.<package_id>` / `standalone+<source digest>`；保留前缀禁止进入 spec | 从 spec 借用会碰撞；从目录推导会随 cwd 漂移 |
 | O13 | 包级机器码测试是否强制 | **强制**：每个 form 正例+负例、证据引用、`package_conformance` 执行、`--release-evidence` 检查证据完整性，`--release` 再加闭包 | 只靠 `read` 会放过合法结构里的错误 opcode |
-| O14 | 包 target 与 bundle target 的关系 | **包声明保守覆盖、spec 声明选择**；只证明 `⋃E_form ⊆ E_package ⊆ E_bundle`，高报合法且只缩小可选范围，不裁剪声明；`fmp-def/0.1` 用 `h2-exact-target` 过渡，H3 解除 | 逐字段相等会把新增扩展族变成对既有包的强制改版；把声明当最小并集会改变作者摘要或错误拒绝合法 bundle |
+| O14 | 包 target 与 bundle target 的关系 | **包声明保守覆盖、spec 声明选择**；只证明 `⋃E_form ⊆ E_package ⊆ E_bundle`，高报合法且只缩小可选范围，不裁剪声明；`fmp-def/0.1` 用 `h2-exact-target` 过渡，H3 由新计划/定义协议解除，旧协议保持精确集合结论 | 逐字段相等会把新增扩展族变成对既有包的强制改版；把声明当最小并集会改变作者摘要或错误拒绝合法 bundle；删检查解除会让旧计划静默改变含义 |
 | O15 | form 家族与 target 的一致性 | **通用相等规则** `family(form_id) == target_identity.isa_family`；包格式不列 ISA；第四种家族由 H3 的 reader 支持，不需要改包协议 | 三 ISA 对应表实际全是字符串相等，会迫使 H3 再改一次公共格式 |
 | O16 | 证据文件是必需还是可选 | **开发包可选、可发布包必需**；`--release-evidence`/`--release`/spec 选中时要求 `tests/cases.json`、`NOTICE`、`sources`、`oracle.status`、skip 理由和用例证据；`tests/cases.json` 本身被哈希 | 永远可选或只哈希用例证据会让 `release_digest` 不代表完整审核证据 |
 | O17 | 已发布包与定义名如何继续演进 | **版本目录是不可变快照**：`packages/<target>/<package>/<version>/`；发布路径记入只追加的 `bundles/published.json`，`(package_id, version)` 全局唯一且永久绑定首次 path/摘要；`identities` 永久绑定 `(namespace, version)` 与 `definition_digest`，退役后仍拒绝换字节重发；`bundle_id` 是可移动发布线，不可变的 bundle 内容标签是 `(bundle_id, bundle_digest)`，证据完备的发布身份是 `release_digest`；只有 base 条目在 PR 内不可变，同一 PR 首次创建并登记合法；退役 spec 不删除登记；更新创建同级新目录；旧 spec 未改时旧 lock 原样重建，退役后旧快照/lock 仍可由旧提交重放；发布者另行选择新版本 | 原地覆盖会迫使作者改旧 spec；仅按当前 spec 判断会让退役后的旧目录和旧定义名失去保护；把 `bundle_id` 当不可变身份会拒绝正常的版本推进 |
@@ -1594,6 +1642,10 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | `verify --published --check` 独立历史审计与**有界**断言（可执行资产/身份，不含 README/NOTICE/证据用例字节） | 尚未实现 | **未验证** — H2a |
 | `legacy_source` 的目标一致性 | 尚未实现 | **未验证** — H2a |
 | `scope:"form"` 基线变异、`bind`-only 拒绝、变异操作数诊断、完整诊断集、Level 0/1 精确投影 | 尚未实现；`fmp-materialize` 的 `E-BYTE-001` 反例已确认存在 | **未验证** — H2a |
+| 不同包根下的同名相对路径合法，根折叠别名是 `path-lexical` | 尚未实现；没有闭包读取路径 | **未验证** — H2a |
+| 声明小写路径不打开大小写不同的磁盘目录项（中间目录与最终文件） | 尚未实现；精确名字查找必须与打开动作同一句柄 | **未验证** — H2a N1 三平台门禁 |
+| `h2-exact-target` 仅由新计划/定义协议解除，`fmp/0.1` 保持精确集合结论 | 尚未实现；`fmp/0.2` 计划不存在 | **未验证** — H3 门禁 |
+| 有界 form 的 min/max/相邻非法边界证据与 `min`/`max`/`value` 明细 | 尚未实现；三个包与用例不存在 | **未验证** — H2a/H2b |
 | `structure`/`--release-evidence`/`dependency_closure` 三态分离与传递闭包重读 | 尚未实现 | **未验证** — H2a |
 | 证据完整性、`evidence_digest` 与 release 摘要分层 | 尚未实现 | **未验证** — H2a（机制）；H2b 只增加资产 |
 | 解析前 JSON 深度拒绝 | 尚未实现；H0 探针只证明现有递归解析器会栈溢出 | **未验证** — H2a 加迭代预算 |

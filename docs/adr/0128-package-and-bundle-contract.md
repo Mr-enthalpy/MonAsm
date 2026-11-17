@@ -5,27 +5,20 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: ninth revision, 2026-11-17, after the portability and lifecycle
-  audit: identifiers, path segments and artifact file names get an ASCII grammar
-  with case-fold, trailing-dot/space and Windows device-name rejection; the
-  digest, legacy comparison, per-package `read` and merge consume one loaded
-  package value; first publication has a cycle-free build → append → check order
-  and `build` validates every output in memory before replacing a file; and
-  `enabled_extensions` is stated as a conservative declared cover rather than a
-  minimum, so over-declaration is legal.
-- Prior revision: eighth revision, 2026-11-16, after the cross-history and
-  composition audit: the case diff is defined over the two **final values**, so
-  a member addition reports the member and only a kind change reports the
-  container; an H2 definition name may not collide with a frozen legacy
-  `definitions/` identity; every exported form's extension requirement must be
-  inside the package's declared cover, and the cover inside the bundle, with a
-  per-package `read` before the merge; the slotless form in §7.0 is labelled as
-  a digest preimage rather than a legal Definition; the publication audit's
-  guarantee is narrowed to the executable assets and identity; the digest
-  layers are named by the question each answers; and the path work is an H2a
-  platform feasibility gate. The seventh revision's open-time no-follow rule,
-  definition-name history, movable `bundle_id` and derived capability set
-  remain in force.
+- Revision: tenth revision, 2026-11-17, after the path-domain and path-spelling
+  audit: path collisions are scoped to a package root and, across a closure, to
+  repository-root-relative joined paths; every opened segment must match its
+  on-disk entry name exactly; lifting `h2-exact-target` is tied to a new
+  plan/definition protocol rather than a changed `fmp/0.1` verdict; and
+  representative forms carry boundary-value evidence.
+- Prior revision: ninth revision, 2026-11-17, added the ASCII identifier,
+  path-segment and artifact-filename grammar, the single loaded package value
+  shared by digest/comparison/`read`/merge, the cycle-free first-publication
+  order, and the conservative declared extension cover.
+- Earlier revisions: the eighth (value-defined case diff, legacy name
+  reservation, form/package/bundle inclusion, audit narrowing), seventh
+  (open-time no-follow, definition-name history, movable `bundle_id`, derived
+  capability set) and their predecessors remain in force.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
   `monasm-lock/0.1`, `monasm-bundle/0.1` and `monasm-published/0.1` formats;
   immutable published package version directories and their append-only
@@ -41,9 +34,12 @@
   mandatory package case and evidence gate with `bind`-only form-scope mutation
   and complete diagnostic sets; exact Level 0/Level 1 machine-output projections;
   portable identifier, path-segment and artifact-filename lexical rules; the
+  package-root and repository-relative domains of path collision; exact on-disk
+  entry-name matching for every opened segment; the
   single loaded-package value shared by digest, comparison, `read` and merge; the
   cycle-free first-publication order and in-memory output validation; package
-  target covers versus bundle target selection; package/form
+  target covers versus bundle target selection; the versioned H3 condition for
+  accepting a subset target; package/form
   ISA-family consistency; package ownership and conflict rules; which legacy
   definition version a re-homed form is compared against; transitive dependency
   closure and release-evidence status; the builder's error and exit behaviour;
@@ -358,17 +354,46 @@ path     = pseg "/" ... "/" pseg
   (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`,
   case-insensitively, with or without an extension). A violation is
   `path-lexical` (exit 1), raised on the string before the file is opened.
-- Declared paths are compared under ASCII case folding (`A`–`Z` → `a`–`z`). Two
-  declared paths in one package, or in one closure, that fold to the same string
-  are `path-lexical`. The grammar already admits only lowercase, so a legal
-  document cannot trigger the fold rule; it exists because the builder does not
-  assume every manifest it is handed came from this grammar, and because the
-  fold — not "the file happened to open" — must be the stated reason.
-  Documentation files (`README.md`, `NOTICE`) are not declared paths and are not
-  covered by the lowercase rule.
+- **A path collision is scoped to its root.** An asset path
+  (`exports.forms/types/profiles[].path`) and an evidence path are relative to
+  their own `packages/<target>/<package>/<version>/` directory. The fold rule is
+  applied to those **relative** strings within one package, and across a closure
+  only to the **repository-root-relative** path formed by joining the selected
+  `packages[].path` with the relative asset path. Two paths that fold to the
+  same string in the same domain are `path-lexical` (exit 1). Equal relative
+  names under different package roots do **not** collide, because the joined
+  paths differ before the file name:
+  `packages/x86_64/alu/0.1.0/forms/add.json` and
+  `packages/x86_64/vector/0.1.0/forms/add.json` are two files and both are
+  legal. In particular:
+  - inside one package, `forms/Add.json` and `forms/add.json` collide;
+  - across a closure, two selected package roots that fold to the same
+    repository path (for example `packages/x86_64/alu/0.1.0` and
+    `packages/x86_64/ALU/0.1.0`) collide, and a spec may not list one path
+    twice;
+  - the fold — not "the file happened to open" — must be the stated reason.
+  The grammar already admits only lowercase, so a document that follows §1.3
+  cannot trigger the fold rule; it exists because the builder does not assume
+  every manifest it is handed came from this grammar. Documentation files
+  (`README.md`, `NOTICE`) are not declared paths and are not covered by the
+  lowercase rule.
 - Paths are matched exactly as written. The builder never lowercases, trims a
   trailing dot or space, or resolves an 8.3 alias; a path that matches only after
   such a repair is `path-lexical`, not a successful open.
+- **The on-disk entry must have the declared spelling.** A declaration being
+  lowercase-legal does not make the file on disk lowercase. A declared
+  `forms/add.json` is satisfied only when the opened `forms` directory contains
+  an entry named exactly `add.json`. On a case-insensitive APFS or NTFS volume
+  the declared `add.json` would open `Add.json`; that is `path-lexical`
+  (exit 1), not a success, and the verdict is the same on ext4. Every segment is
+  checked this way, intermediate directories included. The path layer performs
+  the check on the **already-open parent handle**: it enumerates that handle for
+  an entry whose name is byte-for-byte equal to the declared segment and then
+  opens that entry relative to the same handle with the no-follow rule of §3.
+  It does not compare an absolute path string, and a separate probe before the
+  open does not satisfy the rule. A platform that cannot perform an exact-name
+  lookup relative to an open handle fails the H2a N1 gate; it must not accept
+  the aliased name and must not fall back to a following open.
 - `bundles/specs/<file>.json` is the spec, `bundles/locks/<file>.lock.json` the
   lock and `bundles/sealed/<file>.bundle.json` the sealed bundle, with `<file>`
   equal to the document's `bundle_id` in each case. A file whose `<file>`
@@ -391,6 +416,21 @@ Counterexamples:
   NTFS volume the second write replaces the first, so the manifest names two
   paths but one file exists and `source_package_digest` differs by platform. The
   fold rule rejects the manifest everywhere with one `path-lexical`.
+- Two packages both declare `forms/add.json` and both contain
+  `tests/cases.json`. They are different files under different package roots, and
+  a closure that selects both is legal. A check that compared the bare relative
+  strings across the closure would reject ordinary composition; the joined
+  repository paths are the closure domain.
+- A spec selects `packages/x86_64/alu/0.1.0` under one package ID and
+  `packages/x86_64/ALU/0.1.0` under another. The roots fold to the same
+  repository path, so the closure is `path-lexical` (exit 1); it is not two
+  packages that happen to use a case-different directory.
+- A manifest declares `forms/add.json` and the tree contains only
+  `forms/Add.json`. Without an entry-name rule, ext4 reports a missing file
+  (exit 2) while a case-insensitive APFS or NTFS volume opens it (exit 0). The
+  exact-name check makes both `path-lexical` (exit 1); the same applies to an
+  intermediate `Forms/` directory. This is distinct from declaring
+  `forms/Add.json`, which the grammar rejects before any open.
 - `forms/NUL.json` or `forms/aux` opens a device on Windows, or fails with an I/O
   error (exit 2), while another platform creates an ordinary file. The grammar
   rejects the name before the open, so the same document is a format rejection
@@ -508,10 +548,13 @@ The lexical rules for identifiers, path segments and artifact file names are
 §1.3; this section bounds the resolution of an already-legal path. Every
 manifest path is a normalised relative path using `/`. Absolute paths, `..`,
 empty segments, `.`, backslashes, NUL, URL schemes and drive letters are
-rejected. The bound is a property of the **open**, not of a moment before it: no
-component on the path from `--root` to an opened file may be a symlink or
-reparse point, and the builder never traverses one. H2 package inputs contain no
-such links on that path; a package that has one is `path-escape` (exit 1).
+rejected. The exact-entry-name rule of §1.3 is part of the same open, not a
+preceding `stat`: a case-insensitive host must not turn a declared `add.json`
+into the on-disk `Add.json`. The bound is a property of the **open**, not of a
+moment before it: no component on the path from `--root` to an opened file may
+be a symlink or reparse point, and the builder never traverses one. H2 package
+inputs contain no such links on that path; a package that has one is
+`path-escape` (exit 1).
 
 A metadata pre-check is **not** sufficient, even a non-following one.
 `symlink_metadata()` can report `forms/` as a real directory, another process can
@@ -751,6 +794,15 @@ parallel-extension drills; if it is not, this ADR's package contract must be
 revised by a new ADR before H5 starts. H2 does not claim the transitional
 equality is the final composition rule, and it does not freeze a package
 manifest that must be edited for every new extension family.
+
+**Lifting is versioned, not a silent relaxation.** The subset rule may apply to
+an existing `fmp/0.1` plan only through a new plan/definition protocol that
+defines plan-to-definition target compatibility. A `fmp/0.1` plan keeps today's
+exact-set `bind` verdict: the builder must not admit a subset bundle for it, and
+no build option changes that. H3 acceptance must show the same package with
+different extension sets under both protocols — the old protocol keeps its
+exact result, the new one accepts the subset only where the new rule says so.
+A build that passes after the check is deleted is not evidence for the new rule.
 
 No `monasm-package/0.1` bump is required to lift the transition: the package
 field already means "a cover of the extensions these rows require", and the
@@ -2015,6 +2067,21 @@ assertion therefore cannot satisfy a form's negative coverage. For
 "form"` negatives: every exported form needs at least one positive and at least
 one such negative, or the package is `uncovered-form`.
 
+**Representative forms carry boundary evidence.** One positive and one illegal
+neighbour proves that a form is not wholly absent; it does not prove the operand
+domain. For every form the H2a/H2b slices ship that takes an immediately encoded
+or otherwise bounded operand (an immediate range, a register-number width, a
+modifier index), the package's cases must include the minimum legal value, the
+maximum legal value, and both adjacent illegal values. Each boundary case uses
+the same `scope:"form"`/`bind`/complete-diagnostic contract above, and an illegal
+value must be rejected at the mutated operand. When the observed diagnostic
+carries a detail map, the case's referenced evidence file records the relevant
+`min`/`max`/`value` fields; the pass condition remains the `(code, path)` set, so
+`monasm-cases/0.1` is unchanged and no detail key enters the comparison. This is
+evidence for the slices H2 actually ships, not a claim that every ISA boundary is
+proved; a missing boundary case fails the slice acceptance but does not create a
+new coverage error code.
+
 A positive case records the exact machine-output projection defined in §15:
 Level 0 is `{format_version, level, bytes_hex, size, fixups}`; Level 1 is
 `{format_version, level, sections, symbols?, fixups}`. `expect` is a closed
@@ -2140,7 +2207,7 @@ does not pretend to be `fmp/0.1` diagnostics.
 
 | Class | Examples | Exit |
 |---|---|---|
-| Deterministic rejection | manifest shape (required/optional keys), identifier/path lexical violation, artifact filename mismatch, empty forms, path escape or a symlink/reparse point on a package path, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, form-scope materialize stage, form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit | 1 |
+| Deterministic rejection | manifest shape (required/optional keys), identifier/path lexical violation, artifact filename mismatch, empty forms, path escape, a symlink/reparse point on a package path, or an opened entry whose name differs from the declared segment, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, form-scope materialize stage, form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit | 1 |
 | Host / I/O / internal | unreadable file, unwritable lock, internal invariant break, materializer `Internal`/`HostFailure` during conformance | 2 |
 | Success | build or verify passed, digest printed | 0 |
 
@@ -2359,6 +2426,13 @@ comparing the materializer with itself proves the bytes.
   `bind`, and name a diagnostic on the mutated operand or its parent object. A
   wrong `expected_digest` or an `E-BYTE-001`/`E-SIZE-001` artifact assertion may
   be a plan-scope test but cannot cover a form.
+- One illegal neighbour is not the whole operand domain. A form with an
+  immediately encoded or otherwise bounded operand also carries minimum, maximum
+  and both adjacent-illegal cases, rejected at the mutated operand, with the
+  `min`/`max`/`value` details recorded in the referenced evidence when the
+  diagnostic has them. This is slice evidence, not a new coverage rule: the pass
+  condition is still the `(code, path)` set and `monasm-cases/0.1` is unchanged
+  (§9.1).
 - Publication is recorded in an append-only registry, so a version remains
   immutable after its last spec retires. A later PR cannot reclassify an old
   snapshot as unpublished by deleting a spec. A version can be created and first
@@ -2390,6 +2464,18 @@ comparing the materializer with itself proves the bytes.
   portable, and are checked before any open. A name that one filesystem aliases,
   folds, trims or maps to a device is a deterministic format rejection on every
   platform, not an I/O failure on one of them (§1.3).
+- Path collisions are scoped to a root, so independent packages compose. Two
+  packages may both ship `forms/add.json` and `tests/cases.json`; the closure
+  domain is the repository-relative joined path, and only a root alias (two
+  selected roots folding to one repository path) or a repeated spec path is
+  `path-lexical` (§1.3).
+- A declared path matches only the on-disk entry with the same spelling. The
+  exact-name check happens on the already-open parent handle, so a
+  case-insensitive volume cannot make `add.json` resolve to `Add.json`. A host
+  where the declared lowercase path and the stored mixed-case path disagree
+  yields `path-lexical` on every platform, not a platform-dependent success
+  (§1.3, §3). This is what lets one package input produce one build verdict on
+  Linux, macOS and Windows.
 - A package is read once into one immutable value; the source digest, the
   legacy row and target comparison, the per-package `read` and the merge all
   consume that value. A recorded digest therefore cannot describe bytes the
@@ -2449,7 +2535,10 @@ comparing the materializer with itself proves the bytes.
   bundle target. A new instruction family can join a bundle without editing an
   unrelated package, provided the bundle selection is a superset. The H2
   `h2-exact-target` equality is a stated transition, not a permanent rule;
-  H3's plan-side compatibility lifts it before H5.
+  H3's plan-side compatibility lifts it before H5. The lift is versioned: a
+  `fmp/0.1` plan keeps its exact-set verdict until a new plan/definition protocol
+  defines subset compatibility, and no build flag substitutes for that protocol
+  (§4.1).
 - Form-family consistency is a string equality, not a package-format whitelist.
   A fourth ISA added to `fmp_model::definition::read` in H3 needs no edit to
   `monasm-package/0.1` or to a central builder table.
@@ -2629,6 +2718,28 @@ comparing the materializer with itself proves the bytes.
   lowercasing, trimming a trailing dot or space, or resolving an 8.3 alias would
   make the accepted name depend on the platform. §1.3 rejects the string and
   keeps the digest identical everywhere.
+- **Compare bare relative asset paths across a package closure.** Rejected:
+  `forms/add.json` and `tests/cases.json` are fixed positions that every package
+  may use, so the rule would reject the ordinary two-author composition H2 exists
+  to enable. Collisions are checked on relative strings inside one package and on
+  repository-relative joined paths across a closure (§1.3).
+- **Pre-check the declared name against the directory listing, then open by
+  path.** Rejected: the two calls are another check-then-use gap, and on a
+  case-insensitive volume the open still resolves `Add.json`. The exact-name
+  lookup happens on the already-open parent handle (§1.3, §3).
+- **Accept the on-disk case-different name on a case-insensitive host.** Rejected:
+  the same package input would build on NTFS and fail on ext4, so the digest and
+  the verdict would be host facts (`INV-05`). The mismatch is `path-lexical`
+  everywhere (§1.3).
+- **Lift `h2-exact-target` by deleting the equality check in the builder.**
+  Rejected: existing `fmp/0.1` plans would silently change meaning with no
+  version marker. The subset rule arrives with a new plan/definition protocol,
+  and only plans that adopt it get the subset verdict (§4.1).
+- **Treat one illegal neighbour as a form's complete operand domain.** Rejected:
+  a single out-of-range value does not show that the minimum, the maximum and
+  both adjacent illegals behave. The shipped bounded forms carry boundary cases;
+  the comparison rule stays `(code, path)` and no new error code is added
+  (§9.1).
 - **Re-open a package path after hashing it, or hash and merge from different
   buffers.** Rejected: a file changed between the two stages yields a lock whose
   source digest describes bytes the merged definition never contained. One loaded
@@ -2707,6 +2818,10 @@ comparing the materializer with itself proves the bytes.
 | The publication audit's guarantee is bounded to executable assets and identity | specified; whole-directory immutability is enforced by the changed-path gate, not by the audit | **specified, not implemented** — H2a |
 | The no-follow open is achievable on Linux, macOS and Windows | not proved; `std::fs` has no portable no-follow open, so H2a N1 must measure a path layer on all three platforms | **unverified** — H2a N1 gate |
 | Identifier, path-segment and artifact-filename rules are format rejections before any open | specified; the builder has no package reader | **unverified** — H2a |
+| The same relative asset path in two different package roots is legal, and a folded root alias or repeated spec path is `path-lexical` | specified; no closure reader exists | **unverified** — H2a |
+| A declared lowercase path does not open a case-different on-disk entry, on intermediate directory or final file | specified as part of the open; no path layer exists | **unverified** — H2a N1 gate (Linux, macOS, Windows) |
+| `h2-exact-target` is lifted only by a new plan/definition protocol, while `fmp/0.1` keeps its exact-set verdict | specified; no `fmp/0.2` plan exists | **unverified** — H3 gate |
+| Shipped bounded forms carry min/max/adjacent-illegal cases with `min`/`max`/`value` evidence details | specified; the three packages and their cases do not exist | **unverified** — H2a/H2b |
 | One loaded package value feeds the source digest, row/target comparison, per-package `read` and merge | specified; no reader exists | **unverified** — H2a |
 | First publication bootstraps without a registry cycle, and `build` validates every output before writing | specified; no builder exists | **unverified** — H2a |
 | `enabled_extensions` is a conservative declared cover, not a minimal required set | specified; `fmp-def/0.1` forms have no requirement key and no builder exists | **unverified** — H2a |
@@ -2761,6 +2876,22 @@ comparing the materializer with itself proves the bytes.
 - Someone compares declared paths only case-sensitively, or lets a trailing
   dot/space, a Windows device name or a non-ASCII segment reach an open: stop.
   §1.3 makes the name a format rule with one diagnostic on every platform.
+- Someone compares bare relative asset paths across a package closure: stop.
+  Equal `forms/add.json` names under different package roots are legal; the
+  closure domain is the repository-relative joined path, and only a folded root
+  alias or a repeated spec path collides (§1.3).
+- Someone accepts a case-insensitive open, compares an absolute path string, or
+  probes the directory before opening it: stop. The declared segment must equal
+  the opened entry name byte-for-byte, checked on the already-open parent handle
+  (§1.3, §3).
+- Someone lifts `h2-exact-target` by removing the equality check, or makes a
+  `fmp/0.1` plan accept a subset bundle without a new protocol: stop. The subset
+  verdict belongs to the new plan/definition protocol, and the old protocol keeps
+  its exact result (§4.1).
+- Someone counts one illegal neighbour as a bounded operand's whole domain, or
+  moves `min`/`max`/`value` details into the pass comparison: stop. The shipped
+  bounded forms carry min/max/adjacent-illegal cases, and the pass condition
+  stays the `(code, path)` set (§9.1).
 - Someone re-opens a package path after computing its digest, or hashes one
   buffer and merges another: stop. One loaded value feeds the digest, the row
   comparison, the per-package `read` and the merge (§9).
