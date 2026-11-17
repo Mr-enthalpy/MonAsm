@@ -5,22 +5,27 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: eleventh revision, 2026-11-17, after the representability and
-  protocol-matrix audit: boundary evidence is scoped to values the plan can
-  represent, the plan×definition compatibility matrix is stated explicitly,
-  `mutates` can name a single modifier field, the path production admits a
-  one-segment package-root file, and directory-entry replacement between the
-  name check and the open is part of the N1 gate.
-- Prior revision: tenth revision, 2026-11-17, scoped path collisions to a
-  package root and to repository-relative joined paths across a closure,
-  required the opened entry name to match the declared segment exactly, tied
-  the `h2-exact-target` lift to a new plan/definition protocol, and introduced
-  representative-form boundary evidence.
-- Earlier revisions: the ninth (ASCII identifier/path/artifact-filename grammar,
-  single loaded package value, cycle-free first publication, conservative
-  declared cover) and the eighth and earlier (value-defined case diff, legacy
-  name reservation, inclusion checks, narrowed publication-audit claim,
-  open-time no-follow) remain in force.
+- Revision: twelfth revision, 2026-11-17, after the publication-order and
+  partial-write audit: the first-publication order has one reading (`build`
+  exits 0 → publisher appends the rows → both `--check`s → commit) and
+  publication means the merged commit; the legacy snapshot is an explicit
+  derived development cache that `--check` does not compare and that the write
+  phase removes before rewriting; extension and capability arrays have one
+  canonical spelling (strictly increasing, duplicate-free); the per-closure byte
+  budget counts every package-root byte a command reads, charges a diamond
+  dependency once, and rejects at the crossing read; and the `E_form = ∅`
+  limitation of `fmp-def/0.1` is stated in the H2 acceptance text.
+- Prior revision: eleventh revision, 2026-11-17, scoped boundary evidence to
+  values the plan can represent, stated the plan×definition matrix, allowed
+  `mutates` to name a single modifier field, admitted a one-segment
+  package-root file, and added directory-entry replacement to the N1 gate.
+- Prior revisions: the tenth (package-root and repository-relative path
+  collisions, exact on-disk entry names, the versioned `h2-exact-target` lift,
+  representative-form boundary evidence) and the ninth and earlier (ASCII
+  identifier/path/artifact-filename grammar, single loaded package value,
+  cycle-free first publication, conservative declared cover, value-defined case
+  diff, legacy name reservation, inclusion checks, narrowed publication-audit
+  claim, open-time no-follow) remain in force.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
   `monasm-lock/0.1`, `monasm-bundle/0.1` and `monasm-published/0.1` formats;
   immutable published package version directories and their append-only
@@ -40,8 +45,10 @@
   entry-name matching for every opened segment; the representable-versus-form
   operand domains for boundary evidence; the plan×definition target-compatibility
   matrix; the single loaded-package value shared by digest, comparison, `read`
-  and merge; the cycle-free first-publication order and in-memory output
-  validation; package
+  and merge; the cycle-free first-publication order (build success, then the
+  registry append, then both `--check`s, then commit), in-memory output
+  validation and the derived legacy cache; the one canonical spelling of
+  extension and capability arrays; the counted closure byte budget; package
   target covers versus bundle target selection; the versioned H3 condition for
   accepting a subset target; package/form
   ISA-family consistency; package ownership and conflict rules; which legacy
@@ -181,8 +188,23 @@ Unknown and duplicate keys are rejected (`INV-07`). A missing key is rejected
 when it is required and is legal only for the optional keys in the table above.
 `exports.forms` is sorted strictly by `id`, and `dependencies` strictly by
 `(package_id, version)`; a reordering is a different document and is rejected
-rather than silently canonicalised. Each `forms/*.json` holds exactly one form
-object; its `form_id` must equal the declared `id`.
+rather than silently canonicalised. The two flat set fields,
+`requires_capabilities` and `target_identity.enabled_extensions`, have exactly
+one legal spelling: a strictly increasing, duplicate-free array under the
+code-point order of its element strings — `["rv64c","rv64i"]`, never
+`["rv64i","rv64c"]`; `["field-placement/v1"]`, never that string twice. Set
+membership decides the capability and target relations, but a reversed or
+duplicated array is a **format rejection** before any relation is evaluated:
+`capability-lexical` for `requires_capabilities`, `extension-lexical` for
+`enabled_extensions`, both exit 1. Without that rule two documents with the same
+set would have different `source_package_digest` values and different identities,
+so "the same extension set" would have no unique legal representation and a
+comparison could not tell a spelling change from a semantic one. The rule is new
+for package and spec inputs, so it does **not** re-spell a frozen legacy document:
+`definitions/rv64/0.6.0.json` keeps its published `["rv64i","rv64c"]` bytes, and
+a consumer compares extension arrays as sets (`check_target` collects both sides
+into a `BTreeSet`). Each `forms/*.json` holds exactly one form object; its
+`form_id` must equal the declared `id`.
 
 `exports.forms` must be **non-empty**. `fmp_model::definition::read` rejects an
 empty `forms` array (`fmp-model/src/definition.rs`, `bind_forms`), and
@@ -286,6 +308,13 @@ A declared set that differs from the derived set is `capability-mismatch`
 (exit 1), in both directions: an undeclared requirement lets H3 under-provision,
 and an unused declaration turns the field into a wish list that a reader cannot
 distinguish from a real requirement.
+
+The comparison is over members, not spellings. The declaration is already
+restricted to the one strictly increasing, duplicate-free form of §1, and the
+derived set is compared by membership. A document that names the right
+capabilities in the wrong order, or repeats one, is `capability-lexical` (exit
+1), not `capability-mismatch`: the semantic equality check never canonicalises a
+non-canonical array, and no other spelling of the same set enters a digest.
 
 The derivation has a consequence that the earlier draft avoided rather than
 stated. `fmp_model::definition::read` requires every form to have a non-empty
@@ -696,11 +725,16 @@ listed package's declarations; they are compared as data, not derived from
 `isa_variant`, `execution_mode`, `byte_order` and `address_width` must be equal.
 `enabled_extensions` is different: a package's list is its declared cover and
 the bundle's list is the selected target, so the package list must be a subset
-of the bundle list, without a minimality claim (§4.1). Every package's `target_profile` must equal
-`target.profile_id`. A closure whose packages disagree on the structural target
-fields or on `definition_format` is rejected; the builder does not pick a winner
-and does not convert a package. A package with `legacy_source` is additionally
-checked against that pinned row, but the pin never supplies the target facts.
+of the bundle list, without a minimality claim (§4.1). Both lists are written in
+the one canonical spelling of §1 — strictly increasing and duplicate-free; a
+reversed or duplicated array is `extension-lexical` (exit 1) before the subset
+test runs. The lock and sealed bundle copy the spec's array verbatim, so a second
+spelling of the same target is a byte mismatch, not an alternative target.
+Every package's `target_profile` must equal `target.profile_id`. A closure
+whose packages disagree on the structural target fields or on
+`definition_format` is rejected; the builder does not pick a winner and does
+not convert a package. A package with `legacy_source` is additionally checked
+against that pinned row, but the pin never supplies the target facts.
 The builder writes the selected identity into the generated definition; it does
 not consult a central Rust target table. That is the H3 precondition "a new
 target does not edit a public whitelist".
@@ -714,7 +748,7 @@ exact IDs, "latest" or a range picks a version the author did not name
 
 The composition problem is concrete. Package A (`rv64i` arithmetic) declares
 `enabled_extensions: ["rv64i"]`; package B (`rv64c` compressed) declares
-`["rv64i","rv64c"]`. If the package list were the full target configuration, A
+`["rv64c","rv64i"]`. If the package list were the full target configuration, A
 and B could never share a bundle, because the builder would demand that A's
 manifest also say `rv64c`. Adding the compressed family would force every
 already-published package to edit its manifest, changing `source_package_digest`
@@ -739,7 +773,7 @@ requirement.
 
 Over-declaration is therefore legal, and it has a real effect: it narrows the
 set of bundles that may select the package. A package whose rows all need only
-`rv64i` but whose manifest declares `["rv64i","rv64c"]` cannot be selected by a
+`rv64i` but whose manifest declares `["rv64c","rv64i"]` cannot be selected by a
 bundle whose target is `["rv64i"]`, even though every row would pass there. The
 builder does not trim the declaration to the derived union, because that would
 make `source_package_digest` describe a requirement the author did not write and
@@ -770,6 +804,26 @@ is not covered by its own declaration (`form-extension-mismatch`, exit 1),
 before it looks at the bundle. The package-to-bundle subset is then checked as
 above.
 
+**What the first inclusion proves, and what it does not.** For `fmp-def/0.1`
+`E_form(f)` is empty for every form, so `⋃E_form ⊆ E_package` is vacuously true
+and can never detect an ISA extension that the rows need but the manifest omits.
+What H2 actually proves for a `0.1` package is `E_package ⊆ E_bundle`: the
+declared cover fits the selected target, and the package cannot be selected by a
+bundle that provides less than the author declared. A package with
+`legacy_source` gains one further, independent constraint: its
+`definition_format` and full `target_identity` must equal the pinned row's
+(§1.1, `legacy-target-mismatch`), which catches a migration that silently
+retargets a copied row, but still derives nothing from the row body about which
+extensions the instruction really needs. A new package without `legacy_source`
+rests on the author's declaration plus the cases and evidence in its own
+directory. H2 must not close that gap by adding an ISA-specific derivation of
+extension requirements: that would make the builder a second semantic authority
+over the ISA, which `ADR-0125` forbids. The H2 acceptance report therefore says
+explicitly that **"the package target cover relation is verified" does not mean
+"the real ISA extension requirements are completely proved"**; only a later
+versioned rule may narrow a cover, and until then any such narrowing is an
+author edit with a new `source_package_digest`.
+
 `fmp_model::definition::read` checks a form's `requires_extensions` against the
 **generated definition's** target set, which is the bundle's. A package can
 therefore be legal only after merging, while its own declared target does not
@@ -782,7 +836,7 @@ for that package. The merged document is still read afterwards, and ownership,
 identity and digest checks are unchanged.
 
 Counterexample: a `fmp-def/0.2` package declares `["rv64i"]`, one of its forms
-requires `["rv64c"]`, and the spec selects `["rv64i","rv64c"]`. Package ⊆ bundle
+requires `["rv64c"]`, and the spec selects `["rv64c","rv64i"]`. Package ⊆ bundle
 passes, and the merged `read` passes because the generated target carries
 `rv64c`. `verify --package` on the same bytes fails, because the package's own
 target is `["rv64i"]`. Adding `rv64c` to the manifest fixes it; the larger bundle
@@ -792,8 +846,8 @@ is impossible to express at the form level, which is why the H2a test uses a
 packages.
 
 Counterexample for the opposite direction: every row of a package requires only
-`rv64i`, the manifest declares `["rv64i","rv64c"]`, and the spec selects
-`["rv64i","rv64c"]`. Every check passes and the package is legal, but it cannot
+`rv64i`, the manifest declares `["rv64c","rv64i"]`, and the spec selects
+`["rv64c","rv64i"]`. Every check passes and the package is legal, but it cannot
 be selected by an `rv64i`-only bundle. A reader that treated
 `enabled_extensions` as "exactly what the rows need" would either trim the
 declaration — changing the author's `source_package_digest` and making the
@@ -1141,14 +1195,17 @@ definition.
   receipt, `release_digest` or author paths.
 - `bundles/legacy/<bundle_id>/definition.json` — generated: the plain merged
   definition document, with no bundle envelope, so the existing
-  `fmp materialize <plan> --definitions <dir>` path can load it. It is a
-  development bridge, not a release identity. `Registry::load_dir` recursively
+  `fmp materialize <plan> --definitions <dir>` path can load it. It is a derived
+  development cache, not a release identity: it enters no digest and `--check`
+  does not compare it. The write phase removes the previous copy before writing
+  the new one (§8.3). `Registry::load_dir` recursively
   reads every `.json` under the directory and calls `definition::read`, so the
   sealed `.bundle.json` cannot be used here; point `--definitions` at the
   directory that contains only this snapshot.
 
 The binary has three subcommands: `build` writes the lock, sealed bundle and
-legacy snapshot; `verify` rebuilds in memory; and `digest <package-path>` prints
+legacy snapshot; `verify --check` rebuilds the lock and sealed bundle in memory
+and compares them; and `digest <package-path>` prints
 the computed `source_package_digest` so an author can write it into the spec.
 `verify --all` checks the bundle closures selected by `bundles/specs/*.json`;
 `verify --published --check` audits the entire published registry without
@@ -1437,10 +1494,15 @@ carries a distinct format identifier.
 **Spec** (`monasm-bundle-spec/0.1`) has exactly `bundle_format`, `bundle_id`,
 `target`, `definition_format`, `namespace`, `version`, `packages`.
 `target` has exactly `profile_id`, `identity`; `identity` has exactly the six
-keys in §4.1. `packages` is non-empty, strictly sorted by `(package_id,
+keys in §4.1, and its `enabled_extensions` uses the canonical strictly
+increasing, duplicate-free spelling of §1 (`extension-lexical`, exit 1,
+otherwise). `packages` is non-empty, strictly sorted by `(package_id,
 version)` with no duplicates, and each entry has exactly `package_id`, `version`,
 `path`, `source_package_digest`. A reversed or equal-key entry is rejected; the
-builder never re-sorts an alternate spelling.
+builder never re-sorts an alternate spelling. The lock and the sealed bundle
+carry the same closed `target` object copied from the spec, so the target has one
+spelling per release; `--check` compares those bytes rather than re-canonicalising
+an array.
 
 ```json
 {
@@ -1689,25 +1751,67 @@ registry only as a guard — a base-published path with changed bytes is still
 publisher needs for the `identities` row. It never writes the registry. The
 requirement that every head-selected path has a head row belongs to
 `verify --all --check`, which runs after the append; first publication is
-therefore `build` first and `verify --check` second, not a fixed point. A build
-that failed cannot publish, because the registry row is a separate, later
-action.
+therefore a successful `build` followed by the checks, not a fixed point.
+
+Three moments are distinct and must not be collapsed:
+
+1. **Candidate output.** `build` exits 0 and the lock, sealed bundle and legacy
+   snapshot exist in the working tree. Nothing is published and the registry is
+   untouched.
+2. **Registry append.** The publisher inserts the `published` and `identities`
+   rows into `bundles/published.json`, using the `definition_digest` the build
+   printed. This is a working-tree edit after a successful build; while the PR is
+   open the rows are candidate first publications, not publication.
+3. **Publication.** The merged commit. Only then does a row become a base entry
+   and the snapshot become immutable.
+
+Both checks run between 2 and 3 and only with the rows already present:
+`verify --all --check` (which requires a head row for every head-selected path)
+and `verify --published --check`, and both must pass before the publisher
+commits. A failed build stops the sequence at 1, so it cannot leave a row behind;
+a failing check stops it before 3, so it cannot publish. The row is never
+written "after a passing `--check`": `--all --check` needs the row, so that order
+would be unsatisfiable and would recreate the registry cycle this section removes.
 
 **`build` validates every output in memory and only then replaces files.** It
 computes the lock, sealed bundle, legacy snapshot and every digest in memory, and
-runs `read` and the byte comparison there, before it creates any output file. It
-then writes each output to a temporary sibling in the destination directory,
-flushes it, and renames it over the destination. A deterministic rejection
-(exit 1) happens before the first temporary file, so it writes nothing. An I/O or
-internal failure during the write phase (exit 2) may leave a temporary file or a
-partially replaced set, but never a set that `--check` accepts as current: the
-lock and sealed bundle record the same `bundle_digest` and `definition_digest`, so
-a new lock with an old sealed bundle (or the reverse) is a comparison failure.
-The legacy snapshot is a development bridge rebuilt by the next successful build,
-not a release artifact. The registry row is written by the publisher after a
-successful build and a passing `--check`, so no failed build leaves a *published*
-partial artifact. Git supplies repository-level atomicity; `build` supplies
-"exit 0 means every output was validated before any was written".
+runs `read` and the byte comparison there, before it creates any output file. A
+deterministic rejection (exit 1) happens before the first temporary file, so it
+writes nothing and removes nothing. The write phase then removes the previous
+legacy snapshot and replaces the lock, the sealed bundle and finally that
+snapshot, each through a temporary sibling in the destination directory, a flush
+and a rename. An I/O or internal failure during this phase (exit 2) may leave a
+temporary file, a missing legacy snapshot, or a partially replaced set. It cannot
+leave a lock and sealed bundle that disagree: both record the same
+`bundle_digest` and `definition_digest`, so a new lock with an old sealed bundle
+(or the reverse) is a comparison failure. It can leave the new lock and sealed
+bundle with the legacy snapshot absent, which is the state the next paragraph
+defines: the two release artifacts are consistent, and only the cache must be
+regenerated.
+
+`verify --all --check` proves exactly the release artifacts: the committed lock
+and the sealed bundle, rebuilt from the exact selected closure. It does **not**
+compare the legacy snapshot. That snapshot is a derived development cache: it is
+written for `--definitions <dir>`, it enters no digest, and it is not part of
+`bundle_digest`, `definition_digest` or `release_digest` (§7). A stale copy
+therefore cannot make a release identity wrong; it can only mislead a developer
+who reads it as current. Removing it before the rewrite and writing it last is
+what makes the cache safe without widening `--check`: an interrupted write leaves
+it absent, so a later `--definitions` read fails instead of returning the
+previous build's rows. Any bytes read through `--definitions` after an exit-2
+build are not evidence about the current build; run `build` again. Git supplies
+repository-level atomicity; `build` supplies "exit 0 means every output was
+validated before any was written".
+
+Counterexample if the legacy snapshot were written in place before the lock: a
+crash after the new lock and sealed bundle but before the legacy write leaves a
+snapshot from the previous build next to a consistent new release pair, and a
+developer reading that snapshot would attribute old rows to the new bundle.
+Counterexample if `--check` had to rebuild the legacy snapshot: the release gate
+would depend on a derived cache whose bytes no release identity records, and a
+deliberate cache regeneration would become a release event. Neither is needed:
+removing the stale file and stating that `--check` covers only lock and sealed
+bundle closes the hazard at the write that creates it.
 
 Counterexample if `build` required its own registry row: the row needs
 `definition_digest`, which needs the build, so a first publication could never
@@ -2287,20 +2391,21 @@ does not pretend to be `fmp/0.1` diagnostics.
 
 | Class | Examples | Exit |
 |---|---|---|
-| Deterministic rejection | manifest shape (required/optional keys), identifier/path lexical violation, artifact filename mismatch, empty forms, path escape, a symlink/reparse point on a package path, or an opened entry whose name differs from the declared segment, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, form-scope materialize stage, form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit | 1 |
+| Deterministic rejection | manifest shape (required/optional keys), identifier/path lexical violation, a reversed or duplicated `enabled_extensions`/`requires_capabilities` array, artifact filename mismatch, empty forms, path escape, a symlink/reparse point on a package path, or an opened entry whose name differs from the declared segment, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, form-scope materialize stage, form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit | 1 |
 | Host / I/O / internal | unreadable file, unwritable lock, internal invariant break, materializer `Internal`/`HostFailure` during conformance | 2 |
 | Success | build or verify passed, digest printed | 0 |
 
 The enum names these rejections (`unsupported-capability`, `capability-mismatch`,
 `unsupported-asset`,
-`version-conflict`, `aggregate-limit`, `legacy-row-mismatch`,
+`version-conflict`, `aggregate-limit`, `resource-limit`, `legacy-row-mismatch`,
 `legacy-target-mismatch`, `evidence-mismatch`, `evidence-incomplete`,
 `missing-cases`, `uncovered-form`, `empty-package`, `case-evidence-mismatch`,
 `case-plan-identity`, `case-form-mismatch`, `case-error-scope`,
 `case-format-unsupported`, `case-baseline-invalid`, `case-mutation-mismatch`,
 `case-diagnostics-mismatch`, `case-expect-shape`, `form-family-mismatch`,
 `form-extension-mismatch`, `reserved-identity`, `path-version-mismatch`,
-`path-escape`, `identifier-lexical`, `path-lexical`, `bundle-file-mismatch`,
+`path-escape`, `identifier-lexical`, `path-lexical`, `extension-lexical`,
+`capability-lexical`, `bundle-file-mismatch`,
 `published-package-modified`, `published-registry-modified`,
 `published-registry-incomplete`, `published-registry-invalid`,
 `bundle-id-conflict`, `definition-identity-conflict`, `unmapped-package-path`,
@@ -2327,7 +2432,8 @@ robustness:
 - manifest plus declared asset bytes per package ≤ 16 MiB, enforced by the
   cumulative read in §12.1;
 - total evidence bytes per package ≤ 16 MiB;
-- packages per closure ≤ 1024; total package bytes per closure ≤ 64 MiB;
+- packages per closure ≤ 1024; total package-root bytes read per closure
+  ≤ 64 MiB, charged by §12.2;
 - total declared assets per closure ≤ 65 536; total cases per closure ≤ 65 536;
   total evidence files per closure ≤ 65 536;
 - one path ≤ 1024 bytes; dependency depth ≤ 64;
@@ -2369,6 +2475,48 @@ Counterexample if only the per-file limit existed: 2048 files of 1 MiB each pass
 every per-file check and make the builder read 2 GiB for one package. A single
 `verify --package` run has no closure total, so the cumulative counter is the
 only bound that applies.
+
+#### 12.2 The per-closure budget has one counter and one counted set
+
+A command that opens a selected package root keeps **one closure counter** for
+the whole run, in addition to the per-package counters. It charges the byte count
+of every file it reads from a package root, counting each distinct path once:
+
+- `package.json`;
+- every declared form, type and profile asset it reads;
+- `tests/cases.json`;
+- `evidence/manifest.json`;
+- every file the evidence manifest lists and the command reads — `NOTICE`,
+  `README.md`, oracle text and the case evidence files it names.
+
+Nothing else is charged: the spec, the lock, `bundles/published.json`, the pinned
+legacy definition read for row comparison, and the builder's own outputs have
+their own per-file bounds in §12 and are not package-root bytes.
+
+The counted set is fixed by these rules, not by whichever files a shortcut
+happens to open. `build`, `verify --all` and the release gates read the whole
+list above; a command that reads less charges less, and no command may read more
+than 64 MiB of package-root bytes in one run. A path is charged **once per
+package root per run**, even if the command opens it twice (for example a form
+asset that the evidence manifest also lists): paying twice for one file would
+make the limit depend on which fields mention a path. A package reached along
+two dependency paths is charged once because the spec lists every closure member
+exactly once and a repeated `packages[].path` is already `path-lexical` (§8.2);
+a diamond has one shared directory, not two.
+
+Rejection happens **at the read that would cross the limit**: the reader stops at
+the remaining budget and returns `aggregate-limit` (exit 1) before consuming the
+crossing bytes. Metadata is a hint, not the check, for the reason given in
+§12.1. The 16 MiB per-package asset counter and the 16 MiB evidence counter stay
+independent, so a package cannot be shielded by staying under its own limits
+while the closure total grows.
+
+Counterexample if the closure total charged only manifests and form assets: each
+of three packages carries 12 MiB of cases plus 12 MiB of evidence, all inside the
+per-package limits, yet the command reads 72 MiB under a nominal 64 MiB closure
+cap; eight such packages read 192 MiB. The required negative therefore uses
+**several** packages, each inside its own limits, whose sum crosses 64 MiB — a
+single-package overflow tests §12.1, not this rule.
 
 ### 13. The x86 slice is pinned to `0.1.0`, not the newest definition
 
@@ -2567,11 +2715,12 @@ comparing the materializer with itself proves the bytes.
   consume that value. A recorded digest therefore cannot describe bytes the
   definition did not use, and a file changed between stages cannot produce a
   bundle that fails to replay (§9).
-- First publication is cycle-free: `build` emits the digests, the publisher
-  appends the registry rows, and only the later `--check` requires them.
-  `build` validates every output in memory before replacing a file and never
-  writes the registry, so a failed build leaves no published partial artifact
-  (§8.3).
+- First publication is cycle-free and has one order: `build` exits 0, the
+  publisher appends the registry rows, both `--check`s pass, and the commit
+  merges. `build` validates every output in memory before replacing a file and
+  never writes the registry, so a failed build leaves no row and no published
+  partial artifact; the legacy snapshot is a derived cache that the same build
+  regenerates, and `--check` does not compare it (§8.3).
 - A package's `enabled_extensions` is a conservative declared cover, not a
   minimal set. Over-declaration is legal and only narrows which bundles may
   select the package; under-declaration is `form-extension-mismatch`, and
@@ -2862,8 +3011,17 @@ comparing the materializer with itself proves the bytes.
 - **Let `build` require the registry row it helps create, or write that row.**
   Rejected: the row needs the `definition_digest` the build produces, so the
   first publication would deadlock; and a builder-written registry would mix
-  generation with publication. `build` then append then `--check` is the
-  cycle-free order (§8.3).
+  generation with publication. `build` success, then the append, then both
+  `--check`s, then the merge is the only cycle-free order (§8.3).
+- **Write the registry row after a passing `--check`.** Rejected: `--all
+  --check` requires a head row for every head-selected path, so a row written
+  afterwards could never make that check pass. It also confuses candidate output,
+  registry append and publication; only the merged commit publishes (§8.3).
+- **Make `--check` rebuild the legacy snapshot.** Rejected: it would let a derived
+  development cache decide a release gate, and a cache regeneration would become
+  a release event. `--check` proves the lock and sealed bundle; the write phase
+  removes the stale snapshot first and writes it last, so an interrupted write
+  leaves it absent rather than stale (§8.3).
 - **Measure JSON depth after parsing.** Rejected: the parser recurses, so a
   20 000-deep document overflows before the measurement runs. The budget is
   enforced iteratively before `fmp_model::json::parse` is called (§12).
@@ -2916,7 +3074,7 @@ comparing the materializer with itself proves the bytes.
 | The generic `family(form_id) == isa_family` rule and its cross-ISA negative | not implemented; `check_form_id` only checks the family in isolation | **unverified** — H2a |
 | Unknown-capability rejection, reserved-asset rejection, version-conflict rule and aggregate limits | not implemented | **unverified** — H2a |
 | Evidence completeness, `evidence_digest` and `release_digest`, including development-mode direct case hashing versus the release manifest | not implemented | **unverified** — H2a owns the mechanism; H2b adds assets only |
-| Case, evidence, spec and lock byte/count budgets, including the cumulative per-package asset budget | not implemented | **unverified** — H2a |
+| Case, evidence, spec and lock byte/count budgets, including the cumulative per-package asset budget and the single per-closure counter of §12.2 | not implemented | **unverified** — H2a |
 | Immutable published version directories, legacy target consistency, form-scope mutation coverage, complete diagnostic matching and level-specific projections | not implemented | **unverified** — H2a |
 | Published-version registry, retirement survival and registry edit detection | not implemented | **unverified** — H2a |
 | First publication in the creating PR, with base-only immutability | specified; the old base-or-head rule would have rejected the creating PR | **specified, not implemented** — H2a |
@@ -2943,7 +3101,11 @@ comparing the materializer with itself proves the bytes.
 | Boundary evidence splits representable from form domains and records only emitted diagnostic fields | specified; the three packages and their cases do not exist | **unverified** — H2a/H2b |
 | The plan×definition matrix keeps `fmp/0.1` + `fmp-def/0.1` equality and `fmp/0.1` + `fmp-def/0.2` subset, and only a new plan protocol lifts `h2-exact-target` | existing two cells read from `check_target`; the new-plan cell does not exist | **partly measured, H3 gate** |
 | One loaded package value feeds the source digest, row/target comparison, per-package `read` and merge | specified; no reader exists | **unverified** — H2a |
-| First publication bootstraps without a registry cycle, and `build` validates every output before writing | specified; no builder exists | **unverified** — H2a |
+| First publication bootstraps without a registry cycle, and `build` validates every output before writing | specified; the order is build success → append rows → both `--check`s → commit, and publication is the merged commit; no builder exists | **unverified** — H2a |
+| `--check` proves only the lock and sealed bundle; the legacy snapshot is a derived development cache removed before rewrite | specified; the write phase removes `<legacy>/definition.json` first and writes it last, so an interrupted write leaves it absent, not stale; no builder exists | **specified, not implemented** — H2a |
+| Extension and capability arrays have one strictly increasing, duplicate-free spelling | specified; `extension-lexical`/`capability-lexical` are format rejections before the set relation | **specified, not implemented** — H2a |
+| The 64 MiB closure budget charges every package-root byte read, once per path, and rejects at the crossing read | specified; the counted set is manifest, declared assets, cases, evidence manifest and listed evidence files; no reader exists | **specified, not implemented** — H2a |
+| For `fmp-def/0.1`, `E_form = ∅`, so only `E_package ⊆ E_bundle` is proved; a `legacy_source` package adds target consistency, not a form-derived requirement | specified; `FORM_FIELDS` rejects `requires_extensions` in 0.1, and no builder exists | **specified, not implemented** — H2a |
 | `enabled_extensions` is a conservative declared cover, not a minimal required set | specified; `fmp-def/0.1` forms have no requirement key and no builder exists | **unverified** — H2a |
 | Form-scope negatives are `bind`-only and point at the mutated operand | specified; `fmp-materialize/src/lib.rs` emits `E-BYTE-001` at `/instructions/0/expected_digest` after encoding, so the counterexample is real | **specified, not implemented** — H2a |
 | Dependency-closure status distinct from package structure, including transitive re-reading of a `--closure` lock, cycles and the dependent-package author path | not implemented | **unverified** — H2a |
@@ -3030,10 +3192,31 @@ comparing the materializer with itself proves the bytes.
   comparison, the per-package `read` and the merge (§9).
 - Someone makes `build` require the registry row it helps create, or lets
   `build` write the registry: stop. First publication is build, then append,
-  then `--check` (§8.3).
+  then both `--check`s, then commit (§8.3).
+- Someone writes the registry row only after a passing `--check`, or treats the
+  merge of the creating PR as anything other than the publication moment: stop.
+  `verify --all --check` requires the row, so that order cannot run, and an
+  unmerged row is only a candidate (§8.3).
+- Someone makes `--check` rebuild or compare the legacy snapshot, or leaves a
+  previous build's snapshot readable after an exit-2 write: stop. The snapshot is
+  a derived development cache, `--check` covers lock and sealed bundle, and the
+  write phase removes the stale file first (§8.3, §7).
+- Someone accepts a reversed or duplicated `enabled_extensions` or
+  `requires_capabilities` array because the set is unchanged: stop. The array has
+  one spelling and the violation is `extension-lexical`/`capability-lexical`
+  (§1, §1.2).
+- Someone counts only manifest and asset bytes toward the 64 MiB closure budget,
+  or charges a diamond dependency twice: stop. The counter charges every
+  package-root byte the command reads, once per path, and rejects at the crossing
+  read (§12.2).
 - Someone treats `enabled_extensions` as exactly the union of the form
   requirements, or trims an over-declared cover: stop. The declared set is a
   conservative cover and exactness is a later format (§4.1).
+- Someone reports "the target cover relation is verified" as "the ISA extension
+  requirements are completely proved", or adds an ISA-specific derivation to make
+  `fmp-def/0.1`'s empty `E_form` look meaningful: stop. For 0.1 only
+  `E_package ⊆ E_bundle` is proved, and the ISA authority stays outside the
+  builder (§4.1).
 - Someone lets a retired `(namespace, version)` come back with a different
   `definition_digest`, or treats `bundle_id` as an immutable release identity:
   stop. The definition name is permanent and the bundle ID is a movable release
