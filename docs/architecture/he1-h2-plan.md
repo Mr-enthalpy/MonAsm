@@ -1,10 +1,15 @@
 # H2 实施计划：目标包作者层与确定性定义构建
 
 - 状态：**待审提案**（2026-11-16；同日按八轮审计 P1/P2 修订，2026-11-17 至
-  2026-11-18 按第九轮至第十五轮审计修订）。规范决策见
+  2026-11-18 按第九轮至第十六轮审计修订）。规范决策见
   `docs/adr/0128-package-and-bundle-contract.md`，该 ADR 仍为 `proposed`；
   评审合并前本文和 ADR 都不是冻结依据。本文保留为实施计划与验收映射。
   **H2 尚未实现，本文不把任何 H2/H3/H4/H5 项目算作已完成。**
+  第十六轮固定：`legacy_source` 的迁移目标等价是 `TargetEq`——`definition_format`
+  相等，`target_identity` 除 `enabled_extensions` 外逐字段 canonical 相等、该字段
+  按集合相等，因此规范升序的新包可以迁移扩展数组顺序不同的冻结 legacy 文档；
+  边界正例取最终合法域 `D_form`（应用 `L`/`U`、`align_bits` 和 `excluded`）的
+  端点与内部值，原始端点被排除或不对齐时不得作正例。
   第十五轮固定：`verify --package` 只验证用例的静态阶段契约，
   `package_conformance` 才执行并证明第一个真实拒绝阶段与完整诊断集，报告分别
   记录两种状态；寄存器边界按编码宽度 `w` 区分，`D_reg = ([0, 2^w−1] ∩
@@ -408,14 +413,18 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
 - `legacy_source` 按固定路径解析为 `<root>/definitions/<isa>/<version>.json`；
   `isa` 是目录名（`x86_64`、`aarch64`、`rv64`），不是 form 家族名。构建器不
   搜索、不取最新、不在多个候选中选择。
-- 有 `legacy_source` 时，迁移等价性不止是行相等：包的 `definition_format` 和
-  完整 `target_identity` 必须与钉住文档的对应值 canonical 相等（`isa_family`、
-  `isa_variant`、`execution_mode`、`enabled_extensions`、`byte_order`、
-  `address_width` 及 legacy 目标实际声明的字段）。不一致是
-  `legacy-target-mismatch`（退出码 1），在合并文档交给 `read` 之前拒绝。历史
-  文件仍不是目标权威；包自述目标，legacy 只用于证明迁移保持语义。把
-  `execution_mode` 改成 `"32"` 或 `address_width` 改成 32、同时保留逐字节相同
-  form 行的反例，必须被这条检查拒绝。
+- 有 `legacy_source` 时，迁移等价性不止是行相等：包的 `definition_format` 必须
+  与钉住文档相等，`target_identity` 必须满足 `TargetEq`——除
+  `enabled_extensions` 外每个字段 canonical 相等，`enabled_extensions` 按集合
+  相等。这条规则是必需的：§1 要求包内数组用唯一严格升序写法，而冻结的 legacy
+  文档保留已发布字节（`definitions/rv64/0.6.0.json` 是
+  `["rv64i","rv64c"]`，规范写法是 `["rv64c","rv64i"]`）；若要求原始数组相等，
+  两种写法会分别被 `legacy-target-mismatch` 和 `extension-lexical` 拒绝，不存在
+  合法清单。包仍自述目标并各自计算摘要，legacy 文件不重拼写。其他字段不一致或
+  扩展成员集合不同是 `legacy-target-mismatch`（退出码 1），在合并文档交给
+  `read` 之前拒绝。历史文件仍不是目标权威；包自述目标，legacy 只用于证明迁移
+  保持语义。把 `execution_mode` 改成 `"32"` 或 `address_width` 改成 32、同时保留
+  逐字节相同 form 行的反例，必须被这条检查拒绝。
 - `exports.forms` 用 `{id, path}` 而不是裸字符串：文件内容里的 `form_id` 必须
   等于声明的 `id`；交换两个文件不会静默改变归属。
 - `exports.forms` 必须按 `id` 严格升序，重复 `id` 拒绝；这样清单只有一种写法，
@@ -713,7 +722,8 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   `E_form(f) = ∅`，`⋃E_form ⊆ E_package` 对每个包都自动成立，无法发现 form
   真正需要、而清单漏报的 ISA 扩展。H2 对 `0.1` 包实际证明的是
   `E_package ⊆ E_bundle`：声明的覆盖落在所选目标内。`legacy_source` 只额外提供
-  target 一致性（`definition_format` 与完整 `target_identity` 必须等于钉住行，
+  target 一致性（`definition_format` 相等，`target_identity` 满足 `TargetEq`：
+  除 `enabled_extensions` 按集合外逐字段相等；不一致是
   `legacy-target-mismatch`），仍不从行体推导 ISA 需求；没有 `legacy_source` 的
   新包依赖作者声明和包自己的用例/证据。构建器不得为消除这个限制而发明 ISA 专用
   推导器——那会让它成为第二套 ISA 语义权威（`ADR-0125`）。H2 验收报告必须写明
@@ -1244,8 +1254,9 @@ H2 每个 ISA 选一个代表性纵向切片，不迁移全部 forms：
 2. 把包文件的 form 对象与 legacy 行分别转成 canonical JSON；
 3. 断言两者逐字节相等；
 4. 断言包导出的 form 集合恰好等于声明的集合，不多不少；
-5. 断言包的 `definition_format` 和完整 `target_identity` 与 legacy 文档对应值
-   canonical 相等。目标由包自述，但迁移包必须证明自述没有改变来源语义；不一致
+5. 断言包的 `definition_format` 与 legacy 文档相等，且 `target_identity` 满足
+   `TargetEq`：除 `enabled_extensions` 外逐字段 canonical 相等，扩展按集合
+   相等。目标由包自述，但迁移包必须证明自述没有改变来源语义；不一致
    是 `legacy-target-mismatch`（退出码 1），在合并文档交给 `read` 之前拒绝。
 
 没有 `legacy_source` 的包跳过 1–3 和 5；`verify --package` 检查清单、路径、
@@ -1343,26 +1354,36 @@ harness 只会把它替换成正确身份，无法制造 digest 错配，也**�
 - **代表性 form 带边界证据，但边界只取计划可表示的值（第十、十一轮 P2-2）。**
   一个正例加一个非法邻域只证明该 form 存在，不证明操作数取值域。域分两层：
   `D_Representable` 是 `plan::read` 能构造的值（`payload.reg` 是 `u64`，
-  `payload.value` 是 `i128`，modifier 值是整数/字符串/布尔），`D_Form` 是槽位
-  接受的值，且 `D_Form ⊆ D_Representable`。只有落在
-  `D_Representable \ D_Form` 的值才能做 `scope:"form"` 负例；超出表示域的值
+  `payload.value` 是 `i128`，modifier 值是整数/字符串/布尔），`D_form` 是槽位
+  接受的值，且 `D_form ⊆ D_Representable`。只有落在
+  `D_Representable \ D_form` 的值才能做 `scope:"form"` 负例；超出表示域的值
   （例如 `{"reg": -1}`）是 `scope:"plan"` + `stage:"read"` 的 `plan::read`
   拒绝（`E-PLAN-002` 在 `payload/reg`），不能算 form 覆盖。
-  对 H2a/H2b 实际交付的有界操作数：
-  - 立即数区间 `[min, max]`：`min`/`max` 正例，`min−1`/`max+1` 为 form 负例。
+  对 H2a/H2b 实际交付的有界操作数，边界必须取自**最终合法域**，而不是原始
+  编码区间。对有区间 `[L, U]`、对齐 `a`（`align_bits`）和排除集 `E` 的槽位：
+  `D_form = {x ∈ D_Representable, L≤x≤U, x≡0 (mod 2^a)} \ E`。寄存器再取
+  `L=0`、`U` 为 `2^w−1` 与 `u64::MAX` 的较小者、`a=0`。
+  - 正例是 `D_form` 的最小值、最大值和一个有代表性的内部值。原始端点若被排除
+    或不对齐就不是正例：`x86:mov/rm8h-r8h/legacy`（`w=3`，`E={0,1,2,3}`）的
+    正例是 `4`/`7`；`aarch64:add/w32-w32-w32-imm6-lsl`（`E=32..63`）的正例上界
+    是 `31`；`riscv:c.addi/rd-imm6`（`E={0}`）的正例下界是 `1`。
+  - excluded 中可表示但非法的值是 `scope:"form"` 负例（`E-RANGE-004`）。
+  - 相邻越界值（`min−1`/`max+1`，或寄存器的 `2^w`）只有在
+    `D_Representable` 能表示时才能作 `stage:"bind"` 的 form 负例；不能表示的值
+    只能作 `stage:"read"` 的 plan 负例，不能声明成读取器会先拒绝的 bind 负例。
   - 寄存器字段：编码宽度 `w` 是 placement 宽度之和，可超过 64 位（`ADR-0127`
     §7.1 只限制每个 placement，不限制总和；H1 的
     `prototype/crates/fmp-materialize/tests/he1_wide_register.rs` 已对
     64/127/128/192 位调用 `bind` 与 `materialize`）。`payload.reg` 仍是 `u64`，
-    所以计划可表示的寄存器域是
-    `D_reg = ([0, 2^w−1] ∩ [0, 2^64−1]) \ E`，`E` 是 form 可表示的排除值：
-    - `w < 64`：正例 `0` 与 `2^w−1`，相邻非法 `2^w` 作 form 负例；
-    - `w = 64`：正例 `0` 与 `u64::MAX`，`2^64` 不可表示，form 负例用可表示的
-      排除值或错误 `target_type`/操作数类型；
-    - `w > 64`：正例 `0` 与 `u64::MAX`（都在字段内），`2^w−1` 与 `2^w` 都不可
-      表示，因此不要求、也不允许声明 `max+1`；form 负例用排除值或错误
-      `target_type`/操作数类型。没有排除值的宽槽位没有数值 form 负例，不得
-      发明一个。
+    所以 `D_reg = ([0, 2^w−1] ∩ [0, 2^64−1]) \ E`：
+    - `w < 64`：正例是 `D_reg` 的最小与最大成员（通常 `0`/`2^w−1`）；可表示的
+      `2^w` 作 form 负例；
+    - `w = 64`：正例是 `D_reg` 的最小与最大成员；`2^64` 不可表示，form 负例用
+      可表示的排除值或错误 `target_type`/操作数类型；
+    - `w > 64`：正例是 `D_reg` 的最小与最大成员（通常 `0`/`u64::MAX`）；
+      `2^w−1` 与 `2^w` 都不可表示，因此不要求、也不允许声明 `max+1`；form 负例
+      用排除值或错误 `target_type`/操作数类型。没有排除值的宽槽位没有数值 form
+      负例，不得发明一个。
     `0−1` 不可表示，只能做 `scope:"plan"` 的 `stage:"read"` 负例。另需一个
     包级边界协议测试让 127/192 位槽位走完 `read`/`bind`/`materialize`，确保 H2
     作者层不会把 H1 已验证的编码能力缩回 64 位；它补充而不是替代三个实际包的
@@ -1528,7 +1549,9 @@ A/B 工作流合并留给 H5。
 | `the_no_follow_open_is_proved_on_three_platforms` | H2a N1：Linux/macOS/Windows 各跑中间目录链接、末段文件链接、Windows reparse point、以及检查与打开之间替换目标 → 打开拒绝并报 `path-escape`。同一门禁还跑两条精确拼写负例：声明 `forms/add.json` 而中间目录是 `Forms/`，以及最终文件是 `Add.json` → 三平台都报 `path-lexical`，大小写不敏感卷不得成功打开。另加**目录项替换**场景：名字匹配后、打开前把该项换成另一文件或链接 → 只能打开刚匹配的对象或以 `path-escape` 拒绝，不能读到未检查的新对象；只测符号链接不算覆盖。某平台无法表达 no-follow 打开、精确名字查找或把打开绑定到匹配项时该平台失败，且 H2a 判定失败，不降级为跟随打开；一个只在 Linux 通过的门禁不算通过 | 第八轮 P2-4、第十轮 P1-2、第十一轮 P2-3、`ADR-0128` §3/§9、N1 |
 | `a_published_version_cannot_change_evidence_in_place` | base 已登记 `0.1.0` 的 `tests/cases.json` 改动并同步 manifest → 仍然是 `published-package-modified`；新版本 `0.2.0/` 才允许 `evidence_digest`/`release_digest` 变化 | 第五轮 P2-3、`ADR-0128` §1.1/§7.1 |
 | `a_package_update_does_not_edit_an_old_spec` | 只新增版本目录、不动 spec/lock；旧 lock 字节不变 | 第三轮 P1-1、`HE-AC-05` |
-| `a_legacy_package_target_must_match_its_source` | 复制 x86 行不变、把 `execution_mode` 改成 `"32"` 或 `address_width` 改成 32 → `legacy-target-mismatch`，在 `read` 前拒绝 | 第三轮 P1-2 |
+| `a_legacy_package_target_must_match_its_source` | 复制 x86 行不变、把 `execution_mode` 改成 `"32"` 或 `address_width` 改成 32 → `legacy-target-mismatch`，在 `read` 前拒绝；扩展成员不同（不是顺序不同）同样拒绝 | 第三轮 P1-2、第十六轮 P1-1 |
+| `a_set_equal_target_migrates_a_differently_ordered_legacy_array` | 测试用合成包从 `definitions/rv64/0.6.0.json` 原样迁移一条 form（不发布第四个包）：新包按 §1 写 `["rv64c","rv64i"]`，legacy 是 `["rv64i","rv64c"]` → `TargetEq` 通过，构建成功；把成员改成 `["rv64c"]` 或 `["rv64c","rv64i","rv64m"]` → `legacy-target-mismatch`；把新包写成 legacy 顺序 → `extension-lexical`。原始数组相等会产生前两种都失败、后一种也失败的不可满足组合 | 第十六轮 P1-1、`ADR-0128` §1.1、§1 |
+| `a_boundary_positive_lies_in_the_final_legal_domain` | 对 `D_form = {x ∈ D_Representable, L≤x≤U, x≡0 (mod 2^a)} \ E`：`x86:mov/rm8h-r8h/legacy`（`w=3`，`E={0,1,2,3}`）正例是 `4`/`7`；`aarch64:add/w32-w32-w32-imm6-lsl`（`E=32..63`）正例上界是 `31`；`riscv:c.addi/rd-imm6`（`E={0}`）正例下界是 `1`。把原始端点 `0` 或 `63` 当正例 → 该用例被实际 `bind` 拒绝，测试失败；excluded 值作 form 负例，只有可表示的越界值才作 `stage:"bind"` 负例 | 第十六轮 P1-2、`ADR-0128` §9.1 |
 | `the_digest_preimage_vector_matches` | H2-D8 向量在 Rust 与 Python 中都得到 `1afee65c…`；把嵌套摘要改成原始 32 字节 → 不匹配 | 第三轮 P2-3 |
 | `level_zero_and_level_one_projections_are_exact` | Level 0 声明 `symbols` → `case-expect-shape`；Level 1 `include_symbol_table:false` 缺 `symbols` → 接受，写 `symbols: []` → 拒绝；`fingerprint`/`materializer_version` 永不在投影 | 第三轮 P2-4 |
 | `a_dependent_package_is_structure_verified_but_closure_unverified` | 非空 `dependencies` 且无闭包：开发 `verify --package` 退出 0 并打印 `dependency_closure: unverified`；`--release-evidence` 在完整证据下退出 0；`--release` 退出 1（`dependency-unverified`）；`--release --closure <lock>` 且摘要匹配后通过 | 第三轮 P2-5、第四轮 P1-3、第五轮 P2-4 |
@@ -1542,7 +1565,7 @@ A/B 工作流合并留给 H5。
 | `every_package_form_equals_the_pinned_legacy_row` | 三个包逐 form canonical JSON 相等，比较对象是钉住版本 | `HE-AC-03`、`HE-AC-11` |
 | `a_form_row_is_compared_against_its_pinned_version_not_the_newest_file` | 把钉住版本换成最新版本 → x86 行被判定不等；构建器不自动改用最新 | `H2-D8`、`HE-AC-11` |
 | `the_package_export_set_is_exact` | 导出集合 = 清单声明集合；没有隐藏 form | `HE-AC-03` |
-| `a_representative_form_proves_its_bounded_operand_domain` | 对 H2a/H2b 实际交付的有界 form：立即数给 `min`/`max` 正例与 `min−1`/`max+1` form 负例；寄存器按 `D_reg = ([0, 2^w−1] ∩ [0, 2^64−1]) \ E`——`w < 64` 给 `0`/`2^w−1` 正例与 `2^w` form 负例，`w = 64` 给 `0`/`u64::MAX` 且用排除值或错误 `target_type` 作 form 负例，`w > 64` 给 `0`/`u64::MAX` 且不得要求 `2^w`；`0−1` 只作 `scope:"plan"` 负例；modifier 给允许对与可表示但不允许的对。form 负例由 `bind` 在被改动操作数处拒绝；证据记录诊断实际携带的键——立即数 `E-RANGE-001` 的 `min`/`max`/`value`、寄存器 `E-OPERAND-004` 的 `target_type`/`value`/`field_bits`、排除值 `E-RANGE-004` 的 `target_type`/`value`/`excluded`，不要求该诊断不产生的键。pass 条件仍是 `(code, path)` 集合 | 第十、十一、十五轮 P2-2、`ADR-0128` §9.1、§4.3 |
+| `a_representative_form_proves_its_bounded_operand_domain` | 对 H2a/H2b 实际交付的有界 form，正例取最终合法域 `D_form = {x ∈ D_Representable, L≤x≤U, x≡0 (mod 2^a)} \ E` 的最小值、最大值和一个内部值；原始端点若被排除或不对齐就不是正例。立即数用 `D_form` 的端点与可表示的越界值；寄存器按 `D_reg = ([0, 2^w−1] ∩ [0, 2^64−1]) \ E`——`w < 64` 的上界是 `D_reg` 的最大成员（通常 `2^w−1`），`w = 64` 至多 `u64::MAX` 且用排除值或错误 `target_type` 作 form 负例，`w > 64` 同样至多 `u64::MAX` 且不得要求 `2^w`；`0−1` 只作 `scope:"plan"` 负例；modifier 给允许对与可表示但不允许的对。excluded 值作 form 负例，只有可表示的越界值才作 `stage:"bind"` 负例；form 负例由 `bind` 在被改动操作数处拒绝。证据记录诊断实际携带的键——立即数 `E-RANGE-001` 的 `min`/`max`/`value`、寄存器 `E-OPERAND-004` 的 `target_type`/`value`/`field_bits`、排除值 `E-RANGE-004` 的 `target_type`/`value`/`excluded`，不要求该诊断不产生的键。pass 条件仍是 `(code, path)` 集合 | 第十、十一、十五、十六轮、`ADR-0128` §9.1、§4.3 |
 | `a_wide_register_slot_keeps_the_h1_encoding_domain` | 合成包的槽位宽度为 127 和 192 位（各 placement ≤ 64 位，总和超过 64），寄存器值 `0` 与 `u64::MAX` 走 `plan::read` → `bind` → `materialize` 并产生确定字节；边界证据不得要求 `2^127`/`2^192`，form 负例用排除值或错误操作数类型。实现把作者层寄存器域硬编码为 64 位、或拒绝宽槽位时失败 | 第十五轮 P2-2、`ADR-0128` §9.1、`prototype/crates/fmp-materialize/tests/he1_wide_register.rs` |
 | `a_static_stage_claim_is_not_a_dynamic_rejection` | 用例声明 `scope:"plan"` + `stage:"bind"`，但其计划在 `plan::read` 就以 `E-PLAN-002` 拒绝 → `verify --package` 只做静态检查可通过；`package_conformance` 必须拒绝为 `case-error-scope`（退出 1），且该用例不计为有效负例。报告必须分别记录“静态文档有效”和“执行阶段已验证” | 第十五轮 P2-1、`ADR-0128` §9.1 |
 | `the_x86_package_reproduces_legacy_machine_output` | X86-P1 的 §4.2.1 精确投影相等 | `HE-T18`（H2 部分） |
@@ -1670,7 +1693,7 @@ H2 是一个阶段，但按 `ADR-0125` §13.1 拆成两个可回归提交（同�
 
 | 提交 | 内容 | 必过 |
 |---|---|---|
-| H2a | `ADR-0128` 评审通过后接受 + 本文状态更新 + `fmp-definition` crate（manifest、spec、build、digest、error、CLI）+ `monasm-standalone/0.1` 独立身份 + **完整的单包发布证据与摘要机制**（`tests/cases.json` 入清单、`NOTICE`、`sources`、`oracle.status`/skip、`evidence_digest`/`release_digest`、跨语言摘要向量、用例/证据/spec/lock/registry 预算与单包累计资产预算）+ **版本目录不可变（只保护 base 条目、同一 PR 首次发布合法、追加登记、退役后仍不可变、全局 `(package_id, version)` 唯一且永久绑定 path/摘要）** + **`identities` 定义名历史与永久摘要绑定** + **spec 严格排序 + 跨 spec `bundle_id`/定义身份唯一** + **`bundle_id` 可移动、`(bundle_id, bundle_digest)` 为 bundle 内容标签、`release_digest` 为证据完备发布身份** + **打开动作 no-follow 的读取边界（含 Linux/macOS/Windows 可行性门禁与 `--root` 下的输出父目录）** + **已提交 lock/sealed 的有界流式比较** + **`requires_capabilities` 声明等于推导** + **冻结 legacy 定义名保留** + **form ⊆ 包 ⊆ bundle 与合并前逐包 `read`**（含 `form-extension-mismatch`） + **`structure`/`--release-evidence`/`dependency_closure` 三态**（含传递闭包重读、缺项/摘要错/环检测）+ **legacy 目标一致性** + **`scope:"form"` 仅 `bind` 拒绝、诊断落在变异操作数上、禁止 `E-BYTE-001`/`E-SIZE-001`** + **用例 stage 三态（`read`/`bind`/`materialize`）且声明阶段必须是第一个拒绝阶段；`verify --package` 只验静态契约，`package_conformance` 验执行阶段与完整诊断集，报告分开记录** + **Level 0/1 精确投影** + **值定义用例差分（成员编辑→成员指针、kind 变化→该位置、数组长度→数组）** + `verify --package --release`、`verify --published --check` 与变更路径门禁（含删除/重命名、registry 变更）+ x86 `mov-register` 包（`0.1.0/`）及其 `tests/cases.json`/`evidence` + 无 `legacy_source` 的合成包契约测试 + 错误 opcode 与错误 form 声明反例 + 构建器单测 + X86-P1 字节等价 + `bundles/` 的 x86 spec/lock/sealed/legacy snapshot + 初始 `bundles/published.json` + `gates.yml` 的 verify 三步与 conformance | fmt、workspace test（含 `package_conformance`）、`check_ids`、`check_definition`、baseline、whitespace |
+| H2a | `ADR-0128` 评审通过后接受 + 本文状态更新 + `fmp-definition` crate（manifest、spec、build、digest、error、CLI）+ `monasm-standalone/0.1` 独立身份 + **完整的单包发布证据与摘要机制**（`tests/cases.json` 入清单、`NOTICE`、`sources`、`oracle.status`/skip、`evidence_digest`/`release_digest`、跨语言摘要向量、用例/证据/spec/lock/registry 预算与单包累计资产预算）+ **版本目录不可变（只保护 base 条目、同一 PR 首次发布合法、追加登记、退役后仍不可变、全局 `(package_id, version)` 唯一且永久绑定 path/摘要）** + **`identities` 定义名历史与永久摘要绑定** + **spec 严格排序 + 跨 spec `bundle_id`/定义身份唯一** + **`bundle_id` 可移动、`(bundle_id, bundle_digest)` 为 bundle 内容标签、`release_digest` 为证据完备发布身份** + **打开动作 no-follow 的读取边界（含 Linux/macOS/Windows 可行性门禁与 `--root` 下的输出父目录）** + **已提交 lock/sealed 的有界流式比较** + **`requires_capabilities` 声明等于推导** + **冻结 legacy 定义名保留** + **form ⊆ 包 ⊆ bundle 与合并前逐包 `read`**（含 `form-extension-mismatch`） + **`structure`/`--release-evidence`/`dependency_closure` 三态**（含传递闭包重读、缺项/摘要错/环检测）+ **legacy 目标一致性（`TargetEq`：扩展按集合、其余字段严格相等）** + **边界正例取最终合法域 `D_form`** + **`scope:"form"` 仅 `bind` 拒绝、诊断落在变异操作数上、禁止 `E-BYTE-001`/`E-SIZE-001`** + **用例 stage 三态（`read`/`bind`/`materialize`）且声明阶段必须是第一个拒绝阶段；`verify --package` 只验静态契约，`package_conformance` 验执行阶段与完整诊断集，报告分开记录** + **Level 0/1 精确投影** + **值定义用例差分（成员编辑→成员指针、kind 变化→该位置、数组长度→数组）** + `verify --package --release`、`verify --published --check` 与变更路径门禁（含删除/重命名、registry 变更）+ x86 `mov-register` 包（`0.1.0/`）及其 `tests/cases.json`/`evidence` + 无 `legacy_source` 的合成包契约测试 + 错误 opcode 与错误 form 声明反例 + 构建器单测 + X86-P1 字节等价 + `bundles/` 的 x86 spec/lock/sealed/legacy snapshot + 初始 `bundles/published.json` + `gates.yml` 的 verify 三步与 conformance | fmt、workspace test（含 `package_conformance`）、`check_ids`、`check_definition`、baseline、whitespace |
 | H2b | aarch64 `add-immediate`（`0.1.0/`）+ rv64 `integer-alu`（`0.1.0/`）+ 三 ISA conformance harness + 这两个包的 cases/evidence/NOTICE 资产 + 跨 ISA/跨包测试 + 全部 lock/sealed/legacy snapshot + 各自 registry 登记项 + `research/he1/H2-report.md` + `STATUS.md` 的 H2 记录 | 同上 + oracle |
 
 H2a 必须先全绿再开 H2b：先证明一个包的构建、摘要、完整发布证据和字节等价，
@@ -1718,7 +1741,9 @@ H2a 的阶段边界不变，但按五个可独立 review 的回归节点推进�
    不含 README/NOTICE/证据用例字节）。
 5. **N5 门禁与 x86 包**：变更路径 CI（先按 base registry 判定包含，再做 head 侧
    包根发现，嵌套 `package.json` 不能遮蔽已发布祖先）、x86 包与 bundles、
-   `gates.yml`、H2a 报告（N4 增加 legacy 等价门禁，N5 增加 base-first 映射）。
+   `gates.yml`（`verify --all --check` 与 `verify --published --check` 都是必过
+   项，取消其一即门禁失败）、H2a 报告（N4 增加 legacy 等价门禁，N5 增加
+   base-first 映射）。
 
 每个节点是一个可独立回归、可独立回滚的提交（或子 PR），各自带失败反例和
 门禁，不是实施者内部的检查清单；前一个节点全绿才进入下一个，尤其不能在 N1 的
@@ -1748,13 +1773,15 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | 按计划格式判断目标关系，重新拒绝合法输入 | `check_target` 的 `subset_rule` 只读定义格式；`fmp/0.1`+`fmp-def/0.2` 是既有合法格子，H3 验收必须显式覆盖它不被重新拒绝 |
 | 只加 `fmp/0.2` 计划协议就以为解除了构建期拒绝 | Builder 在绑定计划前按 `h2-exact-target` 拒绝不相等的 `fmp-def/0.1` 选择；解除需要版本化构建规则，且 `monasm-bundle-spec/0.1` 对同一选择永久保持拒绝，Builder 升级不能改变旧格式的接受语义 |
 | 嵌套 `package.json` 遮蔽已发布祖先 | 变更路径先按 base registry 做祖先包含判断，命中即 `published-package-modified`；只有 base 之外的变更才做 head 侧包根发现 |
-| 负寄存器被当成 form 边界负例 | `payload.reg` 是 `u64`，`{"reg":-1}` 在 `plan::read` 就被拒绝，`bind` 从未运行；`D_Form ⊆ D_Representable`，该值只能作 `scope:"plan"` + `stage:"read"` 负例，寄存器 form 负例用可表示的排除值或（`w < 64` 时）`2^w` |
+| 负寄存器被当成 form 边界负例 | `payload.reg` 是 `u64`，`{"reg":-1}` 在 `plan::read` 就被拒绝，`bind` 从未运行；`D_form ⊆ D_Representable`，该值只能作 `scope:"plan"` + `stage:"read"` 负例，寄存器 form 负例用可表示的排除值或（`w < 64` 时）`2^w` |
 | 宽寄存器槽位被 64 位假设压缩 | `w` 是 placement 宽度之和，可超过 64；`D_reg = ([0, 2^w−1] ∩ [0, 2^64−1]) \ E`。`w ≥ 64` 用 `0`/`u64::MAX` 和排除值或错误 `target_type`，不要求 `2^w`；127/192 位包级测试防止作者层缩回 H1 已验证的能力 |
 | 用 `bind` 阶段记录读取期拒绝 | `read` 是独立阶段：`plan::read` 返回单个 `Diagnostic`，该用例写 `scope:"plan"` + `stage:"read"`；声明的阶段必须恰是第一个拒绝阶段，否则 `case-error-scope`（退出 1），不产生证据；form 覆盖仍只认 `bind` |
 | 证据要求诊断不产生的 `min`/`max` | 只有立即数 `E-RANGE-001`/`E-RANGE-002` 带 `min`/`max`；寄存器 `E-OPERAND-004` 只带 `target_type`/`value`/`field_bits`，`E-RANGE-004` 只带 `target_type`/`value`/`excluded`；证据记录实际字段，寄存器上界由 `field_bits` 推导，pass 条件仍是 `(code, path)` |
 | 单个 modifier 值变化无法表达 | `mutates` 允许 `…/modifiers/<i>/name` 与 `…/modifiers/<i>/value`；`bind` 在 modifiers 数组的 `E-OPERAND-003` 是它们的祖先，符合位置规则；modifier 按允许值集合测，不套整数区间 |
 | 单段包根文件被路径产生式拒绝 | 产生式是 `pseg ("/" pseg)*`，`NOTICE`/`README.md` 是单段且是仅有的两个大写例外；发布证据门禁要求它们可声明 |
-| 一个非法邻域被当成完整操作数域 | 边界只在 `D_Representable` 内取：立即数用 `min`/`max`/`min−1`/`max+1`，寄存器按 `D_reg` 用 `0`/可表示上界/排除值（`w < 64` 才有 `2^w`），modifier 用允许/不允许对；不可表示的值是 plan 负例；证据记录实际诊断字段，pass 条件仍是 `(code, path)`，不引入新错误码 |
+| 一个非法邻域被当成完整操作数域 | 边界只在 `D_Representable` 内取，正例取 `D_form` 的最小/最大成员与内部值（`D_form = {x ∈ D_Representable, L≤x≤U, x≡0 (mod 2^a)} \ E`）；寄存器按 `D_reg` 取端点，`w < 64` 才有可表示的 `2^w`；modifier 用允许/不允许对；不可表示的值是 plan 负例；证据记录实际诊断字段，pass 条件仍是 `(code, path)`，不引入新错误码 |
+| 原始区间端点被排除或不对齐，却被当成正例 | `x86:mov/rm8h-r8h/legacy` 的 `E={0,1,2,3}`、`aarch64:add/w32-w32-w32-imm6-lsl` 的 `E=32..63`、`riscv:c.addi/rd-imm6` 的 `E={0}` 都排除原始端点；正例必须取 `D_form` 的端点（`4`/`7`、`31`、`1`），否则正例会被 `bind` 拒绝而无法提交证据 |
+| 迁移包的扩展数组顺序与冻结 legacy 不同 | `TargetEq`：`definition_format` 相等，`target_identity` 除 `enabled_extensions` 外逐字段 canonical 相等、该字段按集合相等。`rv64/0.6.0` 的 `["rv64i","rv64c"]` 与规范写法 `["rv64c","rv64i"]` 等价；原始数组相等会让两种写法分别被 `legacy-target-mismatch` 与 `extension-lexical` 拒绝 |
 | 静态用例校验被当成真实阶段证明 | `verify --package` 只证明声明形状、scope/stage 取值、诊断数组形状和指针语法，不执行 `plan::read`/`bind`/`materialize`；`package_conformance` 才证明第一个真实拒绝阶段与完整诊断集。声明 `bind` 但 `read` 已拒绝的用例必须由 conformance 判为 `case-error-scope`，报告分别记录两种状态 |
 | 独立身份随目录/cwd 漂移 | 固定 `monasm-standalone/0.1` 函数；复制到不同目录/换 cwd 的摘要相等测试；保留前缀禁止写入 spec |
 | 新包没有机器码证据也能通过 | 每个导出 form 强制正例+负例；`package_conformance` 执行；错误 opcode 反例；`--release-evidence` 检查证据完整性，`--release` 再加闭包 |
@@ -1779,7 +1806,7 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | 审计被当成整目录不可变证明 | `verify --published --check` 只证明清单、可执行资产和身份；README/NOTICE/证据/用例字节由变更路径门禁与 git 历史承担，文档写明边界，不新增 `snapshot_digest` |
 | 差分指针随 JSON 库或编辑操作漂移 | 差分定义在两个最终值上：成员增删→成员指针，kind 变化→该位置，数组长度→数组；两成员改动是两个差异因此拒绝；改写整体对象与改一个成员不可区分，格式不尝试区分 |
 | 回滚删掉了发布证据 | 首次发布合并前可删除实验产物；合并后运行时回退为 H1，但快照与 base 登记项保留；撤销是退役 spec，不是删目录 |
-| 迁移包行相同但执行目标变了 | 有 `legacy_source` 时同时比较 `definition_format` 和完整 `target_identity`；不一致是 `legacy-target-mismatch` |
+| 迁移包行相同但执行目标变了 | 有 `legacy_source` 时比较 `definition_format`（严格相等）和 `TargetEq`（`target_identity` 除 `enabled_extensions` 按集合外逐字段相等）；不一致是 `legacy-target-mismatch` |
 | Rust 与 Python 对同一摘要字节不一致 | 冻结域分隔、`sha256:` 文本规则和两个固定向量（开发形状与带 `evidence_digest` 的发布形状）；H2a 两种语言都必须通过 |
 | 发布 lock 用了开发形状的 `release_digest` | 第二个向量的包项必带 `evidence_digest`；漏写得到 `4e3d44a8…` 而不是 `ba60e8ba…`，字节比较即失败 |
 | 缺失键被 harness 归一化成空数组 | Level 0/1 投影键集固定；缺 `symbols` 与 `symbols: []` 不等价；由 `case-expect-shape` 拒绝 |
@@ -1794,7 +1821,7 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | 深 JSON 先解析后测深度 | 迭代扫描在 `json::parse` 之前执行；≤1 MiB 数万层反例不得栈溢出 |
 | 证据完整性只是名义存在 | `--release-evidence` 要求 `tests/cases.json`、`NOTICE`、`sources`、`oracle.status`、skip 理由；证据清单进入 `evidence_digest`；`--release` 在此基础上加闭包 |
 | H2a 的发布校验不完整 | H2a 就交付单包完整证据与摘要机制；H2b 只增加 ISA 资产和跨包测试，不补信任边界 |
-| 退役版本漏检，或未选中包混入 bundle | `verify --all --check` 只读当前 spec 的精确闭包；`verify --published --check` 单独审计 registry 全部条目；两者都由 CI 运行，互不选择 |
+| 退役版本漏检，或未选中包混入 bundle | `verify --all --check` 只读当前 spec 的精确闭包；`verify --published --check` 单独审计 registry 全部条目；两者都由 CI 运行，且都是 `gates.yml` 的必过项（不是可选命令），互不选择 |
 | 包文件改动漏进 legacy | `definitions/` 只读；`payload_root`/`definitions_root` 复跑；PR diff 检查 |
 | lock/sealed 提交后过期 | CI `verify --all --check` 重建；sealed 全字节、lock 除 `builder` 外比较 |
 | 把 H2 做成 H3/H4 | §9 明确排除；`bind` 签名、`fmp/0.2`、profile、深层 JSON 不动 |
@@ -1886,7 +1913,7 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | O15 | form 家族与 target 的一致性 | **通用相等规则** `family(form_id) == target_identity.isa_family`；包格式不列 ISA；第四种家族由 H3 的 reader 支持，不需要改包协议 | 三 ISA 对应表实际全是字符串相等，会迫使 H3 再改一次公共格式 |
 | O16 | 证据文件是必需还是可选 | **开发包可选、可发布包必需**；`--release-evidence`/`--release`/spec 选中时要求 `tests/cases.json`、`NOTICE`、`sources`、`oracle.status`、skip 理由和用例证据；`tests/cases.json` 本身被哈希 | 永远可选或只哈希用例证据会让 `release_digest` 不代表完整审核证据 |
 | O17 | 已发布包与定义名如何继续演进 | **版本目录是不可变快照**：`packages/<target>/<package>/<version>/`；发布路径记入只追加的 `bundles/published.json`，`(package_id, version)` 全局唯一且永久绑定首次 path/摘要；`identities` 永久绑定 `(namespace, version)` 与 `definition_digest`，退役后仍拒绝换字节重发；`bundle_id` 是可移动发布线，不可变的 bundle 内容标签是 `(bundle_id, bundle_digest)`，证据完备的发布身份是 `release_digest`；只有 base 条目在 PR 内不可变，同一 PR 首次创建并登记合法；退役 spec 不删除登记；更新创建同级新目录；旧 spec 未改时旧 lock 原样重建，退役后旧快照/lock 仍可由旧提交重放；发布者另行选择新版本 | 原地覆盖会迫使作者改旧 spec；仅按当前 spec 判断会让退役后的旧目录和旧定义名失去保护；把 `bundle_id` 当不可变身份会拒绝正常的版本推进 |
-| O18 | `legacy_source` 迁移等价性 | **行相等 + `definition_format`/完整 `target_identity` 相等**；不一致是 `legacy-target-mismatch` | 只比行会放过 `execution_mode`/`address_width` 被改、但行逐字节相同的包 |
+| O18 | `legacy_source` 迁移等价性 | **行相等 + `definition_format` 相等 + `TargetEq`**：`target_identity` 除 `enabled_extensions` 外逐字段 canonical 相等，扩展按集合相等；不一致是 `legacy-target-mismatch`。包仍用 §1 的规范升序写法，legacy 字节不变 | 只比行会放过 `execution_mode`/`address_width` 被改、但行逐字节相同的包；原始数组相等会与 §1 的规范排序冲突，使冻结的 `rv64/0.6.0` 无法迁移 |
 | O19 | 每个 form 的负例覆盖 | **`scope:"form"` + 正例基线 + 单操作数变异 + 仅 `bind` 拒绝 + 诊断落在变异操作数 + 完整诊断集**；`scope:"plan"` 不计覆盖 | 任意负例可被 `expected_digest`/`E-BYTE-001`/`E-SIZE-001` 或根级错误满足，不能证明 form 边界 |
 | O20 | 摘要预映像的字节规则 | **canonical record + 域分隔 + 嵌套 `sha256:` 文本 + 跨语言固定向量** | 原始 32 字节/大写 hex 会让 Rust 与 Python 得到不同摘要 |
 | O21 | 机器输出投影 | **Level 0/1 各自封闭键集**；Level 0 无 `symbols`；Level 1 仅在 `include_symbol_table` 时含 `symbols` | 共用并集投影会把缺失键和空数组混为一谈 |
@@ -1895,7 +1922,9 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | O24 | 已提交 legacy 快照要不要进入一致性门禁 | **要，但只是等价门禁**：提交副本必须与已校验 sealed 的 `definition` canonical 字节相同（`legacy-snapshot-mismatch`，退出 1）；缺失合法，门禁不重建缓存、不进入任何摘要，读取 ≤ 16 MiB | 只改 legacy 的 opcode 而 `--check` 仍绿，会让文档规定的兼容路径读到发布对里不存在的定义；把快照升成身份输入又会让派生缓存决定发布 |
 | O25 | 已发布路径与嵌套 `package.json` 的判定顺序 | **先 base registry 包含、后 head 侧发现**：变更落在 base 已登记版本目录内即 `published-package-modified`，其中的新 `package.json` 也属于该快照的修改；只有 base 之外的变更才解析最近 head 清单 | head-first 会让更深清单把已发布快照的改动重新归类为未发布候选，绕开不可变约束 |
 | O26 | 阶段声明由静态校验还是执行证明 | **两者分开**：`verify --package` 只校验 `stage` 取值、form 只 `bind`、诊断数组形状、指针语法等静态契约；`package_conformance` 执行 `read`/`bind`/`materialize`，证明第一个真实拒绝阶段与完整 `(code, path)` 集合，报告分别记录“静态有效”和“执行已验证” | 让不执行计划的命令声称证明阶段，会让“声明 bind、实际 read 拒绝”的用例通过并留下无效覆盖；把两者合成一个布尔值则无法定位失败性质 |
-| O27 | 超过 64 位的寄存器槽位如何取边界 | **按编码宽度 `w` 区分**：`D_reg = ([0, 2^w−1] ∩ [0, 2^64−1]) \ E`；`w < 64` 用 `0`/`2^w−1`/`2^w`，`w ≥ 64` 用 `0`/`u64::MAX` 加排除值或错误操作数类型；127/192 位包级测试保留 H1 已验证的编码能力 | 把字段宽度当计划域会要求不可表示的 `2^w`，使宽槽位无法给出合法边界证据；缩回 64 位则会静默丢掉 H1 已证明的能力 |
+| O27 | 超过 64 位的寄存器槽位如何取边界 | **按编码宽度 `w` 区分**：`D_reg = ([0, 2^w−1] ∩ [0, 2^64−1]) \ E`；正例取 `D_reg` 的最小/最大成员，`w < 64` 时 `2^w` 可作 form 负例，`w ≥ 64` 用排除值或错误操作数类型；127/192 位包级测试保留 H1 已验证的编码能力 | 把字段宽度当计划域会要求不可表示的 `2^w`，使宽槽位无法给出合法边界证据；缩回 64 位则会静默丢掉 H1 已证明的能力 |
+| O28 | 迁移目标的扩展数组按顺序还是按集合比较 | **按集合比较，其余字段严格相等**（`TargetEq`）：`definition_format` 相等；`target_identity` 的 `enabled_extensions` 按集合，其他字段 canonical 相等；包内仍用 §1 的规范升序，legacy 原字节不动 | 原始数组相等与 §1 的规范排序不可同时满足；`rv64/0.6.0` 的 `["rv64i","rv64c"]` 会被 `extension-lexical` 拒绝，而规范写法会被 `legacy-target-mismatch` 拒绝 |
+| O29 | 边界正例取原始区间端点还是最终合法域 | **取最终合法域 `D_form = {x ∈ D_Representable, L≤x≤U, x≡0 (mod 2^a)} \ E` 的端点与内部值**；excluded 值作 form 负例，只有可表示的越界值能作 `bind` 负例 | 原始端点可能被排除或不对齐（`rm8h` 的 `0`、`add imm6` 的 `63`），把它当正例会要求非法操作数通过 |
 
 ## 10. 证据状态
 
@@ -1939,7 +1968,9 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | form ⊆ 包 ⊆ bundle 的逐包扩展检查与合并前逐包 `read` | 尚未实现；`bind_forms` 把 0.2 form 的 `requires_extensions` 对**合并后**目标检查，这是本规则要补的缺口。`fmp-def/0.1` 下 `E_form = ∅`（`FORM_FIELDS` 拒绝该键），所以 0.1 包只证明 `E_package ⊆ E_bundle` | **未验证** — H2a |
 | 回滚语义（发布前可删、发布后只退役） | 文档规则；无实现可测 | **specified, not implemented** — H2a |
 | `verify --published --check` 独立历史审计与**有界**断言（可执行资产/身份，不含 README/NOTICE/证据用例字节） | 尚未实现 | **未验证** — H2a |
-| `legacy_source` 的目标一致性 | 尚未实现 | **未验证** — H2a |
+| `legacy_source` 的目标一致性 | 尚未实现；规则是 `definition_format` 相等加 `TargetEq`（扩展按集合） | **未验证** — H2a |
+| 迁移包的规范扩展序 `["rv64c","rv64i"]` 与冻结 `rv64/0.6.0` 的 `["rv64i","rv64c"]` 等价 | `definitions/rv64/0.6.0.json` 实测该数组；`check_target` 用 `BTreeSet` 比较；`a_set_equal_target_migrates_a_differently_ordered_legacy_array` 待写 | **未验证** — H2a |
+| 边界正例取 `D_form` 的端点，而非原始区间端点 | `x86:mov/rm8h-r8h/legacy` 的 `excluded [0,1,2,3]`、`aarch64:add/w32-w32-w32-imm6-lsl` 的 `excluded 32..63`、`riscv:c.addi/rd-imm6` 的 `excluded [0]` 已读；包级用例待写 | **未验证** — H2a/H2b |
 | `scope:"form"` 基线变异、`bind`-only 拒绝、变异操作数诊断、完整诊断集、Level 0/1 精确投影 | 尚未实现；`fmp-materialize` 的 `E-BYTE-001` 反例已确认存在 | **未验证** — H2a |
 | 不同包根下的同名相对路径合法，根折叠别名是 `path-lexical` | 尚未实现；没有闭包读取路径 | **未验证** — H2a |
 | 声明小写路径不打开大小写不同的磁盘目录项（中间目录与最终文件） | 尚未实现；精确名字查找必须与打开动作同一句柄 | **未验证** — H2a N1 三平台门禁 |

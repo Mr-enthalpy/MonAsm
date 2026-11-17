@@ -5,14 +5,19 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: fifteenth revision, 2026-11-18, after the proof-boundary and
-  wide-register audit: `verify --package` validates only the static stage
-  contract, while `package_conformance` proves the actual first rejecting stage
-  and the complete diagnostic set, and reports record those two statuses
-  separately; the register-domain rule is restated as
-  `D_reg = ([0, 2^w−1] ∩ [0, 2^64−1]) \ E` so a slot wider than 64 bits keeps the
-  H1-verified encoding capability and is tested with `0`/`u64::MAX` plus an
-  excluded value or illegal operand type instead of an unrepresentable `2^w`.
+- Revision: sixteenth revision, 2026-11-18, after the migration-equivalence and
+  boundary-domain audit: `legacy_source` target equality is `TargetEq` — every
+  field strictly equal except `enabled_extensions`, which is compared as a set —
+  so a canonically ordered package can migrate a frozen legacy document whose
+  array is spelled differently; and boundary positives are taken from the final
+  legal domain `D_form` (range, alignment and exclusions applied), never from a
+  raw endpoint that the form excludes.
+- Prior revision: fifteenth revision, 2026-11-18, separated the static stage
+  declaration check from the executed first-rejecting-stage proof, so reports
+  record both statuses separately, and restated the register domain as
+  `D_reg = ([0, 2^w−1] ∩ [0, 2^64−1]) \ E` so slots wider than 64 bits keep the
+  H1-verified encoding capability and are tested without an unrepresentable
+  `2^w`.
 - Prior revision: fourteenth revision, 2026-11-17, required a committed legacy
   snapshot to be byte-identical to the canonical sealed definition
   (`legacy-snapshot-mismatch`) while entering no digest and remaining optional,
@@ -52,14 +57,17 @@
   a field wider than 64 bits; exact Level 0/Level 1 machine-output projections;
   portable identifier, path-segment and artifact-filename lexical rules; the
   package-root and repository-relative domains of path collision; exact on-disk
-  entry-name matching for every opened segment; the representable-versus-form
-  operand domains for boundary evidence; the plan×definition target-compatibility
+  entry-name matching for every opened segment; the final legal operand domain
+  (`D_form`, with exclusions and alignment applied) for boundary evidence; the
+  plan×definition target-compatibility
   matrix; the single loaded-package value shared by digest, comparison, `read`
   and merge; the cycle-free first-publication order (build success, then the
   registry append, then both `--check`s, then commit), in-memory output
   validation and the derived legacy cache with its equality-only bridge gate;
   the one canonical spelling of
-  extension and capability arrays; the counted closure byte budget; package
+  extension and capability arrays, with migration equivalence `TargetEq`
+  comparing `enabled_extensions` as a set and every other target field strictly;
+  the counted closure byte budget; package
   target covers versus bundle target selection; the two-part versioned H3
   condition for accepting a subset target (build rule and plan protocol);
   base-registry-first changed-path containment; package/form
@@ -215,7 +223,8 @@ comparison could not tell a spelling change from a semantic one. The rule is new
 for package and spec inputs, so it does **not** re-spell a frozen legacy document:
 `definitions/rv64/0.6.0.json` keeps its published `["rv64i","rv64c"]` bytes, and
 a consumer compares extension arrays as sets (`check_target` collects both sides
-into a `BTreeSet`). Each `forms/*.json` holds exactly one form object; its
+into a `BTreeSet`); migration equivalence uses the same set comparison through
+`TargetEq` (§1.1). Each `forms/*.json` holds exactly one form object; its
 `form_id` must equal the declared `id`.
 
 `exports.forms` must be **non-empty**. `fmp_model::definition::read` rejects an
@@ -538,20 +547,38 @@ versions with the same file name in different directories would make the
 comparison depend on traversal order.
 
 **Row equality alone is not migration equivalence.** When `legacy_source` is
-present, the builder also requires the package's `definition_format` and its
-whole `target_identity` object to equal the pinned legacy document's values, not
-just be individually legal. The comparison is canonical equality of the parsed
-objects (`isa_family`, `isa_variant`, `execution_mode`, `enabled_extensions`,
-`byte_order`, `address_width` and any field the legacy target declares). A
-mismatch is `legacy-target-mismatch` (exit 1), reported before the merged
-document is read. This does not make the legacy file the target authority: the
-package still declares its target, and a new package without `legacy_source` is
-checked only against its declaration. It closes the gap where a copied row is
-byte-equal but the package claims `execution_mode: "32"` or
-`address_width: 32`, so "self-declared target" and "row equal" are both true
-while the migrated execution semantics are not. A deliberate target change
-needs an explicit, versioned compatibility record in a later format; H2 rejects
-it rather than inferring it.
+present, the builder also requires migration target equivalence, defined over the
+parsed objects rather than their raw spelling:
+
+```
+TargetEq(A, B) = keys(A) = keys(B)
+              ∧ (∀ k ≠ enabled_extensions: A_k = B_k)
+              ∧ Set(A.enabled_extensions) = Set(B.enabled_extensions)
+```
+
+Every field except `enabled_extensions` (`isa_family`, `isa_variant`,
+`execution_mode`, `byte_order`, `address_width` and any other field the legacy
+target declares) must be canonically equal; `enabled_extensions` is compared by
+set membership. The package's `definition_format` must also equal the legacy
+document's, independently of `TargetEq`. This is forced by §1: a package must
+spell the array in the one
+canonical strictly increasing form, while a frozen legacy document keeps its
+published bytes. `definitions/rv64/0.6.0.json` declares
+`["rv64i","rv64c"]`; a package migrating one of its rows must declare
+`["rv64c","rv64i"]`, and the two are the same target. Requiring raw array
+equality would reject both spellings — the canonical one as `legacy-target-mismatch`
+and the legacy one as `extension-lexical` — so no legal manifest could exist.
+
+The package still declares its own target and its own digest; the legacy file is
+not re-spelled and both identities keep their own rules. A mismatch in any other
+field, or a differing extension member set, is `legacy-target-mismatch` (exit 1),
+reported before the merged document is read. This does not make the legacy file
+the target authority: a new package without `legacy_source` is checked only
+against its declaration. It closes the gap where a copied row is byte-equal but
+the package claims `execution_mode: "32"` or `address_width: 32`, so
+"self-declared target" and "row equal" are both true while the migrated execution
+semantics are not. A deliberate target change needs an explicit, versioned
+compatibility record in a later format; H2 rejects it rather than inferring it.
 
 A package that is not re-homed omits `legacy_source`. It is then checked by the
 declared `target_identity`/`definition_format`, by `fmp_model::definition::read`
@@ -825,8 +852,10 @@ What H2 actually proves for a `0.1` package is `E_package ⊆ E_bundle`: the
 declared cover fits the selected target, and the package cannot be selected by a
 bundle that provides less than the author declared. A package with
 `legacy_source` gains one further, independent constraint: its
-`definition_format` and full `target_identity` must equal the pinned row's
-(§1.1, `legacy-target-mismatch`), which catches a migration that silently
+`definition_format` must equal the pinned document's and its `target_identity`
+must satisfy `TargetEq` (`enabled_extensions` compared as a set; every other
+field canonically equal; §1.1, `legacy-target-mismatch`), which catches a
+migration that silently
 retargets a copied row, but still derives nothing from the row body about which
 extensions the instruction really needs. A new package without `legacy_source`
 rests on the author's declaration plus the cases and evidence in its own
@@ -2383,9 +2412,9 @@ wholly absent; it does not prove the operand domain. The domain splits in two:
   `plan::read` rejection — `E-PLAN-002` at the operand's `payload/reg` — and no
   `Plan` exists for `bind` to see. A modifier value is an integer, string or
   boolean.
-- `D_Form` is what the selected slot accepts. `D_Form ⊆ D_Representable`.
+- `D_form` is what the selected slot accepts. `D_form ⊆ D_Representable`.
 
-Only a value in `D_Representable \ D_Form` can be a `scope: "form"` negative,
+Only a value in `D_Representable \ D_form` can be a `scope: "form"` negative,
 because only that value reaches `bind`. A value outside `D_Representable` is a
 `scope: "plan"` case with `stage: "read"`: the declared diagnostics are the
 reader's own, it never counts as form coverage, and treating it as a form
@@ -2393,27 +2422,47 @@ negative would ask for a `Plan` the reader refuses to build. The three stages
 exist so that each rejection is recorded where it happens; collapsing `read`
 into `bind` would either lose the case or name a stage that cannot run.
 
-For every shipped form with an immediately encoded or otherwise bounded operand:
+For every shipped form with an immediately encoded or otherwise bounded operand,
+boundary cases are taken from the **final legal domain**, not the raw encoded
+range. For a slot with range `[L, U]`, alignment `a` (`align_bits`) and excluded
+set `E`:
 
-- An immediate range `[min, max]` inside `i128` uses `min` and `max` as positives
-  and `min−1`/`max+1` as `scope: "form"` negatives.
-- A register field's encoded width `w` is the sum of its placement widths and may
-  exceed 64 bits (`ADR-0127` §7.1 bounds each placement, not the sum; the H1
-  test `prototype/crates/fmp-materialize/tests/he1_wide_register.rs` loads and
+```
+D_form = { x ∈ D_Representable | L ≤ x ≤ U, x ≡ 0 (mod 2^a) } \ E
+```
+
+For a register, `L = 0`, `U = 2^w − 1` clipped to `u64::MAX`, and `a = 0`; this is
+the `D_reg` above.
+
+- Positives are the minimum and maximum of `D_form` plus a representative
+  interior value. A raw endpoint that is excluded or unaligned is not a positive.
+  Measured examples: `x86:mov/rm8h-r8h/legacy` has `w = 3` and `E = {0,1,2,3}`,
+  so `4` and `7` are the positives and `0..3` are form negatives;
+  `aarch64:add/w32-w32-w32-imm6-lsl` excludes `32..63`, so `31` is the positive
+  maximum and `32` is a form negative; `riscv:c.addi/rd-imm6` excludes `rd = 0`,
+  so `1` is the positive minimum and `0` is a form negative.
+- A representable excluded value is a `scope: "form"` negative rejected by
+  `E-RANGE-004` at the mutated operand.
+- An adjacent out-of-range value (`min−1`/`max+1`, or `2^w` for a register) is a
+  form negative only when `D_Representable` can hold it and it is not in
+  `D_form`; otherwise it is a `stage: "read"` plan negative or not testable. It is
+  never declared as a `bind` negative the reader would have rejected first.
+- For a register field, the encoded width `w` is the sum of its placement widths
+  and may exceed 64 bits (`ADR-0127` §7.1 bounds each placement, not the sum; the
+  H1 test `prototype/crates/fmp-materialize/tests/he1_wide_register.rs` loads and
   encodes 64-, 127-, 128- and 192-bit fields). `payload.reg` is still a `u64`, so
-  the plan-representable register domain is
-  `D_reg = ([0, 2^w − 1] ∩ [0, 2^64 − 1]) \ E`, where `E` is the form's
-  representable excluded set. The boundary cases follow `w`:
-  - `w < 64`: positives are `0` and `2^w − 1`; the adjacent illegal value
-    `2^w` is a `scope: "form"` negative.
-  - `w = 64`: positives are `0` and `u64::MAX`; `2^64` is not representable, so
-    the second form negative is a representable excluded value or a wrong
-    `target_type`/operand kind.
-  - `w > 64`: positives are `0` and `u64::MAX`, both inside the field; `2^w − 1`
-    and `2^w` are unrepresentable, so no `max + 1` is required or legal. An
-    excluded value or a wrong `target_type`/operand kind is the form negative;
-    a wide slot without an excluded value has no numeric form negative at all
-    and must not invent one.
+  `D_reg = ([0, 2^w − 1] ∩ [0, 2^64 − 1]) \ E`:
+  - `w < 64`: the positives are the smallest and largest members of `D_reg`
+    (typically `0` and `2^w − 1` when neither is excluded); `2^w` is a form
+    negative when representable.
+  - `w = 64`: the positives are the smallest and largest members of `D_reg`;
+    `2^64` is not representable, so the second form negative is a representable
+    excluded value or a wrong `target_type`/operand kind.
+  - `w > 64`: the positives are the smallest and largest members of `D_reg`
+    (typically `0` and `u64::MAX`); `2^w − 1` and `2^w` are unrepresentable, so no
+    `max + 1` is required or legal. An excluded value or a wrong
+    `target_type`/operand kind is the form negative; a wide slot without an
+    excluded value has no numeric form negative at all and must not invent one.
   There is no representable `0 − 1`: a negative register number is a plan-scope
   `stage: "read"` negative. A package-level boundary protocol test must exercise
   the 127- and 192-bit slots through `read`/`bind`/`materialize`, so the H2 author
@@ -2840,9 +2889,11 @@ comparing the materializer with itself proves the bytes.
   publisher selects the new version later; the author's PR does not edit a global
   spec or lock.
 - A migrated package proves more than byte-equal rows: when `legacy_source` is
-  present, its `definition_format` and full `target_identity` must equal the
-  pinned legacy document's. A deliberately retargeted package is rejected rather
-  than inferred from matching rows.
+  present, its `definition_format` must equal the pinned legacy document's and
+  its `target_identity` must satisfy `TargetEq` — every field strictly equal
+  except `enabled_extensions`, which is compared as a set (`§1.1`). A
+  deliberately retargeted package is rejected rather than inferred from matching
+  rows.
 - Form coverage is an illegal-neighbourhood claim, not a count. A negative case
   must name a positive baseline, mutate exactly one operand field, be rejected by
   `bind`, and name a diagnostic on the mutated operand or its parent object. A
@@ -2850,13 +2901,17 @@ comparing the materializer with itself proves the bytes.
   be a plan-scope test but cannot cover a form.
 - One illegal neighbour is not the whole operand domain. A form with an
   immediately encoded or otherwise bounded operand also carries boundary cases
-  for the values the plan can represent: minimum/maximum positives and the
-  adjacent representable illegal value, rejected at the mutated operand. A
-  register field's encoded width `w` comes from `field_bits` and may exceed 64;
-  its domain is `D_reg = ([0, 2^w − 1] ∩ [0, 2^64 − 1]) \ E`, so for `w ≥ 64`
-  the maximum positive is `u64::MAX` and `2^w` is never a test input. A negative
-  register is a plan-scope `stage: "read"` rejection rather than a form negative
-  (`D_Form ⊆ D_Representable`).
+  taken from the final legal domain `D_form = {x ∈ D_Representable | L ≤ x ≤ U,
+  x ≡ 0 (mod 2^a)} \ E`, not the raw encoded range: positive values are the
+  minimum and maximum of `D_form` plus an interior value, so an excluded or
+  unaligned endpoint is never a positive. A representable excluded value is a
+  form negative; an out-of-range value is a form negative only when the plan can
+  represent it. A register field's encoded width `w` comes from `field_bits` and
+  may exceed 64; its domain is
+  `D_reg = ([0, 2^w − 1] ∩ [0, 2^64 − 1]) \ E`, so for `w ≥ 64` the maximum
+  positive is `u64::MAX` and `2^w` is never a test input. A negative register is
+  a plan-scope `stage: "read"` rejection rather than a form negative
+  (`D_form ⊆ D_Representable`).
   The evidence records the detail keys the relevant diagnostic emits — `min`,
   `max`, `value` for `E-RANGE-001`/`E-RANGE-002`, and `target_type`, `value`,
   `field_bits` or `excluded` for `E-OPERAND-004`/`E-RANGE-004` — and never a key
@@ -3209,9 +3264,21 @@ comparing the materializer with itself proves the bytes.
   the adjacent illegal value behave. The shipped bounded forms carry boundary
   cases; the comparison rule stays `(code, path)` and no new error code is added
   (§9.1).
+- **Take the raw `[min, max]` endpoints as boundary positives.** Rejected: an
+  endpoint can be excluded or unaligned, so requiring it would demand a case that
+  must fail. `x86:mov/rm8h-r8h/legacy` excludes `0..3` from a 3-bit field, and
+  `aarch64:add/w32-w32-w32-imm6-lsl` excludes `32..63`; their positives come from
+  `D_form`, not from the encoded range (§9.1).
+- **Compare `enabled_extensions` as raw arrays in migration equality.** Rejected:
+  §1 requires the canonical strictly increasing spelling, while a frozen legacy
+  file keeps its published order (`definitions/rv64/0.6.0.json` is
+  `["rv64i","rv64c"]`). Raw equality would reject the canonical spelling as
+  `legacy-target-mismatch` and the legacy spelling as `extension-lexical`, so no
+  legal package could migrate a row. `TargetEq` compares that one field as a set
+  and every other field strictly (§1.1).
 - **Require `min−1`/`max+1` for a register field.** Rejected: `payload.reg` is a
   `u64`, so a negative register never becomes a `Plan` and `bind` cannot reject
-  it. `D_Form ⊆ D_Representable`: the lower boundary is a plan-scope negative.
+  it. `D_form ⊆ D_Representable`: the lower boundary is a plan-scope negative.
   The upper form negative is `2^w` only when `w < 64`; for `w ≥ 64` it is a
   representable excluded register or a wrong operand type, never an
   unrepresentable `2^w` (§9.1).
@@ -3335,6 +3402,10 @@ comparing the materializer with itself proves the bytes.
 | x86 `0.1.0` and `0.78.0` `mov` rows differ | canonical JSON comparison of the two rows; `0.78.0` adds `requires_extensions` and REX placements at bits 0/2 | high (measured on this host; not yet a Rust test) |
 | aarch64 selected rows are equal across the pinned and newest versions | canonical JSON comparison: the two `lsl0` rows are equal in `0.1.0`/`0.2.0`/`0.20.0`; `lsl12` is absent in `0.1.0` and equal in `0.2.0`/`0.20.0` | high (measured) |
 | rv64 selected rows are equal, but `0.6.0` target set differs | canonical JSON comparison; `0.6.0` is `["rv64i","rv64c"]`, the plans are `["rv64i"]`, and `check_target` requires equality for `fmp-def/0.1` | high (measured) |
+| A frozen legacy extension array is not in the canonical package spelling | `definitions/rv64/0.6.0.json` declares `["rv64i","rv64c"]`; §1's canonical spelling is `["rv64c","rv64i"]`; `fmp-validate/src/lib.rs` `check_target` compares both sides as `BTreeSet` | high (read and measured) |
+| `TargetEq` (set equality of `enabled_extensions`, strict equality elsewhere) is satisfiable; raw array equality is not | specified; no builder exists; a canonical package migrating an `rv64/0.6.0` row would fail both a raw-array legacy check and `extension-lexical` under the opposite spelling | **specified, not implemented** — H2a |
+| Form exclusions hit raw boundary endpoints | `x86:mov/rm8h-r8h/legacy` has a 3-bit field and `excluded [0,1,2,3]`; `aarch64:add/w32-w32-w32-imm6-lsl` excludes `32..63`; `riscv:c.addi/rd-imm6` excludes `0` | high (read) |
+| Boundary positives come from `D_form`, not the raw range | specified; no package cases exist; the raw endpoints of the three examples are illegal | **specified, not implemented** — H2a/H2b |
 | `fmp-def/0.2` requires `requires_extensions` and rejects it in `0.1` | `bind_form` selects `FORM_FIELDS_V0_2` and `req`s the key; `FORM_FIELDS` rejects it as unknown | high (read) |
 | `check_form_id` accepts any known family but does not compare it to `target_identity.isa_family` | `fmp-model/src/definition.rs` `check_form_id` matches `x86`/`aarch64`/`riscv` and returns; `bind_target` reads `isa_family` independently | high (read) |
 | Builder determinism, digest reproduction, row equality and byte equality | not implemented | **unverified** — H2a/H2b must measure them |
@@ -3366,7 +3437,7 @@ comparing the materializer with itself proves the bytes.
 | `check_target` keys the set relation on the definition format, not the plan format | `fmp-validate/src/lib.rs` `subset_rule = model.definition.definition_format() == DEFINITION_FORMAT_V0_2` | high (read) |
 | `E-OPERAND-004` carries `target_type`, `value` and `field_bits`, and `E-RANGE-004` carries `target_type`, `value` and `excluded` | `fmp-validate/src/lib.rs` `check_operand` and `excluded_diagnostic` | high (read) |
 | A modifier is `{name, value}`, so a single value change reports `…/modifiers/<i>/value` | `fmp-model/src/plan.rs` `bind_modifier` closes the object on `name` and `value` | high (read) |
-| Boundary evidence splits representable from form domains, uses `D_reg = ([0, 2^w−1] ∩ [0, 2^64−1]) \ E`, and records only emitted diagnostic fields | specified; the three packages and their cases do not exist | **unverified** — H2a/H2b |
+| Boundary evidence uses the final legal domain `D_form = {x ∈ D_Representable, L≤x≤U, x≡0 (mod 2^a)} \ E` (registers: `D_reg`), never a raw endpoint the form excludes, and records only emitted diagnostic fields | specified; the three packages and their cases do not exist; `x86:mov/rm8h-r8h/legacy`, `aarch64:add/w32-w32-w32-imm6-lsl` and `riscv:c.addi/rd-imm6` exclude their raw endpoints | **unverified** — H2a/H2b |
 | A register field wider than 64 bits binds and encodes 64/127/128/192-bit placements | `prototype/crates/fmp-materialize/tests/he1_wide_register.rs` calls `fmp_validate::bind` and `fmp_materialize::materialize` for each width and asserts bytes | high (measured by the H1 test) |
 | `verify --package` validates only the static case contract; `package_conformance` proves the first rejecting stage and the complete diagnostic set | specified; no package reader or conformance harness exists; a `stage: "bind"` case that `read` rejects passes the static check and must fail conformance | **specified, not implemented** — H2a |
 | The plan×definition matrix keeps `fmp/0.1` + `fmp-def/0.1` equality and `fmp/0.1` + `fmp-def/0.2` subset, and only a new plan protocol plus a versioned build rule lifts `h2-exact-target` | existing two cells read from `check_target`; the new-plan cell and the versioned build rule do not exist; `monasm-bundle-spec/0.1` has no builder yet | **partly measured, H3 gate** |
@@ -3464,8 +3535,12 @@ comparing the materializer with itself proves the bytes.
   `published-package-modified` (§8.1).
 - Someone counts one illegal neighbour as a bounded operand's whole domain, or
   moves `field_bits`/`value` evidence into the pass comparison: stop. Boundary
-  cases stay inside `D_Representable`, and the pass condition stays the
-  `(code, path)` set (§9.1).
+  cases stay inside `D_Representable` and are taken from `D_form`, and the pass
+  condition stays the `(code, path)` set (§9.1).
+- Someone requires a raw range endpoint as a positive when that endpoint is
+  excluded or unaligned: stop. Positives are the minimum and maximum of `D_form`
+  plus an interior value; `aarch64:add/w32-w32-w32-imm6-lsl` has `31`, not `63`,
+  as its positive maximum (§9.1).
 - Someone makes a negative register number a `scope:"form"` case, reports it at
   `stage: "bind"`, or records `min`/`max` that `E-OPERAND-004` does not emit:
   stop. A negative register is a plan-scope `stage: "read"` rejection; the register
@@ -3616,8 +3691,11 @@ comparing the materializer with itself proves the bytes.
   audit into `verify --all --check`: stop. Retired versions must stay checked
   without entering a bundle closure (§8.4).
 - Someone compares only form rows when `legacy_source` is present: stop. The
-  package's `definition_format` and full `target_identity` must equal the pinned
-  document, or the migration is not proven.
+  package's `definition_format` must equal the pinned document's, and its
+  `target_identity` must satisfy `TargetEq`: every field equal except
+  `enabled_extensions`, which is compared as a set, or the migration is not
+  proven (§1.1). Comparing that one field as a raw array makes a canonical
+  package and a frozen legacy file mutually unsatisfiable.
 - Someone lets `expected_digest`, `format_version` or a root-level error satisfy
   a form's negative coverage, or accepts one matching diagnostic among others:
   stop. Only a `scope: "form"` baseline mutation with complete diagnostic-set
