@@ -1,18 +1,25 @@
 # H2 实施计划：目标包作者层与确定性定义构建
 
 - 状态：**待审提案**（2026-11-16；同日按八轮审计 P1/P2 修订，2026-11-17 按
-  第九轮、第十轮、第十一轮、第十二轮和第十三轮审计修订）。规范决策见
+  第九轮至第十四轮审计修订）。规范决策见
   `docs/adr/0128-package-and-bundle-contract.md`，该 ADR 仍为 `proposed`；
   评审合并前本文和 ADR 都不是冻结依据。本文保留为实施计划与验收映射。
   **H2 尚未实现，本文不把任何 H2/H3/H4/H5 项目算作已完成。**
+  第十四轮固定：已提交的 legacy 快照必须与 sealed 内 `definition` 的 canonical
+  字节相等（`legacy-snapshot-mismatch`），但仍不进入任何摘要、缺失合法；定义
+  身份错配不是 `monasm-cases/0.1` 的用例种类，由独立绑定测试承担；H3 解除
+  `h2-exact-target` 需要版本化构建规则加新计划协议，`monasm-bundle-spec/0.1`
+  的拒绝结论永久不变；变更路径先按 base registry 判定包含，嵌套
+  `package.json` 不能遮蔽已发布祖先。
   第十三轮固定：`scope:"plan"` 负例可用 `stage:"read"` 记录 `plan::read` 自身
   的拒绝（`scope:"form"` 仍只能 `bind`），声明的阶段必须恰是第一个拒绝的
   阶段；中断写入只保证可检测、不是成功发布，不主张跨文件原子性；输出父目录
   受信任但 `--root` 下每段都走 §3 的不跟随规则，已提交 lock/sealed 用有界流式
   比较；`profile_id` 是包内名义标签，身份是完整 `target.identity`。
   第十二轮固定：首次发布只有一种顺序（build 成功 → 追加登记项 → 两项
-  `--check` → 提交），发布是合并提交；legacy 快照是派生开发缓存，`--check`
-  不比较它，写阶段先删除旧文件；扩展/能力数组只有一种严格排序、无重复的写法；
+  `--check` → 提交），发布是合并提交；legacy 快照是派生开发缓存，缺失合法，
+  提交副本受等价门禁，写阶段先删除旧文件；扩展/能力数组只有一种严格排序、
+  无重复的写法；
   64 MiB 闭包预算按实际读取的包根字节计费并在越界读取处拒绝；`fmp-def/0.1`
   的 `E_form = ∅` 限制写进验收报告。
 - 基线：`fefb463`（H1 合并提交；工作树干净）。
@@ -725,14 +732,26 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   `enabled_extensions`，`fmp-def/0.2` 要求计划集合 ⊆ 定义集合，并在之后检查逐
   form 需求。因此 `definition_format == fmp-def/0.1` 时，H2 额外要求包的声明
   覆盖与 spec 选择**完全相等**（`h2-exact-target`）；这不是永久包契约。
-- **解除按协议能力、不是删检查（第十、十一轮 P2-1）。** 现有的两个（计划,
-  定义）格子必须保持不变（矩阵见本节末）：`fmp/0.1` + `fmp-def/0.1` 是集合
-  相等，`fmp/0.1` + `fmp-def/0.2` 是计划集合 ⊆ 定义集合加逐 form 需求。只有
-  **新的计划协议**才能增加格子并解除 `h2-exact-target`；把规则改成按计划格式
-  判断会重新拒绝已经合法的 `fmp/0.1` + `fmp-def/0.2`。要改 `fmp-def/0.1` 的
-  相等规则，必须引入新版本化契约而不是删除旧检查；构建选项不能改变任一格子。
+- **解除按协议能力、不是删检查（第十、十一轮 P2-1；第十四轮 P2-2）。** 现有的
+  两个（计划, 定义）格子必须保持不变（矩阵见本节末）：`fmp/0.1` +
+  `fmp-def/0.1` 是集合相等，`fmp/0.1` + `fmp-def/0.2` 是计划集合 ⊆ 定义集合加
+  逐 form 需求。增加格子并解除 `h2-exact-target` 需要**新的计划协议**且需要
+  **版本化构建规则**，两者必须同时成立；把规则改成按计划格式判断会重新拒绝
+  已经合法的 `fmp/0.1` + `fmp-def/0.2`。要改 `fmp-def/0.1` 的相等规则，必须
+  引入新版本化契约而不是删除旧检查；构建选项不能改变任一格子。
+- **构建期与执行期是两扇门，必须都打开（第十四轮 P2-2）。** Builder 处理的是
+  spec 与包，在任何计划被绑定**之前**就按 `h2-exact-target` 拒绝不相等的
+  `fmp-def/0.1` 选择，所以只增加 `fmp/0.2` 计划格式不能使该 spec 构建成功。
+  解除必须同时包含：一条**版本化构建规则**（新的 `monasm-bundle-spec` 版本，
+  或 Builder 读取的显式版本化兼容关系），以及上面的计划侧格子。已发布的
+  `monasm-bundle-spec/0.1` 永久保留其拒绝结论：同一份 spec 字节不能因为
+  Builder 软件升级而从确定性拒绝变成接受，那等于静默改变旧格式的接受语义。
+  H3 验收必须对同一组合（例如 `rv64i`-only 包 + `rv64c`/`rv64i` bundle）证明
+  三件事：旧 spec 版本仍拒绝不相等的选择、新构建规则版本能构建、得到的 bundle
+  能绑定目标集合为子集的计划；第一条是 `0.1` 语义未漂移的证据，第二条才在
+  Builder 端（而不只是计划校验器端）解开 H5。
   H3 必须用同一包、不同扩展集合跑矩阵：旧格子保持结果，新格子只在自身规则
-  允许处接受子集；「删掉检查后能构建成功」不是新规则的证据。该规则必须在 H5
+  允许处接受子集；「删掉检查后能构建成功」不是新规则的证据。这些规则必须在 H5
   并行扩展演练之前生效，否则先修订 ADR，不得直接开始 H5。H2 不声称这个等号
   是最终组合规则。`h2-exact-target` 与上面的 form ⊆ 包检查互不替代：前者比较
   包与 bundle，后者比较行与包。
@@ -770,6 +789,9 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
 
 实现依据是 `check_target` 的 `subset_rule`，它只读定义格式；按计划格式选择
 关系会把第二行从“合法”改成“拒绝”，这是必须在 H3 验收中单独覆盖的反例。
+第三行不仅需要计划侧的新格子：Builder 在绑定计划前就按 `h2-exact-target`
+拒绝不相等的 `fmp-def/0.1` 选择，所以 H3 还必须带一条版本化构建规则，并证明
+`monasm-bundle-spec/0.1` 对同一选择仍拒绝（§H2-D4 上一段）。
 
 ### H2-D5 依赖闭包：spec 列全，构建器不扫描
 
@@ -963,6 +985,10 @@ Rust 与 Python 都必须复现开发向量和发布向量这两个值。差别�
   `bundle_digest`、`definition`、`packages`；`definition` 是 §9 的合并定义
   文档，包项恰好 `package_id`/`version`/`source_package_digest`。没有 `path`、
   `builder`、`release_digest` 或 `evidence_digest`，因此逐字节比较，没有排除键。
+- 若 `<legacy>/definition.json` 存在，`--check` 还要求它与已校验 sealed bundle
+  的 `definition` 对象的 canonical 字节完全一致，不同是
+  `legacy-snapshot-mismatch`（退出 1）；缺失则跳过，因为它是派生缓存。该比较
+  只读 16 MiB 上限内的字节，不重建缓存，也不进入任何摘要（第十四轮 P1）。
 - 三者的未知键/重复键都拒绝；spec、lock、sealed 的完整最小样例和
   `bundle_digest`/`release_digest` 固定向量见 `ADR-0128` §8.2。
 - `bundles/published.json`：`monasm-published/0.1`，封闭键恰好
@@ -1019,7 +1045,9 @@ Rust 与 Python 都必须复现开发向量和发布向量这两个值。差别�
   现有 `fmp materialize <plan> --definitions <dir>` 读取。它不是 sealed
   bundle：`Registry::load_dir` 会递归读取目录下所有 `.json` 并调用
   `definition::read`，sealed 的 bundle 信封会被拒绝。这个快照是派生开发缓存，
-  不是发布身份；`--check` 不比较它，下一次成功 `build` 重建它（H2-D12）。
+  不是发布身份，也不进入任何摘要、缺失合法；若被提交，`--check` 要求它与
+  已校验 sealed 内 `definition` 的 canonical 字节相同（不同是
+  `legacy-snapshot-mismatch`，退出 1），下一次成功 `build` 重建它（H2-D12）。
 - lock 与 sealed bundle 作为发布产物提交；CI 用 `verify --all --check` 重建并比较
   字节。它们不是手写计数，也不是普通扩展作者必须编辑的文件。
 - `bundles/specs/` 采用本文的目录名，而不是设计草案的 `bundles/profiles/`：
@@ -1032,14 +1060,15 @@ Rust 与 Python 都必须复现开发向量和发布向量这两个值。差别�
 
 | 类 | 例子 | 退出码 |
 |---|---|---|
-| 确定性拒绝 | 清单形状（必需/可选键）、身份/路径词法违规、`enabled_extensions`/`requires_capabilities` 逆序或重复、产物文件名不符、空 forms、路径越界或路径上出现链接/reparse point（含 `--root` 下的输出父目录）、版本目录与版本不符、已发布快照被改、发布登记被改/缺失/不符/重名版本、跨 spec 的 `bundle_id` 或定义身份冲突、声明与推导的 capability 不符、form 需求超出包声明（`form-extension-mismatch`）、复用保留的 legacy 定义名、依赖缺失/摘要错/环、同一 package ID 双版本、归属冲突、未知 capability、非空 reserved asset、闭包聚合上限、证据不完整/不符、用例缺失/未覆盖、用例格式不支持、用例与计划/form 绑定、基线或变异不符、用例 scope/stage 不符（form 负例用 `read`/`materialize`，或声明阶段不是第一个拒绝阶段）、form 诊断不在变异操作数上、完整诊断集不符、投影键集错误、legacy 目标不一致、无法映射的包路径、定义被 `read` 拒绝、资源上限（含已提交 lock/sealed 超过字节预算） | 1 |
+| 确定性拒绝 | 清单形状（必需/可选键）、身份/路径词法违规、`enabled_extensions`/`requires_capabilities` 逆序或重复、产物文件名不符、空 forms、路径越界或路径上出现链接/reparse point（含 `--root` 下的输出父目录）、版本目录与版本不符、已发布快照被改、发布登记被改/缺失/不符/重名版本、跨 spec 的 `bundle_id` 或定义身份冲突、声明与推导的 capability 不符、form 需求超出包声明（`form-extension-mismatch`）、复用保留的 legacy 定义名、依赖缺失/摘要错/环、同一 package ID 双版本、归属冲突、未知 capability、非空 reserved asset、闭包聚合上限、证据不完整/不符、用例缺失/未覆盖、用例格式不支持、用例与计划/form 绑定、基线或变异不符、用例 scope/stage 不符（form 负例用 `read`/`materialize`，或声明阶段不是第一个拒绝阶段）、form 诊断不在变异操作数上、完整诊断集不符、投影键集错误、legacy 目标不一致、已提交 legacy 快照与 sealed 内 `definition` 不一致（`legacy-snapshot-mismatch`）、无法映射的包路径、定义被 `read` 拒绝、资源上限（含已提交 lock/sealed 与已提交 legacy 快照超过字节预算） | 1 |
 | 宿主/IO/内部 | 文件读失败、锁文件不可写、内部不变量破坏、conformance 遇到 `Internal`/`HostFailure` | 2 |
 | 成功 | 构建或校验通过 | 0 |
 
 `BuildError` 的变体名包括 `unsupported-capability`、`capability-mismatch`、
 `unsupported-asset`、
 `version-conflict`、`aggregate-limit`、`resource-limit`、`legacy-row-mismatch`、
-`legacy-target-mismatch`、`evidence-mismatch`、`evidence-incomplete`、
+`legacy-target-mismatch`、`legacy-snapshot-mismatch`、`evidence-mismatch`、
+`evidence-incomplete`、
 `missing-cases`、`uncovered-form`、`empty-package`、`case-evidence-mismatch`、
 `case-plan-identity`、`case-form-mismatch`、`case-error-scope`、
 `case-format-unsupported`、`case-baseline-invalid`、`case-mutation-mismatch`、
@@ -1066,9 +1095,10 @@ H2 只加构建器自己的有界输入，不声称解决深层 JSON：
 - 单个 `tests/cases.json` ≤ 16 MiB；单个 `evidence/manifest.json` ≤ 1 MiB；
   单个 spec 或 lock ≤ 1 MiB；行比较读取的钉住 legacy 定义文件 ≤ 16 MiB；
   已提交 sealed bundle ≤ 80 MiB（64 MiB 闭包预算加至多 16 MiB 信封），
-  `--check` 只按有界流式比较读取它，不 `read_to_end`；超预算的已提交
-  lock/sealed 是 `resource-limit`（退出 1）；`bundles/published.json` ≤ 16 MiB
-  且 ≤ 65 536 项；
+  `--check` 只按有界流式比较读取它，不 `read_to_end`；已提交的 legacy 桥快照
+  也只按有界读取，≤ 16 MiB（等价门禁，不解析成第二份定义权威）；超预算的已
+  提交 lock/sealed/legacy 快照是 `resource-limit`（退出 1）；
+  `bundles/published.json` ≤ 16 MiB 且 ≤ 65 536 项；
 - 每个包导出 forms ≤ 1024；每个包声明资产 ≤ 2048；每个包 cases ≤ 4096；
   每个包证据文件 ≤ 4096；
 - 每个包的 manifest 加声明资产字节累计 ≤ 16 MiB，读取时累计检查（见下）；
@@ -1130,14 +1160,17 @@ spec 已把闭包每个成员恰好列一次，重复的 `packages[].path` 本�
   构建不经过 `Registry`。
 - `fmp` CLI 不改；构建器额外输出 `bundles/legacy/<bundle_id>/definition.json`，
   现有 `--definitions <dir>` 可以读取它；sealed bundle 本身不是定义文档。
-- **legacy 快照是派生开发缓存，不是发布产物（第十二轮 P2-1）。** 它不进入
+- **legacy 快照是派生开发缓存、不是发布身份，但提交时受等价门禁（第十四轮
+  P1）。** 它不进入
   `source_package_digest`/`definition_digest`/`bundle_digest`/`release_digest`；
-  `verify --all --check`/`verify --published --check` 只重建并比较 lock 与
-  sealed bundle，不比较它。写阶段先删除旧的 `definition.json`，再依次替换
-  lock、sealed，最后写 legacy；所以「第三个文件写失败」（退出码 2）留下的是
-  **缺失**，而不是仍可被读成当前构建的旧文件。退出 2 之后经 `--definitions`
-  读到的字节不能作为当前构建的证据，必须重新 `build`。这样既不让开发缓存参与
-  发布身份，也不让部分写入留下可误读的旧行。
+  缺失合法。若它被提交，`verify --all --check` 必须把它与已校验 sealed bundle
+  内 `definition` 对象的 canonical 字节逐字节比较，不同即
+  `legacy-snapshot-mismatch`（退出 1）。门禁是单向的：能让「兼容路径与发布对
+  不是同一份定义」的树变红，绝不让缓存成为身份输入，也不在门禁里重建缓存。
+  写阶段先删除旧的 `definition.json`，再依次替换 lock、sealed，最后写 legacy；
+  所以「第三个文件写失败」（退出码 2）留下的是**缺失**（合法、`--check` 通过），
+  而不是仍可被读成当前构建的旧文件；若留下旧文件，等价门禁会拒绝它。退出 2
+  之后经 `--definitions` 读到的字节不能作为当前构建的证据，必须重新 `build`。
 - `fmp-def/0.1` 行不在构建器里隐式转换成 `0.2`；混合格式闭包拒绝，显式
   版本化转换属于 H3。
 - `definitions/` 一个字节不动；`check_definition.py` 继续只检查 legacy 定义和
@@ -1256,6 +1289,10 @@ H2 每个 ISA 选一个代表性纵向切片，不迁移全部 forms：
 
 反向测试：同一派生计划把 digest 改回错误值，`bind` 必须在
 `/definition_identity/digest` 返回 `E-DEF-001`；包路径不能绕过 H1 的身份检查。
+这条反例**不是** `monasm-cases/0.1` 的一条 plan 负例：用例文法要求
+`definition_identity` 恰为 `$standalone` 三字段哨兵（否则 `case-plan-identity`），
+harness 只会把它替换成正确身份，无法制造 digest 错配，也**不提供** per-case
+身份覆盖机制。定义身份负例由这个独立绑定测试承担。
 
 ### 4.3 独立测试（两个包可以分别验证）
 
@@ -1271,7 +1308,10 @@ H2 每个 ISA 选一个代表性纵向切片，不迁移全部 forms：
   否则“覆盖 B 却执行 A”会被当成通过。正例 `expect` 使用 §4.2.1 的精确投影，
   键集错误是 `case-expect-shape`。
 - 负例必须声明 `scope`。`scope:"plan"` 可针对错误的 `expected_digest`、布局、
-  目标或不可表示的值，但不计覆盖；它用 `expect_error.stage` 区分
+  目标或不可表示的值，但不计覆盖；定义身份错配**不是** plan 负例：判例计划必须
+  写 `$standalone` 哨兵，harness 只会替换成正确身份，错误 digest 在
+  `case-plan-identity` 处就被拒绝，也不存在 per-case 身份覆盖。它用
+  `expect_error.stage` 区分
   `read`/`bind`/`materialize`，且声明的阶段必须恰是第一个拒绝的阶段（更早
   阶段已拒绝、或该阶段放行，都是 `case-error-scope`）。`scope:"form"` 必须
   绑定同 form/instruction 的正例 `baseline_case_id`，只改一个 `mutates` 操作数
@@ -1443,7 +1483,10 @@ A/B 工作流合并留给 H5。
 | `a_first_publication_may_be_created_and_registered_in_one_pr` | 同一 PR 新增 `packages/.../0.1.0/`、spec、lock、sealed 和首个 registry 条目 → 通过；条目与最终 path/version/摘要不一致或未被 head spec 选中 → `published-registry-invalid`；合并后下一 PR 改同一目录 → `published-package-modified` | 第六轮 P1-1、`ADR-0128` §1.1/§8.1/§8.3 |
 | `first_publication_bootstraps_without_registry_cycle` | 新包/新 spec 尚无 registry 行：`build` 成功并打印 `definition_digest`（不要求该行）；追加 `published` 与 `identities` 后 `verify --all --check` 与 `verify --published --check` 通过，两项都通过后才允许提交；`build` 从不写 registry。把追加放到任一 `--check` 之后会使 `--all --check` 报 `published-registry-incomplete`，因此不存在「先 check 后写行」的第二种顺序；合并提交才使该行成为 base 发布 | 第九轮 P2-3、第十二轮 P1-1、`ADR-0128` §8.3、`H2-D9` |
 | `failed_build_leaves_no_published_partial_artifact` | 注入写阶段 I/O 失败 → 退出 2，registry 未改，未报告成功；lock/sealed 一新一旧时 `--check` 失败；修复后重建并通过。确定性拒绝发生在写任何文件之前，也不删除 legacy 快照 | 第九轮 P2-3、第十二轮 P2-1、`ADR-0128` §8.3、`H2-D9` |
-| `a_failed_legacy_write_leaves_no_stale_snapshot` | 故障注入让第三个输出 `bundles/legacy/<bundle_id>/definition.json` 的临时写入或重命名失败 → 退出 2；lock 与 sealed 都是新字节且互相一致，所以 `--check` 通过（它只证明这两件发布产物）；旧 legacy 在写阶段开始时已被删除，因此路径缺失，`--definitions` 读取失败而不是返回上一版行；重新 `build` 后快照恢复且 `--check` 仍通过。断言不存在「新 lock + sealed、旧 legacy 仍可读」的组合 | 第十二轮 P2-1、`ADR-0128` §7/§8.3、`H2-D12` |
+| `a_failed_legacy_write_leaves_no_stale_snapshot` | 故障注入让第三个输出 `bundles/legacy/<bundle_id>/definition.json` 的临时写入或重命名失败 → 退出 2；lock 与 sealed 都是新字节且互相一致，旧 legacy 在写阶段开始时已被删除，因此路径缺失——缺失对等价门禁合法，`--check` 仍通过；`--definitions` 读取失败而不是返回上一版行；重新 `build` 后快照恢复且 `--check` 仍通过。断言不存在「新 lock + sealed、旧 legacy 仍可读」的组合；若实现留下旧文件，等价门禁必须以 `legacy-snapshot-mismatch` 拒绝 | 第十二轮 P2-1、第十四轮 P1、`ADR-0128` §7/§8.3、`H2-D12` |
+| `a_modified_committed_legacy_snapshot_fails_the_bridge_gate` | 对一个正确的已提交 bundle，只改 `bundles/legacy/<bundle_id>/definition.json` 的一个 opcode，不改 spec、lock、sealed 或源包 → `verify --all --check` 以 `legacy-snapshot-mismatch`（退出 1）失败，尽管全部已记录摘要仍匹配；改回 canonical 字节后通过，删掉该文件也通过（缺失合法）。门禁不重建缓存、不把快照字节喂给任何摘要 | 第十四轮 P1、`ADR-0128` §8/§8.3/§12、`H2-D9`、`H2-D12` |
+| `a_nested_package_manifest_cannot_mask_a_published_ancestor` | base registry 已发布 `packages/x86/monasm.isa.x86/0.1.0/`；同一 PR 在该目录内新增更深的 `package.json` 并修改同目录的 form → 变更路径门禁先按 base registry 判定包含，直接 `published-package-modified`（退出 1），不按 head 侧最近的 `package.json` 重新归类；把同一新增 `package.json` 放到 base 未登记的新版本目录则按首次发布处理 | 第十四轮 P2-3、`ADR-0128` §8.1/§8.3 |
+| `lifting_the_transition_needs_a_versioned_build_rule` | H3 验收：同一份不相等的 `fmp-def/0.1` 选择，用 `monasm-bundle-spec/0.1` 构建仍被 `h2-exact-target` 拒绝（退出 1）；只有新的版本化构建规则版本能构建成功，且得到的 bundle 能绑定目标集合为子集的计划。断言 Builder 软件升级本身不改变 `0.1` 的结论 | 第十四轮 P2-2、`ADR-0128` §4.1、`H2-D4` |
 | `a_base_published_version_cannot_be_edited_with_a_registry_change` | base 已登记 `0.1.0`；同一 PR 改 `0.1.0/` 的 form 并同时改写/删除/替换该登记项 → 包改动是 `published-package-modified`，登记改动是 `published-registry-modified`，退出 1 | 第六轮 P1-1、`ADR-0128` §8.1/§8.3 |
 | `a_retired_published_version_is_still_immutable` | PR A 删除最后一个引用 `0.1.0` 的 spec，但保留 registry 条目；PR B 只改旧 `0.1.0/` 目录 → 按 base registry 判为已发布，`published-package-modified` | 第五轮 P1-2、`ADR-0128` §1.1/§8.3 |
 | `the_published_registry_is_append_only` | 删除、改写、重排或替换 base 条目 → `published-registry-modified`；head spec 选中但无条目 → `published-registry-incomplete`；新条目未被任何 head spec 选中或摘要不符 → `published-registry-invalid`；仅追加合法条目通过；head-only 条目在无 spec 选中时可撤销 | 第五轮 P1-2、第六轮 P1-1、`ADR-0128` §8.3 |
@@ -1515,8 +1558,10 @@ cargo run -p fmp-definition -- verify --published --check
 
 第一条按 `bundles/specs/*.json` 显式重建，不按目录扫描决定选择。比较范围是
 sealed bundle 全字节、lock 除 `builder` 外的字节；`builder` 只做形状检查和
-打印，理由与 `ADR-0126` 的 payload/envelope 分层相同。legacy 快照不在比较范围：
-它是派生开发缓存（`H2-D12`），`--check` 只证明两件发布产物一致。第二条只审计
+打印，理由与 `ADR-0126` 的 payload/envelope 分层相同。legacy 快照不在摘要或
+发布身份里：它是派生开发缓存（`H2-D12`），但若被提交，`--check` 还要求它与
+sealed 内 `definition` 的 canonical 字节相同，否则 `legacy-snapshot-mismatch`
+（退出 1）。第二条只审计
 `bundles/published.json` 的全部条目（含退役版本），不选择任何包，也不影响
 lock/sealed。两者分开，未选中包不会混入 bundle 构建，退役版本也不会漏检
 （`ADR-0128` §8.4）。
@@ -1551,7 +1596,11 @@ cargo run -p fmp-definition -- verify --package --release <changed-package-path>
 
 CI 从 PR diff 提取 `packages/**` 和 `bundles/published.json` 的变更：
 
-- 修改/新增包文件：在 **head** 树找最近的含 `package.json` 的祖先；其目录名
+- 修改/新增包文件：**先**用 base registry 判断包含——只要变更路径位于某个
+  base 已登记的版本目录之内，直接 `published-package-modified`，退出 1；head 树
+  里更深的 `package.json` 不能把它重新归类成别的、未发布的根（第十四轮 P2-3）。
+  只有落在所有 base 已登记目录之外的变更，才在 **head** 树找最近的含
+  `package.json` 的祖先；其目录名
   必须等于清单 `version`（`path-version-mismatch`）。只有 **base registry** 中
   已登记的版本目录才在本 PR 内不可变，任何修改是 `published-package-modified`，
   退出 1；当前 spec 是否仍选中它不影响判断。head-only 条目是首次发布：允许同一
@@ -1632,9 +1681,13 @@ H2a 的阶段边界不变，但按五个可独立 review 的回归节点推进�
    `build` 先内存校验再替换输出（失败不留已发布部分产物）、
    `--check` 以有界流式比较读取已提交 lock/sealed（1 MiB/80 MiB 预算，越界是
    `resource-limit`，不 `read_to_end`）、
+   `--check` 对已提交 legacy 快照做 canonical 字节等价门禁（16 MiB 有界读取、
+   缺失合法、不重建缓存、不进入任何摘要；不同是 `legacy-snapshot-mismatch`）、
    `verify --published --check` 的有界断言（可执行资产与身份，
    不含 README/NOTICE/证据用例字节）。
-5. **N5 门禁与 x86 包**：变更路径 CI、x86 包与 bundles、`gates.yml`、H2a 报告。
+5. **N5 门禁与 x86 包**：变更路径 CI（先按 base registry 判定包含，再做 head 侧
+   包根发现，嵌套 `package.json` 不能遮蔽已发布祖先）、x86 包与 bundles、
+   `gates.yml`、H2a 报告（N4 增加 legacy 等价门禁，N5 增加 base-first 映射）。
 
 每个节点是一个可独立回归、可独立回滚的提交（或子 PR），各自带失败反例和
 门禁，不是实施者内部的检查清单；前一个节点全绿才进入下一个，尤其不能在 N1 的
@@ -1660,8 +1713,10 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | 跨包同名相对路径被误判冲突 | 冲突比较域随根而定：包内按相对字符串，闭包按 `packages[].path` 拼接后的仓库根相对路径；不同包根下的 `forms/add.json`/`tests/cases.json` 合法共存；只有折叠后相同的包根或重复 `path` 是 `path-lexical`；两个验收向量分别证明合法组合与根别名拒绝 |
 | 声明小写合法，磁盘目录项大小写不同 | 精确名字查找在已打开的父句柄上完成，中间目录和最终文件都要求逐字节同名；大小写不敏感卷上的 `Add.json` 打开是 `path-lexical`，不是成功；N1 三平台门禁包含这两条负例，与 `forms/Add.json` 的声明词法测试分开 |
 | 名字核对后、打开前目录项被替换 | 打开必须绑定到刚匹配的目录项（句柄或对象身份核对），不能按同名重开；发现替换以 `path-escape` 拒绝；N1 三平台门禁包含该场景，只测符号链接不算覆盖 |
-| 解除 `h2-exact-target` 变成静默放宽 | 目标兼容是（计划, 定义）矩阵：`fmp/0.1`+`fmp-def/0.1` 保持相等，`fmp/0.1`+`fmp-def/0.2` 保持子集加逐 form 需求；只有新计划协议能加格子，构建选项不能绕过；H3 在矩阵各格跑同一包与不同扩展集合 |
+| 解除 `h2-exact-target` 变成静默放宽 | 目标兼容是（计划, 定义）矩阵：`fmp/0.1`+`fmp-def/0.1` 保持相等，`fmp/0.1`+`fmp-def/0.2` 保持子集加逐 form 需求；增加格子需要新计划协议**加**版本化构建规则，构建选项不能绕过；H3 在矩阵各格跑同一包与不同扩展集合 |
 | 按计划格式判断目标关系，重新拒绝合法输入 | `check_target` 的 `subset_rule` 只读定义格式；`fmp/0.1`+`fmp-def/0.2` 是既有合法格子，H3 验收必须显式覆盖它不被重新拒绝 |
+| 只加 `fmp/0.2` 计划协议就以为解除了构建期拒绝 | Builder 在绑定计划前按 `h2-exact-target` 拒绝不相等的 `fmp-def/0.1` 选择；解除需要版本化构建规则，且 `monasm-bundle-spec/0.1` 对同一选择永久保持拒绝，Builder 升级不能改变旧格式的接受语义 |
+| 嵌套 `package.json` 遮蔽已发布祖先 | 变更路径先按 base registry 做祖先包含判断，命中即 `published-package-modified`；只有 base 之外的变更才做 head 侧包根发现 |
 | 负寄存器被当成 form 边界负例 | `payload.reg` 是 `u64`，`{"reg":-1}` 在 `plan::read` 就被拒绝，`bind` 从未运行；`D_Form ⊆ D_Representable`，该值只能作 `scope:"plan"` + `stage:"read"` 负例，寄存器 form 负例用 `2^field_bits` 或可表示的排除值 |
 | 用 `bind` 阶段记录读取期拒绝 | `read` 是独立阶段：`plan::read` 返回单个 `Diagnostic`，该用例写 `scope:"plan"` + `stage:"read"`；声明的阶段必须恰是第一个拒绝阶段，否则 `case-error-scope`（退出 1），不产生证据；form 覆盖仍只认 `bind` |
 | 证据要求诊断不产生的 `min`/`max` | 只有立即数 `E-RANGE-001`/`E-RANGE-002` 带 `min`/`max`；寄存器 `E-OPERAND-004` 只带 `target_type`/`value`/`field_bits`，`E-RANGE-004` 只带 `target_type`/`value`/`excluded`；证据记录实际字段，寄存器上界由 `field_bits` 推导，pass 条件仍是 `(code, path)` |
@@ -1674,7 +1729,7 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | 负例被无关错误满足 | 只有 `scope:"form"` 计入覆盖；它必须绑定同 form 的正例、只改一个操作数指针、由 `bind` 拒绝，并匹配完整 `(code, path)` 集合；至少一条诊断必须落在变异操作数或其父对象上；`expected_digest`/`E-BYTE-001`/`E-SIZE-001` 只能作为 `scope:"plan"` |
 | 已发布包被原地改写，旧 spec 无法重建 | 版本目录是发布快照；`bundles/published.json` 永久登记已发布路径；只有 base 条目在 PR 内不可变，同一 PR 首次创建并登记合法；旧目录禁止修改/删除；新版本用同级新目录；CI 按 base registry 判 `published-package-modified`，删除 spec 不清除登记；删除 base 条目本身是 `published-registry-modified` |
 | 首次发布被登记顺序卡死，或写失败留下半成品 | 三个时点分开：候选输出（`build` 退出 0）、registry 追加（publisher 用打印出的摘要写 `published`/`identities`）、发布（合并提交）。顺序固定为 build → 追加 → 两项 `--check` → 提交；`--all --check` 要求行已存在，所以不存在「先 check 后写行」。`build` 先内存校验全部输出，再写临时文件并重命名，确定性拒绝不写文件，写阶段失败退出 2 且不写 registry；lock/sealed 一新一旧必被 `--check` 拒绝；`build` 从不写 registry |
-| legacy 快照被当成发布身份，或失败后仍可读 | 它是派生开发缓存，不进入四个摘要；`--check` 只证明 lock+sealed；写阶段先删旧 `definition.json`，最后写新文件，第三个文件写失败留下缺失而不是旧行；退出 2 后读到的字节不算当前构建证据 |
+| legacy 快照被当成发布身份，或提交后与 sealed 漂移 | 它是派生开发缓存，不进入四个摘要、缺失合法；但提交副本要与已校验 sealed 内 `definition` 的 canonical 字节完全一致，不同是 `legacy-snapshot-mismatch`（退出 1），该门禁不重建缓存也不喂摘要；写阶段先删旧 `definition.json`，最后写新文件，第三个文件写失败留下缺失而不是旧行；退出 2 后读到的字节不算当前构建证据 |
 | 同一扩展/能力集合有两种 JSON 写法 | `enabled_extensions`/`requires_capabilities` 必须严格递增、无重复；逆序是 `extension-lexical`、重复是 `capability-lexical`，在集合关系之前拒绝；构建器不静默重排，派生集合按成员比较 |
 | 闭包预算只算 manifest/资产，漏掉 cases 与证据 | 单闭包计数器累加实际读取的包根字节：manifest、声明资产、`tests/cases.json`、证据清单及其列出的文件；同一路径每包根计一次，菱形共享包只计一次；在越界读取处 `aggregate-limit` |
 | 把「目标覆盖已验证」当成「ISA 需求已完整证明」 | `fmp-def/0.1` 下 `E_form = ∅`，只证明 `E_package ⊆ E_bundle`；`legacy_source` 只加 target 一致性；报告必须单列这条限制，且不为消除它新增 ISA 专用推导器 |
@@ -1752,12 +1807,16 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
   外层身份、排序、摘要输入和拒绝语义，不冻结其内部语义。
 - `bind` 接受 `VerifiedBundle`、`fmp-validate → fmp-definition` 依赖（H3）。
 - 解除 `h2-exact-target` 的 H3 计划侧目标兼容；H2 只声明过渡限制和退出门槛。
-  H3 的解除必须是新计划协议的一部分，并保持 `fmp/0.1` + `fmp-def/0.1`（相等）
+  H3 的解除必须同时包含新计划协议与版本化构建规则，并保持 `fmp/0.1` +
+  `fmp-def/0.1`（相等）
   与 `fmp/0.1` + `fmp-def/0.2`（子集加逐 form 需求）两个格子不变；验收测试
   `lifting_the_exact_target_requires_a_new_protocol` 用同一包与不同扩展集合跑
   矩阵三行：前两行必须复现今天的相等/子集结论（包括 `fmp-def/0.2` 的逐 form
   需求仍拒绝缺少扩展的行），只有新计划协议那一行按其自身规则接受子集。不能靠
-  删除构建器里的相等检查、按计划格式重判或增加构建选项完成。
+  删除构建器里的相等检查、按计划格式重判或增加构建选项完成；同一份不相等的
+  `fmp-def/0.1` 选择在 `monasm-bundle-spec/0.1` 下必须永久保持拒绝，
+  `lifting_the_transition_needs_a_versioned_build_rule` 断言 Builder 升级本身
+  不改变旧格式的接受语义。
 - 对新增包实际重跑或联网调用外部 oracle；H2 只校验证据记录、来源、哈希和
   用例执行，fixtures 的 `rerun.py` 仍只覆盖 legacy 语料（H3/H4 可扩展）。
 - fixup profile、非零 addend、Hi/Lo 配对、范围/字段所有权语义（H4）。
@@ -1782,7 +1841,7 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | O3 | H2 的类型叫 `VerifiedBundle` 还是 `BuiltBundle` | **`VerifiedBundle`**，但文档限定为 H2 的包/闭包/归属验证；运行期能力验证仍属 H3 | `BuiltBundle` 更保守，但与 H1 D1 的命名不一致 |
 | O4 | 包级 harness 放哪里 | **`fmp-definition/tests/` + dev-dependencies**，不新增产品 crate | 独立 `fmp-conformance` crate 边界更干净，但 H2 会增加一个 workspace 成员 |
 | O5 | 开发工具入口 | **`fmp-definition build\|verify\|digest` 独立 binary**，不改 `fmp` CLI | 加到 `fmp` 子命令更集中，但会扩大 CLI 兼容面 |
-| O6 | 包用例格式 | **完整 `fmp/0.1` 文档 + `$standalone` 哨兵**；计划恰好一条 instruction，其 `instruction_id`/`form_id` 必须绑定 case；负例分 `scope:"plan"`/`scope:"form"`，`expect_error.stage` 取 `read`/`bind`/`materialize` 且必须恰是第一个拒绝阶段（`read` 只观察 `plan::read` 的单个诊断，只有 plan 负例可用），form 负例绑定正例基线、只改一个操作数指针、只接受 `bind` 拒绝，并匹配完整 `(code, path)` 集合 | 独立 DTO 更短，但会把关键映射留给实现者各自解释；允许任意负例会让错误的 `expected_digest` 冒充操作数边界测试；只留 `bind`/`materialize` 会让读取期拒绝没有合法表示 |
+| O6 | 包用例格式 | **完整 `fmp/0.1` 文档 + `$standalone` 哨兵**；计划恰好一条 instruction，其 `instruction_id`/`form_id` 必须绑定 case；负例分 `scope:"plan"`/`scope:"form"`，`expect_error.stage` 取 `read`/`bind`/`materialize` 且必须恰是第一个拒绝阶段（`read` 只观察 `plan::read` 的单个诊断，只有 plan 负例可用），form 负例绑定正例基线、只改一个操作数指针、只接受 `bind` 拒绝，并匹配完整 `(code, path)` 集合；**定义身份错配不是 case 种类**：`definition_identity` 只能写 `$standalone` 哨兵，harness 只会替换成正确身份，错误 digest 在 `case-plan-identity` 处就被拒绝，该反例由派生计划绑定测试承担 | 独立 DTO 更短，但会把关键映射留给实现者各自解释；允许任意负例会让错误的 `expected_digest` 冒充操作数边界测试；只留 `bind`/`materialize` 会让读取期拒绝没有合法表示 |
 | O7 | lock/sealed 是否提交 | **提交**，CI `--check` 重建；它们是发布产物，不是手写计数 | 只在测试里构建更轻，但发布 bundle 无法审计 |
 | O8 | 三个包/forms 是否按 §4 表 | **按表**；已测量：x86 与 rv64 钉 `0.1.0`（前者行漂移，后者目标集合），aarch64 钉 `0.20.0` | 选更多 form 会增加等价面，不增加平台证明力 |
 | O9 | `exports.types`/`profiles` 现在预留还是等新格式版本 | **现在预留**：键、`{id, path}` 形状、排序和摘要都定义；非空在 H2 以 `unsupported-asset` 拒绝 | 版本化延后更少代码，但会同时承诺封闭格式和无缝扩展 |
@@ -1790,7 +1849,7 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | O11 | 新包没有 `legacy_source` 时如何验证 | **包自述 `target_identity`/`definition_format` + 独立身份 + `read` + 包用例**；用一个合成包证明不依赖历史定义 | 强制新包也写 legacy 来源会永久绑定旧目录 |
 | O12 | `verify --package` 的 Definition namespace/version 从哪来 | **`monasm-standalone/0.1` 固定函数**：`monasm.standalone.<package_id>` / `standalone+<source digest>`；保留前缀禁止进入 spec | 从 spec 借用会碰撞；从目录推导会随 cwd 漂移 |
 | O13 | 包级机器码测试是否强制 | **强制**：每个 form 正例+负例、证据引用、`package_conformance` 执行、`--release-evidence` 检查证据完整性，`--release` 再加闭包 | 只靠 `read` 会放过合法结构里的错误 opcode |
-| O14 | 包 target 与 bundle target 的关系 | **包声明保守覆盖、spec 声明选择**；只证明 `⋃E_form ⊆ E_package ⊆ E_bundle`（`fmp-def/0.1` 下 `E_form = ∅`，实际只证明包 ⊆ bundle），高报合法且只缩小可选范围，不裁剪声明；`fmp-def/0.1` 用 `h2-exact-target` 过渡，H3 由新计划协议增加矩阵格子；`fmp/0.1`+`fmp-def/0.1` 相等、`fmp/0.1`+`fmp-def/0.2` 子集两个格子不变。`profile_id` 只是包内名义标签，目标身份是六键 `target.identity`；同名不同 identity 合法，H2 不加 `(profile_id, identity)` 唯一性 | 逐字段相等会把新增扩展族变成对既有包的强制改版；把声明当最小并集会改变作者摘要或错误拒绝合法 bundle；按计划格式重判会重新拒绝已合法的 `fmp-def/0.2` 组合；把 profile 名当全局身份需要中央表且会让同名多义无法表达 |
+| O14 | 包 target 与 bundle target 的关系 | **包声明保守覆盖、spec 声明选择**；只证明 `⋃E_form ⊆ E_package ⊆ E_bundle`（`fmp-def/0.1` 下 `E_form = ∅`，实际只证明包 ⊆ bundle），高报合法且只缩小可选范围，不裁剪声明；`fmp-def/0.1` 用 `h2-exact-target` 过渡，H3 解除它需要**新计划协议加版本化构建规则**（`monasm-bundle-spec/0.1` 的拒绝结论永久不变），二者缺一不可；`fmp/0.1`+`fmp-def/0.1` 相等、`fmp/0.1`+`fmp-def/0.2` 子集两个格子不变。`profile_id` 只是包内名义标签，目标身份是六键 `target.identity`；同名不同 identity 合法，H2 不加 `(profile_id, identity)` 唯一性 | 逐字段相等会把新增扩展族变成对既有包的强制改版；把声明当最小并集会改变作者摘要或错误拒绝合法 bundle；按计划格式重判会重新拒绝已合法的 `fmp-def/0.2` 组合；把 profile 名当全局身份需要中央表且会让同名多义无法表达 |
 | O15 | form 家族与 target 的一致性 | **通用相等规则** `family(form_id) == target_identity.isa_family`；包格式不列 ISA；第四种家族由 H3 的 reader 支持，不需要改包协议 | 三 ISA 对应表实际全是字符串相等，会迫使 H3 再改一次公共格式 |
 | O16 | 证据文件是必需还是可选 | **开发包可选、可发布包必需**；`--release-evidence`/`--release`/spec 选中时要求 `tests/cases.json`、`NOTICE`、`sources`、`oracle.status`、skip 理由和用例证据；`tests/cases.json` 本身被哈希 | 永远可选或只哈希用例证据会让 `release_digest` 不代表完整审核证据 |
 | O17 | 已发布包与定义名如何继续演进 | **版本目录是不可变快照**：`packages/<target>/<package>/<version>/`；发布路径记入只追加的 `bundles/published.json`，`(package_id, version)` 全局唯一且永久绑定首次 path/摘要；`identities` 永久绑定 `(namespace, version)` 与 `definition_digest`，退役后仍拒绝换字节重发；`bundle_id` 是可移动发布线，不可变的 bundle 内容标签是 `(bundle_id, bundle_digest)`，证据完备的发布身份是 `release_digest`；只有 base 条目在 PR 内不可变，同一 PR 首次创建并登记合法；退役 spec 不删除登记；更新创建同级新目录；旧 spec 未改时旧 lock 原样重建，退役后旧快照/lock 仍可由旧提交重放；发布者另行选择新版本 | 原地覆盖会迫使作者改旧 spec；仅按当前 spec 判断会让退役后的旧目录和旧定义名失去保护；把 `bundle_id` 当不可变身份会拒绝正常的版本推进 |
@@ -1800,6 +1859,8 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | O21 | 机器输出投影 | **Level 0/1 各自封闭键集**；Level 0 无 `symbols`；Level 1 仅在 `include_symbol_table` 时含 `symbols` | 共用并集投影会把缺失键和空数组混为一谈 |
 | O22 | 单包验证能否证明依赖 | **分开报告 `structure`、`--release-evidence` 与 `dependency_closure`**；无显式闭包时非空依赖是 `unverified`，`--release` 退出 1，闭包验证递归重读全部可达依赖 | 只检查清单形状会把“声明了依赖”当成“依赖已解析” |
 | O23 | 写阶段失败与输出目录的边界 | **只保证可检测、不是成功发布**：允许退出 2 留下旧/新混合的 lock/sealed 或临时文件，`--check` 必定拒绝该组合；输出目录是发布者控制的受信任路径，但 `--root` 下每个输出父段都 no-follow（`path-escape`，退出 1）；已提交 lock/sealed 用有界流式比较（1 MiB/80 MiB，越界是 `resource-limit`） | 主张跨文件原子性无法由重命名保证；信任目录却不检查父段会让仓库内链接把写重定向；无界读取会让 `--check` 成为内存攻击面 |
+| O24 | 已提交 legacy 快照要不要进入一致性门禁 | **要，但只是等价门禁**：提交副本必须与已校验 sealed 的 `definition` canonical 字节相同（`legacy-snapshot-mismatch`，退出 1）；缺失合法，门禁不重建缓存、不进入任何摘要，读取 ≤ 16 MiB | 只改 legacy 的 opcode 而 `--check` 仍绿，会让文档规定的兼容路径读到发布对里不存在的定义；把快照升成身份输入又会让派生缓存决定发布 |
+| O25 | 已发布路径与嵌套 `package.json` 的判定顺序 | **先 base registry 包含、后 head 侧发现**：变更落在 base 已登记版本目录内即 `published-package-modified`，其中的新 `package.json` 也属于该快照的修改；只有 base 之外的变更才解析最近 head 清单 | head-first 会让更深清单把已发布快照的改动重新归类为未发布候选，绕开不可变约束 |
 
 ## 10. 证据状态
 
@@ -1831,7 +1892,7 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | 标识符/路径段/产物文件名词法在打开前以格式拒绝 | 尚未实现；规则见 `ADR-0128` §1.3，构建器还没有包读取器 | **未验证** — H2a |
 | 单一 `LoadedPackage` 贯穿摘要、行/目标比较、逐包 `read` 与合并 | 尚未实现；当前没有包读取路径 | **未验证** — H2a |
 | 首次发布无 registry 循环，`build` 先内存校验再写文件且从不写 registry | 尚未实现；只有文档规则。顺序固定为 build → 追加行 → 两项 `--check` → 提交，`--all --check` 要求行已存在 | **未验证** — H2a |
-| `--check` 只证明 lock+sealed，legacy 是写阶段先删后写的派生缓存 | 尚未实现；只有文档规则；第三个输出写失败的故障注入测试待写 | **未验证** — H2a |
+| `--check` 证明 lock+sealed，并对已提交 legacy 快照做等价门禁（缺失合法、不重建缓存、不进摘要） | 尚未实现；只有文档规则；第三个输出写失败的故障注入与 legacy 改动测试待写 | **未验证** — H2a |
 | 扩展/能力数组的严格排序与去重写法 | 尚未实现；`extension-lexical`/`capability-lexical` 只是文档中的格式拒绝 | **未验证** — H2a |
 | 64 MiB 闭包预算的固定计数集合、每路径一次与越界读取处拒绝 | 尚未实现；没有包读取器 | **未验证** — H2a |
 | `enabled_extensions` 是保守覆盖而非最小集合 | 尚未实现；`fmp-def/0.1` form 没有需求键，构建器不存在 | **未验证** — H2a |
@@ -1857,7 +1918,10 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | 用例 stage 三态与「声明阶段必须恰是第一个拒绝阶段」 | 尚未实现；没有包级 harness | **未验证** — H2a |
 | 输出父目录 no-follow 与已提交 lock/sealed 的有界流式比较 | 尚未实现；没有写阶段，也没有 `--check` | **未验证** — H2a N1/N4 |
 | 中断写入留下新旧混合的 lock/sealed 时 `--check` 必拒绝 | 尚未实现；故障注入测试待写 | **未验证** — H2a |
-| 目标兼容矩阵保持 `fmp/0.1`+`fmp-def/0.1` 相等、`fmp/0.1`+`fmp-def/0.2` 子集，仅新计划协议加格子 | 前两格可从 `check_target` 读出；新计划格子不存在 | **部分验证** — H3 门禁 |
+| 只改已提交 legacy 快照而不改 spec/lock/sealed/源包时，`--check` 以 `legacy-snapshot-mismatch` 拒绝 | 尚未实现；只改了文档中的门禁规则；`a_modified_committed_legacy_snapshot_fails_the_bridge_gate` 待写 | **未验证** — H2a |
+| 定义身份错配不能表示为 `monasm-cases/0.1` 用例 | 用例要求 `$standalone` 哨兵且 harness 替换为正确身份，错误 digest 在 `case-plan-identity` 处被拒绝；`plan::read`/`bind` 的既有行为已读 | **specified；reader 行为已读** — H2a 绑定测试 |
+| 变更路径先按 base registry 判定包含，嵌套 `package.json` 不能遮蔽已发布祖先 | 尚未实现；没有变更路径映射器；`a_nested_package_manifest_cannot_mask_a_published_ancestor` 待写 | **未验证** — H2a |
+| 目标兼容矩阵保持 `fmp/0.1`+`fmp-def/0.1` 相等、`fmp/0.1`+`fmp-def/0.2` 子集，新计划协议**加版本化构建规则**才加格子 | 前两格可从 `check_target` 读出；新计划格子与构建规则都不存在；`monasm-bundle-spec/0.1` 尚无 Builder | **部分验证** — H3 门禁 |
 | `profile_id` 是包内名义标签，身份是六键 `target.identity` | 文字规则；没有 spec 或 bundle 可测，也不新增跨 spec 唯一性 | **specified, not implemented** — H2a |
 | 边界证据只在 `D_Representable` 内取，且只记录诊断实际字段 | 尚未实现；三个包与用例不存在 | **未验证** — H2a/H2b |
 | `structure`/`--release-evidence`/`dependency_closure` 三态分离与传递闭包重读 | 尚未实现 | **未验证** — H2a |

@@ -5,22 +5,25 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: thirteenth revision, 2026-11-17, after the case-stage and
-  output-boundary audit: `monasm-cases/0.1` gains `stage: "read"` for plan-scope
-  negatives, so a `plan::read` rejection such as `{"reg":-1}` has a legal
-  representation, and the declared stage must be the first stage that rejects;
-  an interrupted write may leave a detectable partial artifact set but never a
-  set that `--check` accepts; output parents are named as trusted,
-  no-follow-checked paths; the committed lock and sealed bundle are read through
-  a bounded streaming comparison; and `profile_id` is a nominal label whose
-  semantics live in the full `target.identity`, not a global target identity.
-- Prior revision: twelfth revision, 2026-11-17, fixed the first-publication
-  order (build success → registry append → both `--check`s → commit, with
-  publication being the merged commit), made the legacy snapshot an explicit
-  derived development cache, gave extension and capability arrays one canonical
-  spelling, counted every package-root byte a command reads toward the closure
-  budget, and stated the `E_form = ∅` limitation in the H2 acceptance text.
-- Prior revisions: the eleventh (representability-scoped boundary evidence, the
+- Revision: fourteenth revision, 2026-11-17, after the bridge and protocol audit:
+  a committed legacy snapshot must be byte-identical to the canonical
+  serialization of the sealed definition (`legacy-snapshot-mismatch`) although it
+  still enters no digest, and its absence stays legal; a definition-identity
+  mismatch is removed from the case vocabulary because the `$standalone` sentinel
+  and the substitution rule make it inexpressible, so the derived-plan binding
+  test carries it; lifting `h2-exact-target` requires a versioned build rule as
+  well as a new plan protocol, and `monasm-bundle-spec/0.1` keeps its rejection
+  conclusion permanently; and the changed-path gate tests base-registry
+  containment before head-side `package.json` discovery, so a nested manifest
+  cannot mask a published ancestor.
+- Prior revision: thirteenth revision, 2026-11-17, added `stage: "read"` for
+  plan-scope negatives and the first-rejecting-stage rule, restated the
+  interrupted-write guarantee as detectability, named output parents as trusted
+  but no-follow-checked, bounded the committed lock and sealed bundle read, and
+  made `profile_id` a nominal label inside one bundle.
+- Prior revisions: the twelfth (first-publication order, derived legacy cache,
+  canonical set spelling, counted closure budget, the `E_form = ∅` acceptance
+  caveat), the eleventh (representability-scoped boundary evidence, the
   plan×definition matrix, a single-modifier `mutates`, one-segment paths,
   entry-replacement in the N1 gate) and the tenth and earlier (package-root
   collisions, exact on-disk entry names, the versioned `h2-exact-target` lift,
@@ -49,10 +52,12 @@
   matrix; the single loaded-package value shared by digest, comparison, `read`
   and merge; the cycle-free first-publication order (build success, then the
   registry append, then both `--check`s, then commit), in-memory output
-  validation and the derived legacy cache; the one canonical spelling of
+  validation and the derived legacy cache with its equality-only bridge gate;
+  the one canonical spelling of
   extension and capability arrays; the counted closure byte budget; package
-  target covers versus bundle target selection; the versioned H3 condition for
-  accepting a subset target; package/form
+  target covers versus bundle target selection; the two-part versioned H3
+  condition for accepting a subset target (build rule and plan protocol);
+  base-registry-first changed-path containment; package/form
   ISA-family consistency; package ownership and conflict rules; which legacy
   definition version a re-homed form is compared against; transitive dependency
   closure and release-evidence status; the builder's error and exit behaviour;
@@ -256,10 +261,12 @@ the immutability boundary:
   registry entry. H2 does not add an archival or deletion tool; retiring the
   bytes themselves needs a later ADR.
 
-The CI changed-path gate resolves each `packages/**` change in the head tree and,
-for a deletion, in the base tree. It then asks the **base published registry**
-(§8.3) whether that snapshot was already published. If so, any changed file fails
-the gate before `verify --package` runs (§8.1). A version whose entry exists only
+The CI changed-path gate first asks the **base published registry** (§8.3) whether
+the changed path lies inside an already published version directory; if so, any
+changed file there fails the gate before `verify --package` runs (§8.1), and a
+`package.json` added deeper in the head tree cannot reclassify it. Only a change
+outside every base-registered directory is resolved to its nearest head
+`package.json`. A version whose entry exists only
 in the head registry is a **first publication**: it is a candidate during this PR
 and is validated against the final snapshot instead of being rejected. Deleting
 or renaming a base-published version directory is the same rejection, not a
@@ -887,8 +894,13 @@ permanent package-contract rule. `fmp-def/0.2` documents already apply the subse
 rule, and a future `fmp/0.2` plan format may define a new cell on the plan side.
 
 **Exit condition.** H3 must define plan-level target compatibility so a plan may
-target a subset of the definition/bundle set without rewriting the definition.
-That H3 result is what lifts `h2-exact-target`. It must be in force before H5's
+target a subset of the definition/bundle set without rewriting the definition,
+**and** a versioned build rule so the builder accepts such a selection under that
+declared protocol. Both halves are required: the builder rejects an unequal
+`fmp-def/0.1` selection before any plan is bound, so a plan protocol alone cannot
+lift the build-time check (the versioned-lift paragraph below).
+`monasm-bundle-spec/0.1` keeps its
+rejection conclusion permanently. The lift must be in force before H5's
 parallel-extension drills; if it is not, this ADR's package contract must be
 revised by a new ADR before H5 starts. H2 does not claim the transitional
 equality is the final composition rule, and it does not freeze a package
@@ -903,7 +915,8 @@ today are fixed, and H3 must preserve every one of them:
 | `fmp/0.1` | `fmp-def/0.1` | equal sets |
 | `fmp/0.1` | `fmp-def/0.2` | plan set ⊆ definition set, plus each form's `requires_extensions` |
 
-Only a **new plan protocol** may add a cell and lift `h2-exact-target`; the
+Only a **new plan protocol together with the versioned build rule below** may add
+a cell and lift `h2-exact-target`; the
 existing `fmp/0.1` + `fmp-def/0.2` cell already uses the subset rule and must not
 be re-rejected by an implementation that keys the rule on the plan format. The
 `fmp/0.1` + `fmp-def/0.1` cell keeps equality, and no build option changes either
@@ -920,6 +933,22 @@ reference plans' target sets) and leaves the package manifest meaning, and the
 two existing cells, unchanged. A new package format version is needed only if a
 future target relationship is not expressible as a subset of the same extension
 vocabulary.
+
+**A new plan protocol alone does not lift the build-time check.** The builder
+rejects an unequal `fmp-def/0.1` selection while it builds a spec, before any plan
+is bound, so adding `fmp/0.2` cannot make such a spec build. Lifting has two
+halves that must land together: a **versioned build rule** — a new
+`monasm-bundle-spec` version, or an explicit versioned compatibility-relation
+declaration that the builder reads — and the plan-side cell above. The shipped
+`monasm-bundle-spec/0.1` keeps its rejection conclusion permanently: the same spec
+bytes must not flip from deterministic rejection (exit 1) to acceptance because
+the builder was upgraded, since that would silently change what an old format
+accepts. H3 acceptance must show, for a composition such as an `rv64i`-only
+package with an `rv64c`/`rv64i` bundle: the old spec version still rejects the
+unequal selection, the new build-rule version builds it, and the resulting bundle
+binds a plan whose target set is the subset. The first assertion is what proves
+`0.1` semantics did not drift; the second is what unblocks H5 at the builder
+rather than only at the plan validator.
 
 Counterexample if the requirement were stored as the bundle selection: adding
 `rv64c` changes package A's source digest although A's rows did not change, and
@@ -1215,16 +1244,20 @@ definition.
 - `bundles/legacy/<bundle_id>/definition.json` — generated: the plain merged
   definition document, with no bundle envelope, so the existing
   `fmp materialize <plan> --definitions <dir>` path can load it. It is a derived
-  development cache, not a release identity: it enters no digest and `--check`
-  does not compare it. The write phase removes the previous copy before writing
-  the new one (§8.3). `Registry::load_dir` recursively
+  development cache, not a release identity: it enters no digest, and its absence
+  is legal. When it is committed, `verify --all --check` requires its canonical
+  bytes to equal the definition document inside the checked sealed bundle
+  (`legacy-snapshot-mismatch`, exit 1); that equality gate is not an identity
+  input (§8.3). The write phase removes the previous copy before writing
+  the new one. `Registry::load_dir` recursively
   reads every `.json` under the directory and calls `definition::read`, so the
   sealed `.bundle.json` cannot be used here; point `--definitions` at the
   directory that contains only this snapshot.
 
 The binary has three subcommands: `build` writes the lock, sealed bundle and
 legacy snapshot; `verify --check` rebuilds the lock and sealed bundle in memory
-and compares them; and `digest <package-path>` prints
+and compares them, and compares a committed legacy snapshot with that rebuilt
+definition; and `digest <package-path>` prints
 the computed `source_package_digest` so an author can write it into the spec.
 `verify --all` checks the bundle closures selected by `bundles/specs/*.json`;
 `verify --published --check` audits the entire published registry without
@@ -1400,7 +1433,9 @@ identity.
 
 Lock and sealed bundle are committed release artifacts. CI runs
 `fmp-definition verify --all --check`, rebuilds each spec in memory, compares the
-sealed bundle byte-for-byte and the lock byte-for-byte **except `builder`**. It
+sealed bundle byte-for-byte and the lock byte-for-byte **except `builder`**, and
+compares a committed legacy snapshot with that rebuilt definition as a one-way
+equality gate (§8.3). It
 also runs `verify --published --check` (§8.4), which re-hashes every registry
 entry including retired versions without selecting any package. The
 changed-path job runs `verify --package <changed>` (structure) for every changed
@@ -1434,8 +1469,19 @@ the **base registry** (entries already published at the merge base) from the
 snapshot immutable during this PR; a head-only entry is a **first publication**
 and is validated, not rejected.
 
-- **Modified or added file:** resolve the nearest ancestor `package.json` in the
-  head tree. Its directory must be a version directory whose name equals the
+**The base registry decides containment first.** Before the head tree is used to
+resolve a `package.json` ancestor, the gate checks whether the changed path lies
+under a **base-registered version directory**. If it does, the change is
+`published-package-modified` (exit 1) no matter what the head tree contains
+below that directory; a nested `package.json` added inside a published snapshot
+is therefore itself a modification of that snapshot, not a reclassification of
+the files around it. Only a change outside every base-registered directory is
+mapped by the head-side rule below. This ordering is what keeps a deeper manifest
+from masking an ancestor that the base registry has already frozen.
+
+- **Modified or added file outside every base-registered directory:** resolve the
+  nearest ancestor `package.json` in the head tree. Its directory must be a
+  version directory whose name equals the
   manifest's `version`; a mismatch is `path-version-mismatch` (exit 1). If none
   exists, fail with `unmapped-package-path` (exit 1); do not skip the path. If
   the version directory is in the **base registry**, it is already published and
@@ -1831,31 +1877,49 @@ bounded reader and compares bytes **as they stream** against the in-memory
 rebuild: the lock is limited by the 1 MiB lock budget and the sealed bundle by
 the 80 MiB budget of §12. Neither is loaded with an unbounded `read_to_end`, and
 a committed file longer than its budget is `resource-limit` (exit 1) — the same
-deterministic rejection a package input gets, not a host error.
+deterministic rejection a package input gets, not a host error. A committed
+legacy snapshot is read the same way, within 16 MiB, for the equality gate below;
+it is never parsed as a second definition authority and never `read_to_end`.
 
-`verify --all --check` proves exactly the release artifacts: the committed lock
-and the sealed bundle, rebuilt from the exact selected closure. It does **not**
-compare the legacy snapshot. That snapshot is a derived development cache: it is
-written for `--definitions <dir>`, it enters no digest, and it is not part of
-`bundle_digest`, `definition_digest` or `release_digest` (§7). A stale copy
-therefore cannot make a release identity wrong; it can only mislead a developer
-who reads it as current. Removing it before the rewrite and writing it last is
-what makes the cache safe without widening `--check`: an interrupted write leaves
-it absent, so a later `--definitions` read fails instead of returning the
-previous build's rows. Any bytes read through `--definitions` after an exit-2
-build are not evidence about the current build; run `build` again. Git supplies
-repository-level atomicity; `build` supplies "exit 0 means every output was
-validated before any was written".
+`verify --all --check` proves the release artifacts: the committed lock and the
+sealed bundle, rebuilt from the exact selected closure. It does **not** put the
+legacy snapshot into any digest: that snapshot is not part of `bundle_digest`,
+`definition_digest` or `release_digest` (§7), and its absence is legal. But a
+committed snapshot is still a claim about this bundle — the tree ships a
+`definition.json` that `fmp materialize --definitions` will load — so the check
+also **compares it with the definition document inside the just-verified sealed
+bundle**: the committed file must be byte-identical to the canonical
+serialization of the sealed bundle's `definition` object. Different bytes are
+`legacy-snapshot-mismatch` (exit 1). The snapshot is read through the same bounded
+reader and 16 MiB budget as a pinned legacy definition (§12), never as an identity
+input. The direction is one-way: a tree whose bridge disagrees with its release
+pair fails, and no bundle identity ever depends on the cache.
 
-Counterexample if the legacy snapshot were written in place before the lock: a
-crash after the new lock and sealed bundle but before the legacy write leaves a
-snapshot from the previous build next to a consistent new release pair, and a
-developer reading that snapshot would attribute old rows to the new bundle.
-Counterexample if `--check` had to rebuild the legacy snapshot: the release gate
-would depend on a derived cache whose bytes no release identity records, and a
-deliberate cache regeneration would become a release event. Neither is needed:
-removing the stale file and stating that `--check` covers only lock and sealed
-bundle closes the hazard at the write that creates it.
+That equality gate closes the gap a digest cannot: the sealed definition and the
+CLI-readable definition must be the same document, so editing only
+`bundles/legacy/<bundle_id>/definition.json` — no spec, lock, sealed bundle or
+package change — makes `verify --all --check` red even though every recorded
+digest still matches. Counterexample if the snapshot were left out of the check: a
+correct build, then one changed opcode in the committed snapshot, then a green
+`--check`, and the documented compatibility path reads a definition the release
+pair does not contain.
+
+Removing it before the rewrite and writing it last keeps the interrupted-write
+story simple: an exit-2 write leaves it absent, which passes because absence is
+legal, so the next `--definitions` read fails loudly instead of returning the
+previous build's rows. A stale snapshot from an interrupted write now fails the
+equality gate instead of being silently readable; both outcomes are "not a
+successful release". Counterexample if the legacy snapshot were written in place
+before the lock: a crash after the new lock and sealed bundle but before the
+legacy write leaves a snapshot from the previous build next to a consistent new
+release pair, and the equality gate reports it rather than letting a developer
+attribute old rows to the new bundle. Counterexample if `--check` had to rebuild
+the legacy snapshot from source: the release gate would depend on a derived
+cache's provenance and a cache regeneration would become a release event. The
+equality gate does neither; it compares the committed bytes with the definition
+already rebuilt for the sealed bundle, so there is no second build path. Git
+supplies repository-level atomicity; `build` supplies "exit 0 means every output
+was validated before any was written".
 
 Counterexample if `build` required its own registry row: the row needs
 `definition_digest`, which needs the build, so a first publication could never
@@ -1895,7 +1959,8 @@ Two questions must not be conflated:
 
 - **Bundle verification** (`verify --all --check`) answers "does each current
   spec rebuild its committed lock and sealed bundle from the exact selected
-  closure?" It reads only the paths selected by `bundles/specs/*.json`, plus the
+  closure, and does a committed legacy snapshot equal that definition?" It reads
+  only the paths selected by `bundles/specs/*.json`, plus the
   registry facts needed to decide publication and validity for those paths. It
   never opens an unselected package, so an unselected package cannot change its
   result (`HE-AC-05`).
@@ -2138,9 +2203,15 @@ projection is compared after `materialize`.
 `form` or `plan`:
 
 - `scope: "plan"` is an ordinary rejection. It may target any deterministic
-  `fmp/0.1` failure, including a wrong `expected_digest`, a bad section layout,
-  a target mismatch, a definition-identity error, or a value `fmp/0.1` cannot
-  represent. It declares `stage: "read"` when `fmp_model::plan::read` is the
+  `fmp/0.1` failure the case document can express, including a wrong
+  `expected_digest`, a bad section layout, a target mismatch, or a value
+  `fmp/0.1` cannot represent. A definition-identity mismatch is **not**
+  expressible as a case: every case's `definition_identity` must be the
+  `$standalone` sentinel, and the harness substitutes the correct standalone
+  identity, so a wrong digest is `case-plan-identity` (exit 1) before execution
+  and no case-level override exists. The H2 binding test that mutates a derived
+  plan's digest carries that negative instead (§4.1). It declares
+  `stage: "read"` when `fmp_model::plan::read` is the
   rejecting stage, and `"bind"` or `"materialize"` when the document reads and a
   later stage rejects. It is validated and executed, but it does not count toward
   a form's negative coverage.
@@ -2153,9 +2224,11 @@ projection is compared after `materialize`.
   `^/instructions/0/operands/[0-9]+/(payload(/[^/]+)*|kind|target_type|modifiers(/[0-9]+(/name|/value)?)?)$`.
   That is the form-constraint surface: an operand value, operand kind, target
   type or modifier. A mutation at `expected_digest`, `form_id`, `offset`,
-  `section_id`, `expected_size`, `output_contract` or `definition_identity` is
-  not a form-neighbourhood test; it must use `scope: "plan"` or is
-  `case-mutation-mismatch` (exit 1).
+  `section_id`, `expected_size` or `output_contract` is not a form-neighbourhood
+  test; it must use `scope: "plan"` or is `case-mutation-mismatch` (exit 1). A
+  mutation at `definition_identity` is neither: the sentinel rule and harness
+  substitution make an identity mismatch inexpressible, so it belongs to the
+  derived-plan binding test, not to any case scope.
 - A modifier is an object `{"name": …, "value": …}`, so changing only its value
   has the pointer `/instructions/0/operands/<n>/modifiers/<i>/value`; that is a
   legal single mutation, as is `…/modifiers/<i>/name` when the name change leaves
@@ -2425,7 +2498,11 @@ expressed as one operand-surface mutation. It does not define:
 - post-encode artifact assertions (H4): a form-scope negative must be a `bind`
   rejection at the mutated operand; `E-BYTE-001`/`E-SIZE-001` and fixup
   assertions are plan-scope evidence or need a later scenario model, never form
-  coverage.
+  coverage;
+- definition-identity negatives: the only legal `definition_identity` is the
+  `$standalone` sentinel and the harness substitutes the correct identity, so a
+  digest mismatch is a binding-test concern, not a case kind, and the format adds
+  no per-case override.
 
 The case document declares `cases_format`; the builder rejects any value other
 than `monasm-cases/0.1` with `case-format-unsupported` (exit 1). H3/H4 must add
@@ -2460,14 +2537,15 @@ does not pretend to be `fmp/0.1` diagnostics.
 
 | Class | Examples | Exit |
 |---|---|---|
-| Deterministic rejection | manifest shape (required/optional keys), identifier/path lexical violation, a reversed or duplicated `enabled_extensions`/`requires_capabilities` array, artifact filename mismatch, empty forms, path escape, a symlink/reparse point on a package path or on an output parent path under `--root`, or an opened entry whose name differs from the declared segment, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, case scope/stage mismatch (form-scope `read`/`materialize`, or a declared stage that is not the first rejecting stage), form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit (including a committed lock or sealed bundle over its byte budget) | 1 |
+| Deterministic rejection | manifest shape (required/optional keys), identifier/path lexical violation, a reversed or duplicated `enabled_extensions`/`requires_capabilities` array, artifact filename mismatch, empty forms, path escape, a symlink/reparse point on a package path or on an output parent path under `--root`, or an opened entry whose name differs from the declared segment, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, committed legacy snapshot differing from the sealed definition (`legacy-snapshot-mismatch`), legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, case scope/stage mismatch (form-scope `read`/`materialize`, or a declared stage that is not the first rejecting stage), form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit (including a committed lock, sealed bundle or legacy snapshot over its byte budget) | 1 |
 | Host / I/O / internal | unreadable file, unwritable lock, internal invariant break, materializer `Internal`/`HostFailure` during conformance | 2 |
 | Success | build or verify passed, digest printed | 0 |
 
 The enum names these rejections (`unsupported-capability`, `capability-mismatch`,
 `unsupported-asset`,
 `version-conflict`, `aggregate-limit`, `resource-limit`, `legacy-row-mismatch`,
-`legacy-target-mismatch`, `evidence-mismatch`, `evidence-incomplete`,
+`legacy-target-mismatch`, `legacy-snapshot-mismatch`,
+`evidence-mismatch`, `evidence-incomplete`,
 `missing-cases`, `uncovered-form`, `empty-package`, `case-evidence-mismatch`,
 `case-plan-identity`, `case-form-mismatch`, `case-error-scope`,
 `case-format-unsupported`, `case-baseline-invalid`, `case-mutation-mismatch`,
@@ -2497,8 +2575,9 @@ robustness:
   ≤ 1 MiB each; a committed sealed bundle ≤ 80 MiB (the 64 MiB closure budget
   plus at most 16 MiB of envelope for the sorted `sources` list and the
   definition wrapper), read only through the bounded streaming comparison of
-  §8.3; the pinned legacy definition file read for row comparison
-  ≤ 16 MiB; `bundles/published.json` ≤ 16 MiB and ≤ 65 536 entries;
+  §8.3; the pinned legacy definition file read for row comparison and the
+  committed bridge snapshot read for the §8.3 equality gate each ≤ 16 MiB;
+  `bundles/published.json` ≤ 16 MiB and ≤ 65 536 entries;
 - exported forms per package ≤ 1024; declared assets per package ≤ 2048; cases
   per package ≤ 4096; evidence files per package ≤ 4096;
 - manifest plus declared asset bytes per package ≤ 16 MiB, enforced by the
@@ -2793,7 +2872,9 @@ comparing the materializer with itself proves the bytes.
   merges. `build` validates every output in memory before replacing a file and
   never writes the registry, so a failed build leaves no row and no published
   partial artifact; the legacy snapshot is a derived cache that the same build
-  regenerates, and `--check` does not compare it (§8.3).
+  regenerates, its absence is legal, and a committed copy is compared with the
+  sealed definition as a one-way equality gate (`legacy-snapshot-mismatch`) that
+  never enters a digest (§8.3).
 - An interrupted write (exit 2) can leave a temporary file and a lock/sealed pair
   from different builds, but never a state `verify --all --check` accepts: the
   guarantee is detectability, not a multi-file atomic rename. Output directories
@@ -2864,6 +2945,13 @@ comparing the materializer with itself proves the bytes.
   the plan format instead of the definition format would wrongly reject the
   already-legal `fmp/0.1` + `fmp-def/0.2` cell, and no build flag substitutes for
   the new protocol (§4.1).
+- The H3 lift has a build-side door and a plan-side door, and both must open.
+  `monasm-bundle-spec/0.1` keeps rejecting an unequal `fmp-def/0.1` selection
+  forever; a new plan format alone cannot make that spec build, and the builder
+  version is not an implicit format upgrade (§4.1).
+- A published version directory is frozen by the base registry before any
+  head-side discovery, so adding a nested `package.json` inside it is itself a
+  modification, not a reclassification of the files around it (§8.1).
 - Form-family consistency is a string equality, not a package-format whitelist.
   A fourth ISA added to `fmp_model::definition::read` in H3 needs no edit to
   `monasm-package/0.1` or to a central builder table.
@@ -3060,6 +3148,15 @@ comparing the materializer with itself proves the bytes.
   Rejected: existing `fmp/0.1` plans would silently change meaning with no
   version marker. The subset rule arrives with a new plan/definition protocol,
   and only plans that adopt it get the subset verdict (§4.1).
+- **Rely on the new plan protocol alone for the lift, or let a builder upgrade
+  change an old spec's verdict.** Rejected: the builder rejects the unequal
+  selection before any plan is bound, so `fmp/0.2` alone leaves the same spec
+  failing; and a `monasm-bundle-spec/0.1` file that was a deterministic rejection
+  must not become an acceptance under newer software (§4.1).
+- **Resolve a published-path change by the nearest head `package.json` first.**
+  Rejected: a `package.json` added deeper inside a published snapshot would
+  reclassify the edit as a different, unpublished root. Base-registry containment
+  is decided first, so the edit stays `published-package-modified` (§8.1).
 - **Treat one illegal neighbour as a form's complete operand domain.** Rejected:
   a single out-of-range value does not show that the minimum, the maximum and
   the adjacent illegal value behave. The shipped bounded forms carry boundary
@@ -3075,6 +3172,11 @@ comparing the materializer with itself proves the bytes.
   `min`/`max` key would make every case fail against the validator's actual
   output. The upper bound is derived from `field_bits`, and the pass condition
   stays `(code, path)` (§9.1).
+- **State that a plan-scope case can test a definition-identity mismatch.**
+  Rejected: the only legal `definition_identity` is the `$standalone` sentinel and
+  the harness substitutes the correct identity, so a wrong digest is
+  `case-plan-identity` before execution. The derived-plan binding test carries
+  that negative; no per-case override is added (§9.1).
 - **Allow only `…/modifiers/<i>` in `mutates`.** Rejected: a modifier is an
   object with `name` and `value`, so a single value change reports
   `…/modifiers/<i>/value`; the old pattern made the common case inexpressible
@@ -3106,9 +3208,15 @@ comparing the materializer with itself proves the bytes.
   registry append and publication; only the merged commit publishes (§8.3).
 - **Make `--check` rebuild the legacy snapshot.** Rejected: it would let a derived
   development cache decide a release gate, and a cache regeneration would become
-  a release event. `--check` proves the lock and sealed bundle; the write phase
-  removes the stale snapshot first and writes it last, so an interrupted write
-  leaves it absent rather than stale (§8.3).
+  a release event. The check instead compares the committed snapshot with the
+  definition it already rebuilt for the sealed bundle; the write phase removes
+  the stale snapshot first and writes it last, so an interrupted write leaves it
+  absent rather than stale (§8.3).
+- **Leave a committed legacy snapshot out of every check because it is not an
+  identity.** Rejected: the tree then ships a `--definitions` file that no release
+  artifact reproduces, and a green `--check` would attest a compatibility path
+  the release pair contradicts. Equality is a one-way gate and never a digest
+  input (§8.3).
 - **Measure JSON depth after parsing.** Rejected: the parser recurses, so a
   20 000-deep document overflows before the measurement runs. The budget is
   enforced iteratively before `fmp_model::json::parse` is called (§12).
@@ -3199,10 +3307,13 @@ comparing the materializer with itself proves the bytes.
 | `E-OPERAND-004` carries `target_type`, `value` and `field_bits`, and `E-RANGE-004` carries `target_type`, `value` and `excluded` | `fmp-validate/src/lib.rs` `check_operand` and `excluded_diagnostic` | high (read) |
 | A modifier is `{name, value}`, so a single value change reports `…/modifiers/<i>/value` | `fmp-model/src/plan.rs` `bind_modifier` closes the object on `name` and `value` | high (read) |
 | Boundary evidence splits representable from form domains and records only emitted diagnostic fields | specified; the three packages and their cases do not exist | **unverified** — H2a/H2b |
-| The plan×definition matrix keeps `fmp/0.1` + `fmp-def/0.1` equality and `fmp/0.1` + `fmp-def/0.2` subset, and only a new plan protocol lifts `h2-exact-target` | existing two cells read from `check_target`; the new-plan cell does not exist | **partly measured, H3 gate** |
+| The plan×definition matrix keeps `fmp/0.1` + `fmp-def/0.1` equality and `fmp/0.1` + `fmp-def/0.2` subset, and only a new plan protocol plus a versioned build rule lifts `h2-exact-target` | existing two cells read from `check_target`; the new-plan cell and the versioned build rule do not exist; `monasm-bundle-spec/0.1` has no builder yet | **partly measured, H3 gate** |
 | One loaded package value feeds the source digest, row/target comparison, per-package `read` and merge | specified; no reader exists | **unverified** — H2a |
 | First publication bootstraps without a registry cycle, and `build` validates every output before writing | specified; the order is build success → append rows → both `--check`s → commit, and publication is the merged commit; no builder exists | **unverified** — H2a |
-| `--check` proves only the lock and sealed bundle; the legacy snapshot is a derived development cache removed before rewrite | specified; the write phase removes `<legacy>/definition.json` first and writes it last, so an interrupted write leaves it absent, not stale; no builder exists | **specified, not implemented** — H2a |
+| `--check` proves the lock and sealed bundle, and compares a committed legacy snapshot with the sealed definition as a one-way equality gate (absence legal, no digest input) | specified; the write phase removes `<legacy>/definition.json` first and writes it last, so an interrupted write leaves it absent, not stale; no builder exists | **specified, not implemented** — H2a |
+| A committed legacy snapshot whose bytes differ from the sealed definition is `legacy-snapshot-mismatch` (exit 1) | specified; the gate compares canonical bytes without rebuilding the cache; no `--check` exists | **specified, not implemented** — H2a |
+| A definition-identity mismatch is not expressible as a `monasm-cases/0.1` case | the case requires the `$standalone` sentinel and the harness substitutes the correct identity, so a wrong digest is `case-plan-identity`; the derived-plan binding test carries the negative | **specified; reader behaviour read** — H2a |
+| The base registry decides published-path containment before head-side `package.json` discovery | specified; no changed-path mapper exists, so a nested manifest masking an ancestor is untested | **specified, not implemented** — H2a |
 | Extension and capability arrays have one strictly increasing, duplicate-free spelling | specified; `extension-lexical`/`capability-lexical` are format rejections before the set relation | **specified, not implemented** — H2a |
 | The 64 MiB closure budget charges every package-root byte read, once per path, and rejects at the crossing read | specified; the counted set is manifest, declared assets, cases, evidence manifest and listed evidence files; no reader exists | **specified, not implemented** — H2a |
 | For `fmp-def/0.1`, `E_form = ∅`, so only `E_package ⊆ E_bundle` is proved; a `legacy_source` package adds target consistency, not a form-derived requirement | specified; `FORM_FIELDS` rejects `requires_extensions` in 0.1, and no builder exists | **specified, not implemented** — H2a |
@@ -3279,7 +3390,16 @@ comparing the materializer with itself proves the bytes.
 - Someone lifts `h2-exact-target` by removing the equality check, makes a
   `fmp/0.1` + `fmp-def/0.1` pair accept a subset, or keys the relation on the
   plan format and re-rejects `fmp/0.1` + `fmp-def/0.2`: stop. The existing cells
-  stay fixed and only a new plan protocol adds one (§4.1).
+  stay fixed and only a new plan protocol **together with the versioned build
+  rule** adds one (§4.1).
+- Someone lets a builder upgrade accept a `monasm-bundle-spec/0.1` selection that
+  it rejected before, or claims a new `fmp/0.2` plan format alone lifts the
+  build-time check: stop. The lift needs a versioned build rule, and the old spec
+  keeps its rejection conclusion (§4.1).
+- Someone lets a nested `package.json` reclassify a change inside a
+  base-registered version directory: stop. Base-registry containment is decided
+  before head discovery, and any change inside the snapshot is
+  `published-package-modified` (§8.1).
 - Someone counts one illegal neighbour as a bounded operand's whole domain, or
   moves `field_bits`/`value` evidence into the pass comparison: stop. Boundary
   cases stay inside `D_Representable`, and the pass condition stays the
@@ -3292,6 +3412,10 @@ comparing the materializer with itself proves the bytes.
   form-scope case `stage: "read"` or `"materialize"`: stop. The stages are a
   sequence, `bind` never sees a `Plan` the reader refused, and a reader rejection
   is not form coverage (§9.1).
+- Someone writes a plan-scope case that claims a definition-identity mismatch, or
+  adds a per-case identity override so that one is expressible: stop. The only
+  legal value is the `$standalone` sentinel and the harness substitutes the
+  correct identity; the derived-plan binding test carries that negative (§9.1).
 - Someone allows only `…/modifiers/<i>` in `mutates`, or rejects
   `…/modifiers/<i>/value`: stop. A single modifier value change is a legal form
   mutation, and the validator's array-level diagnostic is its ancestor (§9.1).
@@ -3305,10 +3429,11 @@ comparing the materializer with itself proves the bytes.
   merge of the creating PR as anything other than the publication moment: stop.
   `verify --all --check` requires the row, so that order cannot run, and an
   unmerged row is only a candidate (§8.3).
-- Someone makes `--check` rebuild or compare the legacy snapshot, or leaves a
-  previous build's snapshot readable after an exit-2 write: stop. The snapshot is
-  a derived development cache, `--check` covers lock and sealed bundle, and the
-  write phase removes the stale file first (§8.3, §7).
+- Someone makes `--check` rebuild the legacy snapshot, or drops its equality gate
+  because the snapshot is not an identity: stop. The gate compares committed bytes
+  with the rebuilt sealed definition and never rebuilds the cache; absence is
+  legal, but a present-and-different snapshot is `legacy-snapshot-mismatch`
+  (§8.3, §7).
 - Someone restates the write guarantee as "an interrupted write cannot leave a
   mixed lock/sealed pair", or adds a multi-file atomicity claim: stop. The
   guarantee is detectability — a mixed pair fails `verify --all --check` and is
