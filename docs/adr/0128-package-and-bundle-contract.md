@@ -5,27 +5,29 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: twelfth revision, 2026-11-17, after the publication-order and
-  partial-write audit: the first-publication order has one reading (`build`
-  exits 0 → publisher appends the rows → both `--check`s → commit) and
-  publication means the merged commit; the legacy snapshot is an explicit
-  derived development cache that `--check` does not compare and that the write
-  phase removes before rewriting; extension and capability arrays have one
-  canonical spelling (strictly increasing, duplicate-free); the per-closure byte
-  budget counts every package-root byte a command reads, charges a diamond
-  dependency once, and rejects at the crossing read; and the `E_form = ∅`
-  limitation of `fmp-def/0.1` is stated in the H2 acceptance text.
-- Prior revision: eleventh revision, 2026-11-17, scoped boundary evidence to
-  values the plan can represent, stated the plan×definition matrix, allowed
-  `mutates` to name a single modifier field, admitted a one-segment
-  package-root file, and added directory-entry replacement to the N1 gate.
-- Prior revisions: the tenth (package-root and repository-relative path
+- Revision: thirteenth revision, 2026-11-17, after the case-stage and
+  output-boundary audit: `monasm-cases/0.1` gains `stage: "read"` for plan-scope
+  negatives, so a `plan::read` rejection such as `{"reg":-1}` has a legal
+  representation, and the declared stage must be the first stage that rejects;
+  an interrupted write may leave a detectable partial artifact set but never a
+  set that `--check` accepts; output parents are named as trusted,
+  no-follow-checked paths; the committed lock and sealed bundle are read through
+  a bounded streaming comparison; and `profile_id` is a nominal label whose
+  semantics live in the full `target.identity`, not a global target identity.
+- Prior revision: twelfth revision, 2026-11-17, fixed the first-publication
+  order (build success → registry append → both `--check`s → commit, with
+  publication being the merged commit), made the legacy snapshot an explicit
+  derived development cache, gave extension and capability arrays one canonical
+  spelling, counted every package-root byte a command reads toward the closure
+  budget, and stated the `E_form = ∅` limitation in the H2 acceptance text.
+- Prior revisions: the eleventh (representability-scoped boundary evidence, the
+  plan×definition matrix, a single-modifier `mutates`, one-segment paths,
+  entry-replacement in the N1 gate) and the tenth and earlier (package-root
   collisions, exact on-disk entry names, the versioned `h2-exact-target` lift,
-  representative-form boundary evidence) and the ninth and earlier (ASCII
-  identifier/path/artifact-filename grammar, single loaded package value,
-  cycle-free first publication, conservative declared cover, value-defined case
-  diff, legacy name reservation, inclusion checks, narrowed publication-audit
-  claim, open-time no-follow) remain in force.
+  ASCII identifier/path grammar, single loaded package value, cycle-free first
+  publication, conservative declared cover, value-defined case diff, legacy name
+  reservation, narrowed publication-audit claim, open-time no-follow) remain in
+  force.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
   `monasm-lock/0.1`, `monasm-bundle/0.1` and `monasm-published/0.1` formats;
   immutable published package version directories and their append-only
@@ -823,6 +825,23 @@ explicitly that **"the package target cover relation is verified" does not mean
 "the real ISA extension requirements are completely proved"**; only a later
 versioned rule may narrow a cover, and until then any such narrowing is an
 author edit with a new `source_package_digest`.
+
+**`profile_id` is a nominal label, not a target identity.** The spec's
+`target.profile_id` and each package's `target_profile` must be equal, but the
+equality is a name check inside one bundle. Two specs may use the same
+`profile_id` with different `target.identity` objects, and H2 treats them as
+different targets: the identity that decides compatibility, enters the generated
+document, the lock and the sealed bundle is the six-key `target.identity`, never
+the profile name. H2 adds no cross-spec uniqueness rule for
+`(profile_id, identity)` and no central profile table, because a name that is
+allowed to differ per bundle must not be read as a global fact. A consumer that
+needs a target identity keys on the full identity; a later phase that wants
+`profile_id` to name exactly one global target has to add that rule through a
+versioned format change and cannot assume H2 already publishes it. Counterexample
+for reading the name as identity: two bundles both say
+`monasm.target.x86_64` while selecting different `enabled_extensions`; a consumer
+that looked up the profile name to decide compatibility would accept or reject
+the same plan depending on which bundle it read first.
 
 `fmp_model::definition::read` checks a form's `requires_extensions` against the
 **generated definition's** target set, which is the bundle's. A package can
@@ -1780,14 +1799,39 @@ deterministic rejection (exit 1) happens before the first temporary file, so it
 writes nothing and removes nothing. The write phase then removes the previous
 legacy snapshot and replaces the lock, the sealed bundle and finally that
 snapshot, each through a temporary sibling in the destination directory, a flush
-and a rename. An I/O or internal failure during this phase (exit 2) may leave a
-temporary file, a missing legacy snapshot, or a partially replaced set. It cannot
-leave a lock and sealed bundle that disagree: both record the same
-`bundle_digest` and `definition_digest`, so a new lock with an old sealed bundle
-(or the reverse) is a comparison failure. It can leave the new lock and sealed
-bundle with the legacy snapshot absent, which is the state the next paragraph
-defines: the two release artifacts are consistent, and only the cache must be
-regenerated.
+and a rename.
+
+An I/O or internal failure during this phase (exit 2) may leave a temporary file,
+a missing snapshot, or a **pair of files from different builds**: a new lock with
+the old sealed bundle, or the reverse. H2 does not claim a multi-file atomic
+transaction, and it does not claim the disk never holds that state. What it
+claims is that the state is **detectable and never a release**: the lock and the
+sealed bundle each record `bundle_digest` and `definition_digest`, so a mixed
+pair fails `verify --all --check`, and exit 2 already means "not built". A
+partial write that `--check` accepts cannot exist, because acceptance requires
+the committed bytes to equal a fresh rebuild of the same closure. An interrupted
+write therefore leaves only two consistent states — both new (a valid build with
+the cache possibly missing) or both old (the previous build, with the new files
+not yet renamed into place) — plus states that `--check` rejects.
+
+**Output directories are trusted inputs with a checked path, not a sandbox.**
+`bundles/locks/`, `bundles/sealed/` and `bundles/legacy/` are
+publisher-controlled repository paths; H2 does not claim to defend against
+another process swapping a directory between the check and the rename. What it
+does require is that the §3 no-follow rule covers **every output parent segment**
+under `--root`: a committed symlink or reparse point anywhere on the path to the
+temporary file is `path-escape` (exit 1) and nothing is written; the temporary
+file is created in the destination directory and renamed over the exact expected
+entry name of §1.3. Repository contents therefore cannot redirect a write out of
+the tree. That is the boundary H2 states, and N1 tests it with a symlinked output
+directory.
+
+`verify --all --check` reads the committed lock and sealed bundle through a
+bounded reader and compares bytes **as they stream** against the in-memory
+rebuild: the lock is limited by the 1 MiB lock budget and the sealed bundle by
+the 80 MiB budget of §12. Neither is loaded with an unbounded `read_to_end`, and
+a committed file longer than its budget is `resource-limit` (exit 1) — the same
+deterministic rejection a package input gets, not a host error.
 
 `verify --all --check` proves exactly the release artifacts: the committed lock
 and the sealed bundle, rebuilt from the exact selected closure. It does **not**
@@ -2095,8 +2139,11 @@ projection is compared after `materialize`.
 
 - `scope: "plan"` is an ordinary rejection. It may target any deterministic
   `fmp/0.1` failure, including a wrong `expected_digest`, a bad section layout,
-  a target mismatch or a definition-identity error. It is validated and
-  executed, but it does not count toward a form's negative coverage.
+  a target mismatch, a definition-identity error, or a value `fmp/0.1` cannot
+  represent. It declares `stage: "read"` when `fmp_model::plan::read` is the
+  rejecting stage, and `"bind"` or `"materialize"` when the document reads and a
+  later stage rejects. It is validated and executed, but it does not count toward
+  a form's negative coverage.
 - `scope: "form"` is the illegal-neighbourhood test for one exported form. It
   must name a `baseline_case_id` that is a positive case in the same file with
   the same `form_id` and `instruction_id`, and a single `mutates` pointer. A
@@ -2160,8 +2207,9 @@ projection is compared after `materialize`.
   example replacing the payload's kind, or changing one of its members — or it
   is not a legal form-scope mutation.
 - A `scope: "form"` case must be rejected by **`bind`**, so its
-  `expect_error.stage` must be `bind`. `stage: "materialize"` on a form-scope
-  case is `case-error-scope` (exit 1). Post-encode assertions are not
+  `expect_error.stage` must be `bind`. `stage: "read"` or `"materialize"` on a
+  form-scope case is `case-error-scope` (exit 1): a value the reader refuses
+  never reaches an operand-slot decision, and a post-encode assertion is not
   operand-legality evidence.
 - At least one declared `(code, path)` must point at the mutated operand
   surface: `path` equals `mutates`, or is a prefix of `mutates` bounded at a `/`
@@ -2190,7 +2238,8 @@ projection is compared after `materialize`.
 }
 ```
 
-`stage` is `bind` or `materialize`. `diagnostics` is a non-empty array sorted by
+`stage` is `read`, `bind` or `materialize`. `diagnostics` is a non-empty array
+sorted by
 `(path, code)`, unique, and each entry is a closed object over exactly `code`
 and `path`. The harness projects the observed diagnostics to `(code, path)`,
 sorts them by `(path, code)`, and requires **set equality** with the declared
@@ -2200,6 +2249,12 @@ part of the case contract; the complete set of `(code, path)` pairs is.
 
 The observed set is the full array returned for that stage:
 
+- `stage: "read"`: after the sentinel substitution the harness calls
+  `fmp_model::plan::read`; it must reject the document, and the observed set is
+  the singleton `(code, path)` of the single `Diagnostic` `read` returns (the
+  reader reports one fault, not a collected array). A document `read` accepts is
+  `case-error-scope` (exit 1). This stage is legal only for `scope: "plan"`; a
+  form-scope case using it is `case-error-scope` (exit 1).
 - `stage: "bind"`: `plan::read` must accept the document; `bind` returns all
   diagnostics. Any array, including an empty one, is compared as-is.
 - `stage: "materialize"`: `bind` must return zero diagnostics. Only
@@ -2207,6 +2262,12 @@ The observed set is the full array returned for that stage:
   `HostFailure` is `case-materialize-fault` (exit 2), never a pass. This stage is
   legal only for `scope: "plan"`; a form-scope case using it is
   `case-error-scope` (exit 1).
+
+Those three bullets are one rule: **the declared stage is the first stage that
+rejects the document.** A plan-scope case whose declared stage accepts, or whose
+earlier stage already rejects, is `case-error-scope` (exit 1) and is evidence for
+nothing. `read` is not a second name for `bind`, and a read rejection cannot be
+dressed as a bind rejection: `bind` never receives a `Plan` the reader refused.
 
 For `scope: "form"`, every declared and observed path must be `/instructions/0`
 or start with `/instructions/0/`; any other path is `case-error-scope` (exit 1).
@@ -2216,7 +2277,9 @@ such as a wrong `format_version`, or an `E-BYTE-001`/`E-SIZE-001` artifact
 assertion therefore cannot satisfy a form's negative coverage. For
 `scope: "plan"` any path is allowed. Coverage is counted only from `scope:
 "form"` negatives: every exported form needs at least one positive and at least
-one such negative, or the package is `uncovered-form`.
+one such negative, or the package is `uncovered-form`. A plan-scope case adds no
+coverage at any stage: `stage: "read"` does not let a form-scope rule be satisfied
+by a reader rejection.
 
 **Representative forms carry boundary evidence, within what the plan can
 represent.** One positive and one illegal neighbour proves that a form is not
@@ -2224,14 +2287,18 @@ wholly absent; it does not prove the operand domain. The domain splits in two:
 
 - `D_Representable` is what `fmp/0.1`'s `plan::read` can hold. `payload.reg` is
   a `u64` (`fmp-model/src/plan.rs` `bind_payload`), so `{"reg": -1}` is a
-  `plan::read` rejection and no `Plan` exists for `bind` to see. A modifier value
-  is an integer, string or boolean.
+  `plan::read` rejection — `E-PLAN-002` at the operand's `payload/reg` — and no
+  `Plan` exists for `bind` to see. A modifier value is an integer, string or
+  boolean.
 - `D_Form` is what the selected slot accepts. `D_Form ⊆ D_Representable`.
 
 Only a value in `D_Representable \ D_Form` can be a `scope: "form"` negative,
 because only that value reaches `bind`. A value outside `D_Representable` is a
-`scope: "plan"` case and never counts as form coverage; treating it as a form
-negative asks for a `Plan` that the reader refuses to build.
+`scope: "plan"` case with `stage: "read"`: the declared diagnostics are the
+reader's own, it never counts as form coverage, and treating it as a form
+negative would ask for a `Plan` the reader refuses to build. The three stages
+exist so that each rejection is recorded where it happens; collapsing `read`
+into `bind` would either lose the case or name a stage that cannot run.
 
 For every shipped form with an immediately encoded or otherwise bounded operand:
 
@@ -2240,7 +2307,8 @@ For every shipped form with an immediately encoded or otherwise bounded operand:
 - A register field has `D_Form = [0, 2^field_bits − 1]` inside `u64`, so its
   positives are `0` and `2^field_bits − 1`, and its adjacent illegal value is
   `2^field_bits` when `field_bits ≤ 63`. There is no representable `0 − 1`: a
-  negative register number is a plan-scope negative. When the form is narrower
+  negative register number is a plan-scope `stage: "read"` negative. When the
+  form is narrower
   than the field, a representable excluded number (for example register `0` for
   a slot whose `excluded` list contains 0) is the second form negative and is
   rejected by `E-RANGE-004`. For a 64-bit field, `2^64` does not fit `u64`, so
@@ -2342,8 +2410,9 @@ H2 does not add per-ISA branches to the harness. It dispatches from
 #### 9.2 `monasm-cases/0.1` is H2's model, not a universal one
 
 `monasm-cases/0.1` deliberately promises only what H2 can execute: one
-`fmp/0.1` plan, exactly one instruction, and a negative neighbourhood expressed
-as one operand-surface mutation. It does not define:
+`fmp/0.1` plan, exactly one instruction, a negative observed at the first stage
+that rejects (`read`, `bind` or `materialize`), and a form neighbourhood
+expressed as one operand-surface mutation. It does not define:
 
 - `fmp/0.2` plans (H3): a case with an unknown plan `format_version` is
   rejected, not translated;
@@ -2391,7 +2460,7 @@ does not pretend to be `fmp/0.1` diagnostics.
 
 | Class | Examples | Exit |
 |---|---|---|
-| Deterministic rejection | manifest shape (required/optional keys), identifier/path lexical violation, a reversed or duplicated `enabled_extensions`/`requires_capabilities` array, artifact filename mismatch, empty forms, path escape, a symlink/reparse point on a package path, or an opened entry whose name differs from the declared segment, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, form-scope materialize stage, form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit | 1 |
+| Deterministic rejection | manifest shape (required/optional keys), identifier/path lexical violation, a reversed or duplicated `enabled_extensions`/`requires_capabilities` array, artifact filename mismatch, empty forms, path escape, a symlink/reparse point on a package path or on an output parent path under `--root`, or an opened entry whose name differs from the declared segment, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, case scope/stage mismatch (form-scope `read`/`materialize`, or a declared stage that is not the first rejecting stage), form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit (including a committed lock or sealed bundle over its byte budget) | 1 |
 | Host / I/O / internal | unreadable file, unwritable lock, internal invariant break, materializer `Internal`/`HostFailure` during conformance | 2 |
 | Success | build or verify passed, digest printed | 0 |
 
@@ -2425,7 +2494,10 @@ robustness:
 
 - manifest ≤ 1 MiB; form, type or profile file ≤ 1 MiB;
 - `tests/cases.json` ≤ 16 MiB; `evidence/manifest.json` ≤ 1 MiB; a spec or lock
-  ≤ 1 MiB each; the pinned legacy definition file read for row comparison
+  ≤ 1 MiB each; a committed sealed bundle ≤ 80 MiB (the 64 MiB closure budget
+  plus at most 16 MiB of envelope for the sorted `sources` list and the
+  definition wrapper), read only through the bounded streaming comparison of
+  §8.3; the pinned legacy definition file read for row comparison
   ≤ 16 MiB; `bundles/published.json` ≤ 16 MiB and ≤ 65 536 entries;
 - exported forms per package ≤ 1024; declared assets per package ≤ 2048; cases
   per package ≤ 4096; evidence files per package ≤ 4096;
@@ -2659,7 +2731,8 @@ comparing the materializer with itself proves the bytes.
   for the values the plan can represent: minimum/maximum positives and the
   adjacent representable illegal value, rejected at the mutated operand. A
   register's upper bound comes from `field_bits`, and a negative register is a
-  plan-scope rejection rather than a form negative (`D_Form ⊆ D_Representable`).
+  plan-scope `stage: "read"` rejection rather than a form negative
+  (`D_Form ⊆ D_Representable`).
   The evidence records the detail keys the relevant diagnostic emits — `min`,
   `max`, `value` for `E-RANGE-001`/`E-RANGE-002`, and `target_type`, `value`,
   `field_bits` or `excluded` for `E-OPERAND-004`/`E-RANGE-004` — and never a key
@@ -2721,6 +2794,12 @@ comparing the materializer with itself proves the bytes.
   never writes the registry, so a failed build leaves no row and no published
   partial artifact; the legacy snapshot is a derived cache that the same build
   regenerates, and `--check` does not compare it (§8.3).
+- An interrupted write (exit 2) can leave a temporary file and a lock/sealed pair
+  from different builds, but never a state `verify --all --check` accepts: the
+  guarantee is detectability, not a multi-file atomic rename. Output directories
+  are trusted, yet every output parent segment under `--root` obeys the same
+  no-follow rule as an input, and the committed lock and sealed bundle are
+  compared as a bounded stream inside the 1 MiB and 80 MiB budgets (§8.3, §12).
 - A package's `enabled_extensions` is a conservative declared cover, not a
   minimal set. Over-declaration is legal and only narrows which bundles may
   select the package; under-declaration is `form-extension-mismatch`, and
@@ -2729,6 +2808,10 @@ comparing the materializer with itself proves the bytes.
   declaration, and the package inside the bundle's selection. A wider bundle
   cannot make an under-declared package legal: the package is read under its own
   target before the merge, so `verify --package` and `verify --all` agree on it.
+- `profile_id` is a nominal label inside one bundle: it must equal the package's
+  `target_profile`, but compatibility, identity and digests use the six-key
+  `target.identity`. Two bundles may share the name with different identities, and
+  H2 adds no global profile table (§4.1).
 - `requires_capabilities` is a checked fact, not a comment: the builder derives
   the set from the row structure and rejects a declaration that differs in either
   direction, so a later consumer cannot under-provision a package that silently
@@ -2739,6 +2822,10 @@ comparing the materializer with itself proves the bytes.
   change reports the position, and an array length change reports the array. A
   mutation that changes two members is rejected as two differences, regardless of
   how the author performed it.
+- A case names the first stage that rejects: `read` when `plan::read` refuses the
+  document, `bind` or `materialize` otherwise. A value such as `{"reg":-1}` thus
+  has a legal plan-scope representation without being dressed as form coverage,
+  and a form-scope case stays `bind`-only (§9.1).
 - The publication audit's claim is bounded to the executable assets and
   identity. Whole-directory immutability is enforced by the changed-path gate and
   recorded by git history, not re-attested by `verify --published --check`; H2
@@ -3036,6 +3123,19 @@ comparing the materializer with itself proves the bytes.
   implementer would interpret the mapping differently. The case carries a
   complete `fmp/0.1` document and substitutes only the standalone identity
   sentinel (§9.1).
+- **Keep `stage` at `bind`/`materialize` and express a read rejection as a
+  `bind` case.** Rejected: `bind` never receives a `Plan` the reader refused, so
+  either the case cannot run or it names a stage that never executed. A
+  `plan::read` rejection is a plan-scope `stage: "read"` case and stays outside
+  form coverage (§9.1).
+- **Claim a multi-file atomic write, or "the disk cannot hold a mixed pair".**
+  Rejected: a lock rename can succeed while the sealed rename fails. H2 claims
+  detectability and never a successful release for that state, which is what
+  `verify --all --check` tests (§8.3).
+- **Make `profile_id` a global target identity with one row per name.**
+  Rejected: it would need a central ISA table and would make two bundles with the
+  same name but different `enabled_extensions` a contradiction H2 cannot resolve.
+  The label is bundle-local and the six-key identity is the fact (§4.1).
 - **Keep a three-family table in `monasm-package/0.1`.** Rejected: the mappings
   are plain string equalities; a table would force a package-format change for a
   fourth ISA added in H3 (§4.2).
@@ -3108,6 +3208,10 @@ comparing the materializer with itself proves the bytes.
 | For `fmp-def/0.1`, `E_form = ∅`, so only `E_package ⊆ E_bundle` is proved; a `legacy_source` package adds target consistency, not a form-derived requirement | specified; `FORM_FIELDS` rejects `requires_extensions` in 0.1, and no builder exists | **specified, not implemented** — H2a |
 | `enabled_extensions` is a conservative declared cover, not a minimal required set | specified; `fmp-def/0.1` forms have no requirement key and no builder exists | **unverified** — H2a |
 | Form-scope negatives are `bind`-only and point at the mutated operand | specified; `fmp-materialize/src/lib.rs` emits `E-BYTE-001` at `/instructions/0/expected_digest` after encoding, so the counterexample is real | **specified, not implemented** — H2a |
+| A `plan::read` rejection has a legal case representation (`scope: "plan"` + `stage: "read"`), and the declared stage must be the first stage that rejects | `fmp-model/src/plan.rs` `read` returns `Result<Plan, Diagnostic>` and `bind_payload` calls `bind::u64_in`, so `{"reg":-1}` is `E-PLAN-002` at `/instructions/0/operands/<n>/payload/reg` before `bind`; no harness | **specified, reader behaviour read** — H2a |
+| `profile_id` is a nominal label inside one bundle; identity is the six-key `target.identity` | specified; no spec or bundle exists, and no cross-spec `(profile_id, identity)` rule is added | **specified, not implemented** — H2a |
+| Output parents under `--root` obey the no-follow rule, and the committed lock/sealed bundle are compared through a bounded streaming reader | specified; no writer and no path layer exist, so the `path-escape` and over-budget rejections are untested | **specified, not implemented** — H2a N1 |
+| An interrupted write may leave a mixed lock/sealed pair, and such a pair never passes `--check` | specified; the write phase and `--check` do not exist | **specified, not implemented** — H2a |
 | Dependency-closure status distinct from package structure, including transitive re-reading of a `--closure` lock, cycles and the dependent-package author path | not implemented | **unverified** — H2a |
 | Release evidence as a separate `--release-evidence` gate | not implemented | **unverified** — H2a |
 | Closed spec/lock/sealed shapes, `builder` omission and the lock drift projection | not implemented | **unverified** — H2a |
@@ -3180,10 +3284,14 @@ comparing the materializer with itself proves the bytes.
   moves `field_bits`/`value` evidence into the pass comparison: stop. Boundary
   cases stay inside `D_Representable`, and the pass condition stays the
   `(code, path)` set (§9.1).
-- Someone makes a negative register number a `scope:"form"` case, or records
-  `min`/`max` that `E-OPERAND-004` does not emit: stop. A negative register is a
-  plan-scope rejection; the register upper bound is derived from `field_bits`
-  (§9.1).
+- Someone makes a negative register number a `scope:"form"` case, reports it at
+  `stage: "bind"`, or records `min`/`max` that `E-OPERAND-004` does not emit:
+  stop. A negative register is a plan-scope `stage: "read"` rejection; the register
+  upper bound is derived from `field_bits` (§9.1).
+- Someone declares a stage that is not the first stage that rejects, or gives a
+  form-scope case `stage: "read"` or `"materialize"`: stop. The stages are a
+  sequence, `bind` never sees a `Plan` the reader refused, and a reader rejection
+  is not form coverage (§9.1).
 - Someone allows only `…/modifiers/<i>` in `mutates`, or rejects
   `…/modifiers/<i>/value`: stop. A single modifier value change is a legal form
   mutation, and the validator's array-level diagnostic is its ancestor (§9.1).
@@ -3201,6 +3309,18 @@ comparing the materializer with itself proves the bytes.
   previous build's snapshot readable after an exit-2 write: stop. The snapshot is
   a derived development cache, `--check` covers lock and sealed bundle, and the
   write phase removes the stale file first (§8.3, §7).
+- Someone restates the write guarantee as "an interrupted write cannot leave a
+  mixed lock/sealed pair", or adds a multi-file atomicity claim: stop. The
+  guarantee is detectability — a mixed pair fails `verify --all --check` and is
+  never a successful release (§8.3).
+- Someone writes an output file through a parent that was not checked for a
+  symlink or reparse point, or trusts the output directory as a sandbox: stop.
+  Output directories are trusted but every parent segment under `--root` obeys
+  the §3 no-follow rule (§8.3).
+- Someone compares the committed sealed bundle with an unbounded `read_to_end`,
+  or lets an over-budget committed file become a host error: stop. The comparison
+  streams against the in-memory rebuild within the 1 MiB lock and 80 MiB sealed
+  budgets, and the excess is `resource-limit` (§8.3, §12).
 - Someone accepts a reversed or duplicated `enabled_extensions` or
   `requires_capabilities` array because the set is unchanged: stop. The array has
   one spelling and the violation is `extension-lexical`/`capability-lexical`
@@ -3217,6 +3337,11 @@ comparing the materializer with itself proves the bytes.
   `fmp-def/0.1`'s empty `E_form` look meaningful: stop. For 0.1 only
   `E_package ⊆ E_bundle` is proved, and the ISA authority stays outside the
   builder (§4.1).
+- Someone keys compatibility, a definition lookup or a digest on `profile_id`
+  alone, or requires one global meaning for a profile name: stop. `profile_id`
+  is a nominal label equal to the package's `target_profile` inside one bundle;
+  the identity is the six-key `target.identity`, and no cross-spec uniqueness for
+  `(profile_id, identity)` exists in H2 (§4.1).
 - Someone lets a retired `(namespace, version)` come back with a different
   `definition_digest`, or treats `bundle_id` as an immutable release identity:
   stop. The definition name is permanent and the bundle ID is a movable release
