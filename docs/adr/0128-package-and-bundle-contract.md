@@ -5,20 +5,22 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: tenth revision, 2026-11-17, after the path-domain and path-spelling
-  audit: path collisions are scoped to a package root and, across a closure, to
-  repository-root-relative joined paths; every opened segment must match its
-  on-disk entry name exactly; lifting `h2-exact-target` is tied to a new
-  plan/definition protocol rather than a changed `fmp/0.1` verdict; and
-  representative forms carry boundary-value evidence.
-- Prior revision: ninth revision, 2026-11-17, added the ASCII identifier,
-  path-segment and artifact-filename grammar, the single loaded package value
-  shared by digest/comparison/`read`/merge, the cycle-free first-publication
-  order, and the conservative declared extension cover.
-- Earlier revisions: the eighth (value-defined case diff, legacy name
-  reservation, form/package/bundle inclusion, audit narrowing), seventh
-  (open-time no-follow, definition-name history, movable `bundle_id`, derived
-  capability set) and their predecessors remain in force.
+- Revision: eleventh revision, 2026-11-17, after the representability and
+  protocol-matrix audit: boundary evidence is scoped to values the plan can
+  represent, the plan×definition compatibility matrix is stated explicitly,
+  `mutates` can name a single modifier field, the path production admits a
+  one-segment package-root file, and directory-entry replacement between the
+  name check and the open is part of the N1 gate.
+- Prior revision: tenth revision, 2026-11-17, scoped path collisions to a
+  package root and to repository-relative joined paths across a closure,
+  required the opened entry name to match the declared segment exactly, tied
+  the `h2-exact-target` lift to a new plan/definition protocol, and introduced
+  representative-form boundary evidence.
+- Earlier revisions: the ninth (ASCII identifier/path/artifact-filename grammar,
+  single loaded package value, cycle-free first publication, conservative
+  declared cover) and the eighth and earlier (value-defined case diff, legacy
+  name reservation, inclusion checks, narrowed publication-audit claim,
+  open-time no-follow) remain in force.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
   `monasm-lock/0.1`, `monasm-bundle/0.1` and `monasm-published/0.1` formats;
   immutable published package version directories and their append-only
@@ -35,9 +37,11 @@
   and complete diagnostic sets; exact Level 0/Level 1 machine-output projections;
   portable identifier, path-segment and artifact-filename lexical rules; the
   package-root and repository-relative domains of path collision; exact on-disk
-  entry-name matching for every opened segment; the
-  single loaded-package value shared by digest, comparison, `read` and merge; the
-  cycle-free first-publication order and in-memory output validation; package
+  entry-name matching for every opened segment; the representable-versus-form
+  operand domains for boundary evidence; the plan×definition target-compatibility
+  matrix; the single loaded-package value shared by digest, comparison, `read`
+  and merge; the cycle-free first-publication order and in-memory output
+  validation; package
   target covers versus bundle target selection; the versioned H3 condition for
   accepting a subset target; package/form
   ISA-family consistency; package ownership and conflict rules; which legacy
@@ -328,7 +332,7 @@ registry is checked against them before any file is opened:
 ident    = ^[a-z][a-z0-9]*(\.[a-z][a-z0-9_-]*)+$
 version  = ^(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){2,}(-[a-z0-9]+([.-][a-z0-9]+)*)?$
 pseg     = ^[a-z0-9_][a-z0-9_.-]*$
-path     = pseg "/" ... "/" pseg
+path     = pseg ("/" pseg)*
 ```
 
 - `package_id`, `bundle_id`, `namespace`, `target_profile` and `profile_id` use
@@ -347,9 +351,16 @@ path     = pseg "/" ... "/" pseg
 - Every declared path — `exports.forms[].path`, `exports.types[].path`,
   `exports.profiles[].path`, a spec's `packages[].path` and the `legacy_source`
   components — uses `path`; `legacy_source.isa` and `legacy_source.version` are
-  further restricted by the component forms of §3. A path listed in
-  `evidence/manifest.json` uses the same grammar, except that the fixed names
-  `README.md` and `NOTICE` keep their uppercase spelling. No segment may be `.`
+  further restricted by the component forms of §3. A `path` may be a **single
+  segment**: a package-root file such as `NOTICE` or `README.md` (the fixed
+  uppercase spellings below) or a top-level form file such as `add.json` is one
+  segment, not a two-segment minimum. Where a shape is fixed,
+  the surrounding rule says so: `packages[].path` has the
+  `packages/<target>/<package>/<version>` shape of §1.1, and a form/type/profile
+  path is relative to the package root. A path listed in
+  `evidence/manifest.json` uses the same grammar; the fixed names `README.md` and
+  `NOTICE` are the two accepted uppercase spellings and are the only exception to
+  lowercase. No segment may be `.`
   or `..`, contain `..`, end with `.` or a space, or be a Windows device name
   (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`,
   case-insensitively, with or without an extension). A violation is
@@ -372,11 +383,13 @@ path     = pseg "/" ... "/" pseg
     `packages/x86_64/ALU/0.1.0`) collide, and a spec may not list one path
     twice;
   - the fold — not "the file happened to open" — must be the stated reason.
-  The grammar already admits only lowercase, so a document that follows §1.3
-  cannot trigger the fold rule; it exists because the builder does not assume
-  every manifest it is handed came from this grammar. Documentation files
-  (`README.md`, `NOTICE`) are not declared paths and are not covered by the
-  lowercase rule.
+  The grammar admits only lowercase, so a document that follows §1.3 cannot
+  trigger the fold rule; it exists because the builder does not assume every
+  manifest it is handed came from this grammar. `README.md` and `NOTICE` are the
+  two fixed uppercase spellings: when an evidence path names one of them, the
+  name matches its on-disk spelling exactly and is the only exemption from the
+  lowercase rule. They are not asset paths and never name a form, type or
+  profile.
 - Paths are matched exactly as written. The builder never lowercases, trims a
   trailing dot or space, or resolves an 8.3 alias; a path that matches only after
   such a repair is `path-lexical`, not a successful open.
@@ -391,9 +404,18 @@ path     = pseg "/" ... "/" pseg
   an entry whose name is byte-for-byte equal to the declared segment and then
   opens that entry relative to the same handle with the no-follow rule of §3.
   It does not compare an absolute path string, and a separate probe before the
-  open does not satisfy the rule. A platform that cannot perform an exact-name
-  lookup relative to an open handle fails the H2a N1 gate; it must not accept
-  the aliased name and must not fall back to a following open.
+  open does not satisfy the rule.
+  - Confirming the name and opening the entry must not leave a gap in which the
+    directory entry is replaced. Opening "the same name" again is not enough:
+    the implementation must either open the entry it just matched (a
+    directory-entry handle or an identity check on the opened object) or detect
+    that the object differs and reject with `path-escape` (exit 1). A path layer
+    that only proves symlink refusal does not prove this; the H2a N1 gate
+    includes the replacement case on every platform.
+  - A platform that cannot perform an exact-name lookup relative to an open
+    handle, or cannot bind the open to the matched entry, fails the H2a N1 gate;
+    it must not accept the aliased name and must not fall back to a following
+    open.
 - `bundles/specs/<file>.json` is the spec, `bundles/locks/<file>.lock.json` the
   lock and `bundles/sealed/<file>.bundle.json` the sealed bundle, with `<file>`
   equal to the document's `bundle_id` in each case. A file whose `<file>`
@@ -550,11 +572,12 @@ manifest path is a normalised relative path using `/`. Absolute paths, `..`,
 empty segments, `.`, backslashes, NUL, URL schemes and drive letters are
 rejected. The exact-entry-name rule of §1.3 is part of the same open, not a
 preceding `stat`: a case-insensitive host must not turn a declared `add.json`
-into the on-disk `Add.json`. The bound is a property of the **open**, not of a
-moment before it: no component on the path from `--root` to an opened file may
-be a symlink or reparse point, and the builder never traverses one. H2 package
-inputs contain no such links on that path; a package that has one is
-`path-escape` (exit 1).
+into the on-disk `Add.json`, and a replacement of that entry between the name
+match and the open must not yield a different object. The bound is a property of
+the **open**, not of a moment before it: no component on the path from `--root`
+to an opened file may be a symlink or reparse point, and the builder never
+traverses one. H2 package inputs contain no such links on that path; a package
+that has one is `path-escape` (exit 1).
 
 A metadata pre-check is **not** sufficient, even a non-following one.
 `symlink_metadata()` can report `forms/` as a real directory, another process can
@@ -778,14 +801,17 @@ package selectable without an edit — or reject a bundle the author deliberatel
 covered. The contract keeps the declaration as the author's cover and states
 that over-declaration only narrows selectability.
 
-**H2 transition.** `fmp-def/0.1` plans compare `enabled_extensions` for set
-equality at `bind` (`check_target`), so an H2 bundle that selected a superset
-would reject the existing reference plans. While `definition_format` is
-`fmp-def/0.1`, H2 additionally requires the package's declared cover to equal
-the bundle selection exactly; this is the transitional `h2-exact-target` check,
-not a permanent package-contract rule. `fmp-def/0.2` already applies the subset
-rule, and a future `fmp/0.2` plan format must make the same distinction on the
-plan side.
+**H2 transition.** `bind` chooses the set relation from the **definition**
+format, not the plan format (`fmp-validate/src/lib.rs` `check_target`): a
+definition whose `definition_format` is `fmp-def/0.1` compares
+`enabled_extensions` for equality, while `fmp-def/0.2` requires the plan's set to
+be a subset of the definition's and checks each form's requirement later. So an
+H2 bundle that generated an `fmp-def/0.1` document selecting a superset would
+reject the existing reference plans. While the generated document is
+`fmp-def/0.1`, H2 additionally requires the package's declared cover to equal the
+bundle selection exactly; this is the transitional `h2-exact-target` check, not a
+permanent package-contract rule. `fmp-def/0.2` documents already apply the subset
+rule, and a future `fmp/0.2` plan format may define a new cell on the plan side.
 
 **Exit condition.** H3 must define plan-level target compatibility so a plan may
 target a subset of the definition/bundle set without rewriting the definition.
@@ -795,21 +821,32 @@ revised by a new ADR before H5 starts. H2 does not claim the transitional
 equality is the final composition rule, and it does not freeze a package
 manifest that must be edited for every new extension family.
 
-**Lifting is versioned, not a silent relaxation.** The subset rule may apply to
-an existing `fmp/0.1` plan only through a new plan/definition protocol that
-defines plan-to-definition target compatibility. A `fmp/0.1` plan keeps today's
-exact-set `bind` verdict: the builder must not admit a subset bundle for it, and
-no build option changes that. H3 acceptance must show the same package with
-different extension sets under both protocols — the old protocol keeps its
-exact result, the new one accepts the subset only where the new rule says so.
-A build that passes after the check is deleted is not evidence for the new rule.
+**Lifting is versioned, and the matrix is explicit.** Target compatibility is a
+property of the (plan protocol, definition protocol) pair. The cells that exist
+today are fixed, and H3 must preserve every one of them:
+
+| plan | definition | relation |
+|---|---|---|
+| `fmp/0.1` | `fmp-def/0.1` | equal sets |
+| `fmp/0.1` | `fmp-def/0.2` | plan set ⊆ definition set, plus each form's `requires_extensions` |
+
+Only a **new plan protocol** may add a cell and lift `h2-exact-target`; the
+existing `fmp/0.1` + `fmp-def/0.2` cell already uses the subset rule and must not
+be re-rejected by an implementation that keys the rule on the plan format. The
+`fmp/0.1` + `fmp-def/0.1` cell keeps equality, and no build option changes either
+cell. Changing the equality rule for `fmp-def/0.1` requires a new versioned
+contract, not deleting the existing check. H3 acceptance must run the same
+package with different extension sets across the matrix: old cells keep their
+results, and the new cell accepts a subset only where its own rule says so. A
+build that passes after the check is deleted is not evidence for the new rule.
 
 No `monasm-package/0.1` bump is required to lift the transition: the package
 field already means "a cover of the extensions these rows require", and the
-builder already checks the subset. H3 changes the *plan-side* comparison (and
-the reference plans' target sets), not the meaning of the package manifest. A new
-package format version is needed only if a future target relationship is not
-expressible as a subset of the same extension vocabulary.
+builder already checks the subset. H3 adds a new plan-protocol cell (with the
+reference plans' target sets) and leaves the package manifest meaning, and the
+two existing cells, unchanged. A new package format version is needed only if a
+future target relationship is not expressible as a subset of the same extension
+vocabulary.
 
 Counterexample if the requirement were stored as the bundle selection: adding
 `rv64c` changes package A's source digest although A's rows did not change, and
@@ -1962,12 +1999,22 @@ projection is compared after `materialize`.
   missing baseline, a baseline of another kind, form or instruction, or a
   `scope: "form"` case without both keys is `case-baseline-invalid` (exit 1).
 - `mutates` must match
-  `^/instructions/0/operands/[0-9]+/(payload(/[^/]+)*|kind|target_type|modifiers(/[0-9]+)?)$`.
+  `^/instructions/0/operands/[0-9]+/(payload(/[^/]+)*|kind|target_type|modifiers(/[0-9]+(/name|/value)?)?)$`.
   That is the form-constraint surface: an operand value, operand kind, target
   type or modifier. A mutation at `expected_digest`, `form_id`, `offset`,
   `section_id`, `expected_size`, `output_contract` or `definition_identity` is
   not a form-neighbourhood test; it must use `scope: "plan"` or is
   `case-mutation-mismatch` (exit 1).
+- A modifier is an object `{"name": …, "value": …}`, so changing only its value
+  has the pointer `/instructions/0/operands/<n>/modifiers/<i>/value`; that is a
+  legal single mutation, as is `…/modifiers/<i>/name` when the name change leaves
+  the pair unpermitted. The validator reports an unpermitted modifier at the
+  modifiers array (`E-OPERAND-003` at `…/modifiers`), which is an ancestor of
+  either pointer and therefore satisfies the location rule below. A kind change
+  at one modifier reports `…/modifiers/<i>`, which the pattern admits as well;
+  adding or removing a modifier changes the array length, so the diff reports the
+  array itself (`…/modifiers`), and that is a shape change rather than a
+  field-value change.
 - The harness compares the baseline plan and the case plan as canonical JSON
   trees. The difference is defined over the two **final values**, not over the
   authoring operations that produced them, and one recursive function fixes it
@@ -2067,16 +2114,49 @@ assertion therefore cannot satisfy a form's negative coverage. For
 "form"` negatives: every exported form needs at least one positive and at least
 one such negative, or the package is `uncovered-form`.
 
-**Representative forms carry boundary evidence.** One positive and one illegal
-neighbour proves that a form is not wholly absent; it does not prove the operand
-domain. For every form the H2a/H2b slices ship that takes an immediately encoded
-or otherwise bounded operand (an immediate range, a register-number width, a
-modifier index), the package's cases must include the minimum legal value, the
-maximum legal value, and both adjacent illegal values. Each boundary case uses
-the same `scope:"form"`/`bind`/complete-diagnostic contract above, and an illegal
-value must be rejected at the mutated operand. When the observed diagnostic
-carries a detail map, the case's referenced evidence file records the relevant
-`min`/`max`/`value` fields; the pass condition remains the `(code, path)` set, so
+**Representative forms carry boundary evidence, within what the plan can
+represent.** One positive and one illegal neighbour proves that a form is not
+wholly absent; it does not prove the operand domain. The domain splits in two:
+
+- `D_Representable` is what `fmp/0.1`'s `plan::read` can hold. `payload.reg` is
+  a `u64` (`fmp-model/src/plan.rs` `bind_payload`), so `{"reg": -1}` is a
+  `plan::read` rejection and no `Plan` exists for `bind` to see. A modifier value
+  is an integer, string or boolean.
+- `D_Form` is what the selected slot accepts. `D_Form ⊆ D_Representable`.
+
+Only a value in `D_Representable \ D_Form` can be a `scope: "form"` negative,
+because only that value reaches `bind`. A value outside `D_Representable` is a
+`scope: "plan"` case and never counts as form coverage; treating it as a form
+negative asks for a `Plan` that the reader refuses to build.
+
+For every shipped form with an immediately encoded or otherwise bounded operand:
+
+- An immediate range `[min, max]` inside `i128` uses `min` and `max` as positives
+  and `min−1`/`max+1` as `scope: "form"` negatives.
+- A register field has `D_Form = [0, 2^field_bits − 1]` inside `u64`, so its
+  positives are `0` and `2^field_bits − 1`, and its adjacent illegal value is
+  `2^field_bits` when `field_bits ≤ 63`. There is no representable `0 − 1`: a
+  negative register number is a plan-scope negative. When the form is narrower
+  than the field, a representable excluded number (for example register `0` for
+  a slot whose `excluded` list contains 0) is the second form negative and is
+  rejected by `E-RANGE-004`. For a 64-bit field, `2^64` does not fit `u64`, so
+  the form negative is an excluded value or a wrong `target_type`, not `max+1`.
+- A modifier is a set of permitted `(name, value)` pairs, not a contiguous
+  integer interval. Test one permitted pair and one representable but unpermitted
+  pair; do not invent `min−1`/`max+1` arithmetic for it.
+- The evidence file records the fields the observed diagnostic actually carries.
+  An immediate outside its `[min, max]` is rejected by `E-RANGE-001` (or
+  `E-RANGE-002` for a target operand), which emits `min`, `max`, `value` and,
+  for a non-target, `target_type`, so those are recorded. A register beyond its
+  field is rejected by `E-OPERAND-004`, which emits `target_type`, `value` and
+  `field_bits`, and the upper bound `2^field_bits − 1` is derived from
+  `field_bits`; it has no `min`/`max` key. An excluded value is rejected by
+  `E-RANGE-004`, which emits `target_type`, `value` and `excluded`. A case does
+  not require fields the validator does not emit.
+
+Each boundary case otherwise uses the same `scope:"form"`/`bind`/complete-
+diagnostic contract above, and an illegal value must be rejected at the mutated
+operand. The pass condition remains the `(code, path)` set, so
 `monasm-cases/0.1` is unchanged and no detail key enters the comparison. This is
 evidence for the slices H2 actually ships, not a claim that every ISA boundary is
 proved; a missing boundary case fails the slice acceptance but does not create a
@@ -2427,12 +2507,16 @@ comparing the materializer with itself proves the bytes.
   wrong `expected_digest` or an `E-BYTE-001`/`E-SIZE-001` artifact assertion may
   be a plan-scope test but cannot cover a form.
 - One illegal neighbour is not the whole operand domain. A form with an
-  immediately encoded or otherwise bounded operand also carries minimum, maximum
-  and both adjacent-illegal cases, rejected at the mutated operand, with the
-  `min`/`max`/`value` details recorded in the referenced evidence when the
-  diagnostic has them. This is slice evidence, not a new coverage rule: the pass
-  condition is still the `(code, path)` set and `monasm-cases/0.1` is unchanged
-  (§9.1).
+  immediately encoded or otherwise bounded operand also carries boundary cases
+  for the values the plan can represent: minimum/maximum positives and the
+  adjacent representable illegal value, rejected at the mutated operand. A
+  register's upper bound comes from `field_bits`, and a negative register is a
+  plan-scope rejection rather than a form negative (`D_Form ⊆ D_Representable`).
+  The evidence records the detail keys the relevant diagnostic emits — `min`,
+  `max`, `value` for `E-RANGE-001`/`E-RANGE-002`, and `target_type`, `value`,
+  `field_bits` or `excluded` for `E-OPERAND-004`/`E-RANGE-004` — and never a key
+  that diagnostic does not produce; the pass condition stays the `(code, path)`
+  set and `monasm-cases/0.1` is unchanged (§9.1).
 - Publication is recorded in an append-only registry, so a version remains
   immutable after its last spec retires. A later PR cannot reclassify an old
   snapshot as unpublished by deleting a spec. A version can be created and first
@@ -2471,11 +2555,13 @@ comparing the materializer with itself proves the bytes.
   `path-lexical` (§1.3).
 - A declared path matches only the on-disk entry with the same spelling. The
   exact-name check happens on the already-open parent handle, so a
-  case-insensitive volume cannot make `add.json` resolve to `Add.json`. A host
-  where the declared lowercase path and the stored mixed-case path disagree
-  yields `path-lexical` on every platform, not a platform-dependent success
-  (§1.3, §3). This is what lets one package input produce one build verdict on
-  Linux, macOS and Windows.
+  case-insensitive volume cannot make `add.json` resolve to `Add.json`. The open
+  is bound to the entry that was matched: if that entry is replaced between the
+  match and the open, the builder either opens the matched object or rejects the
+  replacement rather than reading an unexamined file. A host where the declared
+  lowercase path and the stored mixed-case path disagree yields `path-lexical` on
+  every platform, not a platform-dependent success (§1.3, §3). This is what lets
+  one package input produce one build verdict on Linux, macOS and Windows.
 - A package is read once into one immutable value; the source digest, the
   legacy row and target comparison, the per-package `read` and the merge all
   consume that value. A recorded digest therefore cannot describe bytes the
@@ -2535,10 +2621,13 @@ comparing the materializer with itself proves the bytes.
   bundle target. A new instruction family can join a bundle without editing an
   unrelated package, provided the bundle selection is a superset. The H2
   `h2-exact-target` equality is a stated transition, not a permanent rule;
-  H3's plan-side compatibility lifts it before H5. The lift is versioned: a
-  `fmp/0.1` plan keeps its exact-set verdict until a new plan/definition protocol
-  defines subset compatibility, and no build flag substitutes for that protocol
-  (§4.1).
+  H3's plan-side compatibility lifts it before H5. The lift is versioned and the
+  existing (plan, definition) cells are fixed: `fmp/0.1` + `fmp-def/0.1` keeps
+  equality, `fmp/0.1` + `fmp-def/0.2` keeps the subset-plus-form rule, and only a
+  new plan protocol adds a cell and lifts the transition. Keying the relation on
+  the plan format instead of the definition format would wrongly reject the
+  already-legal `fmp/0.1` + `fmp-def/0.2` cell, and no build flag substitutes for
+  the new protocol (§4.1).
 - Form-family consistency is a string equality, not a package-format whitelist.
   A fourth ISA added to `fmp_model::definition::read` in H3 needs no edit to
   `monasm-package/0.1` or to a central builder table.
@@ -2737,9 +2826,35 @@ comparing the materializer with itself proves the bytes.
   and only plans that adopt it get the subset verdict (§4.1).
 - **Treat one illegal neighbour as a form's complete operand domain.** Rejected:
   a single out-of-range value does not show that the minimum, the maximum and
-  both adjacent illegals behave. The shipped bounded forms carry boundary cases;
-  the comparison rule stays `(code, path)` and no new error code is added
+  the adjacent illegal value behave. The shipped bounded forms carry boundary
+  cases; the comparison rule stays `(code, path)` and no new error code is added
   (§9.1).
+- **Require `min−1`/`max+1` for a register field.** Rejected: `payload.reg` is a
+  `u64`, so a negative register never becomes a `Plan` and `bind` cannot reject
+  it. `D_Form ⊆ D_Representable`: the lower boundary is a plan-scope negative,
+  and the form negative is `2^field_bits` or a representable excluded register
+  (§9.1).
+- **Record `min`/`max` details that `E-OPERAND-004` does not emit.** Rejected:
+  the diagnostic carries `target_type`, `value` and `field_bits`; requiring a
+  `min`/`max` key would make every case fail against the validator's actual
+  output. The upper bound is derived from `field_bits`, and the pass condition
+  stays `(code, path)` (§9.1).
+- **Allow only `…/modifiers/<i>` in `mutates`.** Rejected: a modifier is an
+  object with `name` and `value`, so a single value change reports
+  `…/modifiers/<i>/value`; the old pattern made the common case inexpressible
+  (§9.1).
+- **Read the target relation from the plan format.** Rejected: `check_target`
+  keys the subset rule on the definition format, so `fmp/0.1` + `fmp-def/0.2`
+  is already a legal subset cell. A plan-format test would re-reject it and
+  change H1 behaviour without a version marker (§4.1).
+- **Write the path production as two or more segments.** Rejected: `NOTICE` and
+  `README.md` are single-segment package-root files required by the release
+  evidence gate. The production is `pseg ("/" pseg)*`, with the fixed uppercase
+  names as the only exception (§1.3).
+- **Match a name, then open it again by path.** Rejected: the entry can be
+  replaced between the two calls, so the opened object need not be the one the
+  name check described. The open is bound to the matched entry, or the
+  replacement is rejected (§1.3, §3).
 - **Re-open a package path after hashing it, or hash and merge from different
   buffers.** Rejected: a file changed between the two stages yields a lock whose
   source digest describes bytes the merged definition never contained. One loaded
@@ -2820,8 +2935,13 @@ comparing the materializer with itself proves the bytes.
 | Identifier, path-segment and artifact-filename rules are format rejections before any open | specified; the builder has no package reader | **unverified** — H2a |
 | The same relative asset path in two different package roots is legal, and a folded root alias or repeated spec path is `path-lexical` | specified; no closure reader exists | **unverified** — H2a |
 | A declared lowercase path does not open a case-different on-disk entry, on intermediate directory or final file | specified as part of the open; no path layer exists | **unverified** — H2a N1 gate (Linux, macOS, Windows) |
-| `h2-exact-target` is lifted only by a new plan/definition protocol, while `fmp/0.1` keeps its exact-set verdict | specified; no `fmp/0.2` plan exists | **unverified** — H3 gate |
-| Shipped bounded forms carry min/max/adjacent-illegal cases with `min`/`max`/`value` evidence details | specified; the three packages and their cases do not exist | **unverified** — H2a/H2b |
+| Opening is bound to the directory entry that was name-checked, so a replacement between the two is not read | specified; no path layer exists; not yet measured on any platform | **unverified** — H2a N1 gate |
+| `payload.reg` is a `u64`, so a negative register number is a `plan::read` rejection | `fmp-model/src/plan.rs` `bind_payload` calls `bind::u64_in`; `bind.rs` `u64_in` accepts only `0..=u64::MAX` | high (read) |
+| `check_target` keys the set relation on the definition format, not the plan format | `fmp-validate/src/lib.rs` `subset_rule = model.definition.definition_format() == DEFINITION_FORMAT_V0_2` | high (read) |
+| `E-OPERAND-004` carries `target_type`, `value` and `field_bits`, and `E-RANGE-004` carries `target_type`, `value` and `excluded` | `fmp-validate/src/lib.rs` `check_operand` and `excluded_diagnostic` | high (read) |
+| A modifier is `{name, value}`, so a single value change reports `…/modifiers/<i>/value` | `fmp-model/src/plan.rs` `bind_modifier` closes the object on `name` and `value` | high (read) |
+| Boundary evidence splits representable from form domains and records only emitted diagnostic fields | specified; the three packages and their cases do not exist | **unverified** — H2a/H2b |
+| The plan×definition matrix keeps `fmp/0.1` + `fmp-def/0.1` equality and `fmp/0.1` + `fmp-def/0.2` subset, and only a new plan protocol lifts `h2-exact-target` | existing two cells read from `check_target`; the new-plan cell does not exist | **partly measured, H3 gate** |
 | One loaded package value feeds the source digest, row/target comparison, per-package `read` and merge | specified; no reader exists | **unverified** — H2a |
 | First publication bootstraps without a registry cycle, and `build` validates every output before writing | specified; no builder exists | **unverified** — H2a |
 | `enabled_extensions` is a conservative declared cover, not a minimal required set | specified; `fmp-def/0.1` forms have no requirement key and no builder exists | **unverified** — H2a |
@@ -2884,14 +3004,27 @@ comparing the materializer with itself proves the bytes.
   probes the directory before opening it: stop. The declared segment must equal
   the opened entry name byte-for-byte, checked on the already-open parent handle
   (§1.3, §3).
-- Someone lifts `h2-exact-target` by removing the equality check, or makes a
-  `fmp/0.1` plan accept a subset bundle without a new protocol: stop. The subset
-  verdict belongs to the new plan/definition protocol, and the old protocol keeps
-  its exact result (§4.1).
+- Someone matches the name and then re-opens the path without binding the open to
+  the matched entry: stop. A replacement in the gap reads an object no check
+  described; either open the matched entry or reject the replacement (§1.3, §3).
+- Someone requires at least two path segments, or rejects a single-segment
+  `NOTICE`: stop. The production is `pseg ("/" pseg)*`, and `README.md`/`NOTICE`
+  are the fixed uppercase exceptions (§1.3).
+- Someone lifts `h2-exact-target` by removing the equality check, makes a
+  `fmp/0.1` + `fmp-def/0.1` pair accept a subset, or keys the relation on the
+  plan format and re-rejects `fmp/0.1` + `fmp-def/0.2`: stop. The existing cells
+  stay fixed and only a new plan protocol adds one (§4.1).
 - Someone counts one illegal neighbour as a bounded operand's whole domain, or
-  moves `min`/`max`/`value` details into the pass comparison: stop. The shipped
-  bounded forms carry min/max/adjacent-illegal cases, and the pass condition
-  stays the `(code, path)` set (§9.1).
+  moves `field_bits`/`value` evidence into the pass comparison: stop. Boundary
+  cases stay inside `D_Representable`, and the pass condition stays the
+  `(code, path)` set (§9.1).
+- Someone makes a negative register number a `scope:"form"` case, or records
+  `min`/`max` that `E-OPERAND-004` does not emit: stop. A negative register is a
+  plan-scope rejection; the register upper bound is derived from `field_bits`
+  (§9.1).
+- Someone allows only `…/modifiers/<i>` in `mutates`, or rejects
+  `…/modifiers/<i>/value`: stop. A single modifier value change is a legal form
+  mutation, and the validator's array-level diagnostic is its ancestor (§9.1).
 - Someone re-opens a package path after computing its digest, or hashes one
   buffer and merges another: stop. One loaded value feeds the digest, the row
   comparison, the per-package `read` and the merge (§9).
