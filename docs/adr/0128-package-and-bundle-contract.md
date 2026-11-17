@@ -5,17 +5,20 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: fourteenth revision, 2026-11-17, after the bridge and protocol audit:
-  a committed legacy snapshot must be byte-identical to the canonical
-  serialization of the sealed definition (`legacy-snapshot-mismatch`) although it
-  still enters no digest, and its absence stays legal; a definition-identity
-  mismatch is removed from the case vocabulary because the `$standalone` sentinel
-  and the substitution rule make it inexpressible, so the derived-plan binding
-  test carries it; lifting `h2-exact-target` requires a versioned build rule as
-  well as a new plan protocol, and `monasm-bundle-spec/0.1` keeps its rejection
-  conclusion permanently; and the changed-path gate tests base-registry
-  containment before head-side `package.json` discovery, so a nested manifest
-  cannot mask a published ancestor.
+- Revision: fifteenth revision, 2026-11-18, after the proof-boundary and
+  wide-register audit: `verify --package` validates only the static stage
+  contract, while `package_conformance` proves the actual first rejecting stage
+  and the complete diagnostic set, and reports record those two statuses
+  separately; the register-domain rule is restated as
+  `D_reg = ([0, 2^w−1] ∩ [0, 2^64−1]) \ E` so a slot wider than 64 bits keeps the
+  H1-verified encoding capability and is tested with `0`/`u64::MAX` plus an
+  excluded value or illegal operand type instead of an unrepresentable `2^w`.
+- Prior revision: fourteenth revision, 2026-11-17, required a committed legacy
+  snapshot to be byte-identical to the canonical sealed definition
+  (`legacy-snapshot-mismatch`) while entering no digest and remaining optional,
+  removed the inexpressible definition-identity case, required a versioned build
+  rule as well as a new plan protocol to lift `h2-exact-target`, and decided
+  base-registry containment before head-side `package.json` discovery.
 - Prior revision: thirteenth revision, 2026-11-17, added `stage: "read"` for
   plan-scope negatives and the first-rejecting-stage rule, restated the
   interrupted-write guarantee as detectability, named output parents as trusted
@@ -44,7 +47,9 @@
   target self-description and migration provenance, including legacy target
   consistency; the standalone definition identity used by `verify --package`; the
   mandatory package case and evidence gate with `bind`-only form-scope mutation
-  and complete diagnostic sets; exact Level 0/Level 1 machine-output projections;
+  and complete diagnostic sets, with static declaration validation separate from
+  the executed first-rejecting-stage proof; the representable register domain for
+  a field wider than 64 bits; exact Level 0/Level 1 machine-output projections;
   portable identifier, path-segment and artifact-filename lexical rules; the
   package-root and repository-relative domains of path collision; exact on-disk
   entry-name matching for every opened segment; the representable-versus-form
@@ -2314,7 +2319,8 @@ projection is compared after `materialize`.
 `stage` is `read`, `bind` or `materialize`. `diagnostics` is a non-empty array
 sorted by
 `(path, code)`, unique, and each entry is a closed object over exactly `code`
-and `path`. The harness projects the observed diagnostics to `(code, path)`,
+and `path`. The `package_conformance` harness projects the observed diagnostics
+to `(code, path)`,
 sorts them by `(path, code)`, and requires **set equality** with the declared
 array: same length, same members, no duplicates. One matching error among
 others is a failure (`case-diagnostics-mismatch`, exit 1). Detail maps are not
@@ -2341,6 +2347,20 @@ rejects the document.** A plan-scope case whose declared stage accepts, or whose
 earlier stage already rejects, is `case-error-scope` (exit 1) and is evidence for
 nothing. `read` is not a second name for `bind`, and a read rejection cannot be
 dressed as a bind rejection: `bind` never receives a `Plan` the reader refused.
+
+**A declared stage is a static claim until conformance executes it.**
+`verify --package` checks only the declaration's static contract: the value is
+one of `read`/`bind`/`materialize`, a form-scope case declares `bind`, a
+plan-scope case uses a stage its scope permits, `diagnostics` is non-empty,
+sorted, unique and closed over `code`/`path`, the `mutates` pointer is on the
+allowed operand surface, and the baseline-to-case diff is a single pointer. It
+does **not** call `plan::read`, `bind` or `materialize`, so it cannot prove which
+stage rejects first or that the observed set equals the declared set.
+`package_conformance` executes the case and proves both. A case that declares
+`stage: "bind"` while `plan::read` actually rejects it passes the static document
+check and must fail conformance with `case-error-scope`; it is never valid
+coverage, and the two verification statuses are reported separately (§9.1 split
+of duties).
 
 For `scope: "form"`, every declared and observed path must be `/instructions/0`
 or start with `/instructions/0/`; any other path is `case-error-scope` (exit 1).
@@ -2377,15 +2397,29 @@ For every shipped form with an immediately encoded or otherwise bounded operand:
 
 - An immediate range `[min, max]` inside `i128` uses `min` and `max` as positives
   and `min−1`/`max+1` as `scope: "form"` negatives.
-- A register field has `D_Form = [0, 2^field_bits − 1]` inside `u64`, so its
-  positives are `0` and `2^field_bits − 1`, and its adjacent illegal value is
-  `2^field_bits` when `field_bits ≤ 63`. There is no representable `0 − 1`: a
-  negative register number is a plan-scope `stage: "read"` negative. When the
-  form is narrower
-  than the field, a representable excluded number (for example register `0` for
-  a slot whose `excluded` list contains 0) is the second form negative and is
-  rejected by `E-RANGE-004`. For a 64-bit field, `2^64` does not fit `u64`, so
-  the form negative is an excluded value or a wrong `target_type`, not `max+1`.
+- A register field's encoded width `w` is the sum of its placement widths and may
+  exceed 64 bits (`ADR-0127` §7.1 bounds each placement, not the sum; the H1
+  test `prototype/crates/fmp-materialize/tests/he1_wide_register.rs` loads and
+  encodes 64-, 127-, 128- and 192-bit fields). `payload.reg` is still a `u64`, so
+  the plan-representable register domain is
+  `D_reg = ([0, 2^w − 1] ∩ [0, 2^64 − 1]) \ E`, where `E` is the form's
+  representable excluded set. The boundary cases follow `w`:
+  - `w < 64`: positives are `0` and `2^w − 1`; the adjacent illegal value
+    `2^w` is a `scope: "form"` negative.
+  - `w = 64`: positives are `0` and `u64::MAX`; `2^64` is not representable, so
+    the second form negative is a representable excluded value or a wrong
+    `target_type`/operand kind.
+  - `w > 64`: positives are `0` and `u64::MAX`, both inside the field; `2^w − 1`
+    and `2^w` are unrepresentable, so no `max + 1` is required or legal. An
+    excluded value or a wrong `target_type`/operand kind is the form negative;
+    a wide slot without an excluded value has no numeric form negative at all
+    and must not invent one.
+  There is no representable `0 − 1`: a negative register number is a plan-scope
+  `stage: "read"` negative. A package-level boundary protocol test must exercise
+  the 127- and 192-bit slots through `read`/`bind`/`materialize`, so the H2 author
+  layer cannot silently shrink the encoding capability H1 already proved; that
+  test supplements, and does not replace, the narrow-field boundary cases of the
+  three shipped packages.
 - A modifier is a set of permitted `(name, value)` pairs, not a contiguous
   integer interval. Test one permitted pair and one representable but unpermitted
   pair; do not invent `min−1`/`max+1` arithmetic for it.
@@ -2394,8 +2428,10 @@ For every shipped form with an immediately encoded or otherwise bounded operand:
   `E-RANGE-002` for a target operand), which emits `min`, `max`, `value` and,
   for a non-target, `target_type`, so those are recorded. A register beyond its
   field is rejected by `E-OPERAND-004`, which emits `target_type`, `value` and
-  `field_bits`, and the upper bound `2^field_bits − 1` is derived from
-  `field_bits`; it has no `min`/`max` key. An excluded value is rejected by
+  `field_bits`, and the encoded bound `2^field_bits − 1` is derived from
+  `field_bits`; when `field_bits ≥ 64` that bound exceeds `u64::MAX`, so the
+  representable maximum is `u64::MAX` and the case never claims to test `2^w`.
+  The diagnostic has no `min`/`max` key. An excluded value is rejected by
   `E-RANGE-004`, which emits `target_type`, `value` and `excluded`. A case does
   not require fields the validator does not emit.
 
@@ -2428,12 +2464,17 @@ present is authoritative in both modes.
 coverage of every exported form by a positive and a `scope: "form"` negative,
 ordering, evidence references and hashes, the `baseline_case_id` link, the
 `mutates` pointer grammar, and the structural diff between baseline and case
-plans. It also validates the declared `stage`, the sorted unique `diagnostics`
-array and the `case-error-scope` rule. It does not execute `bind` or
-`materialize`, because the product binary depends only on `fmp-model`. The
+plans. Its stage-related checks are **static only**: `stage` is one of the three
+values, a form-scope case declares `bind`, a plan-scope case uses a stage its
+scope permits, `diagnostics` is a non-empty sorted unique closed array, declared
+paths obey the static scope rule, and the declared diagnostic count is non-zero.
+It does not execute `plan::read`, `bind` or `materialize`, because the product
+binary depends only on `fmp-model`; therefore it cannot prove which stage rejects
+first or that the observed set matches. The
 `package_conformance` test in `fmp-definition/tests/` builds each package under
 its standalone identity (§2.1) and executes every case with the dev-dependency
-graph, matching the complete observed diagnostic set. It enumerates
+graph, proving the actual first rejecting stage and matching the complete
+observed diagnostic set. It enumerates
 `packages/*/*/*/package.json` at test time;
 that enumeration is test-only, never feeds bundle selection and cannot change a
 bundle digest, so it does not reopen `HE-AC-05`.
@@ -2468,13 +2509,15 @@ label these claims separately:
 | Claim | What it means | What it does not mean |
 |---|---|---|
 | Definition structure verified | `fmp_model::definition::read` accepted the merged document | an opcode or operand range is correct |
-| Package structure verified | `verify --package` accepted the manifest, assets, cases and evidence | any declared dependency was resolved |
+| Package structure verified | `verify --package` accepted the manifest, assets and evidence | any declared dependency was resolved, or any case executed |
+| Case document statically valid | `verify --package` accepted the case schema, scope/`stage` declaration form, `mutates` grammar, diagnostic shape and static `case-error-scope` rules | that `plan::read`, `bind` or `materialize` actually rejects at the declared stage |
+| Case stage and diagnostics verified | `package_conformance` executed the case, observed the declared stage as the first rejecting stage, and matched the complete `(code, path)` set | an independent tool was run |
 | Dependency closure verified | every dependency matched an explicit closure entry by ID, version and digest | H2 packages declare any dependencies |
 | Package machine-code test passed | `package_conformance` matched the declared expectation and the complete diagnostic set | an independent tool was run |
 | Evidence traceable | the manifest lists the files and every hash matches | the recorded oracle result is true |
 | Independent oracle re-verified | an external tool was actually re-run and compared on this host | H2 does this for new packages |
 
-None of the first five implies the last. H2 records evidence and executes the
+None of the first seven implies the last. H2 records evidence and executes the
 declared cases; it does not claim a fresh oracle run for a new package.
 
 H2 does not add per-ISA branches to the harness. It dispatches from
@@ -2809,8 +2852,10 @@ comparing the materializer with itself proves the bytes.
   immediately encoded or otherwise bounded operand also carries boundary cases
   for the values the plan can represent: minimum/maximum positives and the
   adjacent representable illegal value, rejected at the mutated operand. A
-  register's upper bound comes from `field_bits`, and a negative register is a
-  plan-scope `stage: "read"` rejection rather than a form negative
+  register field's encoded width `w` comes from `field_bits` and may exceed 64;
+  its domain is `D_reg = ([0, 2^w − 1] ∩ [0, 2^64 − 1]) \ E`, so for `w ≥ 64`
+  the maximum positive is `u64::MAX` and `2^w` is never a test input. A negative
+  register is a plan-scope `stage: "read"` rejection rather than a form negative
   (`D_Form ⊆ D_Representable`).
   The evidence records the detail keys the relevant diagnostic emits — `min`,
   `max`, `value` for `E-RANGE-001`/`E-RANGE-002`, and `target_type`, `value`,
@@ -2904,7 +2949,9 @@ comparing the materializer with itself proves the bytes.
   mutation that changes two members is rejected as two differences, regardless of
   how the author performed it.
 - A case names the first stage that rejects: `read` when `plan::read` refuses the
-  document, `bind` or `materialize` otherwise. A value such as `{"reg":-1}` thus
+  document, `bind` or `materialize` otherwise. Naming it is a static declaration;
+  only `package_conformance` proves it is actually the first rejecting stage —
+  `verify --package` never executes the plan. A value such as `{"reg":-1}` thus
   has a legal plan-scope representation without being dressed as form coverage,
   and a form-scope case stays `bind`-only (§9.1).
 - The publication audit's claim is bounded to the executable assets and
@@ -3164,9 +3211,22 @@ comparing the materializer with itself proves the bytes.
   (§9.1).
 - **Require `min−1`/`max+1` for a register field.** Rejected: `payload.reg` is a
   `u64`, so a negative register never becomes a `Plan` and `bind` cannot reject
-  it. `D_Form ⊆ D_Representable`: the lower boundary is a plan-scope negative,
-  and the form negative is `2^field_bits` or a representable excluded register
-  (§9.1).
+  it. `D_Form ⊆ D_Representable`: the lower boundary is a plan-scope negative.
+  The upper form negative is `2^w` only when `w < 64`; for `w ≥ 64` it is a
+  representable excluded register or a wrong operand type, never an
+  unrepresentable `2^w` (§9.1).
+- **Assume the plan's register domain is `[0, 2^w − 1]` for every `w`.**
+  Rejected: H1 `he1_wide_register.rs` proves 64/127/128/192-bit fields bind and
+  encode, but `payload.reg` is still a `u64`; for `w ≥ 64` the maximum
+  representable value is `u64::MAX` and `2^w` is not a test input. Treating the
+  field width as the plan domain would demand impossible cases and could shrink
+  the capability H1 already proved (§9.1).
+- **Let `verify --package` claim the declared stage is the one that rejects.**
+  Rejected: that command does not call `plan::read`, `bind` or `materialize`, so
+  a case declaring `stage: "bind"` can pass it while the reader actually rejects
+  the plan. Only `package_conformance` can prove the first rejecting stage and
+  the complete observed set; the report records the static and executed statuses
+  separately (§9.1).
 - **Record `min`/`max` details that `E-OPERAND-004` does not emit.** Rejected:
   the diagnostic carries `target_type`, `value` and `field_bits`; requiring a
   `min`/`max` key would make every case fail against the validator's actual
@@ -3306,7 +3366,9 @@ comparing the materializer with itself proves the bytes.
 | `check_target` keys the set relation on the definition format, not the plan format | `fmp-validate/src/lib.rs` `subset_rule = model.definition.definition_format() == DEFINITION_FORMAT_V0_2` | high (read) |
 | `E-OPERAND-004` carries `target_type`, `value` and `field_bits`, and `E-RANGE-004` carries `target_type`, `value` and `excluded` | `fmp-validate/src/lib.rs` `check_operand` and `excluded_diagnostic` | high (read) |
 | A modifier is `{name, value}`, so a single value change reports `…/modifiers/<i>/value` | `fmp-model/src/plan.rs` `bind_modifier` closes the object on `name` and `value` | high (read) |
-| Boundary evidence splits representable from form domains and records only emitted diagnostic fields | specified; the three packages and their cases do not exist | **unverified** — H2a/H2b |
+| Boundary evidence splits representable from form domains, uses `D_reg = ([0, 2^w−1] ∩ [0, 2^64−1]) \ E`, and records only emitted diagnostic fields | specified; the three packages and their cases do not exist | **unverified** — H2a/H2b |
+| A register field wider than 64 bits binds and encodes 64/127/128/192-bit placements | `prototype/crates/fmp-materialize/tests/he1_wide_register.rs` calls `fmp_validate::bind` and `fmp_materialize::materialize` for each width and asserts bytes | high (measured by the H1 test) |
+| `verify --package` validates only the static case contract; `package_conformance` proves the first rejecting stage and the complete diagnostic set | specified; no package reader or conformance harness exists; a `stage: "bind"` case that `read` rejects passes the static check and must fail conformance | **specified, not implemented** — H2a |
 | The plan×definition matrix keeps `fmp/0.1` + `fmp-def/0.1` equality and `fmp/0.1` + `fmp-def/0.2` subset, and only a new plan protocol plus a versioned build rule lifts `h2-exact-target` | existing two cells read from `check_target`; the new-plan cell and the versioned build rule do not exist; `monasm-bundle-spec/0.1` has no builder yet | **partly measured, H3 gate** |
 | One loaded package value feeds the source digest, row/target comparison, per-package `read` and merge | specified; no reader exists | **unverified** — H2a |
 | First publication bootstraps without a registry cycle, and `build` validates every output before writing | specified; the order is build success → append rows → both `--check`s → commit, and publication is the merged commit; no builder exists | **unverified** — H2a |
@@ -3407,11 +3469,22 @@ comparing the materializer with itself proves the bytes.
 - Someone makes a negative register number a `scope:"form"` case, reports it at
   `stage: "bind"`, or records `min`/`max` that `E-OPERAND-004` does not emit:
   stop. A negative register is a plan-scope `stage: "read"` rejection; the register
-  upper bound is derived from `field_bits` (§9.1).
+  encoded bound comes from `field_bits`, and for `w ≥ 64` the representable
+  maximum is `u64::MAX` (§9.1).
+- Someone requires `2^w` or `2^w − 1` for a slot whose encoded width exceeds 64,
+  or caps the author layer at 64 bits because `payload.reg` is a `u64`: stop.
+  H1's `he1_wide_register.rs` proves 127/192-bit fields bind and encode; the
+  boundary cases use `0`/`u64::MAX` plus an excluded value or wrong operand type
+  (§9.1).
 - Someone declares a stage that is not the first stage that rejects, or gives a
   form-scope case `stage: "read"` or `"materialize"`: stop. The stages are a
   sequence, `bind` never sees a `Plan` the reader refused, and a reader rejection
   is not form coverage (§9.1).
+- Someone reports `verify --package` as having proved the declared stage, or
+  treats a statically valid `stage: "bind"` case as executed evidence: stop.
+  That command never calls `plan::read`/`bind`/`materialize`; only
+  `package_conformance` proves the first rejecting stage and the full observed
+  diagnostic set, and the two statuses are reported separately (§9.1).
 - Someone writes a plan-scope case that claims a definition-identity mismatch, or
   adds a per-case identity override so that one is expressible: stop. The only
   legal value is the `$standalone` sentinel and the harness substitutes the
