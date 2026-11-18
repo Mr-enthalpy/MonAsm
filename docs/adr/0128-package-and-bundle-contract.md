@@ -5,7 +5,17 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: eighteenth revision, 2026-11-18, after the resource and artifact
+- Revision: nineteenth revision, 2026-11-18, after the merge-timing and
+  version-boundary audit: a publication verdict authorizes only the
+  `(B_checked, H_checked)` pair it read, so an accepted publication requires
+  `B_checked = B_merge` and `H_checked = H_merge`, enforced by a merge queue or
+  strict up-to-date required checks and proved through the platform API;
+  `monasm-package/0.1` rejects non-empty `exports.types`/`exports.profiles`
+  permanently, with their semantics reserved to an explicit later package format;
+  the input order is fixed as lexical path, no-follow open, handle-level type
+  check, same-handle size hint, bounded read, parse; and a build omits the legacy
+  snapshot rather than writing one above its own 16 MiB read budget.
+- Prior revision: eighteenth revision, 2026-11-18, after the resource and artifact
   lifecycle audit: only a regular file is accepted at an opened leaf — FIFO,
   socket and device nodes are rejected as `not-a-regular-file` on the opened
   handle, and the POSIX input open is non-blocking until the type is known; and a
@@ -41,12 +51,10 @@
   removed the inexpressible definition-identity case, required a versioned build
   rule as well as a new plan protocol to lift `h2-exact-target`, and decided
   base-registry containment before head-side `package.json` discovery.
-- Prior revision: thirteenth revision, 2026-11-17, added `stage: "read"` for
-  plan-scope negatives and the first-rejecting-stage rule, restated the
-  interrupted-write guarantee as detectability, named output parents as trusted
-  but no-follow-checked, bounded the committed lock and sealed bundle read, and
-  made `profile_id` a nominal label inside one bundle.
-- Prior revisions: the twelfth (first-publication order, derived legacy cache,
+- Prior revisions: the thirteenth (plan-scope `stage: "read"` and the
+  first-rejecting-stage rule, interrupted-write detectability, output parents
+  trusted but no-follow-checked, bounded lock/sealed read, bundle-local
+  `profile_id`), the twelfth (first-publication order, derived legacy cache,
   canonical set spelling, counted closure budget, the `E_form = ∅` acceptance
   caveat), the eleventh (representability-scoped boundary evidence, the
   plan×definition matrix, a single-modifier `mutates`, one-segment paths,
@@ -92,6 +100,13 @@
   condition for accepting a subset target (build rule and plan protocol);
   the injective full-`package_id` directory mapping and target-tip
   publication authority (`Published(B) ⊆ Published(H)` with tree-byte equality);
+  the merge-freshness rule that a verdict authorizes only the `(B, H)` pair it
+  read and must be re-established when the target tip moves; the permanent
+  `monasm-package/0.1` rejection of non-empty `exports.types`/`exports.profiles`
+  with their semantics reserved to an explicit later package format; the ordered
+  input pipeline (lexical path, no-follow open, handle type check, same-handle
+  size hint, bounded read, parse); the rule that a build omits a legacy snapshot
+  above its own read budget instead of writing an unreadable one;
   the closed non-empty dependency object and its fixed digest vector;
   base-registry-first changed-path containment; package/form
   ISA-family consistency; package ownership and conflict rules; which legacy
@@ -210,7 +225,7 @@ manifest is `monasm-package/0.1` and is a closed object:
 |---|---|
 | `package_format`, `package_id`, `version`, `target_profile`, `definition_format`, `target_identity`, `requires_capabilities`, `dependencies`, `exports.forms` | required |
 | `legacy_source` | optional; migration provenance only |
-| `exports.types`, `exports.profiles` | optional; reserved asset declarations, must be empty in H2 |
+| `exports.types`, `exports.profiles` | optional; reserved asset declarations, which must stay empty under `monasm-package/0.1` |
 
 | Field | Counterexample when it is missing or unchecked |
 |---|---|
@@ -1091,8 +1106,8 @@ The builder extracts the prefix before `:` from every exported form ID and
 compares it to the declared `isa_family` for equality. It does not enumerate
 allowed families and does not consult a table. A mismatch is
 `form-family-mismatch` (exit 1), reported before `read` is called. The same
-check applies to a package's `exports.types`/`exports.profiles` when H4 gives
-them a family-bearing identity.
+check applies to a package's `exports.types`/`exports.profiles` when a later
+package format gives them a family-bearing identity.
 
 H2's `fmp_model::definition::read` still accepts only `x86`, `aarch64` and
 `riscv`. That is the definition reader's existing check, not a new package
@@ -1112,8 +1127,8 @@ The build creates three read-only ownership tables:
 
 ```text
 form_id    -> package_id + version + source_package_digest
-type_id    -> package_id + version + source_package_digest   # reserved; non-empty rejected in H2
-profile_id -> package_id + version + source_package_digest   # reserved; H4 owns the semantics
+type_id    -> package_id + version + source_package_digest   # reserved; non-empty rejected in 0.1
+profile_id -> package_id + version + source_package_digest   # reserved; non-empty rejected in 0.1
 ```
 
 Two packages exporting the same `form_id` fail the build even when the rows are
@@ -1126,14 +1141,24 @@ declared in the closed manifest and enter `source_package_digest`, but a
 non-empty list is rejected as `unsupported-asset`: the builder will not merge an
 asset whose semantics neither this ADR nor `fmp_model::definition::read`
 defines. A package that writes `"types": []` or `"profiles": []` is accepted and
-records zero assets. This is a real reservation: the key, the `{id, path}`
-shape, the ordering rule and the digest input are fixed now, so H4 adds
-semantics without changing the manifest key set. It is not a promise that H2
-executes or emits those assets; a non-empty list fails closed. Only the outer
-identity, ordering, digest input and rejection semantics are frozen: the inner
-type/profile semantics (shared types, composed profiles) are H4's proposal, and
-if H4 needs a different structure it must evolve the format version rather than
-treat this placeholder shape as verified semantics.
+records zero assets.
+
+**The rejection is permanent for `monasm-package/0.1`.** A later builder that
+"knows" the field does not make a non-empty list legal under this format: what a
+document means is a property of its declared `package_format`, not of the
+builder version that reads it. Otherwise the same unchanged `0.1` manifest would
+change from rejected to accepted when the tool is upgraded, and a replay would
+depend on which binary ran. H4 must therefore introduce an explicit later package
+format (`monasm-package/0.2` or later) that states the type/profile semantics,
+the ownership and conflict rules, the digest input and the validation a non-empty
+list requires; `0.1` keeps `unsupported-asset` forever, exactly as
+`monasm-bundle-spec/0.1` keeps its `h2-exact-target` rejection permanently
+(§4.1). The reserved key names, the `{id, path}` shape, the ordering rule and the
+digest input are fixed in `0.1` so the later format can reuse them without
+reopening the closed key set; reusing the names is not permission to relax the
+`0.1` rejection. What `0.1` freezes is the outer identity, ordering, digest input
+and the rejection; the inner type/profile semantics (shared types, composed
+profiles) remain H4's proposal.
 
 Ownership rows for types and profiles are therefore reserved with the same
 `{owner, version, source_package_digest}` shape but are never populated in H2.
@@ -1385,24 +1410,27 @@ definition.
   `bundle_digest`, `definition_digest`, and the sorted `sources` list
   `{package_id, version, source_package_digest}`. It does not contain the builder
   receipt, `release_digest` or author paths.
-- `bundles/legacy/<bundle_id>/definition.json` — generated: the plain merged
-  definition document, with no bundle envelope, so the existing
-  `fmp materialize <plan> --definitions <dir>` path can load it. It is a derived
-  development cache, not a release identity: it enters no digest, and its absence
-  is legal. When it is committed, `verify --all --check` requires its canonical
-  bytes to equal the definition document inside the checked sealed bundle
-  (`legacy-snapshot-mismatch`, exit 1); that equality gate is not an identity
-  input (§8.3). The write phase removes the previous copy before writing
-  the new one. `Registry::load_dir` recursively
-  reads every `.json` under the directory and calls `definition::read`, so the
-  sealed `.bundle.json` cannot be used here; point `--definitions` at the
-  directory that contains only this snapshot.
+- `bundles/legacy/<bundle_id>/definition.json` — generated when the canonical
+  definition fits its 16 MiB read budget: the plain merged definition document,
+  with no bundle envelope, so the existing `fmp materialize <plan> --definitions
+  <dir>` path can load it. It is a derived development cache, not a release
+  identity: it enters no digest, and its absence is legal. When it is committed,
+  `verify --all --check` requires its canonical bytes to equal the definition
+  document inside the checked sealed bundle (`legacy-snapshot-mismatch`, exit 1);
+  that equality gate is not an identity input (§8.3). The write phase removes the
+  previous copy before writing the new one, and a build never writes a snapshot
+  larger than the read budget (§8.3): a larger canonical document is left
+  uncached. `Registry::load_dir` recursively reads every `.json` under the
+  directory and calls `definition::read`, so the sealed `.bundle.json` cannot be
+  used here; point `--definitions` at the directory that contains only this
+  snapshot.
 
-The binary has three subcommands: `build` writes the lock, sealed bundle and
-legacy snapshot; `verify --check` rebuilds the lock and sealed bundle in memory
-and compares them, and compares a committed legacy snapshot with that rebuilt
-definition; and `digest <package-path>` prints
-the computed `source_package_digest` so an author can write it into the spec.
+The binary has three subcommands: `build` writes the lock and sealed bundle, plus
+the legacy snapshot when the canonical document fits its read budget; `verify
+--check` rebuilds the lock and sealed bundle in memory and compares them, and
+compares a committed legacy snapshot with that rebuilt definition; and `digest
+<package-path>` prints the computed `source_package_digest` so an author can write
+it into the spec.
 `verify --all` checks the bundle closures selected by `bundles/specs/*.json`;
 `verify --published --check` audits the entire published registry without
 selecting any package (§8.4); `verify --package <path>` checks one package
@@ -1639,6 +1667,48 @@ assets, not the whole directory. Only the tip-based comparison rejects A with
 `published-package-modified`. The merge base remains usable for ancestry
 questions (which commits introduced a path) but never for "which versions are
 published now".
+
+**The verdict is valid only for the pair it read.** Let `B` be the target-branch
+tip the gate read and `H` the merge candidate it evaluated: the pair
+`(B_checked, H_checked)`. The gate authorizes exactly that pair, so an accepted
+publication requires `B_checked = B_merge` and `H_checked = H_merge`. Without
+that, a correct run can still be stale in the worst way, and the tip rule alone
+does not catch it:
+
+1. branch A modifies `P/README.md` while `P/0.1.0` is unpublished; CI reads
+   `B_A`, where `Published(B_A) = ∅`, and passes;
+2. branch B appends the registry entry for `P/0.1.0` and merges, so the target
+   tip becomes `B'` with `P/0.1.0 ∈ Published(B')`;
+3. A merges on the old green result.
+
+Evaluated against `(B', H_A)` the same diff is `published-package-modified`;
+evaluated against `(B_A, H_A)` it was legal. The diff bytes did not change, so
+only freshness distinguishes the two runs. H2 therefore requires one of two
+enforcement mechanisms before a publication gate can pass:
+
+- a **merge queue** that evaluates the gate on its merge-group candidate and
+  merges exactly that candidate, rebuilding the group when the target branch
+  moves; or
+- **required up-to-date checks on the merge path**, with the gate re-run whenever
+  the target tip changes, so a verdict computed against an older tip cannot be
+  the last successful result before the merge.
+
+The gate must record the pair it read (for example the two commit SHAs in its
+output) so an automated check or a reviewer can compare it with the merge
+commit's parents. A verdict without that pair is not evidence, reusing a result
+whose recorded `B` is not the merge's `B` is forbidden, and a manual merge that
+bypasses the protected path is not a legal publication. If neither mechanism can
+be demonstrated for the repository, the publisher must re-run the gate on the
+final candidate and merge only that run's result; a stale green never authorizes
+the change. A post-merge run on the target branch that compares the merge commit
+with its first parent and fails when a published directory changed adds
+detectability, but it does not replace this freshness requirement.
+
+This is a repository-setting requirement, and a document cannot prove a setting
+by itself. H2a's acceptance gate therefore reads the effective branch protection
+or merge queue through the platform API and records the evidence; if it cannot
+show the mechanism, the round fails. The ADR neither asserts nor assumes that the
+current repository already has it — that fact is not visible from the tree.
 
 **The base registry decides containment first.** Before the head tree is used to
 resolve a `package.json` ancestor, the gate checks whether the changed path lies
@@ -2022,6 +2092,22 @@ writes nothing and removes nothing. The write phase then removes the previous
 legacy snapshot and replaces the lock, the sealed bundle and finally that
 snapshot, each through a temporary sibling in the destination directory, a flush
 and a rename.
+
+**A build never writes a legacy snapshot it could not later read.** The closure
+and sealed bundle budgets are far larger than the snapshot's 16 MiB read budget
+(§12), so a legal bundle can produce a canonical definition above it. `build`
+decides from the canonical bytes it has already computed in memory: at most
+16 MiB, it writes the snapshot as above; above 16 MiB, it **omits** the snapshot,
+removes any previous copy in the same write phase, and still exits 0, noting the
+omission in its human-readable output. Omission is a function of the bytes, not of
+the filesystem or of an earlier build, so two builds of one closure agree, and no
+digest or release identity changes: the sealed bundle is the release artifact and
+absence of the cache is legal. Failing the build instead is rejected because a
+closure inside the §12 budgets would then be unbuildable, making a published
+limit depend on a development cache. A hand-committed snapshot above 16 MiB
+remains `resource-limit` (exit 1) on `--check`, because the builder cannot read it
+under its own budget; `build` never produces one, so for any accepted input
+`build` success implies `--all --check` passes on the tree it wrote.
 
 An I/O or internal failure during this phase (exit 2) may leave a temporary file,
 a missing snapshot, or a **pair of files from different builds**: a new lock with
@@ -2840,8 +2926,10 @@ robustness:
   plus at most 16 MiB of envelope for the sorted `sources` list and the
   definition wrapper), read only through the bounded streaming comparison of
   §8.3; the pinned legacy definition file read for row comparison and the
-  committed bridge snapshot read for the §8.3 equality gate each ≤ 16 MiB;
-  `bundles/published.json` ≤ 16 MiB and ≤ 65 536 entries;
+  committed bridge snapshot read for the §8.3 equality gate each ≤ 16 MiB
+  (this bound applies to the cache, not to the bundle: a build whose canonical
+  definition exceeds it omits the snapshot instead of writing an unreadable one,
+  §8.3); `bundles/published.json` ≤ 16 MiB and ≤ 65 536 entries;
 - exported forms per package ≤ 1024; declared assets per package ≤ 2048; cases
   per package ≤ 4096; evidence files per package ≤ 4096;
 - manifest plus declared asset bytes per package ≤ 16 MiB, enforced by the
@@ -2862,10 +2950,23 @@ the maximum, which fits a complete one-instruction `fmp/0.1` document plus its
 expectation; the earlier 1 MiB value could not hold the mandatory cases for even
 a few hundred forms.
 
-An over-limit input is a deterministic rejection (exit 1). The builder checks
-the file length from metadata before opening and reading it, so a case or
-evidence file cannot bypass the per-package budget just because no spec selects
-the package. The depth budget is
+An over-limit input is a deterministic rejection (exit 1). Every input follows
+one order, and no step is reordered:
+
+1. lexical validation of the declared path (§1.3);
+2. the no-follow open relative to already-open directory handles (§3);
+3. the type check on the opened handle (`not-a-regular-file` for a non-regular
+   leaf or a wrong-typed component);
+4. a size hint from the **same** handle;
+5. a bounded read that accumulates the bytes it actually reads and stops at the
+   remaining budget (§12.1);
+6. parsing.
+
+The metadata size is only a hint that lets the builder fail early; it is never
+the boundary, because a file can change between the type check and the read. The
+cumulative counter in §12.1 is what enforces the budget, so a case or evidence
+file cannot bypass the per-package budget just because no spec selects the
+package. The depth budget is
 enforced **before and during** parsing, not by parsing first and measuring the
 result: the builder scans the bytes iteratively (counting `{`/`[` outside string
 literals) and refuses a document that would exceed the budget before it calls
@@ -2887,10 +2988,10 @@ decide the type, for the same check-then-use reason as the no-follow rule.
 Each manifest and form/type/profile file is read through a bounded reader. The
 builder adds every byte it actually reads to one per-package counter and
 rejects as soon as the next read would cross 16 MiB. File metadata is a hint,
-not the check: a file can grow between `stat` and `read`, and a symlink or
-reparse target can report a different size. The reader therefore stops at the
-remaining budget and treats a short or overlong read as `resource-limit` (exit
-1). The counter is reset for each package; it is not the closure total.
+not the check: a file can grow between the type check and the read. The reader
+therefore stops at the remaining budget and treats a short or overlong read as
+`resource-limit` (exit 1). The counter is reset for each package; it is not the
+closure total.
 
 Counterexample if only the per-file limit existed: 2048 files of 1 MiB each pass
 every per-file check and make the builder read 2 GiB for one package. A single
@@ -3041,9 +3142,13 @@ comparing the materializer with itself proves the bytes.
 - No implicit conversion between `fmp-def/0.1` and `fmp-def/0.2`; a mixed
   closure is rejected, and an explicit versioned conversion is H3 work.
 - No execution or emission of `type`/`profile` assets; a non-empty declaration
-  is rejected (H4).
+  is rejected, and `monasm-package/0.1` keeps that rejection permanently — H4
+  needs an explicit later package format (§5).
 - No `bind(VerifiedBundle, ...)` and no `fmp-validate → fmp-definition`
   dependency (H3).
+- No claim about the repository's branch-protection or merge-queue settings from
+  a document; H2a reads the effective setting through the platform API and
+  records the evidence (§8.1).
 - No archive format or archive gate for a retired bundle: its lock, sealed
   bundle and legacy snapshot leave the tree with its last spec, and git history
   is the replay record (§8.4).
@@ -3114,6 +3219,22 @@ comparing the materializer with itself proves the bytes.
   `verify --all --check` rejects a surviving orphan, so no unselected release
   artifact is left in an undefined state. The snapshot and registry entry remain
   the permanent record, and git history keeps the retired bytes replayable.
+- A publication verdict is bound to the `(B, H)` pair it read. A green result is
+  not a property of a branch that survives the target moving: when another PR
+  publishes a version and merges first, the old verdict no longer describes the
+  merge, and the publication is authorized only by a run whose `B` is the tip
+  being merged into. The cost is a merge-queue or up-to-date requirement, paid
+  because the alternative is an undetectable edit of a just-published directory.
+- `monasm-package/0.1` rejects non-empty `exports.types`/`exports.profiles`
+  permanently, so acceptance cannot silently widen with a builder upgrade. H4
+  pays one explicit package-format version for type/profile semantics instead of
+  reinterpreting documents that already exist; the key names and digest input are
+  already reserved, so that version does not reopen `0.1`'s closed key set.
+- A legal closure is never made unbuildable by the optional legacy cache. When
+  the canonical definition exceeds the cache's 16 MiB read budget, `build` omits
+  the snapshot and removes a previous copy, and `--all --check` accepts the
+  absence it already treated as legal; the sealed bundle remains the artifact
+  and no digest moves.
 - The spec set has one `bundle_id` and one `(namespace, version)` per release
   identity. Two specs cannot collide on a lock path or produce two definitions
   that `Registry::find` cannot distinguish. A retired definition name cannot be
@@ -3287,6 +3408,25 @@ comparing the materializer with itself proves the bytes.
   last spec would erase the evidence that a version was published, so a later PR
   could edit the old snapshot. §8.3 keeps an append-only registry that survives
   retirement.
+- **Trust a green publication result until the branch is merged.** Rejected: the
+  verdict describes the `(B, H)` pair it read, and the target tip can gain a
+  publication after that read. Reusing the result would let a branch edit a
+  directory that became published in the meantime, and no other gate looks at
+  those bytes. A merge queue or strict up-to-date checks re-establish the pair
+  (§8.1); a post-merge audit alone is detectability, not prevention.
+- **Treat a non-empty `exports.types`/`exports.profiles` as legal once a newer
+  builder knows the field.** Rejected: the same unchanged `monasm-package/0.1`
+  document would then be rejected by one tool version and accepted by the next,
+  so replay would depend on the binary. Acceptance belongs to the declared
+  `package_format`; H4 needs an explicit later format version (§5).
+- **Fail the build when the canonical definition exceeds 16 MiB.** Rejected: the
+  closure and sealed bundle budgets are larger, so a legal bundle would become
+  unbuildable and the effective limit would be set by an optional development
+  cache. The cache is omitted instead (§8.3).
+- **Write an oversized legacy snapshot and let `--check` reject it.** Rejected:
+  `build` would produce a tree that its own check cannot accept, and the failure
+  would surface only after the publisher committed. `build` never writes a
+  snapshot above its read budget (§8.3).
 - **Keep a retired bundle's lock and sealed bundle in the tree as an implicit
   archive.** Rejected: `--all --check` only rebuilds what a spec selects and
   `--published --check` never reads locks or sealed bundles, so the file would
@@ -3668,6 +3808,10 @@ comparing the materializer with itself proves the bytes.
 | A definition-identity mismatch is not expressible as a `monasm-cases/0.1` case | the case requires the `$standalone` sentinel and the harness substitutes the correct identity, so a wrong digest is `case-plan-identity`; the derived-plan binding test carries the negative | **specified; reader behaviour read** — H2a |
 | The base registry (target-branch tip `B`) decides published-path containment before head-side `package.json` discovery | specified; no changed-path mapper exists, so a nested manifest masking an ancestor is untested | **specified, not implemented** — H2a |
 | A version published on the target branch after a feature branch forked still freezes that branch's edits | specified; the counterexample is a fork from `M0`, publication of `P/0.1.0` on the target branch, then an edit to `P/0.1.0/README.md`; only tip-based `Published(B) ⊆ Published(H)` plus tree-byte equality rejects it, since the digest excludes `README.md` | **specified, not implemented** — H2a |
+| A publication verdict authorizes only the `(B, H)` pair it read: a stale green result cannot authorize a merge after another PR publishes first | specified; requires a merge queue or strict up-to-date required checks, and H2a must prove the setting through the platform API; no workflow or settings evidence exists | **specified, not implemented** — H2a N5 |
+| `monasm-package/0.1` rejects non-empty `exports.types`/`exports.profiles` permanently, independent of the builder version; a later format version owns the semantics | specified; no builder exists, and no later package format is written | **specified, not implemented** — H2a |
+| Input budgets apply in one order — lexical path, no-follow open, handle type check, same-handle size hint, bounded read, parse — and metadata size is never the boundary | specified; no reader exists; a file that grows between type check and read is covered by the cumulative counter | **specified, not implemented** — H2a |
+| A build never writes a legacy snapshot above its 16 MiB read budget; a legal closure above it builds with the snapshot omitted and passes `--all --check` | specified; no builder exists; the synthetic over-16 MiB definition case is untested | **specified, not implemented** — H2a |
 | Only a regular file is accepted at an opened leaf, checked on the handle, and a POSIX FIFO is rejected without blocking | specified; no path layer exists; the N1 gate must create a FIFO at a declared asset path on Linux/macOS and require `not-a-regular-file` (exit 1) rather than a blocking read or exit 2 | **specified, not implemented** — H2a N1 gate |
 | A retired bundle's lock, sealed bundle and legacy snapshot leave the tree with its last spec, and `--all --check` rejects an orphan | specified; no builder and no `--all --check` exist; the one-to-one rule is untested | **specified, not implemented** — H2a |
 | Extension and capability arrays have one strictly increasing, duplicate-free spelling | specified; `extension-lexical`/`capability-lexical` are format rejections before the set relation | **specified, not implemented** — H2a |
@@ -3709,8 +3853,11 @@ comparing the materializer with itself proves the bytes.
   dependency this ADR removes.
 - Someone converts `fmp-def/0.1` rows to `0.2` inside the builder: stop. Mixed
   closures are rejected; conversion is explicit H3 work.
-- Someone accepts a non-empty `exports.types` or `exports.profiles` in H2: stop.
-  H2 does not define their semantics and must fail closed.
+- Someone accepts a non-empty `exports.types` or `exports.profiles` in H2, or
+  relaxes `monasm-package/0.1` because a newer builder "knows" the field: stop.
+  H2 does not define their semantics, and acceptance belongs to the declared
+  `package_format`; a later builder upgrade must not widen an unchanged `0.1`
+  document (§5).
 - Someone uses `verify --all` as the only package gate: stop. It enumerates
   specs, so a new unselected package would never be verified.
 - Someone lets a development package skip its case hash check, or lets
@@ -3727,6 +3874,10 @@ comparing the materializer with itself proves the bytes.
   target-branch tip `B`, or accepts a published path whose bytes changed in `H`:
   stop. `Published(B) ⊆ Published(H)` and equal tree bytes are the whole
   invariant; a version published after the branch forked is still frozen (§8.1).
+- Someone reuses a green publication result without checking that its recorded
+  `B` is the tip being merged into: stop. The verdict describes the pair it read;
+  a target tip that gained a publication invalidates it, and no other gate looks
+  at those bytes (§8.1).
 - Someone names the package directory from the last dot-separated segment of
   `package_id`: stop. The component equals the full `package_id`, so
   `monasm.x86.crypto` and `vendor.x86.crypto` can coexist; the last-segment
@@ -3735,6 +3886,10 @@ comparing the materializer with itself proves the bytes.
   decides the type from a path `stat` or a size: stop. A legal no-follow open can
   land on a non-regular object, and a read on it can block outside every budget;
   the type comes from the opened handle (§3, §12).
+- Someone lets `build` write a legacy snapshot above its 16 MiB read budget, or
+  makes an oversized canonical definition fail the build: stop. The snapshot is
+  an optional cache; `build` omits it and `--check` accepts the absence, so the
+  two commands cannot disagree about a legal closure (§8.3, §12).
 - Someone leaves a retired spec's lock, sealed bundle or legacy snapshot in the
   tree and calls it an archive: stop. An unselected sealed file is rebuilt by no
   gate, so its status is undefined; retiring the last spec removes the derived
