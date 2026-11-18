@@ -317,6 +317,11 @@ HE-1 不实现包管理生态。不查询“最新版本”，不使用 semver �
 
 一个 FMP 绑定一个精确 bundle 身份。新增包不会自动加入既有 bundle。
 
+`monasm-bundle/0.1` 不保存 bundle 级 `target` 包装或 `profile_id`，所以 sealed 的
+`bundle_digest` 不能只靠自身重算：H3 绑定 bundle 身份时必须与对应 lock 成对
+校验，或使用嵌入完整预映像的新 sealed 格式版本；H2 的 `verify --check` 从 spec
+重建两件产物并成对比较，不单独信任文件内摘要。
+
 目录扫描只可用于开发期展示“有哪些包”，不能用于决定“这份计划采用哪些包”。
 
 ### 7.2 摘要分层
