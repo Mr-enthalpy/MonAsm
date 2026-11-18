@@ -5,7 +5,14 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: seventeenth revision, 2026-11-18, after the path-injectivity and
+- Revision: eighteenth revision, 2026-11-18, after the resource and artifact
+  lifecycle audit: only a regular file is accepted at an opened leaf — FIFO,
+  socket and device nodes are rejected as `not-a-regular-file` on the opened
+  handle, and the POSIX input open is non-blocking until the type is known; and a
+  retired bundle's lock, sealed bundle and legacy snapshot leave the tree with
+  its last spec, with `--all --check` rejecting an orphan, so no unselected
+  release artifact keeps an undefined status.
+- Prior revision: seventeenth revision, 2026-11-18, after the path-injectivity and
   publication-authority audit: the package directory segment is the **full**
   `package_id`, so the path mapping is injective and two owners whose IDs share a
   last segment can coexist at one version; "already published" is decided at the
@@ -67,7 +74,10 @@
   a field wider than 64 bits; exact Level 0/Level 1 machine-output projections;
   portable identifier, path-segment and artifact-filename lexical rules; the
   package-root and repository-relative domains of path collision; exact on-disk
-  entry-name matching for every opened segment; the final legal operand domain
+  entry-name matching for every opened segment; the regular-file-only open with
+  its handle-level type check; the derived-artifact lifecycle that retires a
+  bundle's lock, sealed bundle and legacy snapshot with its last spec; the final
+  legal operand domain
   (`D_form`, with exclusions and alignment applied) for boundary evidence; the
   plan×definition target-compatibility
   matrix; the single loaded-package value shared by digest, comparison, `read`
@@ -300,16 +310,19 @@ the immutability boundary:
   `packages/<target>/<package_id>/<new-version>/`, with its own manifest version and
   digest. The old directory stays byte-for-byte in place: while its selecting
   spec remains in the head tree, `verify --all --check` still rebuilds the old
-  lock and sealed bundle; after the last spec is retired, the snapshot, lock and
-  sealed bundle remain committed and replayable at the old commit, but the
-  head-tree `--all` run no longer has a selection for them;
+  lock and sealed bundle;
 - updating a spec to select the new version, adding the new registry entry and
   regenerating its lock/sealed bundle is a separate publisher decision. An
   ordinary package change does not edit any spec, lock, sealed bundle or
   registry entry;
-- removing a spec retires a release but deletes neither the snapshot nor its
-  registry entry. H2 does not add an archival or deletion tool; retiring the
-  bytes themselves needs a later ADR.
+- removing the last spec for a `bundle_id` retires its release. The same PR
+  removes that bundle's derived artifacts — `bundles/locks/<bundle_id>.lock.json`,
+  `bundles/sealed/<bundle_id>.bundle.json` and `bundles/legacy/<bundle_id>/` —
+  while the package snapshot and its registry entry stay. The retired artifacts
+  remain replayable at the commit that published them; H2 adds no archive
+  format, because the permanent record of a release is the immutable package
+  snapshot plus the registry entry, not a tree-resident sealed bundle that no
+  spec selects (§8.4).
 
 The CI changed-path gate first asks the **base published registry** — the
 registry at the **target-branch tip `B`** (§8.3) — whether
@@ -719,19 +732,41 @@ not re-open the same path afterwards "to read the bytes". A platform on which
 the builder cannot express a no-follow open rejects the package with
 `path-escape` instead of silently degrading to a following open. The format also
 forbids links outright, so a link whose target is *inside* `--root` is still
-`path-escape`; the builder does not resolve it and call the result bounded. H2
-does not claim protection against an attacker who can rewrite the worktree after
-a successful build, nor against a hostile `--root` itself; it does claim that a
-successful build opened exactly the objects the checks describe. The spec's
-`packages[].path` and the `--root` resolution obey the same rule; `--root` may be
-canonicalised once to establish the base, but no component below it is opened
-through a followed link. `legacy_source.isa` and `legacy_source.version`
+`path-escape`; the builder does not resolve it and call the result bounded.
+
+**Every opened leaf must be a regular file, checked on the handle.** A no-follow
+open of a legal path can still land on an object that is not a regular file: in
+a writable worktree `forms/add.json` may be a POSIX FIFO, a Unix socket or a
+device node. None of those is a link, so `path-escape` does not fire; an
+ordinary read on a FIFO with no writer blocks instead of returning bytes, and a
+byte budget cannot bound an object that has no length. Intermediate components
+must be directories and the leaf must be a **regular file**. The type is taken
+from the **opened handle** (`fstat` on POSIX, `GetFileInformationByHandle` on
+Windows), never from a path `stat` before the open, for the same check-then-use
+reason as the entry-name rule. The POSIX package-input open carries
+non-blocking semantics (`O_NONBLOCK`), so a FIFO without a writer cannot hang
+the builder before the type is known; Windows exposes no filesystem FIFO, so
+`FILE_TYPE_DISK` plus the regular-file attribute is the check there. A
+non-regular leaf, a directory where a file is required, or a non-directory where
+a directory is required, is `not-a-regular-file` (exit 1) — a deterministic
+rejection of the object, not a host I/O failure (exit 2). This applies to every
+file the builder opens: manifest, declared asset, case file, evidence file, spec,
+lock, sealed bundle, legacy snapshot and `bundles/published.json`. The write
+phase needs no counterpart: it writes a temporary sibling and renames it into
+place (§8.3), so it never opens the previous entry.
+
+H2 does not claim protection against an attacker who can rewrite the worktree
+after a successful build, nor against a hostile `--root` itself; it does claim
+that a successful build opened exactly the objects the checks describe. The
+spec's `packages[].path` and the `--root` resolution obey the same rule; `--root`
+may be canonicalised once to establish the base, but no component below it is
+opened through a followed link. `legacy_source.isa` and `legacy_source.version`
 are path components before they are concatenated into
 `<root>/definitions/<isa>/<version>.json`, so they receive the same treatment:
 `isa` must match `^[a-z0-9_]+$` and `version` must match
-`^(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){2,}$`. A value containing `/`, `\`, `..`, `.` as a whole
-component, a drive letter, a URL scheme or NUL is rejected before the path is
-formed; the builder does not normalise a value into legality.
+`^(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){2,}$`. A value containing `/`, `\`, `..`,
+`.` as a whole component, a drive letter, a URL scheme or NUL is rejected before
+the path is formed; the builder does not normalise a value into legality.
 `README.md`, `NOTICE`, `evidence/**` and `tests/**` may exist, but only declared
 asset files (`form`, `type`, `profile`) enter the source digest;
 `evidence/manifest.json` enters `evidence_digest` only.
@@ -744,11 +779,12 @@ product dependency whose entire role is this path layer, in addition to
 knowledge; it may not interpret a manifest, a definition or a digest. Whether a
 candidate actually delivers the guarantee on Linux, macOS and Windows is not
 assumed here: H2a's first review node is a platform feasibility gate that must
-demonstrate it with intermediate-directory links, final-file links, Windows reparse
-points and a swap between check and open, or stop the round instead of shipping a
-following open. If a platform cannot be satisfied, the builder refuses package
-reads there with `path-escape`; a build that succeeds on Linux but refuses every
-package on Windows is a failed H2a gate, not a passing one.
+demonstrate it with intermediate-directory links, final-file links, Windows
+reparse points, a swap between check and open, and a POSIX FIFO leaf that must be
+rejected as `not-a-regular-file` without blocking, or stop the round instead of
+shipping a following open. If a platform cannot be satisfied, the builder refuses
+package reads there with `path-escape`; a build that succeeds on Linux but
+refuses every package on Windows is a failed H2a gate, not a passing one.
 
 ### 4. The spec lists the full closure; the builder never scans packages
 
@@ -2100,10 +2136,11 @@ Two questions must not be conflated:
 - **Bundle verification** (`verify --all --check`) answers "does each current
   spec rebuild its committed lock and sealed bundle from the exact selected
   closure, and does a committed legacy snapshot equal that definition?" It reads
-  only the paths selected by `bundles/specs/*.json`, plus the
-  registry facts needed to decide publication and validity for those paths. It
-  never opens an unselected package, so an unselected package cannot change its
-  result (`HE-AC-05`).
+  the paths selected by `bundles/specs/*.json`, the directory entries under
+  `bundles/locks/`, `bundles/sealed/` and `bundles/legacy/` that enforce the
+  one-to-one artifact rule below, and the registry facts needed to decide
+  publication and validity for those paths. It never opens an unselected package,
+  so an unselected package cannot change its result (`HE-AC-05`).
 - **Publication-history audit** (`verify --published --check`) answers "is every
   published entry still valid?" It reads every entry in
   `bundles/published.json`, including versions that no current spec selects, and
@@ -2129,6 +2166,32 @@ CI runs both. If only `--all --check` ran, a retired version with no selecting
 spec would never be re-hashed. If the audit were folded into `--all`, every
 bundle build would read every historical package and an unrelated retired package
 could break an old spec, which is the discovery coupling H2 removes.
+
+**A derived artifact exists only while its spec exists.** A lock, a sealed
+bundle and a legacy snapshot are outputs of one spec, not independent releases.
+When a PR removes the last `bundles/specs/<bundle_id>.json`, the same PR removes
+`bundles/locks/<bundle_id>.lock.json`, `bundles/sealed/<bundle_id>.bundle.json`
+and `bundles/legacy/<bundle_id>/`. `verify --all --check` enforces the
+one-to-one rule in both directions: every lock, sealed bundle and legacy
+snapshot in the tree names a spec that exists in the same tree, and each spec
+still needs its committed lock and sealed bundle, so a missing one fails the
+check as before. An artifact with no spec is `orphan-bundle-artifact` (exit 1).
+The rule is about directory entries, not package selection: it never opens an
+unselected package and changes no digest, so `HE-AC-05` is unaffected. Retired
+bytes stay replayable at the commit that published them, and the permanent
+record — the immutable package snapshot and its registry entry — is untouched.
+
+Counterexample if the rule were left out: the last spec for `bundle_id` is
+removed but its sealed bundle stays in the tree. `--all --check` skips it
+because no spec selects it, and `--published --check` never reads locks or
+sealed bundles at all, so a hand-edited or stale sealed file would sit in the
+repository looking like a release while no gate rebuilds it or can say whether
+its bytes are the ones that were published. A reader that pointed at it would be
+trusting an unselected artifact whose status the contract never defined.
+Defining an archive format instead is rejected for H2: it would add a second
+lifecycle and a second gate for bytes whose only remaining reader is git
+history, and the package snapshot plus registry already carry every permanent
+fact (§8.3).
 
 **The audit's guarantee is bounded, and the contract states the bound.** It
 proves that the published manifest, the declared executable assets and the
@@ -2737,7 +2800,7 @@ does not pretend to be `fmp/0.1` diagnostics.
 
 | Class | Examples | Exit |
 |---|---|---|
-| Deterministic rejection | manifest shape (required/optional keys), identifier/path lexical violation, a reversed or duplicated `enabled_extensions`/`requires_capabilities` array, artifact filename mismatch, empty forms, path escape, a symlink/reparse point on a package path or on an output parent path under `--root`, or an opened entry whose name differs from the declared segment, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, committed legacy snapshot differing from the sealed definition (`legacy-snapshot-mismatch`), legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, case scope/stage mismatch (form-scope `read`/`materialize`, or a declared stage that is not the first rejecting stage), form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit (including a committed lock, sealed bundle or legacy snapshot over its byte budget) | 1 |
+| Deterministic rejection | manifest shape (required/optional keys), identifier/path lexical violation, a reversed or duplicated `enabled_extensions`/`requires_capabilities` array, artifact filename mismatch, empty forms, path escape, a symlink/reparse point on a package path or on an output parent path under `--root`, an opened leaf that is not a regular file (FIFO, socket, device, a directory where a file is required, or a non-directory where a directory is required), or an opened entry whose name differs from the declared segment, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, committed legacy snapshot differing from the sealed definition (`legacy-snapshot-mismatch`), legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, case scope/stage mismatch (form-scope `read`/`materialize`, or a declared stage that is not the first rejecting stage), form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit (including a committed lock, sealed bundle or legacy snapshot over its byte budget), orphan bundle artifact | 1 |
 | Host / I/O / internal | unreadable file, unwritable lock, internal invariant break, materializer `Internal`/`HostFailure` during conformance | 2 |
 | Success | build or verify passed, digest printed | 0 |
 
@@ -2756,7 +2819,8 @@ The enum names these rejections (`unsupported-capability`, `capability-mismatch`
 `published-package-modified`, `published-registry-modified`,
 `published-registry-incomplete`, `published-registry-invalid`,
 `bundle-id-conflict`, `definition-identity-conflict`, `unmapped-package-path`,
-`dependency-unverified`, `dependency-mismatch`); they
+`dependency-unverified`, `dependency-mismatch`, `not-a-regular-file`,
+`orphan-bundle-artifact`); they
 are `BuildError` variants, not `fmp/0.1` diagnostic codes.
 `case-materialize-fault` is the conformance harness's name for an unexpected
 `Internal`/`HostFailure`; it is never a passing case and reports exit 2, the
@@ -2811,6 +2875,12 @@ be rejected without recursing to the stack limit. This is the builder's own
 input budget; it is not a claim that `fmp` is robust to deep JSON, and a parser
 stack overflow from a 20 000-deep document remains H4 (`HE-T13`). H2's package
 inputs are developer-controlled.
+
+These budgets assume **regular files**. A FIFO, socket or device node has no
+bounded length, so a size check cannot bound it and a read may never return. §3
+therefore rejects a non-regular leaf as `not-a-regular-file` (exit 1) on the
+opened handle, before any budget is applied; a metadata size is also not used to
+decide the type, for the same check-then-use reason as the no-follow rule.
 
 #### 12.1 The per-package asset budget is cumulative and enforced while reading
 
@@ -2974,6 +3044,9 @@ comparing the materializer with itself proves the bytes.
   is rejected (H4).
 - No `bind(VerifiedBundle, ...)` and no `fmp-validate → fmp-definition`
   dependency (H3).
+- No archive format or archive gate for a retired bundle: its lock, sealed
+  bundle and legacy snapshot leave the tree with its last spec, and git history
+  is the replay record (§8.4).
 - No fixup profiles, non-zero addends, Hi/Lo pairing or field-ownership
   semantics (H4).
 - No deep-JSON fuzzing or full input-robustness programme (H4).
@@ -3036,6 +3109,11 @@ comparing the materializer with itself proves the bytes.
   `verify --all --check` keeps unselected packages out of a bundle build, while
   `verify --published --check` still re-hashes retired versions. Neither can
   silently take over the other's job.
+- A lock, sealed bundle or legacy snapshot exists only while its spec exists.
+  Removing the last spec removes those derived artifacts from the tree, and
+  `verify --all --check` rejects a surviving orphan, so no unselected release
+  artifact is left in an undefined state. The snapshot and registry entry remain
+  the permanent record, and git history keeps the retired bytes replayable.
 - The spec set has one `bundle_id` and one `(namespace, version)` per release
   identity. Two specs cannot collide on a lock path or produce two definitions
   that `Registry::find` cannot distinguish. A retired definition name cannot be
@@ -3052,6 +3130,12 @@ comparing the materializer with itself proves the bytes.
   concurrent replacement cannot make the builder read a file that none of the
   checks described. The mechanism is a platform capability, so H2a's first gate
   proves it on Linux, macOS and Windows rather than assuming a portable call.
+- A legal path does not guarantee an ordinary file: a FIFO, socket or device node
+  is not a link, so it passes the path rules and can block or escape every byte
+  budget. The opened leaf's type is therefore checked on the handle and a
+  non-regular object is `not-a-regular-file` (exit 1); the POSIX open is
+  non-blocking until the type is known, so the rejection is deterministic rather
+  than a hang.
 - Identifiers, path segments and artifact file names are ASCII, lowercase and
   portable, and are checked before any open. A name that one filesystem aliases,
   folds, trims or maps to a device is a deterministic format rejection on every
@@ -3203,6 +3287,21 @@ comparing the materializer with itself proves the bytes.
   last spec would erase the evidence that a version was published, so a later PR
   could edit the old snapshot. §8.3 keeps an append-only registry that survives
   retirement.
+- **Keep a retired bundle's lock and sealed bundle in the tree as an implicit
+  archive.** Rejected: `--all --check` only rebuilds what a spec selects and
+  `--published --check` never reads locks or sealed bundles, so the file would
+  keep the name of a release while no gate could say whether its bytes are the
+  published ones. Retirement removes the derived artifacts; git history is the
+  archive (§8.4).
+- **Add a `bundles/archive/` format and a third gate for retired bundles.**
+  Rejected for H2: it defines a second lifecycle and a second verification path
+  for artifacts whose permanent facts — the package snapshot and the registry
+  entry — are already recorded. A later format can add archival if a reader
+  needs it.
+- **Let the byte budget or a `stat` size bound a special file.** Rejected: a FIFO
+  or device node has no length, and an ordinary read can block until a writer
+  appears, so no budget applies; the type must come from the opened handle and
+  the POSIX open must be non-blocking until it is known (§3, §12).
 - **Treat any registry entry as immutability, including one added by this PR.**
   Rejected: a version could never be created and first published in the same PR,
   and the alternative — add the entry in a later PR — makes the entry unprovable
@@ -3569,6 +3668,8 @@ comparing the materializer with itself proves the bytes.
 | A definition-identity mismatch is not expressible as a `monasm-cases/0.1` case | the case requires the `$standalone` sentinel and the harness substitutes the correct identity, so a wrong digest is `case-plan-identity`; the derived-plan binding test carries the negative | **specified; reader behaviour read** — H2a |
 | The base registry (target-branch tip `B`) decides published-path containment before head-side `package.json` discovery | specified; no changed-path mapper exists, so a nested manifest masking an ancestor is untested | **specified, not implemented** — H2a |
 | A version published on the target branch after a feature branch forked still freezes that branch's edits | specified; the counterexample is a fork from `M0`, publication of `P/0.1.0` on the target branch, then an edit to `P/0.1.0/README.md`; only tip-based `Published(B) ⊆ Published(H)` plus tree-byte equality rejects it, since the digest excludes `README.md` | **specified, not implemented** — H2a |
+| Only a regular file is accepted at an opened leaf, checked on the handle, and a POSIX FIFO is rejected without blocking | specified; no path layer exists; the N1 gate must create a FIFO at a declared asset path on Linux/macOS and require `not-a-regular-file` (exit 1) rather than a blocking read or exit 2 | **specified, not implemented** — H2a N1 gate |
+| A retired bundle's lock, sealed bundle and legacy snapshot leave the tree with its last spec, and `--all --check` rejects an orphan | specified; no builder and no `--all --check` exist; the one-to-one rule is untested | **specified, not implemented** — H2a |
 | Extension and capability arrays have one strictly increasing, duplicate-free spelling | specified; `extension-lexical`/`capability-lexical` are format rejections before the set relation | **specified, not implemented** — H2a |
 | The 64 MiB closure budget charges every package-root byte read, once per path, and rejects at the crossing read | specified; the counted set is manifest, declared assets, cases, evidence manifest and listed evidence files; no reader exists | **specified, not implemented** — H2a |
 | For `fmp-def/0.1`, `E_form = ∅`, so only `E_package ⊆ E_bundle` is proved; a `legacy_source` package adds target consistency, not a form-derived requirement | specified; `FORM_FIELDS` rejects `requires_extensions` in 0.1, and no builder exists | **specified, not implemented** — H2a |
@@ -3630,6 +3731,14 @@ comparing the materializer with itself proves the bytes.
   `package_id`: stop. The component equals the full `package_id`, so
   `monasm.x86.crypto` and `vendor.x86.crypto` can coexist; the last-segment
   mapping is not injective (§1.3).
+- Someone accepts a FIFO, socket or device node as a package or artifact input, or
+  decides the type from a path `stat` or a size: stop. A legal no-follow open can
+  land on a non-regular object, and a read on it can block outside every budget;
+  the type comes from the opened handle (§3, §12).
+- Someone leaves a retired spec's lock, sealed bundle or legacy snapshot in the
+  tree and calls it an archive: stop. An unselected sealed file is rebuilt by no
+  gate, so its status is undefined; retiring the last spec removes the derived
+  artifacts, and git history is the archive (§8.4).
 - Someone verifies a path by calling `symlink_metadata()` and then opening the
   same path string, or treats a canonicalise/check step as the guarantee: stop.
   The no-follow property belongs to the open, not to a preceding check (§3).
