@@ -5,13 +5,23 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: sixteenth revision, 2026-11-18, after the migration-equivalence and
-  boundary-domain audit: `legacy_source` target equality is `TargetEq` — every
-  field strictly equal except `enabled_extensions`, which is compared as a set —
-  so a canonically ordered package can migrate a frozen legacy document whose
-  array is spelled differently; and boundary positives are taken from the final
-  legal domain `D_form` (range, alignment and exclusions applied), never from a
-  raw endpoint that the form excludes.
+- Revision: seventeenth revision, 2026-11-18, after the path-injectivity and
+  publication-authority audit: the package directory segment is the **full**
+  `package_id`, so the path mapping is injective and two owners whose IDs share a
+  last segment can coexist at one version; "already published" is decided at the
+  **target-branch tip `B`**, not the merge base, with
+  `Published(B) ⊆ Published(H)` and equal tree bytes for every published path;
+  a non-empty `dependencies` array is a closed three-key object with a fixed
+  digest vector; and `verify --package` is stated as executing
+  `fmp_model::definition::read` while never executing a case's
+  `plan::read`/`bind`/`materialize`.
+- Prior revision: sixteenth revision, 2026-11-18, after the migration-equivalence
+  and boundary-domain audit: `legacy_source` target equality is `TargetEq` —
+  every field strictly equal except `enabled_extensions`, which is compared as a
+  set — so a canonically ordered package can migrate a frozen legacy document
+  whose array is spelled differently; and boundary positives are taken from the
+  final legal domain `D_form` (range, alignment and exclusions applied), never
+  from a raw endpoint that the form excludes.
 - Prior revision: fifteenth revision, 2026-11-18, separated the static stage
   declaration check from the executed first-rejecting-stage proof, so reports
   record both statuses separately, and restated the register domain as
@@ -70,6 +80,9 @@
   the counted closure byte budget; package
   target covers versus bundle target selection; the two-part versioned H3
   condition for accepting a subset target (build rule and plan protocol);
+  the injective full-`package_id` directory mapping and target-tip
+  publication authority (`Published(B) ⊆ Published(H)` with tree-byte equality);
+  the closed non-empty dependency object and its fixed digest vector;
   base-registry-first changed-path containment; package/form
   ISA-family consistency; package ownership and conflict rules; which legacy
   definition version a re-homed form is compared against; transitive dependency
@@ -91,7 +104,7 @@
 ## Context
 
 H2's goal is that adding an instruction family lands in
-`packages/<target>/<owned-package>/<version>/**` instead of a hand-edited full
+`packages/<target>/<package_id>/<version>/**` instead of a hand-edited full
 definition document (`ADR-0125` decision 1). The repository has no builder, no
 package manifest and no explicit closure today: `Registry::load_dir` recursively
 reads every JSON file under a directory (`fmp-model/src/definition.rs`), so
@@ -145,10 +158,11 @@ fixture-verified rows.
 
 ### 1. A package is a directory with one closed manifest
 
-`packages/<target>/<package>/<version>/package.json` is the only entry point.
+`packages/<target>/<package_id>/<version>/package.json` is the only entry point.
 The target directory is a path component (`x86_64`, `aarch64`, `rv64`), not a
-form-ID prefix; its lexical form and the mapping from `package_id` to
-`<package>` are §1.3. The `<version>` component is exactly the manifest's
+form-ID prefix; its lexical form and the injective mapping from the full
+`package_id` to the `<package_id>` component are §1.3. The `<version>` component
+is exactly the manifest's
 `version` string; the spec's `packages[].path` and `packages[].version` must
 agree with that component. A mismatch is `path-version-mismatch` (exit 1). The
 manifest is `monasm-package/0.1` and is a closed object:
@@ -227,6 +241,25 @@ into a `BTreeSet`); migration equivalence uses the same set comparison through
 `TargetEq` (§1.1). Each `forms/*.json` holds exactly one form object; its
 `form_id` must equal the declared `id`.
 
+**A non-empty `dependencies` entry is a closed object.** Each element has
+exactly `package_id`, `version` and `source_package_digest`; all three are
+required, unknown keys and duplicate keys are rejected (`INV-07`), and an object
+with a missing or extra key is a format rejection rather than an ignorable
+annotation. `package_id` is the dotted identifier of §1.3, `version` is the
+package version grammar of §1, and `source_package_digest` is the literal
+`sha256:<64 lowercase hex>` text of §7.0. The digest is the dependency's
+`source_package_digest`, not a definition or bundle digest: it names the exact
+source snapshot the dependent package was written against. An entry that resolves
+to a selected package must match all three values exactly; a nearest-version,
+`latest` or range match is not a legal resolution (§4). `dependencies: []` is the
+only empty form and `{}` is never legal. Counterexample if the shape were open and
+advisory: an entry with `{"package_id": "monasm.x86.base", "version": "0.1.0"}`
+would omit the digest, so after `monasm.x86.base` re-releases at the same version
+with different bytes the dependent package would still verify against a snapshot
+it never saw; a spelling such as `{"package_id": ..., "version": ..., "digest":
+...}` would also enter `source_package_digest` while no reader knew which key the
+closure check must trust.
+
 `exports.forms` must be **non-empty**. `fmp_model::definition::read` rejects an
 empty `forms` array (`fmp-model/src/definition.rs`, `bind_forms`), and
 `monasm-package/0.1` rejects non-empty `exports.types`/`exports.profiles`
@@ -250,7 +283,7 @@ Holding a `source_package_digest` in the spec is not enough if the directory it
 names can change afterwards. The layout therefore makes the version component
 the immutability boundary:
 
-- a `packages/<target>/<package>/<version>/` directory is a **source snapshot**;
+- a `packages/<target>/<package_id>/<version>/` directory is a **source snapshot**;
 - a version is **published** when its entry exists in the registry of a merged
   commit. The publisher adds that entry in the same PR that first selects the
   version in a `bundles/specs/*.json`; the registry entry, not the current spec
@@ -259,9 +292,12 @@ the immutability boundary:
   PR's final head snapshot, and only the merged snapshot is immutable;
 - after publication, no file under that directory may be added, modified,
   renamed or deleted — including `README`, `NOTICE`, `evidence/` and
-  `tests/cases.json`. A change is `published-package-modified` (exit 1);
+  `tests/cases.json`. A change is `published-package-modified` (exit 1).
+  Publication is read from the registry at the **target-branch tip `B`**, not
+  from the merge base, so a version published on the target branch after this
+  branch forked is frozen here too (§8.1);
 - new forms, fixed encodings or new evidence require a new sibling directory
-  `packages/<target>/<package>/<new-version>/`, with its own manifest version and
+  `packages/<target>/<package_id>/<new-version>/`, with its own manifest version and
   digest. The old directory stays byte-for-byte in place: while its selecting
   spec remains in the head tree, `verify --all --check` still rebuilds the old
   lock and sealed bundle; after the last spec is retired, the snapshot, lock and
@@ -275,7 +311,8 @@ the immutability boundary:
   registry entry. H2 does not add an archival or deletion tool; retiring the
   bytes themselves needs a later ADR.
 
-The CI changed-path gate first asks the **base published registry** (§8.3) whether
+The CI changed-path gate first asks the **base published registry** — the
+registry at the **target-branch tip `B`** (§8.3) — whether
 the changed path lies inside an already published version directory; if so, any
 changed file there fails the gate before `verify --package` runs (§8.1), and a
 `package.json` added deeper in the head tree cannot reclassify it. Only a change
@@ -408,7 +445,7 @@ path     = pseg ("/" pseg)*
   uppercase spellings below) or a top-level form file such as `add.json` is one
   segment, not a two-segment minimum. Where a shape is fixed,
   the surrounding rule says so: `packages[].path` has the
-  `packages/<target>/<package>/<version>` shape of §1.1, and a form/type/profile
+  `packages/<target>/<package_id>/<version>` shape of §1.1, and a form/type/profile
   path is relative to the package root. A path listed in
   `evidence/manifest.json` uses the same grammar; the fixed names `README.md` and
   `NOTICE` are the two accepted uppercase spellings and are the only exception to
@@ -419,20 +456,20 @@ path     = pseg ("/" pseg)*
   `path-lexical` (exit 1), raised on the string before the file is opened.
 - **A path collision is scoped to its root.** An asset path
   (`exports.forms/types/profiles[].path`) and an evidence path are relative to
-  their own `packages/<target>/<package>/<version>/` directory. The fold rule is
+  their own `packages/<target>/<package_id>/<version>/` directory. The fold rule is
   applied to those **relative** strings within one package, and across a closure
   only to the **repository-root-relative** path formed by joining the selected
   `packages[].path` with the relative asset path. Two paths that fold to the
   same string in the same domain are `path-lexical` (exit 1). Equal relative
   names under different package roots do **not** collide, because the joined
   paths differ before the file name:
-  `packages/x86_64/alu/0.1.0/forms/add.json` and
-  `packages/x86_64/vector/0.1.0/forms/add.json` are two files and both are
-  legal. In particular:
+  `packages/x86_64/monasm.x86.alu/0.1.0/forms/add.json` and
+  `packages/x86_64/monasm.x86.vector/0.1.0/forms/add.json` are two files and
+  both are legal. In particular:
   - inside one package, `forms/Add.json` and `forms/add.json` collide;
   - across a closure, two selected package roots that fold to the same
-    repository path (for example `packages/x86_64/alu/0.1.0` and
-    `packages/x86_64/ALU/0.1.0`) collide, and a spec may not list one path
+    repository path (for example `packages/x86_64/monasm.x86.alu/0.1.0` and
+    `packages/x86_64/MONASM.X86.ALU/0.1.0`) collide, and a spec may not list one path
     twice;
   - the fold — not "the file happened to open" — must be the stated reason.
   The grammar admits only lowercase, so a document that follows §1.3 cannot
@@ -475,13 +512,21 @@ path     = pseg ("/" pseg)*
   `bundle-file-mismatch` (exit 1), so `--all` has exactly one filename per
   identity and renaming a spec cannot attach it to a different release. The
   legacy snapshot is `bundles/legacy/<bundle_id>/definition.json`.
-- `packages/<target>/<package>/<version>/` requires `<package>` to equal the last
-  dot-separated segment of `package_id` and `<version>` to equal the manifest's
-  `version`. A `<package>` mismatch is `path-lexical`; a `<version>` mismatch is
-  the `path-version-mismatch` of §1. `<target>` is a directory label only:
-  it must satisfy `pseg`, but the builder does not compare it to `isa_family`,
-  `target_profile` or a central table, because target facts are self-declared
-  (§2) and a fourth H3 family must not need a directory mapping.
+- `packages/<target>/<package_id>/<version>/` requires `<package_id>` to equal
+  the manifest's **full** `package_id` and `<version>` to equal the manifest's
+  `version`. A `<package_id>` mismatch is `path-lexical`; a `<version>` mismatch
+  is the `path-version-mismatch` of §1. The mapping
+  `Path(target, package_id, version) = (target, package_id, version)` is
+  injective: two distinct `package_id` values never share a directory. Using
+  only the last dot-separated segment would not be injective —
+  `monasm.x86.crypto` and `vendor.x86.crypto` would both map to
+  `packages/x86_64/crypto/0.1.0/` and could not coexist without renaming one
+  owner, so the namespace isolation `package_id` promises would not survive the
+  directory layout. `pseg` already admits dots, so the full ID needs no escaping.
+  `<target>` is a directory label only: it must satisfy `pseg`, but the builder
+  does not compare it to `isa_family`, `target_profile` or a central table,
+  because target facts are self-declared (§2) and a fourth H3 family must not
+  need a directory mapping.
 
 Counterexamples:
 
@@ -495,10 +540,10 @@ Counterexamples:
   a closure that selects both is legal. A check that compared the bare relative
   strings across the closure would reject ordinary composition; the joined
   repository paths are the closure domain.
-- A spec selects `packages/x86_64/alu/0.1.0` under one package ID and
-  `packages/x86_64/ALU/0.1.0` under another. The roots fold to the same
-  repository path, so the closure is `path-lexical` (exit 1); it is not two
-  packages that happen to use a case-different directory.
+- A spec selects `packages/x86_64/monasm.x86.alu/0.1.0` under one package ID
+  and `packages/x86_64/MONASM.X86.ALU/0.1.0` under another. The roots fold to
+  the same repository path, so the closure is `path-lexical` (exit 1); it is not
+  two packages that happen to use a case-different directory.
 - A manifest declares `forms/add.json` and the tree contains only
   `forms/Add.json`. Without an entry-name rule, ext4 reports a missing file
   (exit 2) while a case-insensitive APFS or NTFS volume opens it (exit 0). The
@@ -516,13 +561,14 @@ Counterexamples:
   `bundle_id: "monasm.bundle.x86.mov"`: the file and the document disagree, so
   `--all` cannot say which identity the file belongs to. `bundle-file-mismatch`
   makes the filename a checked fact rather than a convention.
-- `packages/x86_64/mov/0.1.0` containing
+- `packages/x86_64/monasm.x86.mov/0.1.0` containing
   `package_id: "monasm.x86.mov-register"`: `verify --package <path>` and the
-  spec's `(package_id, path)` describe different owners. The last-segment rule
-  ties them without a central package table.
-- A `package_id` of `monasm.x86.` yields an empty final segment, so the version
-  directory would be `packages/x86_64//0.1.0`; `identifier-lexical` rejects the
-  ID before a path is formed.
+  spec's `(package_id, path)` describe different owners. The full-ID rule ties
+  them without a central package table.
+- A `package_id` of `monasm.x86.` yields an empty final segment; the ID is not
+  a legal dotted identifier and `identifier-lexical` rejects it before a path is
+  formed. A `package_id` containing `/` or `..` is likewise rejected before it
+  could escape the target directory.
 
 ### 2. Target facts are self-declared; `legacy_source` is migration provenance
 
@@ -730,7 +776,7 @@ package on Windows is a failed H2a gate, not a passing one.
     {
       "package_id": "monasm.x86.mov-register",
       "version": "0.1.0",
-      "path": "packages/x86_64/mov-register/0.1.0",
+      "path": "packages/x86_64/monasm.x86.mov-register/0.1.0",
       "source_package_digest": "sha256:..."
     }
   ]
@@ -745,8 +791,10 @@ package on Windows is a failed H2a gate, not a passing one.
 exactly these paths and nothing else. The array is strictly ordered by
 `(package_id, version)`; a reversed or duplicate entry is rejected before any
 manifest is opened, never normalised into an equivalent spec. Each package's
-`dependencies` are verification edges: every edge must resolve to a listed
-`(package_id, version)` with exactly the listed `source_package_digest`. An edge
+`dependencies` are verification edges: every element is the closed
+`{package_id, version, source_package_digest}` object of §1, and every edge must
+resolve to a listed `(package_id, version)` with exactly the listed
+`source_package_digest`. An edge
 to a package outside the list is a missing-dependency error, never a scan
 trigger. Two entries with the same `(package_id, version)` or the same `path` are
 rejected even when their content is identical; identity is a release fact, not a
@@ -1148,6 +1196,32 @@ This vector was computed independently with Python `hashlib` and .NET
 platform serialisation, and the prefix `sha256:` is inside the record text that
 is hashed.
 
+**A second fixed vector covers a non-empty `dependencies` array**, so the closed
+dependency object of §1 is pinned at the byte level and not only in prose. The
+dependency is `{"package_id":"monasm.x86.base","source_package_digest":
+"sha256:231b9034ecbe6c9f806f7f2a647295e47a57cddcff47e4afacb24c98510648bf",
+"version":"0.1.0"}` — canonical key order, and the digest is the
+`source_package_digest` of the base package's own record, recomputed with the
+same `monasm-package/0.1` preimage. The dependent manifest's canonical bytes are:
+
+```json
+{"definition_format":"fmp-def/0.1","dependencies":[{"package_id":"monasm.x86.base","source_package_digest":"sha256:231b9034ecbe6c9f806f7f2a647295e47a57cddcff47e4afacb24c98510648bf","version":"0.1.0"}],"exports":{"forms":[{"id":"x86:example/dependent","path":"forms/dependent.json"}],"profiles":[],"types":[]},"package_format":"monasm-package/0.1","package_id":"monasm.x86.dependent","requires_capabilities":[],"target_identity":{"address_width":64,"byte_order":"little","enabled_extensions":[],"execution_mode":"64","isa_family":"x86","isa_variant":"x86-64"},"target_profile":"monasm.target.x86_64","version":"0.1.0"}
+```
+
+Its form asset is `{"form_id":"x86:example/dependent","template":"90"}`.
+
+| Value | Expected |
+|---|---|
+| dependency object, canonical bytes | `{"package_id":"monasm.x86.base","source_package_digest":"sha256:231b9034ecbe6c9f806f7f2a647295e47a57cddcff47e4afacb24c98510648bf","version":"0.1.0"}` |
+| base package `source_package_digest` (the dependency's value) | `sha256:231b9034ecbe6c9f806f7f2a647295e47a57cddcff47e4afacb24c98510648bf` |
+| dependent asset digest | `sha256:93e471b1fda937f2a3cab2b0de0d6131f347a4b967972960ca76bf4a4d7b0ccc` |
+| dependent `source_package_digest` | `sha256:637edab0e19dc949bf44994d36fd703b97ecf3d9145d2648f22729b16f748251` |
+
+Both digests were computed from the same bytes with Python `hashlib` and .NET
+`SHA256`. The vector fails an implementation that renames the digest key,
+drops it as optional, hashes raw digest bytes instead of the literal text, or
+sorts `dependencies` by anything other than `(package_id, version)`.
+
 | Digest | Input | Excludes | Counterexample if it were missing or collapsed |
 |---|---|---|---|
 | `source_package_digest` | `sha256(b"monasm-package/0.1" ++ 0x00 ++ canonical(record))`, where `record = {"manifest": manifest, "assets": [{"kind", "path", "digest"}]}` and assets are sorted by `path`; `digest` is the literal `sha256:<hex>` text from §7.0, never raw bytes; `kind` is `form`, `type` or `profile` | README, NOTICE, evidence manifest, tests, author path | Hashing only the manifest: swapping a form's template with the manifest unchanged leaves the package digest still. |
@@ -1498,20 +1572,48 @@ produced it.
 Mapping a changed file to "the nearest ancestor with `package.json`" is only
 defined when that file still exists in the PR head. Deletion and rename need
 their own rules, or a package can leave the gate silently. The gate distinguishes
-the **base registry** (entries already published at the merge base) from the
-**head registry** (the entries this PR proposes). Only a base entry makes a
-snapshot immutable during this PR; a head-only entry is a **first publication**
-and is validated, not rejected.
+the **base registry** — the entries published in the **target branch tip `B`** at
+the moment the gate runs — from the **head registry**, the entries present in the
+merged result tree `H` this PR proposes. Only a base entry makes a snapshot
+immutable during this PR; a head-only entry is a **first publication** and is
+validated, not rejected.
+
+**The target-branch tip is the only authority for "already published".** The
+merge base is not: it records where the branch forked, not what the target branch
+publishes now. Let `Published(T)` be the set of version directories registered in
+tree `T` and `TreeBytes_T(p)` the bytes of every file under directory `p` in `T`.
+The gate runs against the PR's base-tip SHA `B` and the merged result `H` and
+requires both:
+
+```
+Published(B) ⊆ Published(H)
+∀ p ∈ Published(B): TreeBytes_B(p) = TreeBytes_H(p)
+```
+
+A version the target branch already publishes cannot be changed by this PR,
+whatever commit the feature branch forked from. Counterexample if the merge base
+were authoritative: `M0` contains `P/0.1.0` but has not published it; branch A
+forks from `M0` and edits `P/0.1.0/README.md`; branch B publishes `P/0.1.0`,
+appends the registry entry and merges to the target branch; A then merges. A's
+merge base is still `M0`, whose registry lacks `P`, so a merge-base check treats
+the edit as an unpublished candidate and accepts it. The other gates do not catch
+it either: `source_package_digest` covers neither `README.md` nor other auxiliary
+files, and `verify --published --check` re-hashes the manifest and executable
+assets, not the whole directory. Only the tip-based comparison rejects A with
+`published-package-modified`. The merge base remains usable for ancestry
+questions (which commits introduced a path) but never for "which versions are
+published now".
 
 **The base registry decides containment first.** Before the head tree is used to
 resolve a `package.json` ancestor, the gate checks whether the changed path lies
-under a **base-registered version directory**. If it does, the change is
-`published-package-modified` (exit 1) no matter what the head tree contains
-below that directory; a nested `package.json` added inside a published snapshot
-is therefore itself a modification of that snapshot, not a reclassification of
-the files around it. Only a change outside every base-registered directory is
-mapped by the head-side rule below. This ordering is what keeps a deeper manifest
-from masking an ancestor that the base registry has already frozen.
+under a **base-registered version directory** (`Published(B)`). If it does, the
+change is `published-package-modified` (exit 1) no matter what the head tree
+contains below that directory; a nested `package.json` added inside a published
+snapshot is therefore itself a modification of that snapshot, not a
+reclassification of the files around it. Only a change outside every
+base-registered directory is mapped by the head-side rule below. This ordering is
+what keeps a deeper manifest from masking an ancestor that the base registry has
+already frozen.
 
 - **Modified or added file outside every base-registered directory:** resolve the
   nearest ancestor `package.json` in the head tree. Its directory must be a
@@ -1527,7 +1629,7 @@ from masking an ancestor that the base registry has already frozen.
   `published-registry-invalid` (exit 1). The final head bytes are the snapshot
   that becomes immutable when this PR merges. A spec that no longer lists the
   path does not clear this check.
-- **Deleted file or directory:** resolve the version directory in the **base**
+- **Deleted file or directory:** resolve the version directory in the **`B`**
   tree. If that directory is in the base registry, any deletion inside it —
   including `package.json`, `NOTICE`, `tests/cases.json` or a form — is
   `published-package-modified` (exit 1); it is never a silent removal. If it is
@@ -1561,22 +1663,25 @@ from masking an ancestor that the base registry has already frozen.
   an entry is `published-registry-incomplete` (exit 1).
 
 Counterexample for the base/head split: the PR that creates
-`packages/x86_64/mov-register/0.1.0/` must also add its registry entry. If the
-gate treated any head entry as immutability, the entry would forbid the very
-files it registers and no package could ever be born. If the gate ignored the
-head registry instead, a PR could add an entry plus a mismatched directory in one
-step; the path/digest validation above is what rejects that. Deleting a base
-entry to escape is already `published-registry-modified`, so the split does not
-reopen the retirement bypass.
+`packages/x86_64/monasm.x86.mov-register/0.1.0/` must also add its registry
+entry. If the gate treated any head entry as immutability, the entry would
+forbid the very files it registers and no package could ever be born. If the
+gate ignored the head registry instead, a PR could add an entry plus a
+mismatched directory in one step; the path/digest validation above is what
+rejects that. Deleting a base entry to escape is already
+`published-registry-modified`, so the split does not reopen the retirement
+bypass.
 
-Counterexample for global uniqueness: spec A selects `monasm.x86.mov` `0.1.0`
-at `packages/x86_64/mov-a/0.1.0` with digest D₁, and spec B selects the same
-`package_id`/`version` at `packages/x86_64/mov-b/0.1.0` with digest D₂. Each
-closure is internally consistent and each path is unique, so a path-only registry
-accepts both rows. The same logical version now has two published contents, and a
-reader naming `monasm.x86.mov`/`0.1.0` can get either definition depending on
-which bundle was loaded. The `(package_id, version)` rule in §8.3 rejects the
-second entry.
+Counterexample for global uniqueness: the `target` directory is only a label, so
+spec A selects `monasm.x86.mov` `0.1.0` at `packages/x86_64/monasm.x86.mov/0.1.0`
+with digest D₁, and spec B selects the same `package_id`/`version` at
+`packages/amd64/monasm.x86.mov/0.1.0` with digest D₂. Within one target directory
+the injective path rule of §1.3 already forbids two paths for one identity; across
+labels it does not, and each closure is internally consistent with a unique path,
+so a path-only registry accepts both rows. The same logical version now has two
+published contents, and a reader naming `monasm.x86.mov`/`0.1.0` can get either
+definition depending on which bundle was loaded. The `(package_id, version)` rule
+in §8.3 rejects the second entry.
 
 The CI path list remains an input to which packages are checked, never an input
 to what the builder selects. Deleting an unselected package still runs the
@@ -1625,7 +1730,7 @@ an array.
     {
       "package_id": "monasm.x86.example",
       "version": "0.1.0",
-      "path": "packages/x86_64/example/0.1.0",
+      "path": "packages/x86_64/monasm.x86.example/0.1.0",
       "source_package_digest": "sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0"
     }
   ]
@@ -1734,7 +1839,7 @@ identity name?", independent of the current specs.
   "published_format": "monasm-published/0.1",
   "published": [
     {
-      "path": "packages/x86_64/example/0.1.0",
+      "path": "packages/x86_64/monasm.x86.example/0.1.0",
       "package_id": "monasm.x86.example",
       "version": "0.1.0",
       "source_package_digest": "sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0"
@@ -1808,7 +1913,8 @@ and with which bytes?" after its spec retires:
   merge it is a base entry and the snapshot is immutable.
 - `verify --all --check` requires every head-selected path to have a head entry;
   a missing entry is `published-registry-incomplete` (exit 1). An entry present
-  in the base tree may remain after every spec retires, and must remain.
+  in the target-branch tip `B` may remain after every spec retires, and must
+  remain; that is exactly the `Published(B) ⊆ Published(H)` half of §8.1.
 - A base entry may not be removed, edited, reordered or replaced. Any change to
   the base registry other than inserting a new entry in sorted position is
   `published-registry-modified` (exit 1). A new entry must be selected by at
@@ -1969,7 +2075,7 @@ check would call the snapshot unpublished and accept the edit. The registry
 entry survives PR A, so PR B still fails `published-package-modified`.
 
 Counterexample if first publication were treated as immutability: the H2a PR
-creates `packages/x86_64/mov-register/0.1.0/` and its first registry entry
+creates `packages/x86_64/monasm.x86.mov-register/0.1.0/` and its first registry entry
 together. A rule that rejects any file under a head-registered path rejects the
 package's own creation, so the format could only be published by a second PR that
 adds the files after the entry — which the digest check forbids. The base-only
@@ -2065,8 +2171,10 @@ diagnostic text. It does not construct `Definition` directly and does not call
 `Registry::load_dir`.
 
 `verify --package` follows the same rule: it merges the declared assets into a
-document with the package's `definition_format`, calls `read`, and compares
-pinned rows only when `legacy_source` is present. It never writes a lock or
+document with the package's `definition_format`, calls
+`fmp_model::definition::read`, and compares
+pinned rows only when `legacy_source` is present. It never calls a case's
+`fmp_model::plan::read`, `bind` or `materialize`, and never writes a lock or
 sealed bundle, so a package author can run it before any spec exists.
 
 **Every digest and every consumer sees one loaded package.** A package is read
@@ -3010,9 +3118,13 @@ comparing the materializer with itself proves the bytes.
   has a legal plan-scope representation without being dressed as form coverage,
   and a form-scope case stays `bind`-only (§9.1).
 - The publication audit's claim is bounded to the executable assets and
-  identity. Whole-directory immutability is enforced by the changed-path gate and
-  recorded by git history, not re-attested by `verify --published --check`; H2
-  says so instead of implying a snapshot proof it does not have.
+  identity. Whole-directory immutability is enforced by the changed-path gate,
+  which compares the **target-branch tip `B`** against the merged result `H`
+  (`Published(B) ⊆ Published(H)` and equal tree bytes for every published path),
+  and recorded by git history, not re-attested by `verify --published --check`;
+  H2 says so instead of implying a snapshot proof it does not have. Using the
+  merge base here would miss a version published on the target branch after the
+  feature branch forked.
 - Digest preimages, the Level 0/Level 1 projections and the package budgets are
   frozen at the byte and key level, with a cross-language vector, so a Rust and a
   Python implementation cannot silently disagree.
@@ -3051,9 +3163,10 @@ comparing the materializer with itself proves the bytes.
   `monasm-bundle-spec/0.1` keeps rejecting an unequal `fmp-def/0.1` selection
   forever; a new plan format alone cannot make that spec build, and the builder
   version is not an implicit format upgrade (§4.1).
-- A published version directory is frozen by the base registry before any
-  head-side discovery, so adding a nested `package.json` inside it is itself a
-  modification, not a reclassification of the files around it (§8.1).
+- A published version directory is frozen by the base registry at the
+  target-branch tip `B` before any head-side discovery, so adding a nested
+  `package.json` inside it is itself a modification, not a reclassification of
+  the files around it (§8.1).
 - Form-family consistency is a string equality, not a package-format whitelist.
   A fourth ISA added to `fmp_model::definition::read` in H3 needs no edit to
   `monasm-package/0.1` or to a central builder table.
@@ -3082,7 +3195,7 @@ comparing the materializer with itself proves the bytes.
 - **Scan `packages/**` and build a global `(id, version)` index.** Rejected: a
   damaged unselected package would affect an old build, contradicting
   `HE-AC-05`, and selection would be directory-driven (`INV-05`).
-- **Overwrite `packages/<target>/<package>/` in place and update every spec on a
+- **Overwrite `packages/<target>/<package_id>/` in place and update every spec on a
   package change.** Rejected: an ordinary author would again edit global specs and
   locks, which is the coordination H2 exists to remove. The version directory is
   the immutability boundary.
@@ -3141,6 +3254,12 @@ comparing the materializer with itself proves the bytes.
   so the audit cannot attest those bytes. H2 narrows the claim to executable
   assets and identity and leaves whole-snapshot enforcement to the changed-path
   gate and git history; adding a full `snapshot_digest` is a later format (§8.4).
+- **Decide "already published" from the merge base.** Rejected: the merge base is
+  where the branch forked, so a version published on the target branch afterwards
+  would be invisible and an edit to it would pass as a candidate. The gate uses
+  the target-branch tip `B`, requires `Published(B) ⊆ Published(H)` and equal tree
+  bytes for every `p ∈ Published(B)`, and keeps the merge base for ancestry only
+  (§8.1).
 - **Assume a portable `std::fs` call satisfies the no-follow bound.** Rejected:
   `File::open` follows links, so a package read would silently degrade on every
   platform. The path layer is an explicit, pinned dependency or direct platform
@@ -3417,6 +3536,8 @@ comparing the materializer with itself proves the bytes.
 | Immutable published version directories, legacy target consistency, form-scope mutation coverage, complete diagnostic matching and level-specific projections | not implemented | **unverified** — H2a |
 | Published-version registry, retirement survival and registry edit detection | not implemented | **unverified** — H2a |
 | First publication in the creating PR, with base-only immutability | specified; the old base-or-head rule would have rejected the creating PR | **specified, not implemented** — H2a |
+| Published-set authority is the target-branch tip `B`, not the merge base: `Published(B) ⊆ Published(H)` and equal tree bytes for every published path | specified; no changed-path mapper exists; the cross-branch publish-then-edit regression is untested | **specified, not implemented** — H2a |
+| Package directory segment equals the full `package_id`, so the path mapping is injective | specified; no mapper exists; two IDs with the same last segment are untested | **specified, not implemented** — H2a |
 | Global `(package_id, version)` uniqueness and the permanent path/digest binding | specified; per-closure uniqueness cannot exclude two paths for one logical version | **specified, not implemented** — H2a |
 | Cross-spec `bundle_id` and `(namespace, version)` uniqueness | `Registry::find` returns `E-DEF-001` when two definitions share `(namespace, version)` (`fmp-model/src/definition.rs` 843–865); the builder does not yet reject the pair at spec level | **unverified** — H2a |
 | No-follow package reads (no symlink or reparse point on the resolved path under `--root`) | specified as a property of the open: a metadata pre-check followed by a path open is explicitly insufficient, and the implementation has no package reader yet | **specified, not implemented** — H2a |
@@ -3446,7 +3567,8 @@ comparing the materializer with itself proves the bytes.
 | `--check` proves the lock and sealed bundle, and compares a committed legacy snapshot with the sealed definition as a one-way equality gate (absence legal, no digest input) | specified; the write phase removes `<legacy>/definition.json` first and writes it last, so an interrupted write leaves it absent, not stale; no builder exists | **specified, not implemented** — H2a |
 | A committed legacy snapshot whose bytes differ from the sealed definition is `legacy-snapshot-mismatch` (exit 1) | specified; the gate compares canonical bytes without rebuilding the cache; no `--check` exists | **specified, not implemented** — H2a |
 | A definition-identity mismatch is not expressible as a `monasm-cases/0.1` case | the case requires the `$standalone` sentinel and the harness substitutes the correct identity, so a wrong digest is `case-plan-identity`; the derived-plan binding test carries the negative | **specified; reader behaviour read** — H2a |
-| The base registry decides published-path containment before head-side `package.json` discovery | specified; no changed-path mapper exists, so a nested manifest masking an ancestor is untested | **specified, not implemented** — H2a |
+| The base registry (target-branch tip `B`) decides published-path containment before head-side `package.json` discovery | specified; no changed-path mapper exists, so a nested manifest masking an ancestor is untested | **specified, not implemented** — H2a |
+| A version published on the target branch after a feature branch forked still freezes that branch's edits | specified; the counterexample is a fork from `M0`, publication of `P/0.1.0` on the target branch, then an edit to `P/0.1.0/README.md`; only tip-based `Published(B) ⊆ Published(H)` plus tree-byte equality rejects it, since the digest excludes `README.md` | **specified, not implemented** — H2a |
 | Extension and capability arrays have one strictly increasing, duplicate-free spelling | specified; `extension-lexical`/`capability-lexical` are format rejections before the set relation | **specified, not implemented** — H2a |
 | The 64 MiB closure budget charges every package-root byte read, once per path, and rejects at the crossing read | specified; the counted set is manifest, declared assets, cases, evidence manifest and listed evidence files; no reader exists | **specified, not implemented** — H2a |
 | For `fmp-def/0.1`, `E_form = ∅`, so only `E_package ⊆ E_bundle` is proved; a `legacy_source` package adds target consistency, not a form-derived requirement | specified; `FORM_FIELDS` rejects `requires_extensions` in 0.1, and no builder exists | **specified, not implemented** — H2a |
@@ -3500,6 +3622,14 @@ comparing the materializer with itself proves the bytes.
 - Someone decides "published" from the current specs instead of
   `bundles/published.json`: stop. The two-step retirement bypass is the
   counterexample (§8.3).
+- Someone decides "already published" from the merge base rather than the
+  target-branch tip `B`, or accepts a published path whose bytes changed in `H`:
+  stop. `Published(B) ⊆ Published(H)` and equal tree bytes are the whole
+  invariant; a version published after the branch forked is still frozen (§8.1).
+- Someone names the package directory from the last dot-separated segment of
+  `package_id`: stop. The component equals the full `package_id`, so
+  `monasm.x86.crypto` and `vendor.x86.crypto` can coexist; the last-segment
+  mapping is not injective (§1.3).
 - Someone verifies a path by calling `symlink_metadata()` and then opening the
   same path string, or treats a canonicalise/check step as the guarantee: stop.
   The no-follow property belongs to the open, not to a preceding check (§3).
@@ -3661,7 +3791,8 @@ comparing the materializer with itself proves the bytes.
 - Someone parses first and measures depth afterwards: stop. The recursive parser
   is the thing the budget protects.
 - Someone skips a `packages/**` change because no `package.json` was found:
-  stop. Deletions and renames must be resolved against the base tree or fail.
+  stop. Deletions and renames must be resolved against the target-branch tip
+  `B` or fail.
 - Someone leaves `tests/cases.json` out of the evidence manifest for a
   release-ready package: stop. The release identity must cover the test
   contract, and a case edit without a manifest update must fail.
