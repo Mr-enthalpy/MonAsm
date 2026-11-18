@@ -295,7 +295,7 @@ form_id -> package_id + exact version + verified form      # monasm-package/0.1
 
 `type_id`、`profile_id` 的归属表属于 H4：`monasm-package/0.1` 的 `exports.types`/`exports.profiles` 必须为空，所以 `0.1` 里没有可归属的类型或 profile。共享寄存器类型和 Fixup Profile 的独立小包也要等那个显式的新包格式版本；普通扩展不需要递增全局数字或申请下一个 ADR 号。
 
-归属表本身不进入 `monasm-bundle/0.1`：sealed bundle 只记录合并后的定义和 `sources`（`{package_id, version, source_package_digest}`）。H3 做目标子集校验时需要的「每条 form 的归属与扩展需求」因此必须来自版本化的新产物或另一个冻结来源，不能从 `0.1` bundle 反推（§7.3）。
+归属表本身不进入 `monasm-bundle/0.1`：sealed bundle 只记录合并后的定义和 `packages`（`{package_id, version, source_package_digest}`），不记录 `target`，也没有归属信息。H3 做目标子集校验时需要的「每条 form 的归属与扩展需求」因此必须来自版本化的新产物或另一个冻结来源，不能从 `0.1` bundle 反推（§7.3）。
 
 ### 6.4 依赖不使用隐式版本求解
 
@@ -312,7 +312,7 @@ HE-1 不实现包管理生态。不查询“最新版本”，不使用 semver �
 `bundles/specs/<bundle_id>.json` 是 `monasm-bundle-spec/0.1`，显式列出 target、`definition_format`、namespace/version 和所选包的**完整闭包**（每项 `{package_id, version, path, source_package_digest}`）。构建器只读取 spec 列出的路径，不扫描 `packages/`，并生成：
 
 1. `bundles/locks/<bundle_id>.lock.json`：具体依赖路径与摘要；
-2. `bundles/sealed/<bundle_id>.bundle.json`：`monasm-bundle/0.1`，合并后的定义与 `sources`；
+2. `bundles/sealed/<bundle_id>.bundle.json`：`monasm-bundle/0.1`，恰好七个键，含合并后的定义与 `packages`（无 `target`）；
 3. `bundles/legacy/<bundle_id>/definition.json`：派生的开发缓存，可缺失。
 
 一个 FMP 绑定一个精确 bundle 身份。新增包不会自动加入既有 bundle。
@@ -351,7 +351,7 @@ HE-1 不实现包管理生态。不查询“最新版本”，不使用 semver �
 
 具体字符串由 `ADR-0128` 固定。这些版本语义必须分开：升级读取器不得改变旧格式的接受结论。
 
-**H3 的目标子集不靠扩展 `monasm-bundle/0.1`。** 该格式只有合并定义和 `sources`，没有 `form_id → owner` 或包扩展覆盖；H2 也不补这条映射。H3 必须用新的版本化 bundle（例如 `monasm-bundle/0.2`）或另一个冻结、摘要绑定的来源提供逐 form 需求/归属证据，并对每条选中指令检查 `E_owner(form(i)) ⊆ E_plan`；缺少证明的 legacy form 在子集组合下默认拒绝，不按空集放行。只新增 `fmp/0.2` 并把集合关系从相等改成子集，会放行声明 `{rv64i}` 的计划选中 `c.addi`。
+**H3 的目标子集不靠扩展 `monasm-bundle/0.1`。** 该格式只有合并定义和 `packages`，没有 `form_id → owner` 或包扩展覆盖；H2 也不补这条映射。H3 必须用新的版本化 bundle（例如 `monasm-bundle/0.2`）或另一个冻结、摘要绑定的来源提供逐 form 需求/归属证据，并对每条选中指令检查 `E_owner(form(i)) ⊆ E_plan`；缺少证明的 legacy form 在子集组合下默认拒绝，不按空集放行。只新增 `fmp/0.2` 并把集合关系从相等改成子集，会放行声明 `{rv64i}` 的计划选中 `c.addi`。
 
 新 FMP 的 layout、instruction、operand 基本骨架沿用现有结构。`definition_identity` 可以继续承担 bundle 身份，不必仅为改名新增一套冗余字段。
 
@@ -658,7 +658,7 @@ Compose(Base, A, B) == Compose(Base, B, A)
 
 增加最小 `fmp/0.2` 与 bundle reader；目标身份由快照声明，能力由内核检查；旧协议通过 legacy adapter 保留。
 
-目标子集要逐指令证明：对每条选中指令检查 `E_owner(form(i)) ⊆ E_plan`，证据来自版本化的新 bundle（例如 `monasm-bundle/0.2`）或另一个冻结、摘要绑定的来源。`monasm-bundle/0.1` 只有合并定义与 `sources`，不足以支撑这条检查；缺少归属证明的 legacy form 在子集组合下默认拒绝，不能按空集推定其合法。只新增 `fmp/0.2` 并放宽集合关系不算完成。
+目标子集要逐指令证明：对每条选中指令检查 `E_owner(form(i)) ⊆ E_plan`，证据来自版本化的新 bundle（例如 `monasm-bundle/0.2`）或另一个冻结、摘要绑定的来源。`monasm-bundle/0.1` 只有合并定义与 `packages`，不足以支撑这条检查；缺少归属证明的 legacy form 在子集组合下默认拒绝，不能按空集推定其合法。只新增 `fmp/0.2` 并放宽集合关系不算完成。
 
 加载明确 lock 的闭包，不读取未选中包。新增合成目标仅需添加数据和测试。支持零操作数形式，避免用假操作数绕过结构限制。
 
@@ -726,6 +726,8 @@ H0 是共同前提。H1 的执行安全与 H2 的包契约设计可在接口明�
 | HE-T20 | 构建版本变化 | implementation ID 可追踪；不借元数据变化掩盖载荷差异 |
 
 HE-T19 只适用于规范中明确排除构建来源元数据的执行摘要。包源码摘要和构建收据可以不同。
+
+构建来源记录是**信息性**的：它不进入执行定义摘要，也不证明产物确实由该实现生成；改动记录可以不使 `verify --all --check` 失败。可信构建来源需要独立的构建证明或发布工件签名，不能靠把实现版本塞回定义摘要获得（`ADR-0128` §7）。
 
 主机故障不纳入“同一非法计划规范化错误必须相同”的测试；应验证其单独分类，不把环境不足误报成机器计划不合法。
 

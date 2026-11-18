@@ -1,10 +1,18 @@
 # H2 实施计划：目标包作者层与确定性定义构建
 
 - 状态：**待审提案**（2026-11-16；同日按八轮审计 P1/P2 修订，2026-11-17 至
-  2026-11-18 按第九轮至第二十一轮审计修订）。规范决策见
+  2026-11-18 按第九轮至第二十二轮审计修订）。规范决策见
   `docs/adr/0128-package-and-bundle-contract.md`，该 ADR 仍为 `proposed`；
   评审合并前本文和 ADR 都不是冻结依据。本文保留为实施计划与验收映射。
   **H2 尚未实现，本文不把任何 H2/H3/H4/H5 项目算作已完成。**
+  第二十二轮固定：`monasm-bundle/0.1` 只有一套封闭键集——恰好七个键，包列表
+  名为 `packages`，**没有** bundle 级 `target`；旧文里把它叫 `sources` 或说
+  sealed 复制 spec `target` 的规范性描述已删除，不留两套说法给读者仲裁。N5
+  不能以绿色 CI 关闭门禁，必须记录实际生效的 merge 机制并执行 stale-CI 反例，
+  否则 H2a 停在该节点，不能用合并后审计替代。包作者并行开发与并行发布是两种
+  能力：H2 只给前者打基础，并保证发布在串行化下正确，不保证无协调并行发布。
+  `builder` 是信息性来源记录，改动它可以不使 `--all --check` 失败，因此它不证明
+  构建来源。
   第二十一轮固定：`monasm-bundle/0.1` 是 lock 的伴随产物，不是自校验执行快照。
   `bundle_digest` 的预映像含 bundle 级 `target`（含 `profile_id`），sealed 不存该包装，
   消费者必须用 lock 的 `target` 与 sealed 字节重算，并与 lock 和 sealed 记录的
@@ -787,8 +795,9 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   版本。低报仍然是错误，由 form ⊆ 包检查拒绝。这样新增一个 `rv64c` 包时，
   `rv64i` 算术包的清单不需要改，源摘要不变，不会把无关包重新发布一次。
 - **扩展与能力数组只有一种写法（第十二轮 P2-2）。** 包的
-  `target_identity.enabled_extensions`、spec（以及 lock/sealed 复制的
-  `target.identity.enabled_extensions`）和包的 `requires_capabilities` 都必须是
+  `target_identity.enabled_extensions`、spec 与 lock 的
+  `target.identity.enabled_extensions`、sealed 内合并定义的
+  `target.identity.enabled_extensions`，以及包的 `requires_capabilities` 都必须是
   严格递增、无重复的数组：集合关系按成员判定，但逆序或重复是**格式拒绝**，
   不是第二种等价写法。例：`["rv64c","rv64i"]` 合法，`["rv64i","rv64c"]` 是逆序
   拒绝。错误分别是 `extension-lexical` 与 `capability-lexical`
@@ -887,7 +896,7 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   检查 form 需求，所以缺口是 `fmp-def/0.1`/legacy form（没有该键）与 0.2 行
   低报（需求列表不含基础 ISA/profile 事实）。
   **H2 冻结的 sealed bundle 不足以支撑该检查**：`monasm-bundle/0.1` 只有合并
-  定义和 `sources`，没有 `form_id → owner` 或 `E_package`；lock 只有 path/摘要。
+  定义和 `packages`，没有 `form_id → owner` 或 `E_package`；lock 只有 path/摘要。
   H3 必须先取得版本化 bundle（如 `monasm-bundle/0.2`）中的逐 form 需求或可验证
   归属/覆盖映射，或另一个同样冻结、摘要绑定且有门禁的来源，然后才可接受子集
   计划。只增加 `fmp/0.2` 不放宽；重新解释 `0.1` bundle 等于改格式。
@@ -899,8 +908,8 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   义务现在写入，避免冻结 H2 后让 H3 无法证明。
 - `target.profile_id` 必须与每个包的 `target_profile` 一致，否则构建失败。
   这是一次**包内名义标签**检查，不是全局目标身份：两个 spec 可以用同一个
-  `profile_id` 搭配不同的 `target.identity`，H2 视之为不同目标，兼容性、
-  生成文档、lock 和 sealed bundle 一律以六键 `target.identity` 为准。H2 不加
+  `profile_id` 搭配不同的 `target.identity`，H2 视之为不同目标，兼容性、生成
+  文档以及 lock 与 sealed 内合并定义的权威身份都是六键 `target.identity`。H2 不加
   `(profile_id, identity)` 的跨 spec 唯一性，也不建中央 profile 表；否则
   「同名多义」会被误读成已发布的全局事实。若后续阶段要让 `profile_id` 唯一
   指向一份目标事实，必须走版本化格式变更，不能假设 H2 已经如此。
@@ -1013,7 +1022,8 @@ profile_id -> package_id + version + source_package_digest     # 已定义键与
   `(package_id, version)` 严格排序（§8.2），逆序是拒绝，不是被静默重排。目录
   发现顺序和内部集合迭代顺序不参与摘要；构建器校验声明顺序后按身份哈希闭包。
 - 集合字段 `requires_capabilities`、包的 `target_identity.enabled_extensions`
-  和 spec/lock/sealed 的 `target.identity.enabled_extensions` 采用唯一写法：
+  和 spec 与 lock 的 `target.identity.enabled_extensions`、sealed 内合并定义的
+  同一字段采用唯一写法：
   严格递增、无重复（第十二轮 P2-2）。逆序是 `extension-lexical`，重复的
   capability 是 `capability-lexical`（退出码 1），在集合关系之前拒绝；规范化
   只作用于构建器自己生成的排序，不修复作者写下的数组。
@@ -1142,13 +1152,19 @@ Rust 与 Python 都必须复现开发向量和发布向量这两个值。差别�
   `packages`、`builder`；包项恰好 `package_id`/`version`/`path`/
   `source_package_digest`/`evidence_digest`。`builder` 恰好 `name`/`version`
   和可选 `build`，没有 build 标识时省略键，绝不写 `null`。`--check` 比较
-  **去掉 `builder` 后的 canonical 字节**；builder 只做形状检查和打印。
+  **去掉 `builder` 后的 canonical 字节**；builder 只做形状检查和打印。因此
+  `builder` 是信息性来源记录，不是来源证明：改 lock 的 `builder.version`/
+  `build` 可以不使 `--all --check` 失败；可信来源需要独立的构建证明或工件签名
+  （第二十二轮 builder 保证范围、`ADR-0128` §7）。
 - `bundles/sealed/<bundle_id>.bundle.json`：扁平化的 `monasm-bundle/0.1`，封闭键
-  恰好 `bundle_format`、`bundle_id`、`definition_format`、`definition_digest`、
-  `bundle_digest`、`definition`、`packages`；`definition` 是 §9 的合并定义
-  文档，包项恰好 `package_id`/`version`/`source_package_digest`。没有 `path`、
-  `builder`、`release_digest`、`evidence_digest` 或 bundle 级 `target` 包装，因此
-  逐字节比较，没有排除键；它也不保存 `profile_id`（第二十一轮 P2-1）。
+  **恰好七个**：`bundle_format`、`bundle_id`、`definition_format`、
+  `definition_digest`、`bundle_digest`、`definition`、`packages`；`definition`
+  是 §9 的合并定义文档，`packages` 项恰好 `package_id`/`version`/
+  `source_package_digest`。没有 `path`、`builder`、`release_digest`、
+  `evidence_digest` 或 bundle 级 `target` 包装，因此逐字节比较，没有排除键；
+  也不保存 `profile_id`（第二十一轮 P2-1）。包列表的键名是 `packages`，
+  `sources` 在这里是未知键（exit 1）：`sources` 只属于证据清单，不是 bundle 键
+  （第二十二轮 P1）。
 - **sealed 不能单独重算 `bundle_digest`（第二十一轮 P2-1）。** 预映像含 bundle 级
   `target`（含 `profile_id`），sealed 只存合并 `definition`，所以文件内摘要只是
   「声称」。消费者必须用 lock 的 `target`/`namespace`/`version` 加上 sealed 的
@@ -1191,6 +1207,13 @@ Rust 与 Python 都必须复现开发向量和发布向量这两个值。差别�
   工具链版本；验收报告记录曲线、触发新 ADR 的版本数/时间/字节阈值，以及每
   job 的 CI 成本上限。越阈或超预算才是分片、增量审计或新登记格式的触发条件，
   不是 H2 可以声称的性质；三个代表包通过不构成规模证据。
+- **并行开发与并行发布是两种能力，H2 只承诺前者加串行化正确性（第二十二轮）。**
+  包作者在各自 `package_id` 版本目录与显式 spec 下并行开发、互不改全局选择文件，
+  这由 H2 打基础，端到端并发实证属 H5；两个发布者无需集中协调地并行发布，H2
+  **不保证**——首次发布都写同一个追加登记文件，后来者必须 rebase 并重跑两项
+  `--check`。验收报告同时给出发布作业（build、两项 `--check`、1,000 版本审计）
+  的 CI 延迟与资源预算，并写明何时必须分片或做增量审计；包变更路径已局部化
+  不构成「整条发布路径无集中瓶颈」的证据。
 - **首次发布无登记循环；`build` 先内存校验再替换文件（第九轮 P2-3）。** 顺序
   是：候选 `<version>/` 目录 → 计算 `source_package_digest` → 写 spec →
   `build` 生成候选 lock/sealed/legacy → 追加 `published` 与 `identities` 行 →
@@ -1671,7 +1694,7 @@ A/B 工作流合并留给 H5。
 | `a_capability_must_be_declared_if_a_row_uses_it` | 声明 `[]` 但 form 有带 `placements` 的 slot → `capability-mismatch`；补上 `field-placement/v1` 后通过。由于 `read` 要求每个 form 的 `slots` 非空且每个 slot 的 `placements` 非空，任何含 form 的 `fmp-def/0.1` 包声明 `[]` 都必然失败 | `H2-D2`、`ADR-0128` §1.2、第七轮 P2-4、第八轮 P2-1 |
 | `a_declared_capability_must_be_used_by_a_row` | 声明 `integer-domain/v1` 但所有 slot 都是寄存器、无 `range` → `capability-mismatch`；包含一条 `from: "operand_value"` 的 slot 后通过。测试不构造无 slot 的 form：`{"form_id":"x86:example/form","template":"90"}` 不是合法 Definition，`read` 先以 `E-DEF-001` 拒绝 | `H2-D2`、`ADR-0128` §1.2/§7.0、第七轮 P2-4、第八轮 P2-1 |
 | `a_duplicated_capability_is_rejected` | `requires_capabilities` 写 `["field-placement/v1","field-placement/v1"]` → `capability-lexical`（退出 1），派生集合相同也不能放行；`["field-placement/v1"]` 通过。重复不进入任何摘要 | 第十二轮 P2-2、`ADR-0128` §1/§1.2、`H2-D7` |
-| `a_reversed_extension_array_is_rejected` | 包 `enabled_extensions` 写 `["rv64i","rv64c"]`（同一集合的逆序写法）→ `extension-lexical`（退出 1）；spec/lock/sealed 的 `target.identity.enabled_extensions` 逆序同样拒绝。排序写法 `["rv64c","rv64i"]` 通过，且 `source_package_digest` 与逆序写法不同，证明这是两个身份而不是被静默规范化的一份 | 第十二轮 P2-2、`ADR-0128` §1/§6/§8.2、`H2-D7` |
+| `a_reversed_extension_array_is_rejected` | 包 `enabled_extensions` 写 `["rv64i","rv64c"]`（同一集合的逆序写法）→ `extension-lexical`（退出 1）；spec 与 lock 的 `target.identity.enabled_extensions`、sealed 内合并定义的同一字段逆序同样拒绝。排序写法 `["rv64c","rv64i"]` 通过，且 `source_package_digest` 与逆序写法不同，证明这是两个身份而不是被静默规范化的一份 | 第十二轮 P2-2、`ADR-0128` §1/§6/§8.2、`H2-D7` |
 | `a_non_empty_reserved_asset_is_refused` | `exports.types`/`profiles` 非空 → `unsupported-asset`，不静默忽略 | `H2-D2`、`H2-D6` |
 | `a_non_empty_reserved_asset_is_refused_forever_under_0_1` | 同一份未改动的 `monasm-package/0.1` 清单（非空 `types` 或 `profiles`）：H2 构建器和任何后续版本的构建器都报 `unsupported-asset`（退出 1）；只有声明新 `package_format`（如 `monasm-package/0.2`）的清单才可能被接受，且该版本尚不存在。断言“构建器认识该字段”本身不改变 `0.1` 的结论 | 第十九轮 P1-2、`ADR-0128` §5、`H2-D2` |
 | `two_versions_of_one_package_id_conflict` | 同一 `package_id` 两个版本、导出不相交 → `version-conflict` | `H2-D5` |
@@ -1717,10 +1740,12 @@ A/B 工作流合并留给 H5。
 | `a_build_never_writes_a_snapshot_it_cannot_read` | 合成闭包：合并后的 canonical 定义略高于 16 MiB（包与闭包都在 64/80 MiB 预算内）→ `build` 退出 0、**不写** `bundles/legacy/<bundle_id>/definition.json`（若先前存在则被删除），随后的 `verify --all --check` 通过；手工放入同尺寸快照 → `--check` 报 `resource-limit`（退出 1）。同一闭包两次构建结果一致，且 lock/sealed/摘要不变 | 第十九轮 P2-2、`ADR-0128` §8.3/§12、`H2-D11`/`H2-D12` |
 | `changing_the_legacy_source_changes_the_source_digest` | `legacy_source` 从 `0.1.0` 改成 `0.78.0` → 源摘要变化；行未改时行相等测试失败 | `H2-D8`、`HE-AC-11` |
 | `the_builder_identity_is_not_part_of_the_definition_digest` | 两个 builder 版本 → 同 definition/bundle 摘要，lock 的 builder 不同；`verify --check` 不把 builder 差异算作失败 | `HE-T19` |
+| `a_builder_field_change_is_not_a_provenance_proof` | 手改已提交 lock 的 `builder.version`/`builder.build`（其余字节不变）→ `verify --all --check` 通过，`definition_digest`/`bundle_digest` 不变；改 `definition_digest` → 失败。断言该测试只证明 `builder` 不在身份里、**不**证明构建来源；可信来源需要独立构建证明或签名（文档结论，无运行时实现） | 第二十二轮 builder 保证范围、`ADR-0128` §7、第四轮 P2-2 |
 | `the_generated_definition_is_read_by_fmp_model` | 坏 form 行 → `fmp_model::definition::read` 拒绝，构建器包装该拒绝 | `H2-D12` |
 | `the_output_is_canonical_json` | lock/sealed 无空白、键排序、无尾随换行；与 Python canonical 一致 | `H2-D7` |
 | `the_spec_lock_and_sealed_shapes_are_closed` | 三者的未知键/重复键被拒；`builder.build` 缺省时键省略而不是 `null`；lock 去掉 `builder` 后比较，sealed 逐字节比较 | `ADR-0128` §8.2、第四轮 P2-2 |
 | `a_sealed_bundle_cannot_verify_its_own_digest` | 只拿 sealed 字节：`definition_digest` 可重算且相等，`bundle_digest` 无法重算（缺 bundle 级 `target` 包装与 `profile_id`）；用 lock 的 `target` 重算后同时等于 lock 与 sealed 记录的两个值。把 sealed 的 `bundle_digest` 改成另一个合法十六进制值、lock 不变 → 成对校验是差异（退出 1）；只按文件内摘要放行的实现会错误通过 | 第二十一轮 P2-1、`ADR-0128` §7/§8、`H2-D9` |
+| `the_sealed_bundle_key_set_is_exactly_seven_keys` | sealed 排序后的键集**恰好** `["bundle_digest","bundle_format","bundle_id","definition","definition_digest","definition_format","packages"]`：加 `target` 或 `sources`、或其 `packages` 项加 `path`/`evidence_digest` → 未知键拒绝（退出 1）；`definition` 的 `target` 是六键身份而不是 bundle 级 `{profile_id, identity}` 包装；`packages` 每项恰好 `package_id`/`version`/`source_package_digest` 且与 lock 的同名集合逐项相等 | 第二十二轮 P1、`ADR-0128` §8/§8.2、`H2-D9` |
 | `the_artifact_filename_matches_its_bundle_id` | `bundles/specs/mov.json` 的 `bundle_id` 是 `monasm.bundle.x86.mov` → `bundle-file-mismatch`；lock/sealed/legacy 同样检查；改成 `<bundle_id>.json` 后通过 | 第九轮 P2-1、`ADR-0128` §1.3、`H2-D9` |
 | `the_bundle_and_release_vectors_match` | `ADR-0128` §8.2 的 metadata 在 Rust 与 Python 中都得到 `b6d92574…`/`4e3d44a8…`；改域分隔或把嵌套摘要写成原始字节 → 不匹配 | 第四轮 P2-2/P2-3 |
 | `the_release_shaped_vector_matches` | 包项带 `evidence_digest` 时 Rust 与 Python 都得到 `evidence_digest = e9473871…`、`release_digest = ba60e8ba…`；漏写 `evidence_digest` 会退化成 `4e3d44a8…`，因此提交 lock 不能写成开发形状 | 第七轮 P2-3、`ADR-0128` §8.2 |
@@ -1983,11 +2008,15 @@ no-follow 打开」代替实测。下面 N1 描述的是 PoC 通过后构建器�
    （门禁记录 `(B_checked, C_checked, mode)` 并在落地提交上比较
    `B_landed`/`Tree(M)`/`mode`，不一致即拒绝；merge queue 或写入记录候选的合并
    操作由平台 API 证据证明；普通 up-to-date 检查不单独作为证明，合并后审计只作
-   可检测性；403/空 ruleset 视为未取到证据）、x86 包与 bundles、
-   `gates.yml`（`verify --all --check` 与 `verify --published --check` 都是必过
-   项，取消其一即门禁失败）、H2a 报告（N4 增加 legacy 等价门禁与快照省略规则，
-   N5 增加 base-first 映射与合并新鲜度证据；另含 N1 PoC 三平台表、1,000 版本
-   成本曲线与阈值，以及 sealed 成对校验的结论）。
+   可检测性；403/空 ruleset 视为未取到证据）、**N5 不得以绿色 CI 关闭**：必须
+   记录实际生效的机制并在临时仓库或等价沙箱跑通 stale-CI 反例（提交绿、别的
+   发布先合入、随后合并尝试必须被拒绝并重跑，而不是把旧候选树落到新基线上）；
+   记录不到机制或跑不通反例即停在 N5，不能用合并后审计替代前置授权。x86 包与
+   bundles、`gates.yml`（`verify --all --check` 与 `verify --published --check`
+   都是必过项，取消其一即门禁失败）、H2a 报告（N4 增加 legacy 等价门禁与快照
+   省略规则，N5 增加 base-first 映射与合并新鲜度证据；另含 N1 PoC 三平台表、
+   1,000 版本成本曲线与阈值、发布作业 CI 延迟预算，以及 sealed 键集与成对校验
+   的结论）。
 
 每个节点是一个可独立回归、可独立回滚的提交（或子 PR），各自带失败反例和
 门禁，不是实施者内部的检查清单；前一个节点全绿才进入下一个，尤其不能在 N1 的
@@ -2057,6 +2086,10 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | N1 的「理论上可行」被当成三平台证据 | 三平台 PoC 是独立先决交付物，排在所有构建器代码之前；逐平台记录 OS/工具链/API/故障注入/结果，缺行或结论不明确与失败同等处理，一个平台通过不外推 |
 | sealed 文件内摘要被当成可独立验证的身份 | 它是 lock 的伴随产物：用 lock 的 `target` 重算 `bundle_digest` 并与 lock、sealed 两处记录值比较；H2 只成对重建比较，H3 要么读已验证的 `(lock, sealed)` 对，要么用嵌入完整预映像的新 sealed 版本；`bind` 不接受裸 sealed 文件 |
 | 全局发布登记被当成已验证的可扩展性 | 单文件登记保留，全量审计成本按已发布版本数增长；H2a 记录约 1,000 版本的耗时/内存/读取字节与阈值，越阈触发新 ADR（分片或增量审计），三个代表包不构成规模证据 |
+| 并行开发被当成并行发布已解决 | 作者并行开发由版本目录与显式 spec 支撑，实证属 H5；发布仍共享一个追加登记文件，后来者必须 rebase 并重跑两项 `--check`；H2 只承诺串行化下正确，验收报告给出发布作业的 CI 延迟/资源预算与分片触发条件 |
+| 绿色 CI 被当成 N5 关闭 | N5 必须记录实际生效的 merge queue/候选树锁定机制，并在临时仓库或等价沙箱执行 stale-CI 反例；记录不到或跑不通即停在 N5，合并后审计只作可检测性，不能替代前置授权 |
+| `builder` 被当成来源证明 | `builder` 不进入 `definition_digest`/`bundle_digest`/drift 投影，改动它可让 `--all --check` 仍通过；它只记录写 lock 的实现，不证明构建来源；可信来源需要独立的构建证明或工件签名 |
+| sealed 键集出现两套说法 | `monasm-bundle/0.1` 恰好七个键、包列表为 `packages`、不含 bundle 级 `target`；`sources`（证据清单键）或 `target` 出现在 sealed 即未知键（退出 1）；`the_sealed_bundle_key_set_is_exactly_seven_keys` 固定该断言 |
 | 输出目录被仓库内链接重定向 | 输出目录是发布者控制的受信任路径，但 `--root` 下每个父段都 no-follow；链接/reparse point 在创建临时文件前以 `path-escape` 拒绝；N1 用链接化的 `bundles/locks/` 证明 |
 | 审计被当成整目录不可变证明 | `verify --published --check` 只证明清单、可执行资产和身份；README/NOTICE/证据/用例字节由变更路径门禁与 git 历史承担，文档写明边界，不新增 `snapshot_digest` |
 | 差分指针随 JSON 库或编辑操作漂移 | 差分定义在两个最终值上：成员增删→成员指针，kind 变化→该位置，数组长度→数组；两成员改动是两个差异因此拒绝；改写整体对象与改一个成员不可区分，格式不尝试区分 |
@@ -2190,12 +2223,14 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | O32 | 非空依赖项的格式写在哪 | **写进 `ADR-0128` §1/§4 并给固定向量**：`{package_id, version, source_package_digest}` 三键必需、未知键拒绝、数组按 `(package_id, version)` 升序；§7.0 有非空依赖向量 | 只写在实施计划里，等于让格式语义依赖非规范文档；无向量时键名/可选性改动不会被任何测试发现 |
 | O33 | 打开的叶子是否只接受普通文件，类型在哪判定 | **只接受普通文件，类型取自已打开句柄**：中间段必须是目录、叶子必须是普通文件；POSIX 输入打开带 `O_NONBLOCK`，FIFO 在类型判定前不会挂起；非普通叶子是 `not-a-regular-file`（退出 1），所有字节预算都假设普通文件 | 只做 no-follow 不排除 FIFO/socket/设备节点；靠路径 `stat` 或元数据大小判定有 check-then-use 缺口，且 FIFO 无长度、`read` 可永久阻塞，预算无法约束 |
 | O34 | 退役 spec 后 lock/sealed 留在树里还是删除 | **与 spec 一一对应，随最后一个 spec 删除**：同一 PR 删除 lock/sealed/legacy，`--all --check` 双向检查一一对应，孤儿是 `orphan-bundle-artifact`（退出 1）；包快照与登记项保留，退役字节由 git 历史保存，不定义归档格式 | 留下未选中的 sealed 没有任何门禁重建，改字节或过期都不可检测，状态语义不明；另立归档格式等于为只被 `git log` 读取的字节增加第二生命周期和第二门禁 |
-| O35 | 发布门禁的绿色结果在目标分支前进后是否仍有效 | **只对读到的 `(B_checked, C_checked, mode)` 有效**：`B_checked` 是基线提交 SHA，`C_checked` 是被测候选**树** SHA，`mode` 是合并模式；落地提交 `M` 必须满足 `B_landed = B_checked`、`Tree(M) = C_checked`、`mode(M) = mode`；自动化检查在落地提交上重算，不一致即失败并重跑；用 merge queue（在 merge-group 候选上跑并只合并该候选）或写入记录候选的合并操作；普通 up-to-date required checks 只约束基线新鲜度，不证明落地树相等，不能单独授权；H2a 通过平台 API 读取设置并把端点、生效配置与允许的合并操作写进报告，403/空 ruleset 即未取到证据、本轮失败；post-merge 运行只提供可检测性 | 复用旧绿色结果会让「A 改未发布包的 `README.md`、B 先发布该版本并合入、A 用旧结果合并」改动刚发布的目录，而 A 跑过的检查当时都正确；只做合并后审计能发现却已无法阻止；用提交 SHA 对代替树还会在每种合并模式下都必然失配（临时 test-merge 提交不是最终写入的提交） |
+| O35 | 发布门禁的绿色结果在目标分支前进后是否仍有效 | **只对读到的 `(B_checked, C_checked, mode)` 有效**：`B_checked` 是基线提交 SHA，`C_checked` 是被测候选**树** SHA，`mode` 是合并模式；落地提交 `M` 必须满足 `B_landed = B_checked`、`Tree(M) = C_checked`、`mode(M) = mode`；自动化检查在落地提交上重算，不一致即失败并重跑；用 merge queue（在 merge-group 候选上跑并只合并该候选）或写入记录候选的合并操作；普通 up-to-date required checks 只约束基线新鲜度，不证明落地树相等，不能单独授权；H2a 通过平台 API 读取设置并把端点、生效配置与允许的合并操作写进报告，403/空 ruleset 即未取到证据、本轮失败；post-merge 运行只提供可检测性。**N5 的关闭条件是机制证据加反例，不是绿色 CI**：必须记录实际生效的 merge queue/候选树锁定操作，并在临时仓库或等价沙箱执行 stale-CI 反例（旧绿结果在新基线上必须被拒绝并重跑）；记录不到或跑不通就停在 N5，不能用 post-merge 审计替代前置授权 | 复用旧绿色结果会让「A 改未发布包的 `README.md`、B 先发布该版本并合入、A 用旧结果合并」改动刚发布的目录，而 A 跑过的检查当时都正确；只做合并后审计能发现却已无法阻止；用提交 SHA 对代替树还会在每种合并模式下都必然失配（临时 test-merge 提交不是最终写入的提交） |
 | O36 | `monasm-package/0.1` 的非空 `exports.types`/`profiles` 是否随构建器升级放宽 | **不放宽，`0.1` 永久拒绝**：接受语义属于清单声明的 `package_format`，不属于读取它的工具版本；升级不得把同一份未改动 `0.1` 从拒绝变成接受；H4 必须引入显式新包格式（如 `monasm-package/0.2`），在版本内定义 type/profile 语义、归属/冲突规则、摘要输入和验证；既有键名、`{id, path}` 形状、排序和摘要输入可直接复用，但复用不放宽 `0.1`，与 `h2-exact-target` 在 `monasm-bundle-spec/0.1` 的永久拒绝同理 | 按「新构建器认识该字段」放宽会让重放依赖二进制版本，同一份旧文档的接受语义随工具升级而变；现在就设计完整类型系统会超出 H2/H4 边界 |
 | O37 | canonical 定义超过 legacy 快照 16 MiB 读取上限时 build 怎么办 | **省略快照，不失败**：闭包 64 MiB、sealed 80 MiB 都允许更大的 canonical 定义；`build` 依据内存中的 canonical 字节决定，≤ 16 MiB 才写 `bundles/legacy/<bundle_id>/definition.json`，超过则省略并在同一写阶段删除旧副本，仍退出 0 并在人类可读输出中说明；`--all --check` 对缺失本就合法，对手工提交的超限快照仍是 `resource-limit`（退出 1）；因此 build 成功意味着所写树的 `--all --check` 通过。加合成测试：合并定义略高于 16 MiB | 让 build 失败会使 64/80 MiB 预算内的合法闭包不可构建，等于让可选缓存决定有效上限；写超限快照会让 build 产出自己的 check 拒绝的树，失败要到发布者提交后才暴露；引入压缩或归档格式需要新的读取路径和门禁 |
 | O38 | sealed bundle 能否独立重算自己的 `bundle_digest` | **不能，它是 lock 的伴随产物**：预映像含 bundle 级 `target`（含 `profile_id`），sealed 不存该包装；消费者用 lock 的 `target` + sealed 字节重算，并与 lock 和 sealed 两个记录值比较，不符即差异（退出 1）。H2 保留 `0.1` 并成对重建比较；H3 明确选择读已验证的 `(lock, sealed)` 对，或引入嵌入完整预映像的新 sealed 格式版本；`bind` 不接受裸 sealed 文件 | 让消费者信任文件内摘要等于把无法重算的声称当身份；把 `target` 塞进 `0.1` 会改已冻结的格式语义，所以新能力放新版本 |
-| O39 | 单文件 `bundles/published.json` 如何面对长期横向扩容 | **保留单文件与全量历史审计，但把成本变成实测预算**：H2a 用约 1,000 个已发布版本测普通包变更、bundle 发布、全量审计各三次（耗时/峰值内存/读取字节），报告记录曲线与版本数/时间/字节阈值，以及每 job 的 CI 成本上限；越阈触发新 ADR 讨论分片或增量审计 | 现在分片会新增格式与一致性风险，且没有实测成本作依据；把 `--published` 并入 `--all` 会把历史耦合回 bundle 构建 |
+| O39 | 单文件 `bundles/published.json` 如何面对长期横向扩容 | **保留单文件与全量历史审计，但把成本变成实测预算**：H2a 用约 1,000 个已发布版本测普通包变更、bundle 发布、全量审计各三次（耗时/峰值内存/读取字节），报告记录曲线与版本数/时间/字节阈值，以及每 job 的 CI 成本上限；越阈触发新 ADR 讨论分片或增量审计。**并行开发与并行发布分开验收**：作者并行开发由 H2 打基础、H5 实证；无协调并行发布 H2 **不保证**（同一追加文件，后来者 rebase 并重跑两项 `--check`），报告还要给出发布作业的 CI 延迟/资源预算 | 现在分片会新增格式与一致性风险，且没有实测成本作依据；把 `--published` 并入 `--all` 会把历史耦合回 bundle 构建；把包变更路径局部化当成整条发布路径无瓶颈，会掩盖首次发布的集中协调点 |
 | O40 | N1 三平台 PoC 放在哪个交付阶段 | **独立先决交付物，先于任何读取器/构建器代码**：逐平台记录 OS 版本、工具链与 crate 版本、API/系统调用、故障注入方法和逐例结果；缺行、结论不明确或某平台只能跟随打开/拒绝所有读取，都停止 H2a | 把 PoC 并入 N1 实现会让平台失败推迟到大量代码之后，且容易用「理论上可行」代替实测；一个平台先通过也不能外推 |
+| O41 | `monasm-bundle/0.1` 的封闭键集以哪套说法为准 | **唯一键集：恰好七个键，包列表名 `packages`，无 bundle 级 `target`**：`bundle_format`/`bundle_id`/`definition_format`/`definition_digest`/`bundle_digest`/`definition`/`packages`；`sources` 只属于证据清单，出现在 sealed 即未知键（退出 1）；`target` 只在 spec 与 lock 中。ADR、HE-1 总览、本文与示例统一为此，旧的两套说法删除；`the_sealed_bundle_key_set_is_exactly_seven_keys` 固定断言 | 保留两套说法会让同一个封闭格式有两套必需键集，读者或实现只能自行仲裁；把 `target` 加进 `0.1` 会改冻结格式并让「伴随 lock 重算」的设计失效 |
+| O42 | `builder` 字段的保证范围 | **信息性来源记录，不是来源证明**：它不进 `definition_digest`/`bundle_digest`，也不进 lock 的 drift 投影，因此改动 `builder.version`/`build` 可不使 `--all --check` 失败；契约只声称 lock 记录了写它的实现，不声称该实现确实生成了这些字节。可信构建来源另立构建证明或发布工件签名，绑定 `bundle_digest`/`release_digest`，不把版本塞回定义摘要 | 把 builder 当证明会让「改 lock 的 builder 仍过检查」变成隐性错误；把 builder 混入定义摘要会让工具升级误报定义漂移（`HE-T19`）；签名或证明需要密钥与验证路径，属另一轮设计 |
 
 ## 10. 证据状态
 
@@ -2232,6 +2267,8 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | 首次发布无 registry 循环，`build` 先内存校验再写文件且从不写 registry | 尚未实现；只有文档规则。顺序固定为 build → 追加行 → 两项 `--check` → 提交，`--all --check` 要求行已存在 | **未验证** — H2a |
 | `--check` 证明 lock+sealed，并对已提交 legacy 快照做等价门禁（缺失合法、不重建缓存、不进摘要） | 尚未实现；只有文档规则；第三个输出写失败的故障注入与 legacy 改动测试待写 | **未验证** — H2a |
 | sealed 的 `bundle_digest` 不能单独重算，必须与 lock 成对校验 | 文字规则；预映像含 bundle 级 `target` 包装与 `profile_id`，sealed 不存；没有消费者；H3 的成对读取或新 sealed 版本未写 | **未验证** — H3 |
+| sealed 键集恰好七个、包列表为 `packages`、不含 bundle 级 `target` | 第二十二轮删除了冲突的 `sources` 与「sealed 复制 spec `target`」表述；没有 sealed 产物，`the_sealed_bundle_key_set_is_exactly_seven_keys` 待写 | **未验证** — H2a |
+| `builder` 只是来源记录，改动它可不使 `--all --check` 失败 | 漂移投影去掉 `builder`，摘要也不含它；没有 lock 产物，`a_builder_field_change_is_not_a_provenance_proof` 待写 | **未验证** — H2a |
 | 扩展/能力数组的严格排序与去重写法 | 尚未实现；`extension-lexical`/`capability-lexical` 只是文档中的格式拒绝 | **未验证** — H2a |
 | 64 MiB 闭包预算的固定计数集合、每路径一次与越界读取处拒绝 | 尚未实现；没有包读取器 | **未验证** — H2a |
 | `enabled_extensions` 是保守覆盖而非最小集合 | 尚未实现；`fmp-def/0.1` form 没有需求键，构建器不存在 | **未验证** — H2a |
@@ -2265,7 +2302,7 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | 定义身份错配不能表示为 `monasm-cases/0.1` 用例 | 用例要求 `$standalone` 哨兵且 harness 替换为正确身份，错误 digest 在 `case-plan-identity` 处被拒绝；`plan::read`/`bind` 的既有行为已读 | **specified；reader 行为已读** — H2a 绑定测试 |
 | 变更路径先按 base registry 判定包含，嵌套 `package.json` 不能遮蔽已发布祖先 | 尚未实现；没有变更路径映射器；`a_nested_package_manifest_cannot_mask_a_published_ancestor` 待写 | **未验证** — H2a |
 | 已发布集合以目标分支尖端 `B` 为准，`Published(B) ⊆ Published(H)` 且已发布路径字节相等 | 尚未实现；反例是 A、B 从 `M0` 分叉、B 先发布、A 只改 `README.md`；`a_concurrent_publish_freezes_the_old_commit_side` 待写 | **未验证** — H2a |
-| 发布结论只对读到的 `(B_checked, C_checked, mode)` 有效，基线或落地树不同即不能授权合并 | 尚未实现；仓库的 branch protection/merge queue 设置无法从树内读出，审核期间的 API 读取返回 403、ruleset 查询无结论，这是未取到证据而非没有保护；`a_stale_publication_verdict_cannot_authorize_a_merge` 与 API 证据都待写 | **未验证** — H2a N5 必须补 API 证据 |
+| 发布结论只对读到的 `(B_checked, C_checked, mode)` 有效，基线或落地树不同即不能授权合并；N5 不以绿色 CI 关闭 | 尚未实现；仓库的 branch protection/merge queue 设置无法从树内读出，审核期间的 API 读取返回 403、ruleset 查询无结论，这是未取到证据而非没有保护；规划 PR 的 `Gates`/`Determinism` 成功只是它自己那个三元组的结果；`a_stale_publication_verdict_cannot_authorize_a_merge`、机制记录与反例执行都待做 | **未验证** — H2a N5 必须补机制证据与 stale-CI 反例 |
 | `monasm-package/0.1` 永久拒绝非空 `exports.types`/`profiles`，与构建器版本无关 | 只有文档规则；`a_non_empty_reserved_asset_is_refused_forever_under_0_1` 待写；后续包格式版本未写 | **未验证** — H2a |
 | 输入顺序固定为词法校验→no-follow 打开→句柄类型检查→同句柄大小提示→有界读取→解析，元数据大小不是边界 | 尚未实现；没有包读取器；「类型检查后文件增长」由累计计数器覆盖，测试待写 | **未验证** — H2a |
 | 超过 16 MiB 的 canonical 定义由 `build` 省略快照并删除旧副本，`--all --check` 通过；手工超限快照是 `resource-limit` | 尚未实现；闭包内 64/80 MiB 预算允许该尺寸；`a_build_never_writes_a_snapshot_it_cannot_read` 待写 | **未验证** — H2a |

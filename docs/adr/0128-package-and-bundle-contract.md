@@ -5,7 +5,20 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: twenty-first revision, 2026-11-18, after the sealed-bundle,
+- Revision: twenty-second revision, 2026-11-18, after the key-set, publication-
+  gate, registry-coordination and builder-provenance audit: `monasm-bundle/0.1`
+  has exactly one closed key set — seven keys, with `packages` as the package
+  list and **no** bundle-level `target` — and the earlier text that called the
+  list `sources` or said the sealed bundle carries the spec's `target` is
+  removed rather than left for a reader to arbitrate; H2a's N5 node does not
+  close on a green CI run but only on a recorded merge mechanism plus an executed
+  stale-CI counterexample, and otherwise stops at that gate; independent package
+  authoring and independent publishing are separate claims, with H2 promising
+  correct serialized publication rather than coordination-free parallel
+  publishing; and `builder` is documented as an informational provenance record
+  whose change can pass `--all --check`, not as proof that the declared
+  implementation produced the bundle.
+- Prior revision: twenty-first revision, 2026-11-18, after the sealed-bundle,
   registry-scale and N1-prerequisite audit: `monasm-bundle/0.1` is a companion
   artifact of its lock, not a self-verifying snapshot — its `bundle_digest`
   preimage includes the bundle-level `target` (with `profile_id`) that the sealed
@@ -1142,7 +1155,7 @@ that half is not the gap. The gaps are the remaining cases:
   construction.
 
 **`monasm-bundle/0.1` does not carry that proof.** It stores the merged
-definition and a sorted `sources` list `{package_id, version,
+definition and a sorted `packages` list `{package_id, version,
 source_package_digest}`; it has no `form_id` → owner and no `E_package`. A
 `fmp-def/0.1` merged document has no `requires_extensions` on any form, and a
 `fmp-def/0.2` document carries only the per-form key, not the package cover or
@@ -1414,6 +1427,18 @@ sorts `dependencies` by anything other than `(package_id, version)`.
 | `release_digest` | `sha256(b"monasm-release/0.1" ++ 0x00 ++ canonical(release_metadata))`, where metadata is `{bundle_id, bundle_digest, definition_digest, packages: [{package_id, version, source_package_digest, evidence_digest}]}` sorted by package identity; every nested digest is the literal `sha256:` text. `evidence_digest` is present for every entry of a committed lock, which is written only for a release-ready closure (§7.1); the metadata shape admits its absence only for a development build, which is not a released identity | the definition rows themselves, the builder receipt, sealed bytes | Two releases that share a definition but ship different evidence have no distinguishing identity. |
 | `builder` | `{name, version, build: Option<String>}`; lock and receipt only | the definition digest | Putting the builder version into `definition_digest`: a builder bump falsely reports definition drift (`HE-T19`). |
 
+**`builder` records provenance; it does not prove it.** The field is outside
+`definition_digest`, `bundle_digest` and the lock drift projection, so editing
+`builder.version` or `builder.build` in a committed lock does not make
+`verify --all --check` fail. That is deliberate — a toolchain upgrade must not
+look like an execution change — but it bounds the claim: a lock names the builder
+that wrote it, and the contract does not assert that the declared implementation
+actually produced these bytes. A reproducibility claim needs two independent
+builds; a trustworthy-provenance claim needs a separate build attestation or
+release-artifact signature bound to `bundle_digest`/`release_digest`. Neither is
+H2 work, and neither may be obtained by folding the builder version back into the
+machine definition digest.
+
 **`bundle_digest` is not recomputable from the sealed bundle alone.** The
 preimage above includes the full bundle-level `target` object, with its
 `profile_id`, but `monasm-bundle/0.1` stores no such wrapper and no `profile_id`
@@ -1537,14 +1562,16 @@ definition.
   `target`, `bundle_digest`, `definition_digest`, `release_digest`), the sorted
   package list with `path`, `source_package_digest` and `evidence_digest`
   (present for a release-ready package, §7.1), and `builder`.
-- `bundles/sealed/<bundle_id>.bundle.json` — `monasm-bundle/0.1`, generated:
-  `bundle_format`, `bundle_id`, the canonical definition document,
-  `bundle_digest`, `definition_digest`, and the sorted `sources` list
+- `bundles/sealed/<bundle_id>.bundle.json` — `monasm-bundle/0.1`, generated with
+  exactly seven keys: `bundle_format`, `bundle_id`, `definition_format`, the
+  canonical definition document under `definition`, `bundle_digest`,
+  `definition_digest`, and the sorted `packages` list
   `{package_id, version, source_package_digest}`. It does not contain the builder
-  receipt, `release_digest` or author paths. It also does not contain a
-  `form_id` → owner or owner-cover map; §4.1 records that H3's target-subset rule
-  needs a versioned artifact (or another frozen source) before it can use this
-  bundle, and that H2 does not add the map to `monasm-bundle/0.1`.
+  receipt, `release_digest`, a bundle-level `target` or author paths. It also does
+  not contain a `form_id` → owner or owner-cover map; §4.1 records that H3's
+  target-subset rule needs a versioned artifact (or another frozen source) before
+  it can use this bundle, and that H2 does not add the map to
+  `monasm-bundle/0.1`.
 - `bundles/legacy/<bundle_id>/definition.json` — generated when the canonical
   definition fits its 16 MiB read budget: the plain merged definition document,
   with no bundle envelope, so the existing `fmp materialize <plan> --definitions
@@ -1883,6 +1910,23 @@ return is not evidence that no protection exists**; it is an evidence step that
 has not been obtained, and the round fails until the mechanism is shown. The ADR
 neither asserts nor assumes that the current repository already has it.
 
+**A green CI run on the planning PR is not that evidence.** N5 cannot be closed
+by pointing at successful checks: they were produced for some `(B_checked,
+C_checked, mode)`, and a workflow that would happily merge a different tree has
+not been tested by them. H2a's N5 acceptance must therefore (a) record the
+effective mechanism it actually found through the API — merge queue, or a merge
+operation that writes the recorded candidate and refuses a moved base — and (b)
+run the stale-CI counterexample end to end on a scratch repository or an
+equivalent sandbox: a green verdict for base `B_A` and tree `C_A`, a publication
+that moves the target tip, and a merge attempt that must be rejected and re-run
+rather than land `C_A` on the new base. A dry description of the equations, or
+a settings page quoted without the operation, does not satisfy (b).
+
+If the mechanism cannot be demonstrated, H2a stops at N5 and the publication
+gate stays open. A post-merge audit on the target branch remains detection only
+and may not be substituted for the pre-merge authorization; shipping H2a with
+"we will notice afterwards" is the failure this gate exists to prevent.
+
 **The base registry decides containment first.** Before the head tree is used to
 resolve a `package.json` ancestor, the gate checks whether the changed path lies
 under a **base-registered version directory** (`Published(B)`). If it does, the
@@ -1982,10 +2026,15 @@ increasing, duplicate-free spelling of §1 (`extension-lexical`, exit 1,
 otherwise). `packages` is non-empty, strictly sorted by `(package_id,
 version)` with no duplicates, and each entry has exactly `package_id`, `version`,
 `path`, `source_package_digest`. A reversed or equal-key entry is rejected; the
-builder never re-sorts an alternate spelling. The lock and the sealed bundle
-carry the same closed `target` object copied from the spec, so the target has one
-spelling per release; `--check` compares those bytes rather than re-canonicalising
-an array.
+builder never re-sorts an alternate spelling. The lock carries the same closed
+`target` object copied from the spec, so the target has one spelling per release,
+and `--check` compares those bytes rather than re-canonicalising an array. The
+sealed bundle stores **no** `target` and no `profile_id`: it carries the merged
+definition (whose `target` is the six-key identity) and its own `packages` list,
+so the bundle-level target exists only in the spec and the lock, and
+`bundle_digest` is recomputed from the lock (§7, §8). That asymmetry is the
+contract, not an oversight: the sealed key set is exactly the seven keys listed
+below, and `target` or `sources` in it is an unknown key (exit 1).
 
 ```json
 {
@@ -2263,6 +2312,30 @@ Crossing a recorded threshold or a CI budget overrun is the trigger for a new AD
 on sharding, incremental audit or a different registry format; it is not a
 scaling property H2 may claim, and three representative packages are no evidence
 that the global registry scales.
+
+**Two scalability claims are separate, and H2 makes only the first.** They must
+not be merged into "the publication flow scales":
+
+- **Independent package authoring.** An author adds a version directory under
+  their own `package_id`, writes their own spec and merges without editing another
+  package or a global selection file. H2 establishes the basis — per-package
+  version directories, explicit specs, no global package index, a changed-path
+  gate that verifies exactly the changed package — and H5 is where concurrent
+  real authors prove it end to end. H2 does not claim that proof in advance.
+- **Independent publishing.** Two first publications can proceed without any
+  central coordination. H2 does **not** provide this: both edit the one
+  append-only `bundles/published.json`, so one publisher must rebase and re-run
+  both checks after the other lands. The contract guarantees correctness under
+  that serialization, not parallel throughput, and the full-history audit adds a
+  cost proportional to published history. A sharded registry, an incremental
+  audit or an out-of-band publication record is future work with its own ADR;
+  none of them is assumed here.
+
+The H2a report therefore records concrete CI latency and resource budgets for the
+publication jobs — build, both `--check`s and the ~1,000-version audit — next to
+the threshold above, and states the conditions that force sharding or incremental
+audit. A localized package-change path is not evidence that the end-to-end
+publication path has no central bottleneck.
 
 **First publication has no registry cycle.** A registry row for a definition
 needs the `definition_digest`, which only a build produces; requiring the row
@@ -3150,7 +3223,7 @@ robustness:
 - manifest ≤ 1 MiB; form, type or profile file ≤ 1 MiB;
 - `tests/cases.json` ≤ 16 MiB; `evidence/manifest.json` ≤ 1 MiB; a spec or lock
   ≤ 1 MiB each; a committed sealed bundle ≤ 80 MiB (the 64 MiB closure budget
-  plus at most 16 MiB of envelope for the sorted `sources` list and the
+  plus at most 16 MiB of envelope for the sorted `packages` list and the
   definition wrapper), read only through the bounded streaming comparison of
   §8.3; the pinned legacy definition file read for row comparison and the
   committed bridge snapshot read for the §8.3 equality gate each ≤ 16 MiB
@@ -3380,6 +3453,9 @@ comparing the materializer with itself proves the bytes.
   a document; H2a reads the effective setting through the platform API and
   records the evidence. A 403, an empty ruleset list or an unreadable setting is
   a missing evidence step, not proof that no protection exists (§8.1).
+- No claim that a green CI run closes the publication gate. N5 needs the
+  mechanism recorded and the stale-CI counterexample executed; otherwise H2a
+  stops there, and a post-merge audit is detection, never authorization (§8.1).
 - No claim that `monasm-bundle/0.1` is a self-verifying execution snapshot. Its
   `bundle_digest` covers a bundle-level `target` the file does not store, so it is
   a companion of its lock: a consumer recomputes the value and verifies the pair,
@@ -3387,6 +3463,14 @@ comparing the materializer with itself proves the bytes.
 - No claim that the single-file published registry scales. The 1,000-version
   measurement and its threshold are a recorded cost and a trigger for a later
   ADR, not a proven property (§8.3).
+- No claim that independent package authoring and independent publishing scale
+  together. H2 provides the authoring basis and correct serialized publication;
+  uncoordinated parallel publishing is not guaranteed and needs a later ADR
+  (§8.3).
+- No claim that `builder` proves provenance. It records which implementation
+  wrote the lock; it is excluded from the definition identity, and a change to it
+  can pass `--all --check`. Trusted build provenance needs a separate attestation
+  or artifact signature (§7).
 - No claim from documentation that the N1 no-follow guarantee is achievable on a
   platform, or that three platforms behave alike: the PoC is a separate
   prerequisite deliverable with recorded per-platform results (§3).
@@ -3464,6 +3548,17 @@ comparing the materializer with itself proves the bytes.
   1,000-version time, memory and bytes-read curve for a package change, a
   publication and a full audit, plus the threshold for revisiting the single-file
   design, so scale is a budgeted cost rather than an assumed property.
+- Independent authoring and independent publishing are separate claims. H2 gives
+  authors version directories and explicit specs, so ordinary package work needs
+  no central edit; it does not give publishers a coordination-free path, because
+  every first publication writes the same append-only registry file. Correctness
+  under that serialization is promised; parallel publishing throughput is not
+  (§8.3).
+- `builder` is a provenance record with a bounded claim. It is deliberately
+  outside the definition identity and the drift projection, so it can change
+  without failing `--all --check`; the contract therefore does not assert that
+  the declared implementation produced the bundle, and trusted provenance needs a
+  separate attestation or artifact signature (§7).
 - The path layer's feasibility is evidence, not an assumption. The N1 PoC is a
   standalone prerequisite with per-platform OS versions, toolchain and API names,
   fault-injection methods and observed results; it lands before the builder.
@@ -3479,11 +3574,14 @@ comparing the materializer with itself proves the bytes.
   merge, and the publication is authorized only by a run whose base and tree are
   the ones actually landed. The cost is a merge queue or an operation that writes
   the recorded candidate; required up-to-date checks alone do not establish it.
-- H3 pays an artifact change for target subsets. `monasm-bundle/0.1` records
-  sources and the merged definition, not per-form owners or covers, so a subset
-  plan cannot be checked against it. H3's versioned bundle or frozen companion
-  source carries that proof, and a form without one is rejected rather than read
-  as needing no extension (§4.1).
+  N5 closes only when the effective mechanism is recorded and the stale-CI
+  counterexample has been executed; if neither can be shown, H2a stops at that
+  gate, because a post-merge audit is detection and cannot authorize a merge.
+- H3 pays an artifact change for target subsets. `monasm-bundle/0.1` records its
+  selected `packages` and the merged definition, not per-form owners or covers, so
+  a subset plan cannot be checked against it. H3's versioned bundle or frozen
+  companion source carries that proof, and a form without one is rejected rather
+  than read as needing no extension (§4.1).
 - `monasm-package/0.1` rejects non-empty `exports.types`/`exports.profiles`
   permanently, so acceptance cannot silently widen with a builder upgrade. H4
   pays one explicit package-format version for type/profile semantics instead of
@@ -3683,6 +3781,19 @@ comparing the materializer with itself proves the bytes.
   both add a second format or lifecycle, or re-couple bundle verification to
   history, before the measured cost exists. H2 records the 1,000-version curve
   and a threshold; crossing it is the trigger for a new ADR (§8.3).
+- **Accept a green CI run, or a post-merge audit, as the publication gate.**
+  Rejected: the run belongs to some `(B_checked, C_checked, mode)`, and only the
+  platform mechanism plus the stale-CI counterexample shows that the landed
+  commit is the tested tree. A post-merge audit can detect a bad landing but
+  cannot prevent it (§8.1).
+- **Describe the append-only registry as coordination-free publishing.**
+  Rejected: every first publication edits one file, so two publishers serialize
+  on a rebase and a re-validation. H2 claims correct serialization, not parallel
+  publication throughput; that needs a later, separately reviewed design (§8.3).
+- **Recover provenance by putting the builder version into the definition
+  digest.** Rejected: a toolchain upgrade would look like an execution change
+  (`HE-T19`), and the field still would not prove which implementation ran.
+  Provenance needs a separate attestation or signature (§7).
 - **Trust a green publication result until the branch is merged.** Rejected: the
   verdict is keyed on a base commit and a candidate tree, and the target tip can
   gain a publication after that read. Reusing the result would let a branch edit
@@ -4102,6 +4213,9 @@ comparing the materializer with itself proves the bytes.
 | H3 target subsets check `E_owner(form(i)) ⊆ E_plan` for every selected instruction, from a versioned owner/cover map or another frozen source; a form without a proof is rejected | specified; `monasm-bundle/0.1` has no owner map and no H3 plan or bundle format exists; the `c.addi`/`rv64i` case is untested | **specified, not implemented** — H3 |
 | `bundle_digest` cannot be recomputed from `monasm-bundle/0.1` alone; a consumer must recompute it from the lock's `target` | specified; the §7 preimage includes the bundle-level `target` with `profile_id` while §8's sealed key list has no such wrapper, so the gap is structural; the §8 vectors were computed from that preimage, but no consumer applies the recompute-from-lock rule yet | **specified, not implemented** — H3 |
 | Required up-to-date checks alone do not prove the landed tree equals the tested tree; a 403 or empty ruleset list is missing evidence, not absence of protection | specified; an API read attempt during review returned 403 and the ruleset query was inconclusive, and no merge-queue evidence has been recorded | **unobtained; H2a must record API evidence before acceptance** |
+| N5 cannot close on a green CI run: the effective merge mechanism must be recorded and the stale-CI counterexample executed, or H2a stops at the gate | specified; `Gates`/`Determinism` succeeded on the planning PR, but a green run is a verdict for its own `(B_checked, C_checked, mode)` and does not demonstrate the mechanism; no counterexample has been run | **unobtained; H2a N5** |
+| `monasm-bundle/0.1` has exactly seven keys, its package list is `packages` and it stores no bundle-level `target` | specified; this revision found and removed conflicting normative text (`sources`, and "the sealed bundle carries the same `target`"); no sealed bundle exists, so the key set test is unrun | **specified, not implemented** — H2a |
+| `builder` records provenance but does not prove it; a change to `builder.version`/`build` can pass `--all --check` | specified; the drift projection excludes `builder` and no digest covers it; no lock exists, so the counterexample is unrun | **specified, not implemented** — H2a |
 | `monasm-package/0.1` rejects non-empty `exports.types`/`exports.profiles` permanently, independent of the builder version; a later format version owns the semantics | specified; no builder exists, and no later package format is written | **specified, not implemented** — H2a |
 | Input budgets apply in one order — lexical path, no-follow open, handle type check, same-handle size hint, bounded read, parse — and metadata size is never the boundary | specified; no reader exists; a file that grows between type check and read is covered by the cumulative counter | **specified, not implemented** — H2a |
 | A build never writes a legacy snapshot above its 16 MiB read budget; a legal closure above it builds with the snapshot omitted and passes `--all --check` | specified; no builder exists; the synthetic over-16 MiB definition case is untested | **specified, not implemented** — H2a |
@@ -4172,9 +4286,20 @@ comparing the materializer with itself proves the bytes.
   keyed on `(B_checked, C_checked, mode)`; a target tip or merge mode that moved
   invalidates it, and no other gate looks at those bytes (§8.1).
 - Someone cites "required branches to be up to date" as proof that the landed
-  tree equals the tested tree, or treats a 403 or an empty ruleset list as proof
-  that no protection exists: stop. Up-to-date checks bound base staleness, not
-  tree identity; missing API evidence fails the H2a gate (§8.1).
+  tree equals the tested tree, treats a 403 or an empty ruleset list as proof
+  that no protection exists, or closes N5 on a green CI run or a post-merge
+  audit: stop. Up-to-date checks bound base staleness, not tree identity; the
+  mechanism plus the stale-CI counterexample is the evidence, and without it H2a
+  stops (§8.1).
+- Someone gives `monasm-bundle/0.1` a `sources` key or a bundle-level `target`
+  "for convenience", or describes the sealed file as carrying them: stop. The
+  sealed key set is the seven keys in §8.2, `packages` is the package-list name,
+  and the missing `target` is why the digest is recomputed from the lock (§7,
+  §8).
+- Someone treats `builder` as proof that the declared implementation produced
+  the bundle, or folds `builder` back into the definition digest to make it one:
+  stop. It is an informational provenance record; trusted provenance needs a
+  separate attestation or signature (§7).
 - Someone lets a consumer accept a sealed bundle's `bundle_digest` without
   recomputing it from the lock's `target`, or passes a bare sealed file to `bind`:
   stop. The embedded value covers bytes the sealed file does not store; H3
@@ -4184,6 +4309,10 @@ comparing the materializer with itself proves the bytes.
   scalability property, drops the 1,000-version budget, or crosses a recorded
   threshold without a new ADR: stop. It is a measured, accepted cost with a
   written trigger (§8.3).
+- Someone claims that independent authoring implies coordination-free parallel
+  publishing, or removes the rebase-and-revalidate rule because the package
+  change path is localized: stop. The registry is one shared file; H2 promises
+  correct serialization, not parallel publication throughput (§8.3).
 - Someone demotes the N1 PoC to a plan note, or accepts "theoretically possible"
   as three-platform evidence: stop. The PoC is a separate prerequisite deliverable
   with recorded platform, toolchain, API, fault-injection and result rows (§3).
