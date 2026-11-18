@@ -1,13 +1,18 @@
 # H2 实施计划：目标包作者层与确定性定义构建
 
 - 状态：**待审提案**（2026-11-16；同日按八轮审计 P1/P2 修订，2026-11-17 至
-  2026-11-18 按第九轮至第十九轮审计修订）。规范决策见
+  2026-11-18 按第九轮至第二十轮审计修订）。规范决策见
   `docs/adr/0128-package-and-bundle-contract.md`，该 ADR 仍为 `proposed`；
   评审合并前本文和 ADR 都不是冻结依据。本文保留为实施计划与验收映射。
   **H2 尚未实现，本文不把任何 H2/H3/H4/H5 项目算作已完成。**
-  第十九轮固定：发布门禁只对它读到的 `(B, H)` 对生效，接受发布要求
-  `B_checked = B_merge` 且 `H_checked = H_merge`，由 merge queue 或强制的
-  up-to-date required checks 保证，H2a 通过平台 API 读取并记录证据；
+  第二十轮固定：H3 的子集目标必须逐指令证明 `E_owner(form(i)) ⊆ E_plan`，
+  证据来自版本化的 bundle 归属/覆盖映射或另一个冻结来源；`monasm-bundle/0.1`
+  没有该映射，只加 `fmp/0.2` 不放宽；无归属证明的 legacy form 默认拒绝，不按
+  空集推定。发布门禁的键改为 `(B_checked, C_checked, mode)`：基线提交 SHA、
+  被测候选**树** SHA 与合并模式；普通 up-to-date 检查不等于落地树相等，403 或
+  空 ruleset 是未取到证据而不是没有保护。HE-1 总体设计 §6/§7/§10 的示例同步到
+  本 ADR 的包与 bundle 结构。
+  第十九轮固定：发布门禁只对它读到的提交对生效，禁止复用旧绿色结果；
   `monasm-package/0.1` 永久拒绝非空 `exports.types`/`exports.profiles`，语义留给
   显式的新包格式版本；输入顺序固定为词法校验→no-follow 打开→句柄类型检查→
   同句柄大小提示→有界读取→解析；canonical 定义超过 16 MiB 时构建省略 legacy
@@ -360,20 +365,31 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   删除最后一个 spec 只退役发布：同一 PR 删除该 bundle 的 lock、sealed 和 legacy
   快照，包快照与登记项保留，退役字节在发布它的提交上仍可重放；H2 不定义归档
   格式，也不留下没有 spec 的 sealed 文件。
-- **门禁结论必须对应实际合并的提交对（第十九轮 P1-1）。** 变更路径门禁读取显式
-  的一对 `(B, H)`：`B` 是判定的目标分支尖端，`H` 是合并候选。只有
-  `B_checked = B_merge` 且 `H_checked = H_merge`，绿色结果才授权合并；否则
-  「A 改未发布包的 `README.md`、B 先发布该版本并合入、A 用旧结果合并」会改动
-  刚发布的目录，而 A 跑过的每个检查都曾是对的（差异字节没有变化，只有 `B` 变了）。
-  仓库必须提供可验证机制之一：merge queue 在 merge-group 候选上跑门禁并且只合并
-  该候选（目标前进时组重建），或对合并路径强制 up-to-date required checks，目标
-  尖端变化即重跑。门禁输出记录 `(B_checked, H_checked)` 两个 SHA，自动化检查把
-  它们与实际合并提交的父提交比较，不一致即失败（非零退出）；不得复用旧结果，
-  手工绕过保护路径的合并不是合法发布。两个机制都无法证明时，必须在最终候选上
-  重跑门禁并只合并该次结果。合并后在目标分支再跑一次（合并提交对第一父提交）
-  只提供可检测性，不能替代新鲜度。平台设置无法从树内读出：H2a 必须通过 API
-  读取生效的 branch protection/merge queue 并把证据写进报告，读不到即本轮失败，
-  不假定已配置（`ADR-0128` §8.1）。
+- **门禁结论必须对应实际落地的基线与候选树（第十九、二十轮 P1-1）。** 变更路径
+  门禁读取并记录一个三元组 `(B_checked, C_checked, mode)`：`B_checked` 是它读的
+  目标分支提交 SHA，`C_checked` 是它在声明的合并模式下评估出的候选**树** SHA，
+  `mode` 是 `merge`/`squash`/`rebase`/`fast-forward`。合并落在提交 `M` 上，令
+  `B_landed` 为 `M` 所应用的提交（合并提交的第一父提交，其余模式为原目标尖端）、
+  `C_landed = Tree(M)`；只有 `B_landed = B_checked`、`C_landed = C_checked` 且
+  `mode(M) = mode`，绿色结果才授权合并。否则「A 改未发布包的 `README.md`、B 先
+  发布该版本并合入、A 用旧结果合并」会改动刚发布的目录，而 A 跑过的每个检查都
+  曾是对的（差异字节没变，只有基线移动了）。**不能用提交 SHA 对代替树**：每种
+  合并模式都产生新提交，`refs/pull/N/merge` 的临时提交不是最终写入目标分支的
+  提交，树才是可跨模式比较的单位。
+  可建立等式的机制有两种：merge queue 在当前目标尖端上构建 merge-group 候选、
+  在该候选上跑门禁并只合并该候选（目标前进时组重建）；或把记录的候选提交以
+  目标移动即被 git 拒绝的操作落到记录的基线上（候选提交的 fast-forward，或
+  写入该确切提交的受保护分支合并）。**普通 up-to-date required checks 不等价**：
+  它只在基线前进时重跑检查，不承诺最终写入的提交带被测树，且合并提交 SHA 必然
+  不同于临时测试合并 ref；因此「要求分支为最新」的设置不能证明
+  `C_landed = C_checked`，若仓库走这条路，还必须额外合并记录的候选（或在最终
+  候选上重跑并合并该确切候选），否则只有检测、不构成授权。门禁输出三元组，
+  自动化检查在落地提交上重算并比较，不一致即失败（非零退出）；不得复用旧结果，
+  手工绕过保护路径的合并不是合法发布。合并后审计只提供可检测性，不能替代等式。
+  平台设置无法从树内读出：H2a 必须通过 API 读取生效的 branch protection/merge
+  queue 并把证据（查询的端点、生效配置、仓库实际允许的合并操作）写进报告；
+  **403、空 ruleset 列表或 API 不返回设置都不是「没有保护」的证据**，而是尚未
+  取到证据，本轮仍失败（`ADR-0128` §8.1）。
 - 登记还包括 `identities` 数组：每项恰好 `definition_digest`/`namespace`/
   `version`，按 `(namespace, version)` 严格排序。定义名是永久的，bundle ID
   是可移动的发布线：
@@ -846,6 +862,31 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   并行扩展演练之前生效，否则先修订 ADR，不得直接开始 H5。H2 不声称这个等号
   是最终组合规则。`h2-exact-target` 与上面的 form ⊆ 包检查互不替代：前者比较
   包与 bundle，后者比较行与包。
+- **H3 的子集规则必须逐指令证明（第二十轮 P1-1）。** 只查
+  `E_plan ⊆ E_bundle` 不够：bundle 选 `{rv64i, rv64c}`、包 A 覆盖 `{rv64i}`、
+  包 B 覆盖 `{rv64c, rv64i}` 时，声明 `{rv64i}` 的计划仍可选中 `c.addi`，而它的
+  归属包需要 `rv64c`。H3 必须对每条选中的指令检查
+
+  ```text
+  E_owner(form(i)) ⊆ E_plan     对 Plan.instructions 中的每条 i
+  ```
+
+  `E_owner` 优先取版本化定义里的逐 form 需求，否则取该 form 归属包的声明覆盖
+  （保守但不会放行计划目标不支持的指令）；从 mnemonic 或 ISA 名推导需求是
+  `INV-01`/`INV-06` 禁止的。`fmp-def/0.2` 的 `E-TARGET-003` 已按**计划**集合
+  检查 form 需求，所以缺口是 `fmp-def/0.1`/legacy form（没有该键）与 0.2 行
+  低报（需求列表不含基础 ISA/profile 事实）。
+  **H2 冻结的 sealed bundle 不足以支撑该检查**：`monasm-bundle/0.1` 只有合并
+  定义和 `sources`，没有 `form_id → owner` 或 `E_package`；lock 只有 path/摘要。
+  H3 必须先取得版本化 bundle（如 `monasm-bundle/0.2`）中的逐 form 需求或可验证
+  归属/覆盖映射，或另一个同样冻结、摘要绑定且有门禁的来源，然后才可接受子集
+  计划。只增加 `fmp/0.2` 不放宽；重新解释 `0.1` bundle 等于改格式。
+  **缺少归属证明的 legacy form 默认拒绝**（`target-subset-unproved`，H3 协议自己
+  的诊断，不是 `fmp/0.1` 码），不能按空集推定其对任何扩展配置都合法；精确目标
+  格子不受影响，因为那里所有集合相等。H3 验收至少证明：`c.addi`/`rv64i` 计划被
+  拒、包含归属覆盖的计划通过、无证明的 0.1/legacy form 被拒而不是当作空集、
+  两个旧格子保持 H2 结果。H2 不实现该规则，也不向 `monasm-bundle/0.1` 加映射；
+  义务现在写入，避免冻结 H2 后让 H3 无法证明。
 - `target.profile_id` 必须与每个包的 `target_profile` 一致，否则构建失败。
   这是一次**包内名义标签**检查，不是全局目标身份：两个 spec 可以用同一个
   `profile_id` 搭配不同的 `target.identity`，H2 视之为不同目标，兼容性、
@@ -1662,7 +1703,8 @@ A/B 工作流合并留给 H5。
 | `a_base_published_version_cannot_be_edited_with_a_registry_change` | base 已登记 `0.1.0`；同一 PR 改 `0.1.0/` 的 form 并同时改写/删除/替换该登记项 → 包改动是 `published-package-modified`，登记改动是 `published-registry-modified`，退出 1 | 第六轮 P1-1、`ADR-0128` §8.1/§8.3 |
 | `a_retired_published_version_is_still_immutable` | PR A 删除最后一个引用 `0.1.0` 的 spec，但保留 registry 条目；PR B 只改旧 `0.1.0/` 目录 → 按 base registry 判为已发布，`published-package-modified` | 第五轮 P1-2、`ADR-0128` §1.1/§8.3 |
 | `a_concurrent_publish_freezes_the_old_commit_side` | A、B 从同一个旧提交 `M0` 分叉（`M0` 已有 `P/0.1.0` 目录但未登记）；B 先发布 `P/0.1.0`（追加 registry 条目）并合入目标分支；A 随后只改 `P/0.1.0/README.md` 这类不进 `source_package_digest` 的辅助文件 → 门禁以**目标分支尖端 `B`** 为权威，判定 `Published(B) ∋ P/0.1.0` 而 `TreeBytes_B(P) ≠ TreeBytes_H(P)`，报 `published-package-modified`（退出 1）。用 merge-base（仍是 `M0`）会把它当作未发布候选而放行；`verify --published --check` 也不覆盖该字节。同一 PR 若同时改 form → 仍是同一条拒绝 | 第十七轮 P1-2、`ADR-0128` §8.1 |
-| `a_stale_publication_verdict_cannot_authorize_a_merge` | A 在 `P/0.1.0` 未发布时改 `P/README.md` 并通过门禁（记录的 `B_checked = B_A`，`Published(B_A) = ∅`）；随后 B 登记并合入 `P/0.1.0`，目标尖端变成 `B'`；合并检查比较 `(B_checked, H_checked)` 与实际合并提交的父提交 → `B_checked ≠ B'`，拒绝复用（非零退出），必须在新尖端重跑门禁；重跑后同一 diff 报 `published-package-modified`（退出 1）。只有 `B_checked = B_merge` 且 `H_checked = H_merge` 才授权。仅做 post-merge 审计可检测但不能授权 | 第十九轮 P1-1、`ADR-0128` §8.1、N5 |
+| `a_stale_publication_verdict_cannot_authorize_a_merge` | A 在 `P/0.1.0` 未发布时改 `P/README.md` 并通过门禁（记录的 `B_checked = B_A`，`Published(B_A) = ∅`）；随后 B 登记并合入 `P/0.1.0`，目标尖端变成 `B'`；合并检查在落地提交上重算 `B_landed` 和 `Tree(M)` → `B_landed ≠ B_checked`，拒绝复用（非零退出），必须在新尖端重跑门禁；重跑后同一 diff 报 `published-package-modified`（退出 1）。另测：基线不变但落地树 `Tree(M) ≠ C_checked`（例如合并方式产生不同树）同样拒绝。只有 `(B_checked, C_checked, mode)` 与落地提交相符才授权；仅做 post-merge 审计可检测但不能授权 | 第十九、二十轮 P1-1、`ADR-0128` §8.1、N5 |
+| `a_target_subset_requires_per_form_ownership` | H3 验收：bundle 选 `{rv64i, rv64c}`、包 A 覆盖 `{rv64i}`、包 B 覆盖 `{rv64c, rv64i}`；声明 `{rv64i}` 的计划选中 `c.addi` → 新子集格子拒绝（`target-subset-unproved` 或逐 form 需求错误），尽管 `E_plan ⊆ E_bundle` 成立；把 `rv64c` 加入计划目标后通过。同一测试断言：从 `fmp-def/0.1`/legacy form 没有归属证明时默认拒绝，不按空集放行；两个旧格子结果不变 | 第二十轮 P1-1、`ADR-0128` §4.1、`H2-D4` |
 | `the_published_registry_is_append_only` | 删除、改写、重排或替换 base 条目 → `published-registry-modified`；head spec 选中但无条目 → `published-registry-incomplete`；新条目未被任何 head spec 选中或摘要不符 → `published-registry-invalid`；仅追加合法条目通过；head-only 条目在无 spec 选中时可撤销 | 第五轮 P1-2、第六轮 P1-1、`ADR-0128` §8.3 |
 | `a_published_identity_is_globally_unique` | 两个 spec 分别在 `packages/x86_64/monasm.x86.mov/0.1.0` 和 `packages/amd64/monasm.x86.mov/0.1.0` 登记同一 `monasm.x86.mov`/`0.1.0`、摘要不同 → `published-registry-invalid`；同一 path+摘要被两个 spec 引用 → 通过。同一 target 目录下路径由完整 `package_id` 唯一决定，两路径只可能来自不同 target 标签 | 第六轮 P1-2、第十七轮 P1-1、`ADR-0128` §8.3 |
 | `a_retired_definition_identity_cannot_be_reused_with_new_bytes` | PR A 发布 `monasm.isa.x86`/`0.1.0-h2`（D1），PR B 删除该 spec；PR C 用同名字段但得到 D2、当前 spec 集合无冲突 → `definition-identity-conflict`。用相同 D1 重新发布 → 通过且不新增第二行 | 第七轮 P2-2、`ADR-0128` §8 |
@@ -1814,16 +1856,21 @@ CI 从 PR diff 提取 `packages/**` 和 `bundles/published.json` 的变更：
   `published-registry-incomplete`；新增条目未被任何 head spec 选中、与包摘要
   不符，或与另一条目共用 `(package_id, version)` 却换 path/摘要，是
   `published-registry-invalid`；只有追加合法条目通过，head-only 条目可撤销。
-- **合并新鲜度（第十九轮 P1-1）。** 门禁读取并记录显式的一对
-  `(B_checked, H_checked)`；自动化检查要求它们分别等于实际合并提交的目标分支
-  父提交与合并候选。仓库必须配置 merge queue（在 merge-group 候选上跑门禁且只
-  合并该候选）或对合并路径强制 up-to-date required checks，目标尖端变化即失效
-  并重跑。记录不一致或缺失即失败（非零退出）；不得复用旧绿色结果，绕过保护路径
-  的手工合并不是合法发布。两个机制都无法证明时，发布者必须在最终候选上重跑门禁
-  并只合并该次结果。H2a 通过平台 API 读取生效的 branch protection/merge queue
-  并写进报告；读不到设置就是失败，不是通过。
-- 合并后在目标分支再跑一次同一门禁（合并提交对第一父提交）：已发布目录被改即
-  失败。该运行只提供可检测性，不替代上面的新鲜度条件。
+- **合并新鲜度（第十九、二十轮 P1-1）。** 门禁读取并记录
+  `(B_checked, C_checked, mode)`：基线提交 SHA、被测候选树 SHA、合并模式。
+  落地提交 `M` 必须满足 `B_landed = B_checked`、`Tree(M) = C_checked` 且
+  `mode(M) = mode`；自动化检查在落地提交上重算并比较，不一致或缺失即失败
+  （非零退出）。不能用提交 SHA 对代替树：每种合并模式都产生新提交，
+  `refs/pull/N/merge` 的临时提交不是最终写入的提交。可建立等式的机制是 merge
+  queue（在 merge-group 候选上跑门禁且只合并该候选，目标前进时组重建）或把记录
+  的候选提交以「目标移动即被 git 拒绝」的方式落到记录的基线上；普通 up-to-date
+  required checks 只在基线前进时重跑，不承诺落地树相等，不能单独作为授权依据。
+  不得复用旧绿色结果，绕过保护路径的手工合并不是合法发布。H2a 通过平台 API 读取
+  生效的 branch protection/merge queue 并把查询端点、生效配置与实际允许的合并
+  操作写进报告；**403、空 ruleset 或读不到设置是未取到证据，本轮失败**，不能
+  推断为没有保护。
+- 合并后在目标分支再跑一次同一门禁，重算 `Tree(M)` 与 `B_landed`：已发布目录
+  被改或落地树不符即失败。该运行只提供可检测性，不替代上面的等式。
 
 这条路径不要求包已被任何 spec 选中，也不改中心 `bundles/specs/`。只改
 `forms/*.json` 而不改清单也会触发检查。变更路径列表只决定跑哪些包，不决定
@@ -1890,9 +1937,10 @@ H2a 的阶段边界不变，但按五个可独立 review 的回归节点推进�
    不含 README/NOTICE/证据用例字节）。
 5. **N5 门禁与 x86 包**：变更路径 CI（先按 base registry 判定包含，再做 head 侧
    包根发现，嵌套 `package.json` 不能遮蔽已发布祖先）、**合并新鲜度**
-   （`B_checked = B_merge`、`H_checked = H_merge`；门禁记录两个 SHA、自动比较
-   失败即拒绝，merge queue 或强制的 up-to-date required checks 由平台 API 证据
-   证明，合并后审计只作可检测性）、x86 包与 bundles、
+   （门禁记录 `(B_checked, C_checked, mode)` 并在落地提交上比较
+   `B_landed`/`Tree(M)`/`mode`，不一致即拒绝；merge queue 或写入记录候选的合并
+   操作由平台 API 证据证明；普通 up-to-date 检查不单独作为证明，合并后审计只作
+   可检测性；403/空 ruleset 视为未取到证据）、x86 包与 bundles、
    `gates.yml`（`verify --all --check` 与 `verify --published --check` 都是必过
    项，取消其一即门禁失败）、H2a 报告（N4 增加 legacy 等价门禁与快照省略规则，
    N5 增加 base-first 映射与合并新鲜度证据）。
@@ -1943,7 +1991,7 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | 用例声明 form B、计划实际执行 A | 计划恰好一条 instruction，`instruction_id`/`form_id` 必须等于 case 字段；不一致 `case-form-mismatch`；正例比较实际执行的 form |
 | 负例被无关错误满足 | 只有 `scope:"form"` 计入覆盖；它必须绑定同 form 的正例、只改一个操作数指针、由 `bind` 拒绝，并匹配完整 `(code, path)` 集合；至少一条诊断必须落在变异操作数或其父对象上；`expected_digest`/`E-BYTE-001`/`E-SIZE-001` 只能作为 `scope:"plan"` |
 | 已发布包被原地改写，旧 spec 无法重建 | 版本目录是发布快照；`bundles/published.json` 永久登记已发布路径；只有 `B` 中已发布的条目在 PR 内不可变，同一 PR 首次创建并登记合法；旧目录禁止修改/删除；新版本用同级新目录；CI 按目标分支尖端判 `published-package-modified`，删除 spec 不清除登记；删除 base 条目本身是 `published-registry-modified` |
-| 旧绿色结果在目标分支前进后仍被当作授权 | 门禁结论绑定它读到的 `(B_checked, H_checked)`；自动比较实际合并提交的父提交与候选，不一致即失败并重跑；用 merge queue 或强制的 up-to-date required checks，平台设置由 H2a 通过 API 证明，读不到即失败；post-merge 运行只提供可检测性 |
+| 旧绿色结果在目标分支前进后仍被当作授权，或落地树与被测树不同 | 门禁结论绑定 `(B_checked, C_checked, mode)`；在落地提交上重算 `B_landed`/`Tree(M)`/`mode`，不一致即失败并重跑；用 merge queue 或写入记录候选的合并操作；普通 up-to-date 检查不单独作为证明；平台设置由 H2a 通过 API 证明，403/空 ruleset 视为未取到证据；post-merge 运行只提供可检测性 |
 | 退役后留下无 spec 的 lock/sealed，语义不明 | 派生产物与 spec 一一对应：删除最后一个 spec 的同一 PR 删除 lock/sealed/legacy；`--all --check` 双向检查，孤儿是 `orphan-bundle-artifact`（退出 1）；包快照与登记项保留，退役字节由 git 历史保存；不定义归档格式，不留下未选中 sealed 文件 |
 | 首次发布被登记顺序卡死，或写失败留下半成品 | 三个时点分开：候选输出（`build` 退出 0）、registry 追加（publisher 用打印出的摘要写 `published`/`identities`）、发布（合并提交）。顺序固定为 build → 追加 → 两项 `--check` → 提交；`--all --check` 要求行已存在，所以不存在「先 check 后写行」。`build` 先内存校验全部输出，再写临时文件并重命名，确定性拒绝不写文件，写阶段失败退出 2 且不写 registry；lock/sealed 一新一旧必被 `--check` 拒绝；`build` 从不写 registry |
 | legacy 快照被当成发布身份，或提交后与 sealed 漂移 | 它是派生开发缓存，不进入四个摘要、缺失合法；但提交副本要与已校验 sealed 内 `definition` 的 canonical 字节完全一致，不同是 `legacy-snapshot-mismatch`（退出 1），该门禁不重建缓存也不喂摘要；写阶段先删旧 `definition.json`，最后写新文件，第三个文件写失败留下缺失而不是旧行；退出 2 后读到的字节不算当前构建证据 |
@@ -1952,6 +2000,7 @@ matrix。若增加，先写 `ADR-0130`，再改 workflow。
 | 同一扩展/能力集合有两种 JSON 写法 | `enabled_extensions`/`requires_capabilities` 必须严格递增、无重复；逆序是 `extension-lexical`、重复是 `capability-lexical`，在集合关系之前拒绝；构建器不静默重排，派生集合按成员比较 |
 | 闭包预算只算 manifest/资产，漏掉 cases 与证据 | 单闭包计数器累加实际读取的包根字节：manifest、声明资产、`tests/cases.json`、证据清单及其列出的文件；同一路径每包根计一次，菱形共享包只计一次；在越界读取处 `aggregate-limit` |
 | 把「目标覆盖已验证」当成「ISA 需求已完整证明」 | `fmp-def/0.1` 下 `E_form = ∅`，只证明 `E_package ⊆ E_bundle`；`legacy_source` 只加 target 一致性；报告必须单列这条限制，且不为消除它新增 ISA 专用推导器 |
+| H3 只查计划 ⊆ bundle，子集计划选中目标不支持的指令 | 逐指令检查 `E_owner(form(i)) ⊆ E_plan`；归属证据来自版本化 bundle 映射或另一冻结来源，`monasm-bundle/0.1` 不补；无证明的 legacy form 在子集组合下默认拒绝（`target-subset-unproved`），不按空集放行；验收含 `c.addi`/`rv64i` 反例与旧格子回归 |
 | 同一逻辑包版本有两个内容 | registry 的 `(package_id, version)` 全局唯一，首次登记永久绑定 path 和摘要；多个 spec 只能引用同一项；第二项换 path/摘要是 `published-registry-invalid` |
 | 两个 spec 共用产物或定义身份 | 同时存活的 spec 不能共用 `bundle_id`（`bundle-id-conflict`），也不能共用 `(namespace, version)`（`definition-identity-conflict`）；不以摘要相同为由接受 |
 | 退役后同名定义被换成不同字节 | `identities` 永久绑定 `(namespace, version)` 与 `definition_digest`；退役 spec 不删除该行；换摘要即 `definition-identity-conflict`，同摘要重发合法且不新增行 |
@@ -2073,7 +2122,7 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | O11 | 新包没有 `legacy_source` 时如何验证 | **包自述 `target_identity`/`definition_format` + 独立身份 + `read` + 包用例**；用一个合成包证明不依赖历史定义 | 强制新包也写 legacy 来源会永久绑定旧目录 |
 | O12 | `verify --package` 的 Definition namespace/version 从哪来 | **`monasm-standalone/0.1` 固定函数**：`monasm.standalone.<package_id>` / `standalone+<source digest>`；保留前缀禁止进入 spec | 从 spec 借用会碰撞；从目录推导会随 cwd 漂移 |
 | O13 | 包级机器码测试是否强制 | **强制**：每个 form 正例+负例、证据引用、`package_conformance` 执行、`--release-evidence` 检查证据完整性，`--release` 再加闭包 | 只靠 `read` 会放过合法结构里的错误 opcode |
-| O14 | 包 target 与 bundle target 的关系 | **包声明保守覆盖、spec 声明选择**；只证明 `⋃E_form ⊆ E_package ⊆ E_bundle`（`fmp-def/0.1` 下 `E_form = ∅`，实际只证明包 ⊆ bundle），高报合法且只缩小可选范围，不裁剪声明；`fmp-def/0.1` 用 `h2-exact-target` 过渡，H3 解除它需要**新计划协议加版本化构建规则**（`monasm-bundle-spec/0.1` 的拒绝结论永久不变），二者缺一不可；`fmp/0.1`+`fmp-def/0.1` 相等、`fmp/0.1`+`fmp-def/0.2` 子集两个格子不变。`profile_id` 只是包内名义标签，目标身份是六键 `target.identity`；同名不同 identity 合法，H2 不加 `(profile_id, identity)` 唯一性 | 逐字段相等会把新增扩展族变成对既有包的强制改版；把声明当最小并集会改变作者摘要或错误拒绝合法 bundle；按计划格式重判会重新拒绝已合法的 `fmp-def/0.2` 组合；把 profile 名当全局身份需要中央表且会让同名多义无法表达 |
+| O14 | 包 target 与 bundle target 的关系 | **包声明保守覆盖、spec 声明选择**；只证明 `⋃E_form ⊆ E_package ⊆ E_bundle`（`fmp-def/0.1` 下 `E_form = ∅`，实际只证明包 ⊆ bundle），高报合法且只缩小可选范围，不裁剪声明；`fmp-def/0.1` 用 `h2-exact-target` 过渡；H3 解除它需要**三件事**：新计划协议、版本化构建规则（`monasm-bundle-spec/0.1` 的拒绝结论永久不变）、以及版本化 bundle 或另一冻结来源提供的逐指令归属/需求证据（检查 `∀i: E_owner(form(i)) ⊆ E_plan`），缺一不可；`fmp/0.1`+`fmp-def/0.1` 相等、`fmp/0.1`+`fmp-def/0.2` 子集两个格子不变。`profile_id` 只是包内名义标签，目标身份是六键 `target.identity`；同名不同 identity 合法，H2 不加 `(profile_id, identity)` 唯一性 | 逐字段相等会把新增扩展族变成对既有包的强制改版；把声明当最小并集会改变作者摘要或错误拒绝合法 bundle；按计划格式重判会重新拒绝已合法的 `fmp-def/0.2` 组合；把 profile 名当全局身份需要中央表且会让同名多义无法表达；只加 `fmp/0.2` 并查 `E_plan ⊆ E_bundle` 会放行 `{rv64i}` 计划选中 `c.addi`，因为 bundle 本就比计划宽，`monasm-bundle/0.1` 又没有归属映射 |
 | O15 | form 家族与 target 的一致性 | **通用相等规则** `family(form_id) == target_identity.isa_family`；包格式不列 ISA；第四种家族由 H3 的 reader 支持，不需要改包协议 | 三 ISA 对应表实际全是字符串相等，会迫使 H3 再改一次公共格式 |
 | O16 | 证据文件是必需还是可选 | **开发包可选、可发布包必需**；`--release-evidence`/`--release`/spec 选中时要求 `tests/cases.json`、`NOTICE`、`sources`、`oracle.status`、skip 理由和用例证据；`tests/cases.json` 本身被哈希 | 永远可选或只哈希用例证据会让 `release_digest` 不代表完整审核证据 |
 | O17 | 已发布包与定义名如何继续演进 | **版本目录是不可变快照**：`packages/<target>/<package_id>/<version>/`；发布路径记入只追加的 `bundles/published.json`，`(package_id, version)` 全局唯一且永久绑定首次 path/摘要；`identities` 永久绑定 `(namespace, version)` 与 `definition_digest`，退役后仍拒绝换字节重发；`bundle_id` 是可移动发布线，不可变的 bundle 内容标签是 `(bundle_id, bundle_digest)`，证据完备的发布身份是 `release_digest`；只有 base 条目在 PR 内不可变，同一 PR 首次创建并登记合法；退役 spec 不删除登记；更新创建同级新目录；旧 spec 未改时旧 lock 原样重建，退役后旧快照/lock 仍可由旧提交重放；发布者另行选择新版本 | 原地覆盖会迫使作者改旧 spec；仅按当前 spec 判断会让退役后的旧目录和旧定义名失去保护；把 `bundle_id` 当不可变身份会拒绝正常的版本推进 |
@@ -2094,7 +2143,7 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | O32 | 非空依赖项的格式写在哪 | **写进 `ADR-0128` §1/§4 并给固定向量**：`{package_id, version, source_package_digest}` 三键必需、未知键拒绝、数组按 `(package_id, version)` 升序；§7.0 有非空依赖向量 | 只写在实施计划里，等于让格式语义依赖非规范文档；无向量时键名/可选性改动不会被任何测试发现 |
 | O33 | 打开的叶子是否只接受普通文件，类型在哪判定 | **只接受普通文件，类型取自已打开句柄**：中间段必须是目录、叶子必须是普通文件；POSIX 输入打开带 `O_NONBLOCK`，FIFO 在类型判定前不会挂起；非普通叶子是 `not-a-regular-file`（退出 1），所有字节预算都假设普通文件 | 只做 no-follow 不排除 FIFO/socket/设备节点；靠路径 `stat` 或元数据大小判定有 check-then-use 缺口，且 FIFO 无长度、`read` 可永久阻塞，预算无法约束 |
 | O34 | 退役 spec 后 lock/sealed 留在树里还是删除 | **与 spec 一一对应，随最后一个 spec 删除**：同一 PR 删除 lock/sealed/legacy，`--all --check` 双向检查一一对应，孤儿是 `orphan-bundle-artifact`（退出 1）；包快照与登记项保留，退役字节由 git 历史保存，不定义归档格式 | 留下未选中的 sealed 没有任何门禁重建，改字节或过期都不可检测，状态语义不明；另立归档格式等于为只被 `git log` 读取的字节增加第二生命周期和第二门禁 |
-| O35 | 发布门禁的绿色结果在目标分支前进后是否仍有效 | **只对读到的 `(B_checked, H_checked)` 对有效**：接受发布要求 `B_checked = B_merge` 且 `H_checked = H_merge`；门禁记录两个 SHA，自动化检查与实际合并提交的父提交比较，不一致即失败并重跑；用 merge queue（在 merge-group 候选上跑并只合并该候选）或强制的 up-to-date required checks；两个机制都无法证明时在最终候选上重跑并只合并该结果；H2a 通过平台 API 读取设置并记录证据，读不到即失败；post-merge 运行只提供可检测性 | 复用旧绿色结果会让「A 改未发布包的 `README.md`、B 先发布该版本并合入、A 用旧结果合并」改动刚发布的目录，而 A 跑过的检查当时都正确；只做合并后审计能发现却已无法阻止 |
+| O35 | 发布门禁的绿色结果在目标分支前进后是否仍有效 | **只对读到的 `(B_checked, C_checked, mode)` 有效**：`B_checked` 是基线提交 SHA，`C_checked` 是被测候选**树** SHA，`mode` 是合并模式；落地提交 `M` 必须满足 `B_landed = B_checked`、`Tree(M) = C_checked`、`mode(M) = mode`；自动化检查在落地提交上重算，不一致即失败并重跑；用 merge queue（在 merge-group 候选上跑并只合并该候选）或写入记录候选的合并操作；普通 up-to-date required checks 只约束基线新鲜度，不证明落地树相等，不能单独授权；H2a 通过平台 API 读取设置并把端点、生效配置与允许的合并操作写进报告，403/空 ruleset 即未取到证据、本轮失败；post-merge 运行只提供可检测性 | 复用旧绿色结果会让「A 改未发布包的 `README.md`、B 先发布该版本并合入、A 用旧结果合并」改动刚发布的目录，而 A 跑过的检查当时都正确；只做合并后审计能发现却已无法阻止；用提交 SHA 对代替树还会在每种合并模式下都必然失配（临时 test-merge 提交不是最终写入的提交） |
 | O36 | `monasm-package/0.1` 的非空 `exports.types`/`profiles` 是否随构建器升级放宽 | **不放宽，`0.1` 永久拒绝**：接受语义属于清单声明的 `package_format`，不属于读取它的工具版本；升级不得把同一份未改动 `0.1` 从拒绝变成接受；H4 必须引入显式新包格式（如 `monasm-package/0.2`），在版本内定义 type/profile 语义、归属/冲突规则、摘要输入和验证；既有键名、`{id, path}` 形状、排序和摘要输入可直接复用，但复用不放宽 `0.1`，与 `h2-exact-target` 在 `monasm-bundle-spec/0.1` 的永久拒绝同理 | 按「新构建器认识该字段」放宽会让重放依赖二进制版本，同一份旧文档的接受语义随工具升级而变；现在就设计完整类型系统会超出 H2/H4 边界 |
 | O37 | canonical 定义超过 legacy 快照 16 MiB 读取上限时 build 怎么办 | **省略快照，不失败**：闭包 64 MiB、sealed 80 MiB 都允许更大的 canonical 定义；`build` 依据内存中的 canonical 字节决定，≤ 16 MiB 才写 `bundles/legacy/<bundle_id>/definition.json`，超过则省略并在同一写阶段删除旧副本，仍退出 0 并在人类可读输出中说明；`--all --check` 对缺失本就合法，对手工提交的超限快照仍是 `resource-limit`（退出 1）；因此 build 成功意味着所写树的 `--all --check` 通过。加合成测试：合并定义略高于 16 MiB | 让 build 失败会使 64/80 MiB 预算内的合法闭包不可构建，等于让可选缓存决定有效上限；写超限快照会让 build 产出自己的 check 拒绝的树，失败要到发布者提交后才暴露；引入压缩或归档格式需要新的读取路径和门禁 |
 
@@ -2139,7 +2188,7 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | `requires_capabilities` 的推导等式与 `capability-mismatch` | 尚未实现；`bind_forms` 要求非空 `slots`、`bind_slot` 要求非空 `placements`，因此每个合法 `fmp-def/0.1` form 都推导出 `field-placement/v1`；§7.0 的无 slot 字节是摘要预映像，`read` 会先拒绝，不能作为「空集合法」的样例 | **未验证** — H2a |
 | 带 `evidence_digest` 的发布形状 `release_digest` 向量 | Python 已按文中字节算出 `e9473871…`/`ba60e8ba…`；Rust 侧尚未复现 | **部分验证** — H2a 补 Rust |
 | 值定义用例差分（成员→成员指针、kind 变化→位置、数组长度→数组） | 尚未实现 | **未验证** — H2a |
-| form ⊆ 包 ⊆ bundle 的逐包扩展检查与合并前逐包 `read` | 尚未实现；`bind_forms` 把 0.2 form 的 `requires_extensions` 对**合并后**目标检查，这是本规则要补的缺口。`fmp-def/0.1` 下 `E_form = ∅`（`FORM_FIELDS` 拒绝该键），所以 0.1 包只证明 `E_package ⊆ E_bundle` | **未验证** — H2a |
+| form ⊆ 包 ⊆ bundle 的逐包扩展检查与合并前逐包 `read` | 尚未实现；`bind_forms` 把 0.2 form 的 `requires_extensions` 对**合并后**目标检查，这是本规则要补的缺口。`fmp-def/0.1` 下 `E_form = ∅`（`FORM_FIELDS` 拒绝该键），所以 0.1 包只证明 `E_package ⊆ E_bundle`；H3 的子集格子还要逐指令证明 `E_owner(form(i)) ⊆ E_plan`，证据不在 `monasm-bundle/0.1` 里 | **未验证** — H2a（H3 另计） |
 | 回滚语义（发布前可删、发布后只退役） | 文档规则；无实现可测 | **specified, not implemented** — H2a |
 | `verify --published --check` 独立历史审计与**有界**断言（可执行资产/身份，不含 README/NOTICE/证据用例字节） | 尚未实现 | **未验证** — H2a |
 | `legacy_source` 的目标一致性 | 尚未实现；规则是 `definition_format` 相等加 `TargetEq`（扩展按集合） | **未验证** — H2a |
@@ -2163,14 +2212,14 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | 定义身份错配不能表示为 `monasm-cases/0.1` 用例 | 用例要求 `$standalone` 哨兵且 harness 替换为正确身份，错误 digest 在 `case-plan-identity` 处被拒绝；`plan::read`/`bind` 的既有行为已读 | **specified；reader 行为已读** — H2a 绑定测试 |
 | 变更路径先按 base registry 判定包含，嵌套 `package.json` 不能遮蔽已发布祖先 | 尚未实现；没有变更路径映射器；`a_nested_package_manifest_cannot_mask_a_published_ancestor` 待写 | **未验证** — H2a |
 | 已发布集合以目标分支尖端 `B` 为准，`Published(B) ⊆ Published(H)` 且已发布路径字节相等 | 尚未实现；反例是 A、B 从 `M0` 分叉、B 先发布、A 只改 `README.md`；`a_concurrent_publish_freezes_the_old_commit_side` 待写 | **未验证** — H2a |
-| 发布结论只对读到的 `(B_checked, H_checked)` 对有效，目标尖端前进后旧绿结果不能授权合并 | 尚未实现；仓库的 branch protection/merge queue 设置无法从树内读出，`gh` 也读不到；`a_stale_publication_verdict_cannot_authorize_a_merge` 与 API 证据都待写 | **未验证** — H2a N5 |
+| 发布结论只对读到的 `(B_checked, C_checked, mode)` 有效，基线或落地树不同即不能授权合并 | 尚未实现；仓库的 branch protection/merge queue 设置无法从树内读出，审核期间的 API 读取返回 403、ruleset 查询无结论，这是未取到证据而非没有保护；`a_stale_publication_verdict_cannot_authorize_a_merge` 与 API 证据都待写 | **未验证** — H2a N5 必须补 API 证据 |
 | `monasm-package/0.1` 永久拒绝非空 `exports.types`/`profiles`，与构建器版本无关 | 只有文档规则；`a_non_empty_reserved_asset_is_refused_forever_under_0_1` 待写；后续包格式版本未写 | **未验证** — H2a |
 | 输入顺序固定为词法校验→no-follow 打开→句柄类型检查→同句柄大小提示→有界读取→解析，元数据大小不是边界 | 尚未实现；没有包读取器；「类型检查后文件增长」由累计计数器覆盖，测试待写 | **未验证** — H2a |
 | 超过 16 MiB 的 canonical 定义由 `build` 省略快照并删除旧副本，`--all --check` 通过；手工超限快照是 `resource-limit` | 尚未实现；闭包内 64/80 MiB 预算允许该尺寸；`a_build_never_writes_a_snapshot_it_cannot_read` 待写 | **未验证** — H2a |
 | 包目录段等于完整 `package_id`，两个同末段 ID 可同版本共存 | 词法上 `pseg` 已允许点号（`ADR-0128` §1.3）；映射器不存在；`a_package_path_keeps_the_full_package_id` 待写 | **未验证** — H2a |
 | 非空依赖对象是封闭三键结构，固定向量 `637edab0…` | 已用 Python `hashlib` 与 .NET `SHA256` 对文中字节算出同一值；Rust 侧复现待写；`a_dependency_object_is_closed_and_keeps_its_vector` 待写 | **部分验证（Python/.NET）** — H2a 补 Rust |
 | `verify --package` 执行 `definition::read`、不执行 `plan::read`/`bind`/`materialize` | 规则已写入 `ADR-0128` §9.1 与本文 §5.3；命令不存在；`verify_package_reads_the_definition_not_the_plan` 待写 | **未验证** — H2a |
-| 目标兼容矩阵保持 `fmp/0.1`+`fmp-def/0.1` 相等、`fmp/0.1`+`fmp-def/0.2` 子集，新计划协议**加版本化构建规则**才加格子 | 前两格可从 `check_target` 读出；新计划格子与构建规则都不存在；`monasm-bundle-spec/0.1` 尚无 Builder | **部分验证** — H3 门禁 |
+| 目标兼容矩阵保持 `fmp/0.1`+`fmp-def/0.1` 相等、`fmp/0.1`+`fmp-def/0.2` 子集，新计划协议**加版本化构建规则、再加逐指令归属来源**才加格子 | 前两格可从 `check_target` 读出；新计划格子、构建规则与归属映射都不存在；`monasm-bundle-spec/0.1` 尚无 Builder；`a_target_subset_requires_per_form_ownership` 待写 | **部分验证** — H3 门禁 |
 | `profile_id` 是包内名义标签，身份是六键 `target.identity` | 文字规则；没有 spec 或 bundle 可测，也不新增跨 spec 唯一性 | **specified, not implemented** — H2a |
 | 边界证据只在 `D_Representable` 内取，寄存器用 `D_reg = ([0, 2^w−1] ∩ [0, 2^64−1]) \ E`，且只记录诊断实际字段 | 尚未实现；三个包与用例不存在；`w ≥ 64` 的公式与 H1 宽字段证据一致 | **未验证** — H2a/H2b |
 | 127/192 位寄存器槽位在包级协议中仍可 `bind` 与 `materialize` | `prototype/crates/fmp-materialize/tests/he1_wide_register.rs` 已对 64/127/128/192 位调用 `bind`/`materialize` 并校验字节；包级测试待写 | **H1 已测量；H2 包级测试未实现** — H2a |

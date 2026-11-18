@@ -5,7 +5,17 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: nineteenth revision, 2026-11-18, after the merge-timing and
+- Revision: twentieth revision, 2026-11-18, after the target-subset and
+  merge-mechanics audit: H3 may accept a subset plan only after proving every
+  selected instruction against the plan target
+  (`E_owner(form(i)) ⊆ E_plan`), which needs a versioned bundle owner/cover map
+  or another frozen source — `monasm-bundle/0.1` cannot supply it, and a form
+  without a proof is rejected rather than read as needing nothing; a publication
+  verdict is keyed on the base commit SHA and the tested candidate **tree** SHA
+  plus the merge mode, not on a pair of commit SHAs, so required up-to-date
+  checks alone are not accepted as tree-identity proof; and the HE-1 overview's
+  package/bundle examples are aligned with this ADR.
+- Prior revision: nineteenth revision, 2026-11-18, after the merge-timing and
   version-boundary audit: a publication verdict authorizes only the
   `(B_checked, H_checked)` pair it read, so an accepted publication requires
   `B_checked = B_merge` and `H_checked = H_merge`, enforced by a merge queue or
@@ -96,12 +106,15 @@
   extension and capability arrays, with migration equivalence `TargetEq`
   comparing `enabled_extensions` as a set and every other target field strictly;
   the counted closure byte budget; package
-  target covers versus bundle target selection; the two-part versioned H3
-  condition for accepting a subset target (build rule and plan protocol);
+  target covers versus bundle target selection; the H3 condition for accepting a
+  subset target (a versioned build rule, a plan protocol, and a per-instruction
+  owner/requirement source, with `E_owner(form(i)) ⊆ E_plan` for every selected
+  instruction and default rejection when the proof is absent);
   the injective full-`package_id` directory mapping and target-tip
   publication authority (`Published(B) ⊆ Published(H)` with tree-byte equality);
-  the merge-freshness rule that a verdict authorizes only the `(B, H)` pair it
-  read and must be re-established when the target tip moves; the permanent
+  the merge-freshness rule that a verdict is keyed on the base commit SHA, the
+  tested candidate tree SHA and the merge mode, and must be re-established when
+  any of them moves; the permanent
   `monasm-package/0.1` rejection of non-empty `exports.types`/`exports.profiles`
   with their semantics reserved to an explicit later package format; the ordered
   input pipeline (lexical path, no-follow open, handle type check, same-handle
@@ -1029,11 +1042,13 @@ rule, and a future `fmp/0.2` plan format may define a new cell on the plan side.
 **Exit condition.** H3 must define plan-level target compatibility so a plan may
 target a subset of the definition/bundle set without rewriting the definition,
 **and** a versioned build rule so the builder accepts such a selection under that
-declared protocol. Both halves are required: the builder rejects an unequal
-`fmp-def/0.1` selection before any plan is bound, so a plan protocol alone cannot
-lift the build-time check (the versioned-lift paragraph below).
-`monasm-bundle-spec/0.1` keeps its
-rejection conclusion permanently. The lift must be in force before H5's
+declared protocol, **and** the per-instruction evidence source below (a versioned
+bundle map or another frozen, digest-bound source). All three are required: the
+builder rejects an unequal `fmp-def/0.1` selection before any plan is bound, so a
+plan protocol alone cannot lift the build-time check (the versioned-lift
+paragraph below), and a subset relation without per-form or owner data cannot
+reject the `c.addi`/`rv64i` plan. `monasm-bundle-spec/0.1` keeps its rejection
+conclusion permanently. The lift must be in force before H5's
 parallel-extension drills; if it is not, this ADR's package contract must be
 revised by a new ADR before H5 starts. H2 does not claim the transitional
 equality is the final composition rule, and it does not freeze a package
@@ -1048,8 +1063,9 @@ today are fixed, and H3 must preserve every one of them:
 | `fmp/0.1` | `fmp-def/0.1` | equal sets |
 | `fmp/0.1` | `fmp-def/0.2` | plan set ⊆ definition set, plus each form's `requires_extensions` |
 
-Only a **new plan protocol together with the versioned build rule below** may add
-a cell and lift `h2-exact-target`; the
+Only a **new plan protocol, together with the versioned build rule and the
+per-instruction evidence source described below,** may add a cell and lift
+`h2-exact-target`; the
 existing `fmp/0.1` + `fmp-def/0.2` cell already uses the subset rule and must not
 be re-rejected by an implementation that keys the rule on the plan format. The
 `fmp/0.1` + `fmp-def/0.1` cell keeps equality, and no build option changes either
@@ -1058,6 +1074,77 @@ contract, not deleting the existing check. H3 acceptance must run the same
 package with different extension sets across the matrix: old cells keep their
 results, and the new cell accepts a subset only where its own rule says so. A
 build that passes after the check is deleted is not evidence for the new rule.
+
+**H3's subset rule must prove per-instruction legality.** A plan-side
+`E_plan ⊆ E_bundle` is necessary but not sufficient. Let a bundle select
+`{rv64i, rv64c}`, with package A covering `{rv64i}` (`add`, `addi`) and package B
+covering `{rv64c, rv64i}` (`c.addi`). A plan declaring `{rv64i}` satisfies the
+subset relation and can still select `c.addi`, whose owner needs `rv64c`. The
+selected form and its owner decide execution, not the bundle. H3 must therefore
+check every selected instruction against the plan target:
+
+```text
+∀ i ∈ Plan.instructions: E_owner(form(i)) ⊆ E_plan
+```
+
+`E_owner` is the per-form requirement where the executable definition carries a
+versioned one, and the owning package's declared cover (the table at the start of
+this section) otherwise. The
+cover is conservative — it can reject a row that would have needed less — but it
+cannot accept an instruction whose owner declared more than the plan provides.
+Deriving a requirement from a mnemonic or an ISA name is forbidden (`INV-01`,
+`INV-06`); a per-form rule is more precise only when its own version defines the
+key as complete for target gating, with evidence.
+
+The existing `fmp-def/0.2` reader already checks a form's `requires_extensions`
+against the **plan** set (`fmp-validate/src/lib.rs`, `E-TARGET-003`, step 6), so
+that half is not the gap. The gaps are the remaining cases:
+
+- `fmp-def/0.1` forms carry no requirement key, so the same `c.addi` plan passes
+  the equality cell's subset replacement without a per-form check;
+- even a `0.2` form's list is not defined to include the base ISA or every
+  profile fact (§4.1), so a row that under-declares is caught only by the owner
+  cover;
+- a rule that compares the plan with the **bundle** instead of the plan target
+  accepts the instruction for the wrong reason, because the bundle is wider by
+  construction.
+
+**`monasm-bundle/0.1` does not carry that proof.** It stores the merged
+definition and a sorted `sources` list `{package_id, version,
+source_package_digest}`; it has no `form_id` → owner and no `E_package`. A
+`fmp-def/0.1` merged document has no `requires_extensions` on any form, and a
+`fmp-def/0.2` document carries only the per-form key, not the package cover or
+the owner. The lock is not sufficient either: it names package paths and digests
+but not their covers. H3 therefore cannot implement the rule above from the H2
+artifacts alone. Before accepting a subset plan, H3 must obtain one of:
+
+- a versioned bundle (for example `monasm-bundle/0.2`) that records, per exported
+  `form_id`, the requirement or the verifiable owner cover, bound to the package
+  identity and digest the lock already records; or
+- another frozen, versioned source that the bind path reads together with the
+  bundle and that is itself digest-bound and gated.
+
+Adding `fmp/0.2` alone is not enough, because the plan validator sees neither
+map. Reinterpreting `monasm-bundle/0.1` to invent one is a format change, not an
+implementation detail.
+
+**An absent requirement means "unproved", not "needs nothing".** Treating a
+missing `requires_extensions` as `∅` is the same mistake H2 refuses at the
+package level: it converts unknown into "legal for every target" and lets any
+subset plan select the form. For a legacy form copied from an `fmp-def/0.1`
+document, and for any form whose owner cover is absent from the frozen artifact,
+the default is to reject the subset composition with the new protocol's own
+diagnostic (`target-subset-unproved`; it is not an `fmp/0.1` code). Exact-target
+compositions are unaffected, because every set there is equal and the H2 rule
+already rejects a mismatch. H3 may accept such a form only after the artifact
+supplies the proof.
+
+**What H3 acceptance must show.** At least: the `c.addi` plan above is rejected
+under the new cell; a plan whose target contains the owner cover is accepted; an
+`fmp-def/0.1`/legacy form without a proof is rejected rather than read as `∅`;
+and the two existing cells keep their H2 results. H2 does not implement the rule
+and does not add the map to `monasm-bundle/0.1`; the obligation is written now so
+that freezing the H2 artifact does not silently make H3 unprovable.
 
 No `monasm-package/0.1` bump is required to lift the transition: the package
 field already means "a cover of the extensions these rows require", and the
@@ -1069,17 +1156,20 @@ vocabulary.
 
 **A new plan protocol alone does not lift the build-time check.** The builder
 rejects an unequal `fmp-def/0.1` selection while it builds a spec, before any plan
-is bound, so adding `fmp/0.2` cannot make such a spec build. Lifting has two
-halves that must land together: a **versioned build rule** — a new
+is bound, so adding `fmp/0.2` cannot make such a spec build. Lifting has three
+parts that must land together: a **versioned build rule** — a new
 `monasm-bundle-spec` version, or an explicit versioned compatibility-relation
-declaration that the builder reads — and the plan-side cell above. The shipped
+declaration that the builder reads — the plan-side cell above, and the
+**per-instruction evidence source** (the versioned owner/cover map or the frozen
+companion artifact). The shipped
 `monasm-bundle-spec/0.1` keeps its rejection conclusion permanently: the same spec
 bytes must not flip from deterministic rejection (exit 1) to acceptance because
 the builder was upgraded, since that would silently change what an old format
 accepts. H3 acceptance must show, for a composition such as an `rv64i`-only
 package with an `rv64c`/`rv64i` bundle: the old spec version still rejects the
 unequal selection, the new build-rule version builds it, and the resulting bundle
-binds a plan whose target set is the subset. The first assertion is what proves
+binds a plan whose target set is the subset, while selecting a form whose owner
+cover exceeds the plan target is rejected. The first assertion is what proves
 `0.1` semantics did not drift; the second is what unblocks H5 at the builder
 rather than only at the plan validator.
 
@@ -1409,7 +1499,10 @@ definition.
   `bundle_format`, `bundle_id`, the canonical definition document,
   `bundle_digest`, `definition_digest`, and the sorted `sources` list
   `{package_id, version, source_package_digest}`. It does not contain the builder
-  receipt, `release_digest` or author paths.
+  receipt, `release_digest` or author paths. It also does not contain a
+  `form_id` → owner or owner-cover map; §4.1 records that H3's target-subset rule
+  needs a versioned artifact (or another frozen source) before it can use this
+  bundle, and that H2 does not add the map to `monasm-bundle/0.1`.
 - `bundles/legacy/<bundle_id>/definition.json` — generated when the canonical
   definition fits its 16 MiB read budget: the plain merged definition document,
   with no bundle envelope, so the existing `fmp materialize <plan> --definitions
@@ -1668,12 +1761,36 @@ assets, not the whole directory. Only the tip-based comparison rejects A with
 questions (which commits introduced a path) but never for "which versions are
 published now".
 
-**The verdict is valid only for the pair it read.** Let `B` be the target-branch
-tip the gate read and `H` the merge candidate it evaluated: the pair
-`(B_checked, H_checked)`. The gate authorizes exactly that pair, so an accepted
-publication requires `B_checked = B_merge` and `H_checked = H_merge`. Without
-that, a correct run can still be stale in the worst way, and the tip rule alone
-does not catch it:
+**The verdict is valid only for the base commit and candidate tree it read.**
+Let `B_checked` be the target-branch commit SHA whose registry and published
+bytes the gate read, and `C_checked` the **tree SHA** of the merge result the
+gate evaluated for that base and the PR head under the declared merge mode.
+Record the mode too (`merge`, `squash`, `rebase` or `fast-forward`), because the
+mode decides which tree a merge lands: `merge` lands
+`merge-tree(B_checked, head)`, while `squash`, `rebase` and `fast-forward` land
+the head tree when `B_checked` is an ancestor of the head. Commit SHAs are not
+the comparison unit: every mode writes a different commit, and the ephemeral
+`refs/pull/N/merge` commit is not the commit the platform finally writes. The
+tree is what the gate can compare across all modes.
+
+A merge lands commit `M` on the target branch. Let `B_landed` be the commit `M`
+was applied to (first parent for a merge commit, the previous target tip for the
+other modes) and `C_landed = Tree(M)`. The verdict authorizes the merge only
+when:
+
+```text
+B_landed = B_checked
+C_landed = C_checked
+mode(M) = mode
+```
+
+The gate prints `(B_checked, C_checked, mode)`; an automated check on the landed
+commit recomputes `C_landed` and `B_landed` and fails when either differs. The PR
+head and merge-group commit are recorded for audit, but they are not the
+authorization key, because the landed commit is a new SHA in every mode.
+
+Without this, a correct run can still be stale in the worst way, and the tip rule
+alone does not catch it:
 
 1. branch A modifies `P/README.md` while `P/0.1.0` is unpublished; CI reads
    `B_A`, where `Published(B_A) = ∅`, and passes;
@@ -1681,34 +1798,48 @@ does not catch it:
    tip becomes `B'` with `P/0.1.0 ∈ Published(B')`;
 3. A merges on the old green result.
 
-Evaluated against `(B', H_A)` the same diff is `published-package-modified`;
-evaluated against `(B_A, H_A)` it was legal. The diff bytes did not change, so
-only freshness distinguishes the two runs. H2 therefore requires one of two
-enforcement mechanisms before a publication gate can pass:
+Evaluated against `(B', C_A')` the same diff is `published-package-modified`;
+evaluated against `(B_A, C_A)` it was legal. The diff bytes did not change; only
+the base moved, so `B_landed = B' ≠ B_checked` and the equations reject the
+merge. Two mechanisms establish the equations without relying on a human to
+merge the right commit:
 
-- a **merge queue** that evaluates the gate on its merge-group candidate and
-  merges exactly that candidate, rebuilding the group when the target branch
-  moves; or
-- **required up-to-date checks on the merge path**, with the gate re-run whenever
-  the target tip changes, so a verdict computed against an older tip cannot be
-  the last successful result before the merge.
+- a **merge queue** that builds a merge-group candidate on the current target
+  tip, runs the gate on that candidate, and merges exactly that candidate,
+  rebuilding the group when the target moves; then `B_checked` is the group's
+  base, `C_checked` the group tree, and `M` the group commit, so the equations
+  hold by construction; or
+- **merging the recorded candidate** onto the recorded base with an operation git
+  refuses when the base moved — a fast-forward of the candidate commit, or an
+  equivalent protected-branch merge that writes exactly that commit. The landed
+  tree is `C_checked` by construction, and a moved target makes the operation
+  fail instead of landing a different tree.
 
-The gate must record the pair it read (for example the two commit SHAs in its
-output) so an automated check or a reviewer can compare it with the merge
-commit's parents. A verdict without that pair is not evidence, reusing a result
-whose recorded `B` is not the merge's `B` is forbidden, and a manual merge that
-bypasses the protected path is not a legal publication. If neither mechanism can
-be demonstrated for the repository, the publisher must re-run the gate on the
-final candidate and merge only that run's result; a stale green never authorizes
-the change. A post-merge run on the target branch that compares the merge commit
-with its first parent and fails when a published directory changed adds
-detectability, but it does not replace this freshness requirement.
+**Required up-to-date checks are not equivalent to either.** They make the
+platform re-run checks when the base advances, which bounds staleness, but they
+do not promise that the commit finally written has the tree that was tested, and
+a merge commit's SHA necessarily differs from the ephemeral test-merge ref. A
+setting that merely says "require branches to be up to date" therefore cannot be
+cited as proof of `C_landed = C_checked`. If the repository uses that path, it
+must additionally merge the recorded candidate (or run the gate on the final
+candidate and merge exactly that candidate); otherwise the check is detection
+only and does not authorize a publication.
+
+The gate must print the triple and the automated check must consume it. A
+verdict without the triple is not evidence; reusing a verdict whose `B_checked`
+or `C_checked` no longer describes the merge is forbidden; and a manual merge
+that bypasses the protected path is not a legal publication. A post-merge run on
+the target branch that recomputes `Tree(M)` and `B_landed` adds detectability, but
+it does not replace the equations.
 
 This is a repository-setting requirement, and a document cannot prove a setting
 by itself. H2a's acceptance gate therefore reads the effective branch protection
-or merge queue through the platform API and records the evidence; if it cannot
-show the mechanism, the round fails. The ADR neither asserts nor assumes that the
-current repository already has it — that fact is not visible from the tree.
+or merge queue through the platform API and records the evidence: the endpoints
+queried, the effective configuration, and the merge operation the repository
+actually permits. **A 403, an empty ruleset list, or a setting the API will not
+return is not evidence that no protection exists**; it is an evidence step that
+has not been obtained, and the round fails until the mechanism is shown. The ADR
+neither asserts nor assumes that the current repository already has it.
 
 **The base registry decides containment first.** Before the head tree is used to
 resolve a `package.json` ancestor, the gate checks whether the changed path lies
@@ -3146,9 +3277,13 @@ comparing the materializer with itself proves the bytes.
   needs an explicit later package format (§5).
 - No `bind(VerifiedBundle, ...)` and no `fmp-validate → fmp-definition`
   dependency (H3).
+- No target-subset acceptance in H2, and no H3 subset cell until a versioned
+  artifact supplies per-form or owner-cover data; `fmp/0.2` alone does not
+  (§4.1).
 - No claim about the repository's branch-protection or merge-queue settings from
   a document; H2a reads the effective setting through the platform API and
-  records the evidence (§8.1).
+  records the evidence. A 403, an empty ruleset list or an unreadable setting is
+  a missing evidence step, not proof that no protection exists (§8.1).
 - No archive format or archive gate for a retired bundle: its lock, sealed
   bundle and legacy snapshot leave the tree with its last spec, and git history
   is the replay record (§8.4).
@@ -3219,12 +3354,18 @@ comparing the materializer with itself proves the bytes.
   `verify --all --check` rejects a surviving orphan, so no unselected release
   artifact is left in an undefined state. The snapshot and registry entry remain
   the permanent record, and git history keeps the retired bytes replayable.
-- A publication verdict is bound to the `(B, H)` pair it read. A green result is
+- A publication verdict is keyed on the base commit SHA, the tested candidate
+  tree SHA and the merge mode, not on a pair of commit SHAs. A green result is
   not a property of a branch that survives the target moving: when another PR
   publishes a version and merges first, the old verdict no longer describes the
-  merge, and the publication is authorized only by a run whose `B` is the tip
-  being merged into. The cost is a merge-queue or up-to-date requirement, paid
-  because the alternative is an undetectable edit of a just-published directory.
+  merge, and the publication is authorized only by a run whose base and tree are
+  the ones actually landed. The cost is a merge queue or an operation that writes
+  the recorded candidate; required up-to-date checks alone do not establish it.
+- H3 pays an artifact change for target subsets. `monasm-bundle/0.1` records
+  sources and the merged definition, not per-form owners or covers, so a subset
+  plan cannot be checked against it. H3's versioned bundle or frozen companion
+  source carries that proof, and a form without one is rejected rather than read
+  as needing no extension (§4.1).
 - `monasm-package/0.1` rejects non-empty `exports.types`/`exports.profiles`
   permanently, so acceptance cannot silently widen with a builder upgrade. H4
   pays one explicit package-format version for type/profile semantics instead of
@@ -3392,8 +3533,10 @@ comparing the materializer with itself proves the bytes.
 - The builder is offline and deterministic: no network, no author-directory
   reads, no package hooks, no execution of package scripts (`INV-05`).
 - H3 can replace `VerifiedBundle::definition()` with a bundle-bound `bind` and
-  add the subset-based plan target rule without changing the package, spec or
-  lock formats; the plan format is the H3 surface that changes.
+  add the subset-based plan target rule together with the versioned owner or
+  per-form requirement source (§4.1). The package and spec formats need not
+  change; the sealed bundle artifact is versioned, and the plan format is the H3
+  surface that changes.
 
 ## Alternatives rejected
 
@@ -3409,11 +3552,25 @@ comparing the materializer with itself proves the bytes.
   could edit the old snapshot. §8.3 keeps an append-only registry that survives
   retirement.
 - **Trust a green publication result until the branch is merged.** Rejected: the
-  verdict describes the `(B, H)` pair it read, and the target tip can gain a
-  publication after that read. Reusing the result would let a branch edit a
-  directory that became published in the meantime, and no other gate looks at
-  those bytes. A merge queue or strict up-to-date checks re-establish the pair
-  (§8.1); a post-merge audit alone is detectability, not prevention.
+  verdict is keyed on a base commit and a candidate tree, and the target tip can
+  gain a publication after that read. Reusing the result would let a branch edit
+  a directory that became published in the meantime, and no other gate looks at
+  those bytes. A merge queue or an operation that writes the recorded candidate
+  re-establishes the key (§8.1); a post-merge audit alone is detectability, not
+  prevention.
+- **Treat required up-to-date checks as equivalent to a merge queue.** Rejected:
+  they re-run checks when the base advances but do not promise that the landed
+  commit has the tested tree, and the landed merge commit is a new SHA. The
+  authorization key is `(B_checked, C_checked, mode)`; a setting page cannot prove
+  `C_landed = C_checked` (§8.1).
+- **Accept a plan target subset by checking `E_plan ⊆ E_bundle` only.** Rejected:
+  it accepts `c.addi` for an `rv64i`-only plan when the bundle also selects
+  `rv64c`. The selected instruction's owner must be covered by the plan target;
+  the bundle is wider by construction (§4.1).
+- **Read a missing `requires_extensions` as the empty set.** Rejected: it turns
+  "unproved" into "legal for every configuration", which is exactly the
+  under-declaration the package cover exists to reject. A legacy form without a
+  versioned owner or requirement proof is rejected for subset plans (§4.1).
 - **Treat a non-empty `exports.types`/`exports.profiles` as legal once a newer
   builder knows the field.** Rejected: the same unchanged `monasm-package/0.1`
   document would then be rejected by one tool version and accepted by the next,
@@ -3808,7 +3965,9 @@ comparing the materializer with itself proves the bytes.
 | A definition-identity mismatch is not expressible as a `monasm-cases/0.1` case | the case requires the `$standalone` sentinel and the harness substitutes the correct identity, so a wrong digest is `case-plan-identity`; the derived-plan binding test carries the negative | **specified; reader behaviour read** — H2a |
 | The base registry (target-branch tip `B`) decides published-path containment before head-side `package.json` discovery | specified; no changed-path mapper exists, so a nested manifest masking an ancestor is untested | **specified, not implemented** — H2a |
 | A version published on the target branch after a feature branch forked still freezes that branch's edits | specified; the counterexample is a fork from `M0`, publication of `P/0.1.0` on the target branch, then an edit to `P/0.1.0/README.md`; only tip-based `Published(B) ⊆ Published(H)` plus tree-byte equality rejects it, since the digest excludes `README.md` | **specified, not implemented** — H2a |
-| A publication verdict authorizes only the `(B, H)` pair it read: a stale green result cannot authorize a merge after another PR publishes first | specified; requires a merge queue or strict up-to-date required checks, and H2a must prove the setting through the platform API; no workflow or settings evidence exists | **specified, not implemented** — H2a N5 |
+| A publication verdict authorizes only the `(B_checked, C_checked, mode)` triple it read: a stale green result cannot authorize a merge after another PR publishes first | specified; requires a merge queue or an operation that writes the recorded candidate, and H2a must prove the setting through the platform API; no workflow or settings evidence exists | **specified, not implemented** — H2a N5 |
+| H3 target subsets check `E_owner(form(i)) ⊆ E_plan` for every selected instruction, from a versioned owner/cover map or another frozen source; a form without a proof is rejected | specified; `monasm-bundle/0.1` has no owner map and no H3 plan or bundle format exists; the `c.addi`/`rv64i` case is untested | **specified, not implemented** — H3 |
+| Required up-to-date checks alone do not prove the landed tree equals the tested tree; a 403 or empty ruleset list is missing evidence, not absence of protection | specified; an API read attempt during review returned 403 and the ruleset query was inconclusive, and no merge-queue evidence has been recorded | **unobtained; H2a must record API evidence before acceptance** |
 | `monasm-package/0.1` rejects non-empty `exports.types`/`exports.profiles` permanently, independent of the builder version; a later format version owns the semantics | specified; no builder exists, and no later package format is written | **specified, not implemented** — H2a |
 | Input budgets apply in one order — lexical path, no-follow open, handle type check, same-handle size hint, bounded read, parse — and metadata size is never the boundary | specified; no reader exists; a file that grows between type check and read is covered by the cumulative counter | **specified, not implemented** — H2a |
 | A build never writes a legacy snapshot above its 16 MiB read budget; a legal closure above it builds with the snapshot omitted and passes `--all --check` | specified; no builder exists; the synthetic over-16 MiB definition case is untested | **specified, not implemented** — H2a |
@@ -3875,9 +4034,20 @@ comparing the materializer with itself proves the bytes.
   stop. `Published(B) ⊆ Published(H)` and equal tree bytes are the whole
   invariant; a version published after the branch forked is still frozen (§8.1).
 - Someone reuses a green publication result without checking that its recorded
-  `B` is the tip being merged into: stop. The verdict describes the pair it read;
-  a target tip that gained a publication invalidates it, and no other gate looks
-  at those bytes (§8.1).
+  base commit and candidate tree are the ones being merged: stop. The verdict is
+  keyed on `(B_checked, C_checked, mode)`; a target tip or merge mode that moved
+  invalidates it, and no other gate looks at those bytes (§8.1).
+- Someone cites "required branches to be up to date" as proof that the landed
+  tree equals the tested tree, or treats a 403 or an empty ruleset list as proof
+  that no protection exists: stop. Up-to-date checks bound base staleness, not
+  tree identity; missing API evidence fails the H2a gate (§8.1).
+- Someone lifts `h2-exact-target` by adding `fmp/0.2` and checking only
+  `E_plan ⊆ E_bundle`: stop. Every selected instruction must satisfy
+  `E_owner(form(i)) ⊆ E_plan`; `monasm-bundle/0.1` cannot supply the owner map, so
+  H3 needs a versioned artifact or another frozen source (§4.1).
+- Someone reads a legacy form's absent `requires_extensions` as the empty set and
+  lets any subset plan select it: stop. Absent means unproved; the subset
+  composition is rejected until the artifact supplies the proof (§4.1).
 - Someone names the package directory from the last dot-separated segment of
   `package_id`: stop. The component equals the full `package_id`, so
   `monasm.x86.crypto` and `vendor.x86.crypto` can coexist; the last-segment
