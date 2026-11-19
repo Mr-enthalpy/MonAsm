@@ -295,7 +295,7 @@ form_id -> package_id + exact version + verified form      # monasm-package/0.1
 
 `type_id`、`profile_id` 的归属表属于 H4：`monasm-package/0.1` 的 `exports.types`/`exports.profiles` 必须为空，所以 `0.1` 里没有可归属的类型或 profile。共享寄存器类型和 Fixup Profile 的独立小包也要等那个显式的新包格式版本；普通扩展不需要递增全局数字或申请下一个 ADR 号。
 
-归属表本身不进入 `monasm-bundle/0.1`：sealed bundle 只记录合并后的定义和 `packages`（`{package_id, version, source_package_digest}`），不记录 `target`，也没有归属信息。H3 做目标子集校验时需要的「每条 form 的归属与扩展需求」因此必须来自版本化的新产物或另一个冻结来源，不能从 `0.1` bundle 反推（§7.3）。
+归属表随 sealed bundle 一起冻结：`monasm-bundle/0.1` 的 `form_owners`（每个合并 form 恰好一行 `{form_id, package_id}`）与 `packages` 里每个包的 `enabled_extensions` 覆盖共同给出「每条 form 的归属与扩展需求」，两者都在 `bundle_digest` 预映像内。H2 只记录这些事实，不做子集判定；H3 的 `E_owner(form(i)) ⊆ E_plan` 直接消费它们，不需要第二个 bundle 版本，也不能从 `fmp/0.2` 或 mnemonic 反推（§7.3）。
 
 ### 6.4 依赖不使用隐式版本求解
 
@@ -312,15 +312,17 @@ HE-1 不实现包管理生态。不查询“最新版本”，不使用 semver �
 `bundles/specs/<bundle_id>.json` 是 `monasm-bundle-spec/0.1`，显式列出 target、`definition_format`、namespace/version 和所选包的**完整闭包**（每项 `{package_id, version, path, source_package_digest}`）。构建器只读取 spec 列出的路径，不扫描 `packages/`，并生成：
 
 1. `bundles/locks/<bundle_id>.lock.json`：具体依赖路径与摘要；
-2. `bundles/sealed/<bundle_id>.bundle.json`：`monasm-bundle/0.1`，恰好七个键，含合并后的定义与 `packages`（无 `target`）；
+2. `bundles/sealed/<bundle_id>.bundle.json`：`monasm-bundle/0.1`，恰好九个键，含 bundle 级 `target`、合并后的定义、带 `enabled_extensions` 的 `packages` 与 `form_owners`；
 3. `bundles/legacy/<bundle_id>/definition.json`：派生的开发缓存，可缺失。
 
 一个 FMP 绑定一个精确 bundle 身份。新增包不会自动加入既有 bundle。
 
-`monasm-bundle/0.1` 不保存 bundle 级 `target` 包装或 `profile_id`，所以 sealed 的
-`bundle_digest` 不能只靠自身重算：H3 绑定 bundle 身份时必须与对应 lock 成对
-校验，或使用嵌入完整预映像的新 sealed 格式版本；H2 的 `verify --check` 从 spec
-重建两件产物并成对比较，不单独信任文件内摘要。
+`monasm-bundle/0.1` 保存完整的 digest 预映像：bundle 级 `target`（含 `profile_id`）、
+逐包 `enabled_extensions` 与 `form_owners` 都在文件里，所以 sealed 可以独立重算
+`definition_digest` 与 `bundle_digest`，并检查 `target.identity == definition.target`。
+lock 仍单独校验包路径、`evidence_digest`、`release_digest` 与 builder 记录；H2 的
+`verify --check` 从 spec 重建两件产物并成对比较。自校验只证明 bundle 说了什么，
+不证明计划可用；H3 仍以 `bind(Plan, Arc<Definition>)` 为入口。
 
 目录扫描只可用于开发期展示“有哪些包”，不能用于决定“这份计划采用哪些包”。
 
@@ -351,7 +353,7 @@ HE-1 不实现包管理生态。不查询“最新版本”，不使用 semver �
 
 具体字符串由 `ADR-0128` 固定。这些版本语义必须分开：升级读取器不得改变旧格式的接受结论。
 
-**H3 的目标子集不靠扩展 `monasm-bundle/0.1`。** 该格式只有合并定义和 `packages`，没有 `form_id → owner` 或包扩展覆盖；H2 也不补这条映射。H3 必须用新的版本化 bundle（例如 `monasm-bundle/0.2`）或另一个冻结、摘要绑定的来源提供逐 form 需求/归属证据，并对每条选中指令检查 `E_owner(form(i)) ⊆ E_plan`；缺少证明的 legacy form 在子集组合下默认拒绝，不按空集放行。只新增 `fmp/0.2` 并把集合关系从相等改成子集，会放行声明 `{rv64i}` 的计划选中 `c.addi`。
+**H3 的目标子集直接消费 `monasm-bundle/0.1` 的归属事实，不引入第二个 bundle 版本。** `form_owners` 给出每条 form 的 owner，该 owner 在 `packages` 中的 `enabled_extensions` 给出保守覆盖；两者都在 `bundle_digest` 内。H3 对每条选中指令检查 `E_owner(form(i)) ⊆ E_plan`；缺少 owner 行或覆盖的产物默认拒绝，不按空集放行。只新增 `fmp/0.2` 并把集合关系从相等改成子集，会放行声明 `{rv64i}` 的计划选中 `c.addi`。
 
 新 FMP 的 layout、instruction、operand 基本骨架沿用现有结构。`definition_identity` 可以继续承担 bundle 身份，不必仅为改名新增一套冗余字段。
 
@@ -650,7 +652,9 @@ Compose(Base, A, B) == Compose(Base, B, A)
 
 实现唯一归属、精确依赖、路径边界和确定性规范化。共享检查以 Rust 为权威。
 
-**退出门槛：** 两个不同包可独立测试；新包不会要求改中心表格；对照字节和定义语义无漂移。
+验收分两个独立结论：**作者层**（包独立定义、校验、构建，产生相同机器事实，纯内存构建与确定性不依赖外部平台）与**发布通道**（不可信路径处理、不可变发布记录、合并竞态保护、全历史审计）。作者层可在发布通道前置条件未取到时推进；发布通道未通过前不存在 `bundles/published.json`，lock/sealed/legacy 都是开发产物，任何文档不得称其已发布、不可变或可信。
+
+**退出门槛：** 两个不同包可独立测试；新包不会要求改中心表格；对照字节和定义语义无漂移。发布通道另需三平台 no-follow 证据、合并新鲜度证明与历史审计成本阈值；其失败只停止发布结论与 H2 退出，不回退作者层已证明的事实。
 
 ### H3：新协议与通用加载边界
 
@@ -658,7 +662,7 @@ Compose(Base, A, B) == Compose(Base, B, A)
 
 增加最小 `fmp/0.2` 与 bundle reader；目标身份由快照声明，能力由内核检查；旧协议通过 legacy adapter 保留。
 
-目标子集要逐指令证明：对每条选中指令检查 `E_owner(form(i)) ⊆ E_plan`，证据来自版本化的新 bundle（例如 `monasm-bundle/0.2`）或另一个冻结、摘要绑定的来源。`monasm-bundle/0.1` 只有合并定义与 `packages`，不足以支撑这条检查；缺少归属证明的 legacy form 在子集组合下默认拒绝，不能按空集推定其合法。只新增 `fmp/0.2` 并放宽集合关系不算完成。
+目标子集要逐指令证明：对每条选中指令检查 `E_owner(form(i)) ⊆ E_plan`，事实来自 `monasm-bundle/0.1` 的 `form_owners` 与各包 `enabled_extensions` 覆盖（两者都在 `bundle_digest` 内）；缺少 owner 行或覆盖的产物默认拒绝，不能按空集推定其合法。只新增 `fmp/0.2` 并放宽集合关系不算完成。
 
 加载明确 lock 的闭包，不读取未选中包。新增合成目标仅需添加数据和测试。支持零操作数形式，避免用假操作数绕过结构限制。
 

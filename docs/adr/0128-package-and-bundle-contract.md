@@ -5,21 +5,46 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: twenty-second revision, 2026-11-18, after the key-set, publication-
+- Revision: twenty-third revision, 2026-11-19, after the scheduling and
+  frozen-format audit. Several decisions change shape, not wording.
+  First, H2 is judged by **two separate acceptance verdicts**: an author-layer
+  verdict that needs no external platform fact, and a publication-channel verdict
+  that carries the hardened reader, the registry, the merge-freshness proof and
+  the history audit. The author layer may proceed while the publication channel's
+  prerequisites are still open; no artifact may be called published, immutable or
+  trusted until the publication verdict passes.
+  Second, `monasm-bundle/0.1` stops being a companion that omits facts its own
+  digest covers. Because nothing has shipped, the format is fixed **once**, as a
+  self-contained artifact: it carries the bundle-level `target`, the declared
+  per-package cover, and a complete `form_owners` map, so `bundle_digest` is
+  recomputable from the file and H3 consumes these facts instead of introducing
+  another bundle version. The round-21 companion rule and the round-22 seven-key
+  set are superseded here, explicitly, rather than left as two descriptions a
+  reader has to arbitrate.
+  The registry entry also gains a `snapshot_digest` over every regular file in the
+  published version directory, so published evidence, cases and `NOTICE` are no
+  longer protected by the merge gate alone; the remaining trust boundary is stated
+  in §8.4.
+  Finally, the boundary-positive rule handles degenerate legal domains by
+  cardinality (§9.1), so a one- or two-element `D_form` no longer demands an
+  interior value that does not exist.
+- Prior revision: twenty-second revision, 2026-11-18, after the key-set, publication-
   gate, registry-coordination and builder-provenance audit: `monasm-bundle/0.1`
-  has exactly one closed key set — seven keys, with `packages` as the package
-  list and **no** bundle-level `target` — and the earlier text that called the
+  had one closed key set of seven keys, with `packages` as the package list and
+  **no** bundle-level `target` (superseded by this revision's self-contained
+  nine-key form), and the text that called the
   list `sources` or said the sealed bundle carries the spec's `target` is
-  removed rather than left for a reader to arbitrate; H2a's N5 node does not
-  close on a green CI run but only on a recorded merge mechanism plus an executed
-  stale-CI counterexample, and otherwise stops at that gate; independent package
+  removed rather than left for a reader to arbitrate; the publication verdict's N5
+  node does not close on a green CI run but only on a recorded merge mechanism
+  plus an executed stale-CI counterexample, and otherwise stops at that gate; independent package
   authoring and independent publishing are separate claims, with H2 promising
   correct serialized publication rather than coordination-free parallel
   publishing; and `builder` is documented as an informational provenance record
   whose change can pass `--all --check`, not as proof that the declared
   implementation produced the bundle.
-- Prior revision: twenty-first revision, 2026-11-18, after the sealed-bundle,
-  registry-scale and N1-prerequisite audit: `monasm-bundle/0.1` is a companion
+- Prior revision: twenty-first revision, 2026-11-18 (superseded by this
+  revision's self-contained sealed form), after the sealed-bundle,
+  registry-scale and N1-prerequisite audit: `monasm-bundle/0.1` was a companion
   artifact of its lock, not a self-verifying snapshot — its `bundle_digest`
   preimage includes the bundle-level `target` (with `profile_id`) that the sealed
   file does not store, so a consumer recomputes the value from the lock plus the
@@ -568,10 +593,10 @@ path     = pseg ("/" pseg)*
     the implementation must either open the entry it just matched (a
     directory-entry handle or an identity check on the opened object) or detect
     that the object differs and reject with `path-escape` (exit 1). A path layer
-    that only proves symlink refusal does not prove this; the H2a N1 gate
+    that only proves symlink refusal does not prove this; the V-P N1b gate
     includes the replacement case on every platform.
   - A platform that cannot perform an exact-name lookup relative to an open
-    handle, or cannot bind the open to the matched entry, fails the H2a N1 gate;
+    handle, or cannot bind the open to the matched entry, fails the V-P N1b gate;
     it must not accept the aliased name and must not fall back to a following
     open.
 - `bundles/specs/<file>.json` is the spec, `bundles/locks/<file>.lock.json` the
@@ -834,19 +859,23 @@ product dependency whose entire role is this path layer, in addition to
 `fmp-model` (§9). It must be pinned, offline and free of package-format
 knowledge; it may not interpret a manifest, a definition or a digest. Whether a
 candidate actually delivers the guarantee on Linux, macOS and Windows is not
-assumed here: H2a's first deliverable is a standalone platform feasibility PoC
-that must demonstrate it with intermediate-directory links, final-file links,
-Windows reparse points, a swap between check and open, and a POSIX FIFO leaf that
-must be rejected as `not-a-regular-file` without blocking, or stop the round
-instead of shipping a following open. If a platform cannot be satisfied, the
-builder refuses package reads there with `path-escape`; a build that succeeds on
-Linux but refuses every package on Windows is a failed H2a gate, not a passing
-one.
+assumed here: the publication-channel verdict's first deliverable is a standalone
+platform feasibility PoC that must demonstrate it with intermediate-directory
+links, final-file links, Windows reparse points, a swap between check and open,
+and a POSIX FIFO leaf that must be rejected as `not-a-regular-file` without
+blocking, or stop that verdict instead of shipping a following open. If a platform
+cannot be satisfied, the hardened reader refuses untrusted package reads there with
+`path-escape`; a build that succeeds on Linux but refuses every untrusted package
+on Windows is a failed publication gate, not a passing one. The PoC does not gate
+the author layer: a trusted-tree reader may land and be tested while the PoC is
+still running (§8.5), but no artifact it produces may be published and the
+hardened reader is not claimed to exist on that platform.
 
-**The N1 PoC is a separate deliverable, and it lands before the builder.** The
-gate is not a design note that a later implementation tries to satisfy: H2a's
-first committed deliverable is the PoC itself, and no package reader, closure
-reader or builder code merges before its results are recorded. It records, per
+**The N1 PoC is a separate deliverable, and it lands before the hardened reader.**
+The gate is not a design note that a later implementation tries to satisfy: the
+PoC is the publication channel's first committed deliverable, and no hardened
+package reader, closure reader or publication-capable build merges before its
+results are recorded. It records, per
 platform (Linux, macOS, Windows), the exact OS version, the toolchain and
 path-layer crate version with its lockfile entry, the API or syscall each step
 uses (for example an `openat`-family call with `O_NOFOLLOW`/`O_DIRECTORY`, or a
@@ -856,8 +885,8 @@ case-alias entry such as `Forms/` or `Add.json`, a FIFO leaf where POSIX allows
 it, a Windows reparse point), and the observed result per case. "Theoretically
 possible with a no-follow open" is not evidence: a row without a platform
 version, an API name or an observed result is missing, and a missing or
-inconclusive row stops H2a exactly like a failing one. One green platform is
-never extrapolated to the other two.
+inconclusive row stops the publication verdict exactly like a failing one. One
+green platform is never extrapolated to the other two.
 
 ### 4. The spec lists the full closure; the builder never scans packages
 
@@ -1154,42 +1183,61 @@ that half is not the gap. The gaps are the remaining cases:
   accepts the instruction for the wrong reason, because the bundle is wider by
   construction.
 
-**`monasm-bundle/0.1` does not carry that proof.** It stores the merged
-definition and a sorted `packages` list `{package_id, version,
-source_package_digest}`; it has no `form_id` → owner and no `E_package`. A
-`fmp-def/0.1` merged document has no `requires_extensions` on any form, and a
-`fmp-def/0.2` document carries only the per-form key, not the package cover or
-the owner. The lock is not sufficient either: it names package paths and digests
-but not their covers. H3 therefore cannot implement the rule above from the H2
-artifacts alone. Before accepting a subset plan, H3 must obtain one of:
+**`monasm-bundle/0.1` carries the facts; it does not apply the rule.** The sealed
+bundle stores the merged definition, a sorted `packages` list whose entries also
+carry the owner's declared cover (`enabled_extensions`, the same spelling the
+manifest uses), and a `form_owners` list with exactly one
+`{form_id, package_id}` row per merged form (§8.2). Together they give
+`E_owner(form(i))` without reading package sources: the owner names the package,
+and that package's declared cover is the `E_package` of the table above. Both
+lists are inside the `bundle_digest` preimage (§7), so a cover or owner row cannot
+change without changing the bundle identity.
 
-- a versioned bundle (for example `monasm-bundle/0.2`) that records, per exported
-  `form_id`, the requirement or the verifiable owner cover, bound to the package
-  identity and digest the lock already records; or
-- another frozen, versioned source that the bind path reads together with the
-  bundle and that is itself digest-bound and gated.
+What the artifact deliberately does **not** do is decide the subset relation. H2
+builds no subset cell and runs no `E_owner ⊆ E_plan` check. A consumer that finds
+a selected form missing from `form_owners`, an owner with no `packages` entry, or
+a `packages` entry without `enabled_extensions` must treat the requirement as
+**unproved** and reject; it may not read the absence as `∅` (see below).
 
-Adding `fmp/0.2` alone is not enough, because the plan validator sees neither
-map. Reinterpreting `monasm-bundle/0.1` to invent one is a format change, not an
-implementation detail.
+Why the facts are frozen now rather than deferred: `monasm-bundle/0.1` has never
+shipped, so there is no compatibility surface to preserve, and the alternative —
+publish `0.1` as a bundle that provably cannot carry the H3 proof, then freeze a
+second format whose only difference is data H2's builder already computes — would
+add a version boundary with no semantic content. The counterexample is the one
+below: with the map omitted, the `c.addi` plan is unprovable from any frozen H2
+artifact, and the fix is a new bundle version rather than a new check. Freezing the
+data now costs one extra key and one completeness rule; the rule is testable in H2
+even though the consumer is H3 (§8.2).
+
+Adding `fmp/0.2` alone is still not enough, because the plan validator sees
+neither map: the `E_owner` check is the new protocol's obligation. H3 reads
+`form_owners` and the package cover from the bundle it already verifies and adds
+the comparison; it does not need a second artifact, and it may not reinterpret the
+map as something other than what §8.2 defines.
 
 **An absent requirement means "unproved", not "needs nothing".** Treating a
 missing `requires_extensions` as `∅` is the same mistake H2 refuses at the
 package level: it converts unknown into "legal for every target" and lets any
 subset plan select the form. For a legacy form copied from an `fmp-def/0.1`
-document, and for any form whose owner cover is absent from the frozen artifact,
-the default is to reject the subset composition with the new protocol's own
-diagnostic (`target-subset-unproved`; it is not an `fmp/0.1` code). Exact-target
-compositions are unaffected, because every set there is equal and the H2 rule
-already rejects a mismatch. H3 may accept such a form only after the artifact
-supplies the proof.
+document, the owner cover is the conservative declaration the map records. For a
+form whose owner row or whose owner's cover is missing from the artifact a
+consumer is reading, the default is to reject the subset composition with the new
+protocol's own diagnostic (`target-subset-unproved`; it is not an `fmp/0.1` code).
+A well-formed `monasm-bundle/0.1` cannot reach that state — completeness is a
+format rule enforced by `--check` (§8.2) — so the case covers a damaged or
+non-`0.1` artifact, and it is still a rejection rather than an empty set.
+Exact-target compositions are unaffected, because every set there is equal and
+the H2 rule already rejects a mismatch. H3 may accept such a form only after the
+artifact supplies the proof.
 
 **What H3 acceptance must show.** At least: the `c.addi` plan above is rejected
 under the new cell; a plan whose target contains the owner cover is accepted; an
-`fmp-def/0.1`/legacy form without a proof is rejected rather than read as `∅`;
-and the two existing cells keep their H2 results. H2 does not implement the rule
-and does not add the map to `monasm-bundle/0.1`; the obligation is written now so
-that freezing the H2 artifact does not silently make H3 unprovable.
+`fmp-def/0.1`/legacy form is decided from `form_owners` plus the owner cover, not
+from a mnemonic; a form whose owner row is stripped from a rewritten artifact is
+rejected rather than read as `∅`; and the two existing cells keep their H2
+results. H2 does not implement the rule; what it freezes is the data the rule
+reads, and the obligation is written here so that freezing the artifact does not
+silently make H3 unprovable.
 
 No `monasm-package/0.1` bump is required to lift the transition: the package
 field already means "a cover of the extensions these rows require", and the
@@ -1205,8 +1253,8 @@ is bound, so adding `fmp/0.2` cannot make such a spec build. Lifting has three
 parts that must land together: a **versioned build rule** — a new
 `monasm-bundle-spec` version, or an explicit versioned compatibility-relation
 declaration that the builder reads — the plan-side cell above, and the
-**per-instruction evidence source** (the versioned owner/cover map or the frozen
-companion artifact). The shipped
+**per-instruction evidence source** (`form_owners` plus each package's declared
+cover, both carried by `monasm-bundle/0.1` and bound by its digest, §8.2). The shipped
 `monasm-bundle-spec/0.1` keeps its rejection conclusion permanently: the same spec
 bytes must not flip from deterministic rejection (exit 1) to acceptance because
 the builder was upgraded, since that would silently change what an old format
@@ -1423,7 +1471,7 @@ sorts `dependencies` by anything other than `(package_id, version)`.
 | `source_package_digest` | `sha256(b"monasm-package/0.1" ++ 0x00 ++ canonical(record))`, where `record = {"manifest": manifest, "assets": [{"kind", "path", "digest"}]}` and assets are sorted by `path`; `digest` is the literal `sha256:<hex>` text from §7.0, never raw bytes; `kind` is `form`, `type` or `profile` | README, NOTICE, evidence manifest, tests, author path | Hashing only the manifest: swapping a form's template with the manifest unchanged leaves the package digest still. |
 | `evidence_digest` | `sha256(b"monasm-evidence/0.1" ++ 0x00 ++ canonical(evidence/manifest.json))` when the file exists; `files[].sha256` is bare 64-lowercase-hex text per §7.0; its `files` list includes `tests/cases.json` for a release-ready package | unlisted README/NOTICE text, oracle log contents, author path; the case bytes are covered only through their manifest hash | Not hashing `tests/cases.json`: editing a plan or expectation leaves the same release identity covering two test sets. |
 | `definition_digest` | `fmp_model::definition::read(merged_document).digest()`, which is exactly `sha256(canonical(merged_document))` with no domain separator | builder version, build time, host, source paths | Hashing only the package set: two different form rows produce the same bundle identity. |
-| `bundle_digest` | `sha256(b"monasm-bundle/0.1" ++ 0x00 ++ canonical(bundle_metadata))`, where metadata is `{bundle_id, definition_digest, definition_format, namespace, version, target, packages: [{package_id, version, source_package_digest}]}` sorted by package identity; every nested digest is the literal `sha256:` text | the `bundle_digest` field itself, the builder receipt, package paths | Including the digest in its own preimage: the fixed point does not exist. |
+| `bundle_digest` | `sha256(b"monasm-bundle/0.1" ++ 0x00 ++ canonical(bundle_metadata))`, where metadata is `{bundle_id, definition_digest, definition_format, namespace, version, target, packages: [{package_id, version, source_package_digest, enabled_extensions}], form_owners: [{form_id, package_id}]}`, packages sorted by package identity and owners by `form_id`; every nested digest is the literal `sha256:` text | the `bundle_digest` field itself, the builder receipt, package paths | Including the digest in its own preimage: the fixed point does not exist. Leaving `form_owners` or a package cover out: two bundles with the same definition but different owner/cover facts would share an identity, so the data H3 relies on would not be content-addressed and could be rewritten under a stable digest. |
 | `release_digest` | `sha256(b"monasm-release/0.1" ++ 0x00 ++ canonical(release_metadata))`, where metadata is `{bundle_id, bundle_digest, definition_digest, packages: [{package_id, version, source_package_digest, evidence_digest}]}` sorted by package identity; every nested digest is the literal `sha256:` text. `evidence_digest` is present for every entry of a committed lock, which is written only for a release-ready closure (§7.1); the metadata shape admits its absence only for a development build, which is not a released identity | the definition rows themselves, the builder receipt, sealed bytes | Two releases that share a definition but ship different evidence have no distinguishing identity. |
 | `builder` | `{name, version, build: Option<String>}`; lock and receipt only | the definition digest | Putting the builder version into `definition_digest`: a builder bump falsely reports definition drift (`HE-T19`). |
 
@@ -1439,15 +1487,23 @@ release-artifact signature bound to `bundle_digest`/`release_digest`. Neither is
 H2 work, and neither may be obtained by folding the builder version back into the
 machine definition digest.
 
-**`bundle_digest` is not recomputable from the sealed bundle alone.** The
-preimage above includes the full bundle-level `target` object, with its
-`profile_id`, but `monasm-bundle/0.1` stores no such wrapper and no `profile_id`
-(§8): it carries the definition document, whose `target` is the six-key identity
-only. A reader holding just the sealed bytes can recompute and check
-`definition_digest`, because that preimage is exactly `canonical(document)`, but
-it cannot derive `bundle_digest`. §8 therefore defines the sealed bundle as a
-**companion artifact of its lock** and fixes what a consumer must recompute; the
-embedded value is a claim, never a fact.
+**`bundle_digest` is recomputable from the sealed bundle alone.** Every field of
+the preimage is either a top-level key of `monasm-bundle/0.1` (`bundle_id`,
+`definition_format`, `definition_digest`, `target`, `packages`, `form_owners`) or
+a value the file carries inside `definition` (`namespace`, `version`), and §8.2
+requires each of those to equal the definition document's value. A reader holding
+only the sealed bytes therefore recomputes `definition_digest` as
+`sha256(canonical(definition))`, checks `bundle_digest` against the metadata, and
+compares `target.identity` with `definition.target` — no lock is needed to
+establish the bundle's own identity.
+
+The lock is still checked, but for different facts: package paths,
+`evidence_digest`, `release_digest` and the builder receipt (§8). `verify --all
+--check` rebuilds the pair from the spec and compares both, so a disagreement
+between the sealed bundle and its lock is a difference (exit 1) even though each
+is now self-verifying on its own. `bind` still takes a `Definition`, never a
+bundle: self-verification establishes what the bundle says, not that a plan may
+use it.
 
 `evidence/manifest.json` is optional for a package under development and
 required for a release-ready package (§7.1). Its shape is
@@ -1563,15 +1619,15 @@ definition.
   package list with `path`, `source_package_digest` and `evidence_digest`
   (present for a release-ready package, §7.1), and `builder`.
 - `bundles/sealed/<bundle_id>.bundle.json` — `monasm-bundle/0.1`, generated with
-  exactly seven keys: `bundle_format`, `bundle_id`, `definition_format`, the
+  exactly nine keys: `bundle_format`, `bundle_id`, `definition_format`, the
   canonical definition document under `definition`, `bundle_digest`,
-  `definition_digest`, and the sorted `packages` list
-  `{package_id, version, source_package_digest}`. It does not contain the builder
-  receipt, `release_digest`, a bundle-level `target` or author paths. It also does
-  not contain a `form_id` → owner or owner-cover map; §4.1 records that H3's
-  target-subset rule needs a versioned artifact (or another frozen source) before
-  it can use this bundle, and that H2 does not add the map to
-  `monasm-bundle/0.1`.
+  `definition_digest`, the closed bundle-level `target` `{profile_id, identity}`
+  copied from the spec, the sorted `packages` list `{package_id, version,
+  source_package_digest, enabled_extensions}`, and the sorted `form_owners` list
+  `{form_id, package_id}` with exactly one row per merged form. It does not
+  contain the builder receipt, `release_digest` or author paths. §8.2 fixes the
+  completeness rules; §4.1 records that H3 applies the target-subset rule to
+  these facts, and that H2 does not implement that rule.
 - `bundles/legacy/<bundle_id>/definition.json` — generated when the canonical
   definition fits its 16 MiB read budget: the plain merged definition document,
   with no bundle envelope, so the existing `fmp materialize <plan> --definitions
@@ -1902,30 +1958,33 @@ the target branch that recomputes `Tree(M)` and `B_landed` adds detectability, b
 it does not replace the equations.
 
 This is a repository-setting requirement, and a document cannot prove a setting
-by itself. H2a's acceptance gate therefore reads the effective branch protection
-or merge queue through the platform API and records the evidence: the endpoints
-queried, the effective configuration, and the merge operation the repository
-actually permits. **A 403, an empty ruleset list, or a setting the API will not
-return is not evidence that no protection exists**; it is an evidence step that
-has not been obtained, and the round fails until the mechanism is shown. The ADR
-neither asserts nor assumes that the current repository already has it.
+by itself. The publication-channel verdict (§8.5) therefore reads the effective
+branch protection or merge queue through the platform API and records the
+evidence: the endpoints queried, the effective configuration, and the merge
+operation the repository actually permits. **A 403, an empty ruleset list, or a
+setting the API will not return is not evidence that no protection exists**; it is
+an evidence step that has not been obtained, and the verdict fails until the
+mechanism is shown. The ADR neither asserts nor assumes that the current
+repository already has it.
 
 **A green CI run on the planning PR is not that evidence.** N5 cannot be closed
 by pointing at successful checks: they were produced for some `(B_checked,
 C_checked, mode)`, and a workflow that would happily merge a different tree has
-not been tested by them. H2a's N5 acceptance must therefore (a) record the
-effective mechanism it actually found through the API — merge queue, or a merge
-operation that writes the recorded candidate and refuses a moved base — and (b)
-run the stale-CI counterexample end to end on a scratch repository or an
+not been tested by them. The publication-channel acceptance must therefore (a)
+record the effective mechanism it actually found through the API — merge queue, or
+a merge operation that writes the recorded candidate and refuses a moved base —
+and (b) run the stale-CI counterexample end to end on a scratch repository or an
 equivalent sandbox: a green verdict for base `B_A` and tree `C_A`, a publication
 that moves the target tip, and a merge attempt that must be rejected and re-run
-rather than land `C_A` on the new base. A dry description of the equations, or
-a settings page quoted without the operation, does not satisfy (b).
+rather than land `C_A` on the new base. A dry description of the equations, or a
+settings page quoted without the operation, does not satisfy (b).
 
-If the mechanism cannot be demonstrated, H2a stops at N5 and the publication
-gate stays open. A post-merge audit on the target branch remains detection only
-and may not be substituted for the pre-merge authorization; shipping H2a with
-"we will notice afterwards" is the failure this gate exists to prevent.
+If the mechanism cannot be demonstrated, the publication verdict stops at N5 and
+the publication gate stays open. A post-merge audit on the target branch remains
+detection only and may not be substituted for the pre-merge authorization;
+shipping H2 with "we will notice afterwards" is the failure this gate exists to
+prevent. Author-layer work is not blocked by that outcome (§8.5): it simply may
+not claim a published artifact.
 
 **The base registry decides containment first.** Before the head tree is used to
 resolve a `package.json` ancestor, the gate checks whether the changed path lies
@@ -2029,12 +2088,14 @@ version)` with no duplicates, and each entry has exactly `package_id`, `version`
 builder never re-sorts an alternate spelling. The lock carries the same closed
 `target` object copied from the spec, so the target has one spelling per release,
 and `--check` compares those bytes rather than re-canonicalising an array. The
-sealed bundle stores **no** `target` and no `profile_id`: it carries the merged
-definition (whose `target` is the six-key identity) and its own `packages` list,
-so the bundle-level target exists only in the spec and the lock, and
-`bundle_digest` is recomputed from the lock (§7, §8). That asymmetry is the
-contract, not an oversight: the sealed key set is exactly the seven keys listed
-below, and `target` or `sources` in it is an unknown key (exit 1).
+sealed bundle also stores the bundle-level `target` `{profile_id, identity}`, so
+the `bundle_digest` preimage is complete inside the file and a consumer can
+recompute it without the lock (§7, §8.2). The bundle-level target exists in two
+places, the spec and the sealed file, and the lock repeats it; §8.2 requires the
+sealed `target.identity` to equal `definition.target`, so the identity has one
+spelling and the copies cannot disagree silently. That completeness is the
+contract, not an oversight: the sealed key set is exactly the nine keys listed
+below, and `sources` in it is an unknown key (exit 1).
 
 ```json
 {
@@ -2078,39 +2139,60 @@ lock after removing `builder`; `builder` is shape-checked and printed, not
 compared.
 
 **Sealed bundle** (`monasm-bundle/0.1`) has exactly `bundle_format`, `bundle_id`,
-`definition_format`, `definition_digest`, `bundle_digest`, `definition`,
-`packages`. `definition` is the merged definition document of §9 (not a second
-envelope), and each `packages` entry has exactly `package_id`, `version`,
-`source_package_digest`. There is no `path`, `builder`, `release_digest` or
-`evidence_digest`, so `verify --check` compares its bytes exactly, with no
-excluded key. It also stores no bundle-level `target` wrapper and no `profile_id`,
-so §7's `bundle_digest` preimage is not recoverable from the file; the companion
-rule below fixes what that means.
+`definition_format`, `definition_digest`, `bundle_digest`, `target`,
+`definition`, `packages`, `form_owners`. `definition` is the merged definition
+document of §9 (not a second envelope). `target` is the closed
+`{profile_id, identity}` object copied from the spec; its `profile_id` is a
+nominal bundle-local label and its `identity` must equal `definition.target`
+field for field, so the bundle-level target exists in exactly one spelling in the
+file and the same identity is not written twice with different bytes. Each
+`packages` entry has exactly `package_id`, `version`, `source_package_digest` and
+`enabled_extensions` — the owning package's declared cover, copied unchanged and
+sorted under the one-array rule (§1.3), never derived or trimmed. There is no
+`path`, `builder`, `release_digest` or `evidence_digest`, so `verify --check`
+compares its bytes exactly, with no excluded key.
 
-**A sealed bundle is verified together with its lock, never on the strength of
-its own digest.** Because `bundle_digest` covers the bundle-level `target` (with
-`profile_id`) and the sealed file stores no such wrapper, the embedded
-`bundle_digest` is a claim about bytes a reader cannot reproduce. A consumer
-recomputes it from the lock's `target`, `namespace` and `version` plus the sealed
-bundle's `bundle_id`, `definition_format`, `definition_digest` and `packages`,
-requires the result to equal **both** recorded values, and separately requires
-the sealed `definition_digest` and `packages` to equal the lock's and
-`definition_digest` to equal `sha256(canonical(definition))`. A mismatch is a
-difference (exit 1); the field is never accepted on its own. `definition_digest`
-is different — its preimage is exactly `canonical(definition)` with no domain
-separator, so that part *is* self-verifiable — and the missing context is only
-`target`.
+`form_owners` is a sorted array of `{form_id, package_id}`, sorted by `form_id`,
+with **exactly one row per form in `definition`** and no row for a form that is
+not there. Its rules:
 
-H2 keeps `monasm-bundle/0.1` and this rule: the builder has the spec, and
-`verify --all --check` rebuilds both artifacts from it, so the pair comparison
-already implies the value and no H2 command reads a sealed bundle alone. H3 must
-choose explicitly and must not inherit an implicit trust. Either its bundle
-reader takes a verified `(lock, sealed)` pair, or it introduces a versioned sealed
-format — for example `monasm-bundle/0.2` — that embeds the complete preimage,
-`target` included, so the file is self-verifiable. What it may not do is hand a
-bare sealed file to `bind` because it carries a `bundle_digest` the consumer
-cannot recompute; accepting an unverifiable claim is the failure this rule exists
-to prevent.
+- every `form_id` in the merged definition appears once, and every `package_id`
+  names an entry in `packages`; a missing row, a duplicate row, a row for an
+  absent form or an owner outside `packages` is `bundle-owner-incomplete`
+  (exit 1);
+- the row is attributed by the package that *exports* the form during the merge,
+  not inferred from the `form_id` string, an ISA name or a mnemonic (`INV-01`,
+  `INV-06`); ownership is already computed to enforce form ⊆ package ⊆ bundle
+  (§4.1), so the row records a decision the builder made, not a new derivation;
+- a form exported by two packages is the existing ownership conflict, rejected
+  before the map is written, so the map cannot need a tie-break;
+- `packages[].enabled_extensions` is the cover for every form that package owns
+  under `fmp-def/0.1`; a versioned definition format whose forms carry their own
+  requirement keeps that per-form value as the more precise fact, and the cover
+  remains the fallback (§4.1).
+
+Both `form_owners` and the per-package cover are inside the `bundle_digest`
+preimage (§7), so a rewritten map is a different bundle identity rather than a
+same-digest edit. Completeness is checked when the bundle is built and whenever
+`--check` compares it; H2 builds no subset cell, and the map is not a claim that
+any particular plan is compatible with the target.
+
+**A sealed bundle verifies itself, and is still compared with its lock.** Every
+field of the `bundle_digest` preimage is in the file (§7), so a consumer
+recomputes `definition_digest = sha256(canonical(definition))`, recomputes
+`bundle_digest` over the metadata the file carries, and requires both to equal the
+recorded values; that is a self-contained check of the bundle's identity. The pair
+check is separate and does not disappear: `verify --all --check` rebuilds the lock
+and the sealed bundle from the spec and requires the copies to agree, so a lock
+that disagrees with the sealed bundle on `target`, `definition_digest`, `packages`
+or the bundle `bundle_digest` is a difference (exit 1). A consumer that has both
+artifacts must check both directions; a consumer with only the sealed file gets a
+weaker but real guarantee — the bundle's own identity — and no evidence of which
+package paths, `evidence_digest` or `release_digest` produced it.
+
+`bind` still takes a `Definition`, never a bundle. Self-verification establishes
+what the bundle says about itself; it does not establish that a plan may use those
+rules, which stays with the caller's target check.
 
 The following fixed vectors pin the bundle and release metadata bytes. They use
 the §7.0 preimage fixture (`monasm.x86.example`, source digest
@@ -2123,13 +2205,18 @@ claim that this is the final H2 bundle identity.
 
 ```text
 bundle metadata canonical =
-{"bundle_id":"monasm.bundle.x86.example","definition_digest":"sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad","definition_format":"fmp-def/0.1","namespace":"monasm.isa.x86","packages":[{"package_id":"monasm.x86.example","source_package_digest":"sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0","version":"0.1.0"}],"target":{"identity":{"address_width":64,"byte_order":"little","enabled_extensions":[],"execution_mode":"64","isa_family":"x86","isa_variant":"x86-64"},"profile_id":"monasm.target.x86_64"},"version":"0.1.0-h2"}
-bundle_digest = sha256:b6d925747e41428db2e6dd31d72d7bd05739ab8d552fb53bcd73402af54931fd
+{"bundle_id":"monasm.bundle.x86.example","definition_digest":"sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad","definition_format":"fmp-def/0.1","form_owners":[],"namespace":"monasm.isa.x86","packages":[{"enabled_extensions":[],"package_id":"monasm.x86.example","source_package_digest":"sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0","version":"0.1.0"}],"target":{"identity":{"address_width":64,"byte_order":"little","enabled_extensions":[],"execution_mode":"64","isa_family":"x86","isa_variant":"x86-64"},"profile_id":"monasm.target.x86_64"},"version":"0.1.0-h2"}
+bundle_digest = sha256:a9bc3395c783e029aaeb8f362a2f806ade40cf8d965137096b26b13ac20dc5cc
 
 release metadata canonical =
-{"bundle_digest":"sha256:b6d925747e41428db2e6dd31d72d7bd05739ab8d552fb53bcd73402af54931fd","bundle_id":"monasm.bundle.x86.example","definition_digest":"sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad","packages":[{"package_id":"monasm.x86.example","source_package_digest":"sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0","version":"0.1.0"}]}
-release_digest = sha256:4e3d44a86a966b7d1829d823c6aad00f92cc08a567eee7d23e70e4ecfa6bf8cc
+{"bundle_digest":"sha256:a9bc3395c783e029aaeb8f362a2f806ade40cf8d965137096b26b13ac20dc5cc","bundle_id":"monasm.bundle.x86.example","definition_digest":"sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad","packages":[{"package_id":"monasm.x86.example","source_package_digest":"sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0","version":"0.1.0"}]}
+release_digest = sha256:2416911a9c80357c40410a73db27cd1a966c73a72d354f651c95208e596ad3ad
 ```
+
+The fixture declares an empty owner map and an empty cover because it has no
+exported forms (§7.0); a real bundle must carry one `form_owners` row per merged
+form (§8.2), so these vectors pin the key spelling, the sorting rule and the
+domain separators, not a buildable identity.
 
 Both values were computed with Python `hashlib` over the ASCII domain separator
 (`monasm-bundle/0.1` or `monasm-release/0.1`), one `0x00` byte and the canonical
@@ -2172,8 +2259,8 @@ evidence manifest canonical =
 evidence_digest = sha256:e94738716ffc56d6f1a865c463fee4afae03835d51ef234bff2c213e321f931a
 
 release metadata canonical =
-{"bundle_digest":"sha256:b6d925747e41428db2e6dd31d72d7bd05739ab8d552fb53bcd73402af54931fd","bundle_id":"monasm.bundle.x86.example","definition_digest":"sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad","packages":[{"evidence_digest":"sha256:e94738716ffc56d6f1a865c463fee4afae03835d51ef234bff2c213e321f931a","package_id":"monasm.x86.example","source_package_digest":"sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0","version":"0.1.0"}]}
-release_digest = sha256:ba60e8bab8f15ae57972ee24510798fc7721430fa4508dc810011a753a8d3235
+{"bundle_digest":"sha256:a9bc3395c783e029aaeb8f362a2f806ade40cf8d965137096b26b13ac20dc5cc","bundle_id":"monasm.bundle.x86.example","definition_digest":"sha256:c6bfa90e3fa100f1613537c48cec23e510c424927a2ac62c9bb4449b7f4ebbad","packages":[{"evidence_digest":"sha256:e94738716ffc56d6f1a865c463fee4afae03835d51ef234bff2c213e321f931a","package_id":"monasm.x86.example","source_package_digest":"sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0","version":"0.1.0"}]}
+release_digest = sha256:45a4004eef811f70a02b796e8b2b8ca4cce0626c189567b2e5e9d00f0ee98767
 ```
 
 Both implementations must reproduce the development vector and this one. The
@@ -2197,7 +2284,8 @@ identity name?", independent of the current specs.
       "path": "packages/x86_64/monasm.x86.example/0.1.0",
       "package_id": "monasm.x86.example",
       "version": "0.1.0",
-      "source_package_digest": "sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0"
+      "source_package_digest": "sha256:1afee65ce87cd9e5ff52f7ae8db11fdb6f7c62201e315641417c4e78cb12bca0",
+      "snapshot_digest": "sha256:…"
     }
   ],
   "identities": [
@@ -2211,10 +2299,12 @@ identity name?", independent of the current specs.
 ```
 
 The object has exactly `published_format`, `published` and `identities`. Each
-`published` entry has exactly `path`, `package_id`, `version` and
-`source_package_digest`, sorted strictly by `path`; each `identities` entry has
-exactly `definition_digest`, `namespace` and `version`, sorted strictly by
-`(namespace, version)`. Either array may be empty. Three uniqueness rules hold
+`published` entry has exactly `path`, `package_id`, `version`,
+`source_package_digest` and `snapshot_digest`, sorted strictly by `path`; each
+`identities` entry has exactly `definition_digest`, `namespace` and `version`,
+sorted strictly by `(namespace, version)`. Either array may be empty. The sample
+abbreviates `snapshot_digest`; the stored value is the literal `sha256:<64
+lowercase hex>` text, as everywhere else (§7.0). Three uniqueness rules hold
 across the whole registry, not only within one bundle closure:
 
 - `path` is unique;
@@ -2229,6 +2319,40 @@ A spec may reference an existing entry by the same `path` and
 `source_package_digest` in any number of bundles; that is one published version
 selected by several bundles, not two publications. Unknown or duplicate keys are
 rejected (`INV-07`).
+
+**`snapshot_digest` covers the whole published directory, not only the execution
+assets.** The `source_package_digest` deliberately excludes `README.md`, `NOTICE`,
+`tests/` and `evidence/` (§7), so it cannot answer "is this version directory
+byte-identical to what was published?". The registry therefore records a second,
+independent value:
+
+```text
+snapshot_digest = sha256(b"monasm-snapshot/0.1" ++ 0x00 ++ canonical(files))
+files           = [{path, sha256}] for every regular file under the version
+                  directory, `path` relative to that directory, sorted by `path`
+```
+
+`sha256` is bare 64-lowercase-hex text (§7.0), because this value is not an
+`fmp/0.1` diagnostic input. Directories are not entries; the reader already
+rejects symlinks, reparse points and non-regular leaves, so the file set is
+exactly what a package reader can open. The digest is computed by `build
+--release` from the version directory it just validated and printed for the
+publisher, who copies it into the registry entry; it is not derived from
+`source_package_digest`, `definition_digest`, `bundle_digest` or `release_digest`,
+and none of those digest inputs changes because of it.
+
+`verify --published --check` recomputes it for every entry and requires equality;
+a mismatch is `snapshot-mismatch` (exit 1). That makes a modification of a
+published `README.md`, `NOTICE`, case file or evidence file a registry-level
+failure rather than something only the changed-path gate can see. The cost is
+honest and bounded: each version directory is subject to the same per-package
+byte budget as a closure (§12), and the audit's re-read bytes now cover the whole
+directory, which is part of the 1,000-version measurement and its threshold.
+
+What this still does not prove is **who** produced first the snapshot: the digest
+binds the committed bytes to the recorded value, not the recorded value to an
+author's intent. A publish-time attestation or artifact signature is a separate
+mechanism (§7), and the registry is not one.
 
 The `identities` array is the matching history for definition names, because the
 package registry cannot answer "was `monasm.isa.x86` / `0.1.0-h2` ever published,
@@ -2279,13 +2403,16 @@ and with which bytes?" after its spec retires:
   the same rules, with `definition-identity-conflict` for a reused name and a
   different digest.
 - Each entry's `source_package_digest` must equal the digest recomputed from the
-  package at `path`. A mismatch is `published-registry-invalid` (exit 1), and
-  any byte change under a base-published path is also
-  `published-package-modified` (exit 1).
+  package at `path`, and its `snapshot_digest` must equal the digest recomputed
+  over the whole version directory. A mismatch is `published-registry-invalid`
+  (exit 1) for the source digest and `snapshot-mismatch` (exit 1) for the
+  snapshot; any byte change under a base-published path is also
+  `published-package-modified` (exit 1) when the changed-path gate sees it.
 - The registry is a publication fact, not a selection input. Neither array enters
   `source_package_digest`, `definition_digest`, `bundle_digest` or
-  `release_digest`, and it can never add a package to a bundle. The `identities`
-  digest is checked against the built definition, never fed into it.
+  `release_digest`, `snapshot_digest` enters none of them either, and the registry
+  can never add a package to a bundle. The `identities` digest is checked against
+  the built definition, never fed into it.
 - Retiring a release removes a spec but never removes the snapshot or its
   registry entry. Deleting both in one PR is `published-registry-modified`, not
   a legal retirement.
@@ -2296,14 +2423,17 @@ path: two in-flight first publications coordinate on it, the loser rebases and
 re-runs both `--check`s, and neither merges a registry edit it did not validate —
 the same rebase shape as §8.1, not a merge queue for the file.
 
-The full-history audit is `O(N_published)` in re-read packages, independent of
+The full-history audit is `O(N_published)` in re-read packages plus every
+snapshot file, independent of
 the changed set, and that is the price of the permanent record. H2 accepts it as
-a **measured cost, not a proven scalability property**. H2a must build a
+a **measured cost, not a proven scalability property**. The publication channel
+must build a
 synthetic registry of about 1,000 published versions and record, for three runs
 each, (a) an ordinary package change (`verify --package` plus the changed-path
 gate), (b) a bundle publication (`build` and both `--check`s) and (c) the
-full-history audit (`verify --published --check`): wall time, peak memory and
-bytes read, with the machine, OS and toolchain version. The H2a acceptance
+full-history audit (`verify --published --check`, including re-hashing every
+`snapshot_digest`): wall time, peak memory and
+bytes read, with the machine, OS and toolchain version. Its acceptance
 report records the measured curve, states the documented threshold — a version
 count, a wall-time budget or a bytes-read budget — at which the single-file
 registry and the full re-read audit must be revisited, and fixes a per-job CI
@@ -2331,11 +2461,22 @@ not be merged into "the publication flow scales":
   audit or an out-of-band publication record is future work with its own ADR;
   none of them is assumed here.
 
-The H2a report therefore records concrete CI latency and resource budgets for the
+The publication verdict's report therefore records concrete CI latency and
+resource budgets for the
 publication jobs — build, both `--check`s and the ~1,000-version audit — next to
 the threshold above, and states the conditions that force sharding or incremental
 audit. A localized package-change path is not evidence that the end-to-end
 publication path has no central bottleneck.
+
+**That is a scale boundary, not a performance footnote.** H2 implements
+independent package development and deterministic composition; it does not claim,
+and must not be read as claiming, that independent package *publication* scales
+horizontally. One append-only file plus a full-history audit is the designed
+limit, and any requirement for many teams to publish ISA packages concurrently is
+future architecture work with its own ADR — not a tuning exercise inside H2. A
+report that lists this only under "risks" would understate it: the boundary is
+part of what the contract promises, and an acceptance claim that omits it is
+false.
 
 **First publication has no registry cycle.** A registry row for a definition
 needs the `definition_digest`, which only a build produces; requiring the row
@@ -2492,7 +2633,8 @@ Both the base and head trees of PR B contain no selecting spec, so a spec-only
 check would call the snapshot unpublished and accept the edit. The registry
 entry survives PR A, so PR B still fails `published-package-modified`.
 
-Counterexample if first publication were treated as immutability: the H2a PR
+Counterexample if first publication were treated as immutability: the x86
+publication PR
 creates `packages/x86_64/monasm.x86.mov-register/0.1.0/` and its first registry entry
 together. A rule that rejects any file under a head-registered path rejects the
 package's own creation, so the format could only be published by a second PR that
@@ -2529,7 +2671,8 @@ Two questions must not be conflated:
   checks the closed shape, sorted order, unique `path`, unique
   `(package_id, version)`, the identity binding, that the path exists and is a
   version directory, that the manifest's `package_id`/`version` match the entry,
-  and that the recomputed `source_package_digest` equals the recorded one. It
+  that the recomputed `source_package_digest` equals the recorded one, and that
+  the recomputed `snapshot_digest` covers the same bytes as the recorded value. It
   also checks the `identities` rows: unique and sorted `(namespace, version)`,
   one digest per name, no row naming a reserved legacy pair (§8), and — for a
   name that a current spec still publishes — agreement with the digest the
@@ -2539,12 +2682,13 @@ Two questions must not be conflated:
   `published-registry-invalid` (exit 1); a directory/manifest version disagreement
   is `path-version-mismatch` (exit 1). The audit never selects a package into a
   bundle and never changes a lock or sealed bundle. The changed-path gate (§8.1)
-  reports the underlying file edit as `published-package-modified`; the audit
-  reports the registry effect, not the file edit. The audit applies the §12
+  still reports the underlying file edit as `published-package-modified`; the audit
+  reaches the same bytes through `snapshot_digest` and reports
+  `snapshot-mismatch`, so neither gate depends on the other to notice the edit. The audit applies the §12
   per-package byte and count budgets to each entry it re-reads; it has no closure
   aggregate because it is not a bundle.
 
-CI runs both. If only `--all --check` ran, a retired version with no selecting
+CI runs both once the publication channel exists. If only `--all --check` ran, a retired version with no selecting
 spec would never be re-hashed. If the audit were folded into `--all`, every
 bundle build would read every historical package and an unrelated retired package
 could break an old spec, which is the discovery coupling H2 removes.
@@ -2579,31 +2723,93 @@ lifecycle and a second gate for bytes whose only remaining reader is git
 history, and the package snapshot plus registry already carry every permanent
 fact (§8.3).
 
-**The audit's guarantee is bounded, and the contract states the bound.** It
-proves that the published manifest, the declared executable assets and the
-`(package_id, version)`/`(namespace, version)` identities are unchanged, because
-those are what `source_package_digest` covers (§5, §7.0). It does **not**
-independently prove that every byte under a published version directory is
-unchanged: `source_package_digest` deliberately excludes `README.md`, `NOTICE`,
-`evidence/**` and `tests/cases.json`, and the registry stores neither
-`evidence_digest` nor a full file list. A retired package whose
-`tests/cases.json` and `evidence/manifest.json` are edited and re-hashed
-consistently keeps the same `source_package_digest`, so `verify --published
---check` alone cannot see it.
+**The audit's guarantee is whole-directory, and the contract states what it still
+does not prove.** `verify --published --check` re-hashes every regular file under
+each published version directory through `snapshot_digest` (§8.3), so editing a
+retired package's `tests/cases.json`, `evidence/**`, `NOTICE` or `README.md`
+changes the computed value and fails the audit with `snapshot-mismatch` (exit 1),
+independently of any changed-path gate. The `source_package_digest` check remains
+narrower on purpose: it names the execution input, while the snapshot names the
+release directory.
 
-Whole-directory immutability is enforced at the merge path instead: the
-changed-path gate (§8.1) rejects any added, modified, renamed or deleted file
-under a base-registered version directory, and the merged bytes remain in git
-history. An edit that bypassed both the gate and review is outside what this
-command attests.
+Two things stay outside what the registry can attest:
 
-Adding a `snapshot_digest` over the full published file list would close the gap
-inside the audit, because the registry is append-only and the value could be
-recomputed. H2 does not add it: it would need a defined file-set rule (whether
-`package.json`, evidence and later-added files are in the set), a new registry
-field and a second digest per version, and the gate already rejects every such
-edit in the normal path. The narrower claim is deliberate; a later format that
-must prove whole-snapshot equality can add the field and widen it.
+- **who produced the first snapshot.** The digest binds committed bytes to the
+  recorded value; it does not bind that value to an author's intent, a builder
+  implementation or a review. A publish-time attestation or artifact signature is
+  a separate mechanism, and `builder` is not one (§7).
+- **history rewrite.** Appending is checked against the parent commit's registry
+  and the changed-path gate rejects edits under a published path (§8.1). A
+  force-push that rewrites the branch, or a direct push that bypasses the gate,
+  defeats both. Preventing that is the platform's job and is exactly what the
+  publication-channel verdict must demonstrate (§8.5), not something an in-repo
+  digest can prove.
+
+The changed-path gate is therefore still required — it rejects the edit before it
+lands and reports `published-package-modified` — but it is no longer the only
+thing standing between a published file and a silent modification. An in-repo
+check that could only detect changes when a separate, externally configured gate
+allowed it to see them would be a weaker claim than "the registry records an
+immutable snapshot", and H2 does not make that weaker claim.
+
+#### 8.5 Two acceptance verdicts, not one gate
+
+The H2 work bundles capabilities that do not depend on each other. Reading a
+package from a trusted working tree and computing the same bytes from the same
+inputs is one capability; ingesting an untrusted tree without following a link,
+proving that the merged commit is the tested candidate, and auditing permanent
+history is another. The first is a data-model and determinism claim; the second
+is a publication-safety claim whose prerequisites include platform facts that no
+in-repo test can manufacture.
+
+H2 is therefore accepted through **two verdicts**, recorded separately:
+
+- **V-A, author layer.** `monasm-package/0.1` shape and lexical rules, reading a
+  package from a trusted tree, closure and dependency digest checks, merge and
+  ownership, the four digest layers with their fixed vectors, cases and evidence
+  protocol, conformance, Level 0/1 projections, build determinism and byte
+  equality, the build write phase with its bounded streaming comparison, the
+  legacy-snapshot equality gate, `verify --package` and `verify --all --check`
+  over the committed specs. V-A has no external prerequisite and does not wait
+  for V-P.
+- **V-P, publication channel.** The hardened reader (open-time no-follow, exact
+  directory-entry names, replacement-race binding, regular-file-only leaves) with
+  its three-platform PoC, `bundles/published.json` with `identities` and
+  `snapshot_digest`, append-only and retirement rules, the full-history audit,
+  the changed-path gate, the merge-freshness proof with the executed stale-CI
+  counterexample (§8.1), and the ~1,000-version measurement with its threshold.
+
+The ordering rules are part of the contract, because either misordering would be
+a false claim:
+
+1. V-A work may proceed while V-P prerequisites are open. A single external API
+   returning 403 must not block the data model, the digests, the determinism
+   tests or the first real package.
+2. No artifact is **published**, and no wording calls one immutable, trusted or
+   released, until V-P passes. Until then a lock, sealed bundle or legacy
+   snapshot is a development artifact: reproducible, checked for internal
+   consistency, and explicitly not a publication record.
+3. `bundles/published.json` does not exist before V-P. Creating it early would
+   assert an immutability the channel cannot yet enforce, and `verify --published
+   --check` is not a CI gate before then. While no registry exists on either the
+   base commit `B` or the head `H`, `verify --all --check` verifies the lock,
+   the sealed bundle and the legacy equality gate and reports every selected path
+   as a **development artifact**; it does not report
+   `published-registry-incomplete`, because nothing claims to be published. A
+   branch whose base `B` has a registry cannot use that state: deleting or
+   bypassing it is `published-registry-modified`, and from then on every
+   head-selected path needs a head row (§8.1, §8.3).
+4. A development artifact is not promoted by relabelling. The first V-P
+   publication rebuilds its inputs through the hardened reader, or re-verifies
+   them with it, even when the bytes are identical to a V-A build.
+5. V-P failure stops the publication claim and the H2 exit, not the author layer.
+   No post-merge audit, green CI run or after-the-fact review may substitute for
+   a V-P prerequisite (§8.1).
+
+This is a scheduling split, not a weaker security rule. Every no-follow, naming
+and race requirement keeps its full strength; what changes is that only the
+publication claim depends on them, and that claim is not made until they are
+demonstrated.
 
 ### 9. The builder generates bytes and lets `fmp_model` read them
 
@@ -2991,13 +3197,27 @@ D_form = { x ∈ D_Representable | L ≤ x ≤ U, x ≡ 0 (mod 2^a) } \ E
 For a register, `L = 0`, `U = 2^w − 1` clipped to `u64::MAX`, and `a = 0`; this is
 the `D_reg` above.
 
-- Positives are the minimum and maximum of `D_form` plus a representative
-  interior value. A raw endpoint that is excluded or unaligned is not a positive.
+- Positives are taken from `D_form` by **cardinality**, so a degenerate legal
+  domain does not demand a value that does not exist. A raw endpoint that is
+  excluded or unaligned is not a positive.
+
+  | `D_form` size | Required positives |
+  |---|---|
+  | 0 | none — the form is unusable and the builder rejects it (`empty-form-domain`, exit 1) instead of asking for a case no plan can satisfy |
+  | 1 | the single legal value, which is both minimum and maximum |
+  | 2 | both legal values |
+  | 3 or more | the minimum, the maximum and one representative interior value, distinct from both |
+
   Measured examples: `x86:mov/rm8h-r8h/legacy` has `w = 3` and `E = {0,1,2,3}`,
   so `4` and `7` are the positives and `0..3` are form negatives;
   `aarch64:add/w32-w32-w32-imm6-lsl` excludes `32..63`, so `31` is the positive
   maximum and `32` is a form negative; `riscv:c.addi/rd-imm6` excludes `rd = 0`,
   so `1` is the positive minimum and `0` is a form negative.
+- An empty `D_form` is a property of the encoded form, not of a plan: rejecting it
+  at build time keeps the case protocol satisfiable, and the rejection happens
+  before any case is generated or any coverage counted. A form that legitimately
+  accepts no value needs an explicit later format statement about what it is for;
+  `monasm-package/0.1` has none, so such a form cannot be published.
 - A representable excluded value is a `scope: "form"` negative rejected by
   `E-RANGE-004` at the mutated operand.
 - An adjacent out-of-range value (`min−1`/`max+1`, or `2^w` for a register) is a
@@ -3008,7 +3228,9 @@ the `D_reg` above.
   and may exceed 64 bits (`ADR-0127` §7.1 bounds each placement, not the sum; the
   H1 test `prototype/crates/fmp-materialize/tests/he1_wide_register.rs` loads and
   encodes 64-, 127-, 128- and 192-bit fields). `payload.reg` is still a `u64`, so
-  `D_reg = ([0, 2^w − 1] ∩ [0, 2^64 − 1]) \ E`:
+  `D_reg = ([0, 2^w − 1] ∩ [0, 2^64 − 1]) \ E`; the cardinality rule above applies
+  to `D_reg` as well, so a fully excluded narrow field is `empty-form-domain` and a
+  domain with one surviving value is tested once rather than twice:
   - `w < 64`: the positives are the smallest and largest members of `D_reg`
     (typically `0` and `2^w − 1` when neither is excluded); `2^w` is a form
     negative when representable.
@@ -3186,7 +3408,7 @@ does not pretend to be `fmp/0.1` diagnostics.
 
 | Class | Examples | Exit |
 |---|---|---|
-| Deterministic rejection | manifest shape (required/optional keys), identifier/path lexical violation, a reversed or duplicated `enabled_extensions`/`requires_capabilities` array, artifact filename mismatch, empty forms, path escape, a symlink/reparse point on a package path or on an output parent path under `--root`, an opened leaf that is not a regular file (FIFO, socket, device, a directory where a file is required, or a non-directory where a directory is required), or an opened entry whose name differs from the declared segment, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, committed legacy snapshot differing from the sealed definition (`legacy-snapshot-mismatch`), legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, case scope/stage mismatch (form-scope `read`/`materialize`, or a declared stage that is not the first rejecting stage), form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit (including a committed lock, sealed bundle or legacy snapshot over its byte budget), orphan bundle artifact | 1 |
+| Deterministic rejection | manifest shape (required/optional keys), identifier/path lexical violation, a reversed or duplicated `enabled_extensions`/`requires_capabilities` array, artifact filename mismatch, empty forms, path escape, a symlink/reparse point on a package path or on an output parent path under `--root`, an opened leaf that is not a regular file (FIFO, socket, device, a directory where a file is required, or a non-directory where a directory is required), or an opened entry whose name differs from the declared segment, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), a form whose final legal operand domain is empty (`empty-form-domain`), a sealed bundle whose `form_owners` is incomplete, duplicated or names an absent form or a package outside `packages` (`bundle-owner-incomplete`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, committed legacy snapshot differing from the sealed definition (`legacy-snapshot-mismatch`), legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, case scope/stage mismatch (form-scope `read`/`materialize`, or a declared stage that is not the first rejecting stage), form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, snapshot digest mismatch, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit (including a committed lock, sealed bundle or legacy snapshot over its byte budget), orphan bundle artifact | 1 |
 | Host / I/O / internal | unreadable file, unwritable lock, internal invariant break, materializer `Internal`/`HostFailure` during conformance | 2 |
 | Success | build or verify passed, digest printed | 0 |
 
@@ -3201,9 +3423,11 @@ The enum names these rejections (`unsupported-capability`, `capability-mismatch`
 `case-diagnostics-mismatch`, `case-expect-shape`, `form-family-mismatch`,
 `form-extension-mismatch`, `reserved-identity`, `path-version-mismatch`,
 `path-escape`, `identifier-lexical`, `path-lexical`, `extension-lexical`,
-`capability-lexical`, `bundle-file-mismatch`,
+`capability-lexical`, `bundle-file-mismatch`, `bundle-owner-incomplete`,
+`empty-form-domain`,
 `published-package-modified`, `published-registry-modified`,
 `published-registry-incomplete`, `published-registry-invalid`,
+`snapshot-mismatch`,
 `bundle-id-conflict`, `definition-identity-conflict`, `unmapped-package-path`,
 `dependency-unverified`, `dependency-mismatch`, `not-a-regular-file`,
 `orphan-bundle-artifact`); they
@@ -3222,14 +3446,22 @@ robustness:
 
 - manifest ≤ 1 MiB; form, type or profile file ≤ 1 MiB;
 - `tests/cases.json` ≤ 16 MiB; `evidence/manifest.json` ≤ 1 MiB; a spec or lock
-  ≤ 1 MiB each; a committed sealed bundle ≤ 80 MiB (the 64 MiB closure budget
-  plus at most 16 MiB of envelope for the sorted `packages` list and the
-  definition wrapper), read only through the bounded streaming comparison of
-  §8.3; the pinned legacy definition file read for row comparison and the
+  ≤ 1 MiB each; a committed sealed bundle ≤ 80 MiB — the 64 MiB closure budget
+  plus a 16 MiB envelope allowance for `target`, the sorted `packages` list with
+  each package's cover, `form_owners` and the definition wrapper — read only
+  through the bounded streaming comparison of §8.3. The allowance is a bound on
+  the output, not a proof that every closure fits: a closure whose merged form
+  count makes the envelope exceed 80 MiB is rejected with `resource-limit` before
+  any write, because the bound is part of what a buildable closure is. The
+  per-package form and asset caps keep the owner list proportional to the
+  definition, so the case is a corner, not the normal path.
+  The pinned legacy definition file read for row comparison and the
   committed bridge snapshot read for the §8.3 equality gate each ≤ 16 MiB
   (this bound applies to the cache, not to the bundle: a build whose canonical
   definition exceeds it omits the snapshot instead of writing an unreadable one,
   §8.3); `bundles/published.json` ≤ 16 MiB and ≤ 65 536 entries;
+- a published version directory ≤ 64 MiB and ≤ 8192 regular files, which bounds
+  the `snapshot_digest` file set and the audit's per-entry re-read;
 - exported forms per package ≤ 1024; declared assets per package ≤ 2048; cases
   per package ≤ 4096; evidence files per package ≤ 4096;
 - manifest plus declared asset bytes per package ≤ 16 MiB, enforced by the
@@ -3438,7 +3670,9 @@ comparing the materializer with itself proves the bytes.
 - No `fmp/0.2` plan format, namespaced ISA identity or zero-operand form (H3).
 - No runtime bundle reader, runtime capability negotiation or unselected-package
   isolation at materialisation time (H3). H2 rejects unknown capability strings
-  at build time only.
+  at build time only. The format is frozen with every fact H3's checks need —
+  bundle-level `target`, each package's declared cover and `form_owners` — so H3
+  implements consumption, not a replacement format (§7, §8.2).
 - No implicit conversion between `fmp-def/0.1` and `fmp-def/0.2`; a mixed
   closure is rejected, and an explicit versioned conversion is H3 work.
 - No execution or emission of `type`/`profile` assets; a non-empty declaration
@@ -3446,20 +3680,31 @@ comparing the materializer with itself proves the bytes.
   needs an explicit later package format (§5).
 - No `bind(VerifiedBundle, ...)` and no `fmp-validate → fmp-definition`
   dependency (H3).
-- No target-subset acceptance in H2, and no H3 subset cell until a versioned
-  artifact supplies per-form or owner-cover data; `fmp/0.2` alone does not
-  (§4.1).
+- No target-subset acceptance in H2. `monasm-bundle/0.1` carries the facts the H3
+  rule reads — `form_owners` and each package's declared cover — but H2 runs no
+  `E_owner ⊆ E_plan` check and adds no subset cell; a definition format whose
+  per-form requirement is absent still relies on the conservative cover (§4.1).
+- No claim that a bundle is executable because it verifies. `bundle_digest` is
+  recomputable from the sealed file alone, and that proves what the bundle says,
+  not that a plan may use it; `bind` takes a `Definition`, never a bundle, and the
+  target check stays with the caller (§7, §8.2).
+- No claim that V-A output is published. Until the publication-channel verdict
+  passes, a lock, sealed bundle or legacy snapshot is a development artifact;
+  `bundles/published.json` does not exist and no command calls the output
+  immutable or trusted (§8.5).
+- No claim that `snapshot_digest` proves provenance. It binds committed bytes to
+  a recorded value so a published directory cannot change unnoticed; it does not
+  prove who produced the first value, and it cannot survive a history rewrite or a
+  bypassed merge gate (§8.3, §8.4).
 - No claim about the repository's branch-protection or merge-queue settings from
-  a document; H2a reads the effective setting through the platform API and
-  records the evidence. A 403, an empty ruleset list or an unreadable setting is
-  a missing evidence step, not proof that no protection exists (§8.1).
+  a document; the publication-channel verdict reads the effective setting through
+  the platform API and records the evidence. A 403, an empty ruleset list or an
+  unreadable setting is a missing evidence step, not proof that no protection
+  exists (§8.1, §8.5).
 - No claim that a green CI run closes the publication gate. N5 needs the
-  mechanism recorded and the stale-CI counterexample executed; otherwise H2a
-  stops there, and a post-merge audit is detection, never authorization (§8.1).
-- No claim that `monasm-bundle/0.1` is a self-verifying execution snapshot. Its
-  `bundle_digest` covers a bundle-level `target` the file does not store, so it is
-  a companion of its lock: a consumer recomputes the value and verifies the pair,
-  or H3 introduces a versioned format that embeds the full preimage (§7, §8).
+  mechanism recorded and the stale-CI counterexample executed; otherwise the
+  publication-channel verdict stops there, and a post-merge audit is detection,
+  never authorization (§8.1, §8.5).
 - No claim that the single-file published registry scales. The 1,000-version
   measurement and its threshold are a recorded cost and a trigger for a later
   ADR, not a proven property (§8.3).
@@ -3513,10 +3758,12 @@ comparing the materializer with itself proves the bytes.
 - One illegal neighbour is not the whole operand domain. A form with an
   immediately encoded or otherwise bounded operand also carries boundary cases
   taken from the final legal domain `D_form = {x ∈ D_Representable | L ≤ x ≤ U,
-  x ≡ 0 (mod 2^a)} \ E`, not the raw encoded range: positive values are the
-  minimum and maximum of `D_form` plus an interior value, so an excluded or
-  unaligned endpoint is never a positive. A representable excluded value is a
-  form negative; an out-of-range value is a form negative only when the plan can
+  x ≡ 0 (mod 2^a)} \ E`, not the raw encoded range: positive values are chosen by
+  the domain's cardinality — one value, both endpoints, or minimum, maximum and an
+  interior value — so an excluded or unaligned endpoint is never a positive and a
+  degenerate domain never demands a value that does not exist. An empty domain is
+  `empty-form-domain` (exit 1). A representable excluded value is
+  a form negative; an out-of-range value is a form negative only when the plan can
   represent it. A register field's encoded width `w` comes from `field_bits` and
   may exceed 64; its domain is
   `D_reg = ([0, 2^w − 1] ∩ [0, 2^64 − 1]) \ E`, so for `w ≥ 64` the maximum
@@ -3537,14 +3784,21 @@ comparing the materializer with itself proves the bytes.
   two different contents under the same logical version.
 - Bundle verification and publication-history auditing are separate commands.
   `verify --all --check` keeps unselected packages out of a bundle build, while
-  `verify --published --check` still re-hashes retired versions. Neither can
+  `verify --published --check` still re-hashes retired versions, including every
+  file their `snapshot_digest` covers. Neither can
   silently take over the other's job.
-- The sealed bundle is consumed with its lock. A reader recomputes
-  `bundle_digest` from the lock's `target` and the sealed bytes, so the embedded
-  value cannot become an identity on its own; H3 chooses a verified pair or a
-  versioned format with the full preimage, and `bind` never accepts a bare sealed
-  file on the strength of its digest.
-- The registry's audit cost is measured before it is relied on. H2a records the
+- The sealed bundle verifies its own identity and is still compared with its lock.
+  Every field of the `bundle_digest` preimage is in the file, so a reader
+  recomputes both digests without a lock; the pair check catches a lock and a
+  sealed bundle that disagree on the target, the definition or the package set.
+  `bind` never accepts a bundle, and verifying one is not a permission to use it.
+- Publication is a verdict, not a property of a build. Until the publication
+  channel passes, output is a development artifact and the registry does not
+  exist, so no wording may call it immutable; afterwards a `snapshot_digest`
+  makes every byte of a published version directory checkable in-repo (§8.4,
+  §8.5).
+- The registry's audit cost is measured before it is relied on. The publication
+  channel records the
   1,000-version time, memory and bytes-read curve for a package change, a
   publication and a full audit, plus the threshold for revisiting the single-file
   design, so scale is a budgeted cost rather than an assumed property.
@@ -3560,8 +3814,15 @@ comparing the materializer with itself proves the bytes.
   the declared implementation produced the bundle, and trusted provenance needs a
   separate attestation or artifact signature (§7).
 - The path layer's feasibility is evidence, not an assumption. The N1 PoC is a
-  standalone prerequisite with per-platform OS versions, toolchain and API names,
-  fault-injection methods and observed results; it lands before the builder.
+  standalone prerequisite of the publication channel with per-platform OS
+  versions, toolchain and API names, fault-injection methods and observed
+  results; it lands before the hardened reader, not before the author layer (§8.5).
+- Two verdicts replace one gate. The author layer — package model, trusted-tree
+  reading, digests, determinism, cases, conformance — can land and be tested while
+  the publication prerequisites are still open; the publication channel — hardened
+  reader, registry, merge freshness, history audit — carries every claim about
+  published, immutable or trusted artifacts, and H2 does not exit until it passes
+  (§8.5).
 - A lock, sealed bundle or legacy snapshot exists only while its spec exists.
   Removing the last spec removes those derived artifacts from the tree, and
   `verify --all --check` rejects a surviving orphan, so no unselected release
@@ -3575,7 +3836,8 @@ comparing the materializer with itself proves the bytes.
   the ones actually landed. The cost is a merge queue or an operation that writes
   the recorded candidate; required up-to-date checks alone do not establish it.
   N5 closes only when the effective mechanism is recorded and the stale-CI
-  counterexample has been executed; if neither can be shown, H2a stops at that
+  counterexample has been executed; if neither can be shown, the publication
+  verdict stops at that
   gate, because a post-merge audit is detection and cannot authorize a merge.
 - H3 pays an artifact change for target subsets. `monasm-bundle/0.1` records its
   selected `packages` and the merged definition, not per-form owners or covers, so
@@ -3606,7 +3868,8 @@ comparing the materializer with itself proves the bytes.
 - Package reads never follow a symlink or reparse point, and the rule is stated
   as a property of the open rather than of a preceding metadata check, so a
   concurrent replacement cannot make the builder read a file that none of the
-  checks described. The mechanism is a platform capability, so H2a's first gate
+  checks described. The mechanism is a platform capability, so the publication
+  channel's first gate
   proves it on Linux, macOS and Windows rather than assuming a portable call.
 - A legal path does not guarantee an ordinary file: a FIFO, socket or device node
   is not a link, so it passes the path rules and can block or escape every byte
@@ -3767,16 +4030,22 @@ comparing the materializer with itself proves the bytes.
   last spec would erase the evidence that a version was published, so a later PR
   could edit the old snapshot. §8.3 keeps an append-only registry that survives
   retirement.
-- **Let a consumer trust the `bundle_digest` embedded in a sealed bundle.**
-  Rejected: the preimage includes the bundle-level `target` with `profile_id`,
-  which `monasm-bundle/0.1` does not store, so the consumer cannot recompute it
-  and the field is only a claim. The consumer verifies the `(lock, sealed)` pair,
-  or H3 introduces a versioned sealed format whose preimage is complete (§7, §8).
+- **Publish `monasm-bundle/0.1` without the facts its own digest covers, and
+  freeze a runtime format in H3.** Rejected: the file would be a companion whose
+  embedded `bundle_digest` no consumer can recompute, and H3 would need a second
+  bundle version whose only difference is `target`, the covers and
+  `form_owners` — data H2's builder already computes. Nothing has shipped, so the
+  format is fixed once, self-contained, and H3 consumes it (§7, §8.2).
+- **Add `target` and owner data without binding them.** Rejected: metadata outside
+  the digest is rewritable under a stable identity, so H3 would read facts the
+  bundle does not actually commit to. `form_owners`, the covers and `target` are
+  all inside the `bundle_digest` preimage, and completeness is a format rejection
+  (`bundle-owner-incomplete`) rather than a convention (§8.2).
 - **Trust one green platform for the no-follow layer, or treat the gate as a
   design statement.** Rejected: "theoretically possible with a no-follow open" is
   not evidence, and a platform that fails only at builder time has already sunk
   the layer. The N1 PoC is a standalone prerequisite with recorded per-platform
-  results (§3).
+  results (§3). It gates the publication channel, not the author layer (§8.5).
 - **Shard the registry or fold the audit into `--all` now.** Rejected for H2:
   both add a second format or lifecycle, or re-couple bundle verification to
   history, before the measured cost exists. H2 records the 1,000-version curve
@@ -3888,11 +4157,11 @@ comparing the materializer with itself proves the bytes.
   defined over final values; a mutation that changes two members is two
   differences and is rejected, and an operation-level format would need an
   explicit mutation record that `monasm-cases/0.1` does not have (§9.1).
-- **Let `verify --published --check` imply whole-directory immutability.**
-  Rejected: `source_package_digest` excludes README, NOTICE, evidence and cases,
-  so the audit cannot attest those bytes. H2 narrows the claim to executable
-  assets and identity and leaves whole-snapshot enforcement to the changed-path
-  gate and git history; adding a full `snapshot_digest` is a later format (§8.4).
+- **Let `verify --published --check` imply provenance.** Rejected: the audit
+  recomputes `snapshot_digest` over every file, so it *can* attest that the
+  committed directory still matches the recorded value, but it cannot attest who
+  produced the first value or that a gate was not bypassed. H2 states exactly that
+  boundary (§8.4) instead of claiming the digest proves origin.
 - **Decide "already published" from the merge base.** Rejected: the merge base is
   where the branch forked, so a version published on the target branch afterwards
   would be invisible and an edit to it would pass as a candidate. The gate uses
@@ -3902,8 +4171,8 @@ comparing the materializer with itself proves the bytes.
 - **Assume a portable `std::fs` call satisfies the no-follow bound.** Rejected:
   `File::open` follows links, so a package read would silently degrade on every
   platform. The path layer is an explicit, pinned dependency or direct platform
-  call, and H2a must prove it on all three platforms before the builder grows
-  (§3, §6).
+  call, and the V-P PoC must prove it on all three platforms before the hardened
+  reader grows (§3, §6, §8.5).
 - **Whitelist `requires_capabilities` without deriving it.** Rejected: a package
   that omits a capability its rows use passes the whitelist and understates its
   requirements to H3. The declared set must equal the derived set (§1.2).
@@ -4154,7 +4423,7 @@ comparing the materializer with itself proves the bytes.
 | `definition_digest` is `sha256(canonical(document))` with no domain separator | `fmp-model/src/definition.rs` line 252 calls `canonical::canonical_digest(document)` | high (read) |
 | Level 0 has no `symbols`; Level 1 emits `symbols` only when the table is included | `fmp-materialize/src/lib.rs` `level_zero_json` and `to_json`; the call site sets `symbols` from `plan.output.include_symbol_table` | high (read) |
 | The digest fixed vector is stable across two implementations | the §7.0 vector; Python `hashlib` and .NET `SHA256` both produced `1afee65c…` | high (measured twice) |
-| The bundle/release vectors follow the frozen domain separators | §8.2; Python `hashlib` recomputed `b6d92574…` and `4e3d44a8…` from the canonical bytes | high (measured) |
+| The bundle/release vectors follow the frozen domain separators | §8.2; Python `hashlib` recomputed `a9bc3395…` and `2416911a…` from the canonical bytes after `form_owners` and the package cover joined the preimage | high (measured) |
 | `definition::read` rejects an empty `forms` array | `fmp-model/src/definition.rs` `bind_forms` returns "a definition must declare at least one form" | high (read) |
 | `files[].sha256` is a raw-byte hash, not a canonical-content hash | §7.0 rule; no parser is involved in the builder's file hashing | high (specified; H2a must test CRLF/whitespace) |
 | x86 `0.1.0` and `0.78.0` `mov` rows differ | canonical JSON comparison of the two rows; `0.78.0` adds `requires_extensions` and REX placements at bits 0/2 | high (measured on this host; not yet a Rust test) |
@@ -4163,33 +4432,33 @@ comparing the materializer with itself proves the bytes.
 | A frozen legacy extension array is not in the canonical package spelling | `definitions/rv64/0.6.0.json` declares `["rv64i","rv64c"]`; §1's canonical spelling is `["rv64c","rv64i"]`; `fmp-validate/src/lib.rs` `check_target` compares both sides as `BTreeSet` | high (read and measured) |
 | `TargetEq` (set equality of `enabled_extensions`, strict equality elsewhere) is satisfiable; raw array equality is not | specified; no builder exists; a canonical package migrating an `rv64/0.6.0` row would fail both a raw-array legacy check and `extension-lexical` under the opposite spelling | **specified, not implemented** — H2a |
 | Form exclusions hit raw boundary endpoints | `x86:mov/rm8h-r8h/legacy` has a 3-bit field and `excluded [0,1,2,3]`; `aarch64:add/w32-w32-w32-imm6-lsl` excludes `32..63`; `riscv:c.addi/rd-imm6` excludes `0` | high (read) |
-| Boundary positives come from `D_form`, not the raw range | specified; no package cases exist; the raw endpoints of the three examples are illegal | **specified, not implemented** — H2a/H2b |
+| Boundary positives come from `D_form`, not the raw range, and their count follows its cardinality (0 → `empty-form-domain`, 1, 2, ≥3) | specified; no package cases exist; the raw endpoints of the three examples are illegal | **specified, not implemented** — H2a/H2c |
 | `fmp-def/0.2` requires `requires_extensions` and rejects it in `0.1` | `bind_form` selects `FORM_FIELDS_V0_2` and `req`s the key; `FORM_FIELDS` rejects it as unknown | high (read) |
 | `check_form_id` accepts any known family but does not compare it to `target_identity.isa_family` | `fmp-model/src/definition.rs` `check_form_id` matches `x86`/`aarch64`/`riscv` and returns; `bind_target` reads `isa_family` independently | high (read) |
 | Builder determinism, digest reproduction, row equality and byte equality | not implemented | **unverified** — H2a/H2b must measure them |
 | `verify --package`, the standalone identity, the case/plan/form binding, the release evidence hash and the changed-path gate (including deletion/rename) | not implemented | **unverified** — H2a |
 | The generic `family(form_id) == isa_family` rule and its cross-ISA negative | not implemented; `check_form_id` only checks the family in isolation | **unverified** — H2a |
 | Unknown-capability rejection, reserved-asset rejection, version-conflict rule and aggregate limits | not implemented | **unverified** — H2a |
-| Evidence completeness, `evidence_digest` and `release_digest`, including development-mode direct case hashing versus the release manifest | not implemented | **unverified** — H2a owns the mechanism; H2b adds assets only |
+| Evidence completeness, `evidence_digest` and `release_digest`, including development-mode direct case hashing versus the release manifest | not implemented | **unverified** — H2a owns the mechanism; H2c adds assets only |
 | Case, evidence, spec and lock byte/count budgets, including the cumulative per-package asset budget and the single per-closure counter of §12.2 | not implemented | **unverified** — H2a |
-| Immutable published version directories, legacy target consistency, form-scope mutation coverage, complete diagnostic matching and level-specific projections | not implemented | **unverified** — H2a |
+| Immutable published version directories, legacy target consistency, form-scope mutation coverage, complete diagnostic matching and level-specific projections | not implemented | **unverified** — H2a (legacy/form-scope/projections), V-P (published directories) |
 | Published-version registry, retirement survival and registry edit detection | not implemented | **unverified** — H2a |
 | First publication in the creating PR, with base-only immutability | specified; the old base-or-head rule would have rejected the creating PR | **specified, not implemented** — H2a |
 | Published-set authority is the target-branch tip `B`, not the merge base: `Published(B) ⊆ Published(H)` and equal tree bytes for every published path | specified; no changed-path mapper exists; the cross-branch publish-then-edit regression is untested | **specified, not implemented** — H2a |
 | Package directory segment equals the full `package_id`, so the path mapping is injective | specified; no mapper exists; two IDs with the same last segment are untested | **specified, not implemented** — H2a |
-| Global `(package_id, version)` uniqueness and the permanent path/digest binding | specified; per-closure uniqueness cannot exclude two paths for one logical version | **specified, not implemented** — H2a |
+| Global `(package_id, version)` uniqueness and the permanent path/digest binding | specified; per-closure uniqueness cannot exclude two paths for one logical version; V-P's registry does not exist yet | **specified, not implemented** — V-P |
 | Cross-spec `bundle_id` and `(namespace, version)` uniqueness | `Registry::find` returns `E-DEF-001` when two definitions share `(namespace, version)` (`fmp-model/src/definition.rs` 843–865); the builder does not yet reject the pair at spec level | **unverified** — H2a |
 | No-follow package reads (no symlink or reparse point on the resolved path under `--root`) | specified as a property of the open: a metadata pre-check followed by a path open is explicitly insufficient, and the implementation has no package reader yet | **specified, not implemented** — H2a |
 | Publication-history audit separate from `verify --all --check` | specified; no command exists | **unverified** — H2a |
 | Definition-identity history in the registry (`identities`) and permanent `(namespace, version)` → `definition_digest` binding | specified; no registry exists | **specified, not implemented** — H2a |
 | `requires_capabilities` derived from row structure and required to equal the declaration | specified; `bind_forms` requires non-empty `slots` and `bind_slot` non-empty `placements`, so every legal `fmp-def/0.1` form derives `field-placement/v1`; no implementation | **specified, not implemented** — H2a |
-| Release-shaped fixed vector with `evidence_digest` present (`evidence_digest` `e9473871…`, `release_digest` `ba60e8ba…`) | computed with Python over the bytes shown, not yet reproduced by a Rust implementation | **unverified on the Rust side** — H2a |
+| Release-shaped fixed vector with `evidence_digest` present (`evidence_digest` `e9473871…`, `release_digest` `45a4004e…`) | computed with Python over the bytes shown, not yet reproduced by a Rust implementation | **unverified on the Rust side** — H2a |
 | Value-defined case diff (member edit → member pointer; kind change → position; array length → array) | specified; no harness | **specified, not implemented** — H2a |
 | Form ⊆ package ⊆ bundle extension inclusion and the per-package `read` before merge | specified; `bind_forms` checks a 0.2 form against the merged target, so the merged-only check is the gap | **specified, not implemented** — H2a |
 | Reserved legacy definition names from `definitions/*/*.json` | specified; the index is readable today, the builder has no reserved-set check | **specified, not implemented** — H2a |
-| The publication audit's guarantee is bounded to executable assets and identity | specified; whole-directory immutability is enforced by the changed-path gate, not by the audit | **specified, not implemented** — H2a |
-| The single-file registry's audit cost is recorded at ~1,000 published versions, with a threshold that triggers a later ADR | not measured; the registry does not exist; H2a must run three runs each for a package change, a publication and a full audit, recording time, memory and bytes read | **unverified** — H2a |
-| The no-follow open is achievable on Linux, macOS and Windows | not proved; `std::fs` has no portable no-follow open, so H2a N1 must measure a path layer on all three platforms as a standalone PoC deliverable that records OS version, toolchain/API, fault injection and per-case result before the builder | **unverified** — H2a N1 PoC |
+| The publication audit covers every file in a published version directory, while still not proving provenance | `snapshot_digest` is recomputed by `verify --published --check` over every regular file; a mismatch is `snapshot-mismatch`. Who produced the first value, and a history rewrite or bypassed gate, remain outside the digest | **specified, not implemented** — V-P |
+| The single-file registry's audit cost is recorded at ~1,000 published versions, with a threshold that triggers a later ADR | not measured; the registry does not exist; V-P must run three runs each for a package change, a publication and a full audit (including snapshot re-hashing), recording time, memory and bytes read | **unverified** — V-P |
+| The no-follow open is achievable on Linux, macOS and Windows | not proved; `std::fs` has no portable no-follow open, so the V-P N1b PoC must measure a path layer on all three platforms as a standalone deliverable that records OS version, toolchain/API, fault injection and per-case result before the hardened reader | **unverified** — V-P N1b |
 | Identifier, path-segment and artifact-filename rules are format rejections before any open | specified; the builder has no package reader | **unverified** — H2a |
 | The same relative asset path in two different package roots is legal, and a folded root alias or repeated spec path is `path-lexical` | specified; no closure reader exists | **unverified** — H2a |
 | A declared lowercase path does not open a case-different on-disk entry, on intermediate directory or final file | specified as part of the open; no path layer exists | **unverified** — H2a N1 gate (Linux, macOS, Windows) |
@@ -4207,14 +4476,14 @@ comparing the materializer with itself proves the bytes.
 | `--check` proves the lock and sealed bundle, and compares a committed legacy snapshot with the sealed definition as a one-way equality gate (absence legal, no digest input) | specified; the write phase removes `<legacy>/definition.json` first and writes it last, so an interrupted write leaves it absent, not stale; no builder exists | **specified, not implemented** — H2a |
 | A committed legacy snapshot whose bytes differ from the sealed definition is `legacy-snapshot-mismatch` (exit 1) | specified; the gate compares canonical bytes without rebuilding the cache; no `--check` exists | **specified, not implemented** — H2a |
 | A definition-identity mismatch is not expressible as a `monasm-cases/0.1` case | the case requires the `$standalone` sentinel and the harness substitutes the correct identity, so a wrong digest is `case-plan-identity`; the derived-plan binding test carries the negative | **specified; reader behaviour read** — H2a |
-| The base registry (target-branch tip `B`) decides published-path containment before head-side `package.json` discovery | specified; no changed-path mapper exists, so a nested manifest masking an ancestor is untested | **specified, not implemented** — H2a |
-| A version published on the target branch after a feature branch forked still freezes that branch's edits | specified; the counterexample is a fork from `M0`, publication of `P/0.1.0` on the target branch, then an edit to `P/0.1.0/README.md`; only tip-based `Published(B) ⊆ Published(H)` plus tree-byte equality rejects it, since the digest excludes `README.md` | **specified, not implemented** — H2a |
-| A publication verdict authorizes only the `(B_checked, C_checked, mode)` triple it read: a stale green result cannot authorize a merge after another PR publishes first | specified; requires a merge queue or an operation that writes the recorded candidate, and H2a must prove the setting through the platform API; no workflow or settings evidence exists | **specified, not implemented** — H2a N5 |
-| H3 target subsets check `E_owner(form(i)) ⊆ E_plan` for every selected instruction, from a versioned owner/cover map or another frozen source; a form without a proof is rejected | specified; `monasm-bundle/0.1` has no owner map and no H3 plan or bundle format exists; the `c.addi`/`rv64i` case is untested | **specified, not implemented** — H3 |
-| `bundle_digest` cannot be recomputed from `monasm-bundle/0.1` alone; a consumer must recompute it from the lock's `target` | specified; the §7 preimage includes the bundle-level `target` with `profile_id` while §8's sealed key list has no such wrapper, so the gap is structural; the §8 vectors were computed from that preimage, but no consumer applies the recompute-from-lock rule yet | **specified, not implemented** — H3 |
-| Required up-to-date checks alone do not prove the landed tree equals the tested tree; a 403 or empty ruleset list is missing evidence, not absence of protection | specified; an API read attempt during review returned 403 and the ruleset query was inconclusive, and no merge-queue evidence has been recorded | **unobtained; H2a must record API evidence before acceptance** |
-| N5 cannot close on a green CI run: the effective merge mechanism must be recorded and the stale-CI counterexample executed, or H2a stops at the gate | specified; `Gates`/`Determinism` succeeded on the planning PR, but a green run is a verdict for its own `(B_checked, C_checked, mode)` and does not demonstrate the mechanism; no counterexample has been run | **unobtained; H2a N5** |
-| `monasm-bundle/0.1` has exactly seven keys, its package list is `packages` and it stores no bundle-level `target` | specified; this revision found and removed conflicting normative text (`sources`, and "the sealed bundle carries the same `target`"); no sealed bundle exists, so the key set test is unrun | **specified, not implemented** — H2a |
+| The base registry (target-branch tip `B`) decides published-path containment before head-side `package.json` discovery | specified; no changed-path mapper exists, so a nested manifest masking an ancestor is untested | **specified, not implemented** — V-P |
+| A version published on the target branch after a feature branch forked still freezes that branch's edits | specified; the counterexample is a fork from `M0`, publication of `P/0.1.0` on the target branch, then an edit to `P/0.1.0/README.md`; tip-based `Published(B) ⊆ Published(H)` plus tree-byte equality rejects it, and `snapshot_digest` independently detects the edit in the audit | **specified, not implemented** — V-P |
+| A publication verdict authorizes only the `(B_checked, C_checked, mode)` triple it read: a stale green result cannot authorize a merge after another PR publishes first | specified; requires a merge queue or an operation that writes the recorded candidate, and V-P must prove the setting through the platform API; no workflow or settings evidence exists | **specified, not implemented** — V-P N5 |
+| H3 target subsets check `E_owner(form(i)) ⊆ E_plan` for every selected instruction, from `form_owners` plus the owner's declared cover; a form without a proof is rejected | specified; `monasm-bundle/0.1` carries the owner map and covers, but H2 builds no subset cell and no H3 plan or consumer exists; the `c.addi`/`rv64i` case is untested | **specified, not implemented** — H3 |
+| `monasm-bundle/0.1` is self-verifying: `bundle_digest` is recomputed from the file's own `target`, per-package `enabled_extensions`, `form_owners` and `definition` | specified; the §7 preimage is complete inside the nine-key file, the lock is checked separately for paths, evidence and builder, and the §8 vectors were recomputed from that preimage; no sealed bundle or consumer exists | **specified, not implemented** — H2a (build), H3 (consume) |
+| Required up-to-date checks alone do not prove the landed tree equals the tested tree; a 403 or empty ruleset list is missing evidence, not absence of protection | specified; an API read attempt during review returned 403 and the ruleset query was inconclusive, and no merge-queue evidence has been recorded | **unobtained; V-P must record API evidence** |
+| N5 cannot close on a green CI run: the effective merge mechanism must be recorded and the stale-CI counterexample executed, or the publication verdict stops at the gate | specified; `Gates`/`Determinism` succeeded on the planning PR, but a green run is a verdict for its own `(B_checked, C_checked, mode)` and does not demonstrate the mechanism; no counterexample has been run | **unobtained; V-P N5** |
+| `monasm-bundle/0.1` has exactly nine keys, carries the bundle-level `target`, each package's `enabled_extensions` and a complete `form_owners` map, and its `bundle_digest` is recomputable from the file | specified; this revision replaced the round-21 companion rule and the round-22 seven-key set; no sealed bundle exists, so the key-set, owner-map and self-verification tests are unrun | **specified, not implemented** — H2a |
 | `builder` records provenance but does not prove it; a change to `builder.version`/`build` can pass `--all --check` | specified; the drift projection excludes `builder` and no digest covers it; no lock exists, so the counterexample is unrun | **specified, not implemented** — H2a |
 | `monasm-package/0.1` rejects non-empty `exports.types`/`exports.profiles` permanently, independent of the builder version; a later format version owns the semantics | specified; no builder exists, and no later package format is written | **specified, not implemented** — H2a |
 | Input budgets apply in one order — lexical path, no-follow open, handle type check, same-handle size hint, bounded read, parse — and metadata size is never the boundary | specified; no reader exists; a file that grows between type check and read is covered by the cumulative counter | **specified, not implemented** — H2a |
@@ -4289,37 +4558,53 @@ comparing the materializer with itself proves the bytes.
   tree equals the tested tree, treats a 403 or an empty ruleset list as proof
   that no protection exists, or closes N5 on a green CI run or a post-merge
   audit: stop. Up-to-date checks bound base staleness, not tree identity; the
-  mechanism plus the stale-CI counterexample is the evidence, and without it H2a
-  stops (§8.1).
-- Someone gives `monasm-bundle/0.1` a `sources` key or a bundle-level `target`
-  "for convenience", or describes the sealed file as carrying them: stop. The
-  sealed key set is the seven keys in §8.2, `packages` is the package-list name,
-  and the missing `target` is why the digest is recomputed from the lock (§7,
-  §8).
+  mechanism plus the stale-CI counterexample is the evidence, and without it the
+  publication verdict stops (§8.1, §8.5).
+- Someone gives `monasm-bundle/0.1` a `sources` key, removes a key the digest
+  covers, or describes the file as "verified through its lock": stop. The sealed
+  key set is the nine keys in §8.2, `packages` is the package-list name,
+  `form_owners` has exactly one row per form, and the digest preimage is complete
+  inside the file (§7, §8.2).
+- Someone adds `target`, `form_owners` or a package cover outside the
+  `bundle_digest` preimage, or treats a missing owner row as an empty requirement:
+  stop. Data outside the digest is rewritable under a stable identity, and an
+  absent row means "unproved", not `∅`; `bundle-owner-incomplete` is a format
+  rejection (§4.1, §7, §8.2).
+- Someone treats a passing author-layer verdict as a publication, creates
+  `bundles/published.json` before the publication channel passes, or promotes a
+  development artifact by relabelling it: stop. V-A and V-P are separate verdicts;
+  no artifact is published, immutable or trusted until V-P passes, and the first
+  publication re-verifies through the hardened reader (§8.5).
+- Someone describes `snapshot_digest` as provenance, or uses it to replace the
+  changed-path gate and the merge-freshness proof: stop. It binds committed bytes
+  to a recorded value; who produced the first value, and a history rewrite or a
+  bypassed gate, are outside what an in-repo digest can attest (§8.3, §8.4).
 - Someone treats `builder` as proof that the declared implementation produced
   the bundle, or folds `builder` back into the definition digest to make it one:
   stop. It is an informational provenance record; trusted provenance needs a
   separate attestation or signature (§7).
 - Someone lets a consumer accept a sealed bundle's `bundle_digest` without
-  recomputing it from the lock's `target`, or passes a bare sealed file to `bind`:
-  stop. The embedded value covers bytes the sealed file does not store; H3
-  verifies the pair or uses a versioned format with the complete preimage (§7,
-  §8).
+  recomputing it from the bytes the file carries, or passes a bare sealed file to
+  `bind` as permission: stop. Every preimage field is in the file, so the value is
+  recomputable; recomputation proves what the bundle says, not that a plan may use
+  it, and `bind` still takes a `Definition` (§7, §8.2).
 - Someone presents the single-file registry or the full-history audit as a proven
   scalability property, drops the 1,000-version budget, or crosses a recorded
   threshold without a new ADR: stop. It is a measured, accepted cost with a
-  written trigger (§8.3).
+  written trigger, and it is a scale boundary for *publication*, not a claim that
+  independent package development does not scale (§8.3).
 - Someone claims that independent authoring implies coordination-free parallel
   publishing, or removes the rebase-and-revalidate rule because the package
   change path is localized: stop. The registry is one shared file; H2 promises
   correct serialization, not parallel publication throughput (§8.3).
 - Someone demotes the N1 PoC to a plan note, or accepts "theoretically possible"
   as three-platform evidence: stop. The PoC is a separate prerequisite deliverable
-  with recorded platform, toolchain, API, fault-injection and result rows (§3).
+  of the publication channel with recorded platform, toolchain, API,
+  fault-injection and result rows; it does not gate the author layer (§3, §8.5).
 - Someone lifts `h2-exact-target` by adding `fmp/0.2` and checking only
   `E_plan ⊆ E_bundle`: stop. Every selected instruction must satisfy
-  `E_owner(form(i)) ⊆ E_plan`; `monasm-bundle/0.1` cannot supply the owner map, so
-  H3 needs a versioned artifact or another frozen source (§4.1).
+  `E_owner(form(i)) ⊆ E_plan`, from `form_owners` plus the owner's declared cover;
+  H2 freezes those facts but runs no subset cell (§4.1).
 - Someone reads a legacy form's absent `requires_extensions` as the empty set and
   lets any subset plan select it: stop. Absent means unproved; the subset
   composition is rejected until the artifact supplies the proof (§4.1).
