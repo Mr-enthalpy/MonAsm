@@ -5,14 +5,17 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: twenty-fifth revision, 2026-11-19. The normative entry now keeps
+- Revision: twenty-sixth revision, 2026-11-19. The normative entry now keeps
   only current decisions; per-revision audit notes (fourteenth through
-  twenty-fourth) are in `research/he1/adr-0128-revision-log.md`, which is
+  twenty-fifth) are in `research/he1/adr-0128-revision-log.md`, which is
   historical evidence and not a contract. Earlier decisions remain in force
   except where this revision or the `Settles` list restates them. This revision
-  scopes the `empty-form-domain` rejection to slots that must encode a numeric
-  value and records that design approval does not make the publication channel
-  available before platform evidence exists.
+  moves the legacy bridge into a `compat` module with a long-term lifecycle and
+  renames the bundle type to `CheckedBundle` so its name claims only structure
+  and closure checks; requires a published-directory audit to reject every
+  unreferenced non-regular entry; reconciles every evidence and risk row with the
+  §8.5 phase split; and separates `BuildSucceeded(r)` from
+  `ArtifactsConsistent(T)`.
 - History: `research/he1/adr-0128-revision-log.md`.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
   `monasm-lock/0.1`, `monasm-bundle/0.1` and `monasm-published/0.1` formats;
@@ -72,7 +75,9 @@
   base-registry-first changed-path containment; package/form
   ISA-family consistency; package ownership and conflict rules; which legacy
   definition version a re-homed form is compared against; transitive dependency
-  closure and release-evidence status; the builder's error and exit behaviour;
+  closure and release-evidence status; the `CheckedBundle` name and its single
+  compat adapter to the H1 entry, which has no reverse conversion and is not
+  replaced by the H3 entry; the builder's error and exit behaviour;
   and the boundary between H2 and H3/H4
 - Supersedes: none
 - Superseded by: none
@@ -103,7 +108,7 @@ Three constraints shape the contract:
    Arc<Definition>)` stays the admission entry, `ValidatedPlan` stays the only
    input to `materialize`, and `Definition` stays closed (`ADR-0127`). H3 is the
    round that makes a bundle the binding input. H2 only adds a development-time
-   builder and a bridge back to `Arc<Definition>`.
+   builder and a compat adapter back to `Arc<Definition>`.
 2. **The builder must not become a second definition authority.** Form rows,
    placements, templates, ranges and fixups are still checked by
    `fmp_model::definition::read`. The builder checks manifests, paths, the
@@ -2268,13 +2273,27 @@ files           = [{path, sha256}] for every regular file under the version
 ```
 
 `sha256` is bare 64-lowercase-hex text (§7.0), because this value is not an
-`fmp/0.1` diagnostic input. Directories are not entries; the reader already
-rejects symlinks, reparse points and non-regular leaves, so the file set is
-exactly what a package reader can open. The digest is computed by `build
---release` from the version directory it just validated and printed for the
-publisher, who copies it into the registry entry; it is not derived from
-`source_package_digest`, `definition_digest`, `bundle_digest` or `release_digest`,
-and none of those digest inputs changes because of it.
+`fmp/0.1` diagnostic input. Directories are not entries and are descended into.
+The digest is computed by `build --release` from the version directory it just
+validated and printed for the publisher, who copies it into the registry entry;
+it is not derived from `source_package_digest`, `definition_digest`,
+`bundle_digest` or `release_digest`, and none of those digest inputs changes
+because of it.
+
+**Every directory entry is either a regular file or a rejection, including
+entries nothing references.** The audit enumerates every entry under the version
+directory and classifies it on the opened handle, not on a path `stat` (§3): a
+directory is descended into; a regular file is hashed into `files`; anything else
+— symbolic link, Windows reparse point, POSIX FIFO, socket, device node — is
+`not-a-regular-file` (exit 1), whether or not a manifest, a spec or a case names
+it. Silently skipping an unreferenced entry is not a legal reading of this rule:
+because `files` contains only regular files, a traversal that dropped a newly
+added link would recompute the recorded `snapshot_digest` unchanged, and the link
+would pass the audit. The entry set is part of the claim, so the audit rejects
+such a directory instead of absorbing the extra entry, and the same
+classification applies to a package reader's opened leaves, so an entry cannot be
+legal in one traversal and illegal in the other. The regression test is
+`a_published_snapshot_rejects_unlisted_nonregular_entries`.
 
 `verify --published --check` recomputes it for every entry and requires equality;
 a mismatch is `snapshot-mismatch` (exit 1). That makes a modification of a
@@ -2488,21 +2507,46 @@ absence of the cache is legal. Failing the build instead is rejected because a
 closure inside the §12 budgets would then be unbuildable, making a published
 limit depend on a development cache. A hand-committed snapshot above 16 MiB
 remains `resource-limit` (exit 1) on `--check`, because the builder cannot read it
-under its own budget; `build` never produces one, so for any accepted input
-`build` success implies `--all --check` passes on the tree it wrote.
+under its own budget, and `build` never produces one.
+Two different propositions are involved, and the contract keeps them separate:
+
+- `BuildSucceeded(r)` — the build operation `r` ran to completion and exited 0.
+  It read one set of inputs, wrote a lock and a sealed bundle derived from them,
+  and wrote the legacy snapshot when the canonical definition is inside the
+  16 MiB read budget.
+- `ArtifactsConsistent(T)` — the tree state `T` satisfies the invariants
+  `verify --all --check` tests: the lock and the sealed bundle are the pair a
+  fresh rebuild of the same closure produces (the lock compared without
+  `builder`), a committed legacy snapshot equals the sealed definition's
+  canonical bytes, and every file is inside its budget.
+
+For any accepted input, `BuildSucceeded(r)` implies `ArtifactsConsistent(T_r)` on
+the tree `r` wrote. The converse does **not** hold, and the contract does not
+claim it: `ArtifactsConsistent(T)` describes the current bytes, not the last
+operation. Three states show the gap. A valid closure whose legacy write failed
+(new lock and sealed, snapshot absent, exit 2) is consistent, because absence is
+legal. A tree checked out of git after such a failure is consistent. A lock/sealed
+pair restored from git with matching bytes is consistent although no build ran in
+that working tree. `--check` therefore proves that the artifact pair in front of
+it is self-consistent; it never proves that the most recent build succeeded, and
+no report may cite a green `--check` as evidence about a build operation.
 
 An I/O or internal failure during this phase (exit 2) may leave a temporary file,
 a missing snapshot, or a **pair of files from different builds**: a new lock with
 the old sealed bundle, or the reverse. H2 does not claim a multi-file atomic
 transaction, and it does not claim the disk never holds that state. What it
-claims is that the state is **detectable and never a release**: the lock and the
-sealed bundle each record `bundle_digest` and `definition_digest`, so a mixed
-pair fails `verify --all --check`, and exit 2 already means "not built". A
-partial write that `--check` accepts cannot exist, because acceptance requires
-the committed bytes to equal a fresh rebuild of the same closure. An interrupted
-write therefore leaves only two consistent states — both new (a valid build with
-the cache possibly missing) or both old (the previous build, with the new files
-not yet renamed into place) — plus states that `--check` rejects.
+claims is narrower and checkable: a mixed pair is **detectable**, because the lock
+and the sealed bundle each record `bundle_digest` and `definition_digest` and the
+pair then fails `verify --all --check`; and such a state is **never a release**,
+because the exit code is 2 and `build` never writes a registry row. A partial byte
+stream that `--check` accepts cannot exist, because acceptance streams the
+committed bytes against a fresh rebuild of the same closure. An interrupted write
+therefore leaves only two consistent states — both new (a valid build, with the
+optional cache possibly missing) or both old (the previous build, with the new
+files not yet renamed into place) — plus states that `--check` rejects.
+"Consistent" here includes the legal exit-2 state with a missing cache, so a
+failed build is not always visible to `--check`; only its exit code and the
+mixed-pair states are.
 
 **Output directories are trusted inputs with a checked path, not a sandbox.**
 `bundles/locks/`, `bundles/sealed/` and `bundles/legacy/` are
@@ -2552,8 +2596,12 @@ Removing it before the rewrite and writing it last keeps the interrupted-write
 story simple: an exit-2 write leaves it absent, which passes because absence is
 legal, so the next `--definitions` read fails loudly instead of returning the
 previous build's rows. A stale snapshot from an interrupted write now fails the
-equality gate instead of being silently readable; both outcomes are "not a
-successful release". Counterexample if the legacy snapshot were written in place
+equality gate instead of being silently readable. Both outcomes are "not a
+successful release", but only the first is `¬BuildSucceeded(r)` with
+`ArtifactsConsistent(T)` still true: the missing cache is exactly the state that
+`--check` accepts, so it reports consistency, not the failed operation. The
+stale-snapshot outcome is the other shape, an inconsistent tree that `--check`
+rejects. Counterexample if the legacy snapshot were written in place
 before the lock: a crash after the new lock and sealed bundle but before the
 legacy write leaves a snapshot from the previous build next to a consistent new
 release pair, and the equality gate reports it rather than letting a developer
@@ -2720,8 +2768,9 @@ H2 is therefore accepted through **two verdicts**, recorded separately:
 - **V-P, publication channel.** The hardened reader (open-time no-follow, exact
   directory-entry names, replacement-race binding, regular-file-only leaves) with
   its three-platform PoC, `bundles/published.json` with `identities` and
-  `snapshot_digest`, append-only and retirement rules, the full-history audit,
-  the changed-path gate, the merge-freshness proof with the executed stale-CI
+  `snapshot_digest`, append-only and retirement rules, the full-history audit
+  including the rejection of every unreferenced non-regular directory entry, the
+  changed-path gate, the merge-freshness proof with the executed stale-CI
   counterexample (§8.1), and the ~1,000-version measurement with its threshold.
 
 The ordering rules are part of the contract, because either misordering would be
@@ -3363,22 +3412,74 @@ independent of `package_format`, so adding that support does not rename packages
 or move `source_package_digest`; it does require a new `tests/cases.json`
 contract and harness path.
 
-### 10. The legacy bridge is one method, and it is H2-only
+### 10. A checked bundle narrows through one compat function
 
-`VerifiedBundle` exposes:
+`CheckedBundle` exposes the facts it checked, and no entry that already has a
+named successor:
 
 ```rust
-pub fn definition(&self) -> Arc<Definition>;
 pub fn definition_digest(&self) -> &str;
 pub fn bundle_digest(&self) -> &str;
 pub fn lock_json(&self) -> Json;
 pub fn bundle_json(&self) -> Json;
 ```
 
-`bind` still takes `Arc<Definition>`; H2 does not add a bundle parameter. The
-`definition()` bridge exists so the H2 equivalence tests and the legacy
-`--definitions <dir>` path can execute the generated table. H3 replaces it with
-a bundle-bound `bind`; this ADR does not describe it as a long-term API.
+The name is part of the contract, not a label. A `CheckedBundle` means that the
+selected closure was read, closed, path-checked, read again under each package's
+own target, ownership-checked, merged, serialised into a lock/sealed pair, and
+that the recorded digests match the bytes produced from those inputs. It does
+**not** mean that the bundle is published, that `bundles/published.json` has a
+row for it, that its publication history or source provenance was verified, or
+that V-P passed. Those are properties of a tree and of the registry (§8.5),
+reported by `verify --published --check`; no value of this type carries them.
+Before V-P, every `CheckedBundle` in the repository is a development artifact by
+definition (§8.5 rule 2). A name such as `VerifiedBundle` would blur exactly that
+line, and `BuiltBundle` would claim a build even when `verify --all --check`
+produced the value, so the type is called `CheckedBundle`.
+
+`bind` still takes `Arc<Definition>`; H2 does not add a bundle parameter. The one
+narrowing from a checked bundle to that entry is a free function in its own
+module:
+
+```rust
+pub fn fmp_definition::compat::as_legacy_definition(
+    bundle: &CheckedBundle,
+) -> Arc<Definition>;
+```
+
+It is deliberately not a method and not a crate-root re-export: every call site
+must read `compat::`, no glob import reaches it by accident, and no other crate
+can present it as part of the bundle's own surface. Its lifecycle is part of the
+contract rather than an implementation note:
+
+1. **It is retained, not replaced.** It is the adapter from a checked bundle to
+   the H1 entry and stays valid for as long as `bind(Plan, Arc<Definition>)`
+   exists. H3 does not remove, replace or deprecate it; H3 adds its own
+   bundle-bound entry next to the H1 one, and both remain available.
+2. **It has no independent retirement date.** It is removed only in the change
+   that retires `bind(Plan, Arc<Definition>)` itself, and that retirement needs
+   its own ADR. The adapter's lifetime is the lifetime of the API it adapts, so
+   no revision may describe it as temporary or H2-only.
+3. **It exists so the checked value is the executed value, and in H2 only the
+   harness calls it.** Binding the bundle's own `Definition`, rather than
+   re-reading the sealed document, keeps one value behind the recorded digest and
+   the rows that execute, which is the same rule §9 applies to a package and the
+   merge. H2 ships no runtime bundle consumer, so the equivalence harness of
+   §15.3 is the only caller: `fmp-validate`, `fmp-materialize` and the `fmp` CLI
+   never call it, and it creates no `fmp-validate → fmp-definition` dependency
+   (§15). The legacy `--definitions <dir>` path is the counterpart the harness
+   compares against; it reads the emitted snapshot and does not call the adapter.
+4. **It narrows and cannot widen back.** The returned value is a plain H1
+   `Definition`; package, ownership and lock facts are gone. There is no
+   `TryFrom<Arc<Definition>> for CheckedBundle`, no public constructor and no
+   conversion in that direction, so the adapter cannot be used to claim bundle
+   coverage for a definition that never had it.
+5. **H3's formal entry does not route through it.** That entry takes
+   `&CheckedBundle` directly and re-checks the facts it consumes. Implementing it
+   as `bind(plan, compat::as_legacy_definition(bundle))` is a defect, because the
+   composition discards exactly those facts; the H3 acceptance test asserts that
+   the new entry rejects a plan the bundle's owner cover cannot support even
+   though the narrowed definition alone would bind it.
 
 ### 11. Errors and exit codes are the builder's own
 
@@ -3628,9 +3729,10 @@ drops `fingerprint` and `materializer_version`; a case that declares either is
 
 For each reference fixture, the equivalence test reads the legacy plan, replaces
 only `definition_identity` with the bundle's `{namespace, version, digest}`,
-re-parses with `fmp_model::plan::read`, binds to `VerifiedBundle::definition()`,
-materialises, and compares the same level-specific projection. The positive
-case in `tests/cases.json` compares its `expect` object the same way.
+re-parses with `fmp_model::plan::read`, binds the bundle through
+`fmp_definition::compat::as_legacy_definition(&bundle)`, materialises, and
+compares the same level-specific projection. The positive case in
+`tests/cases.json` compares its `expect` object the same way.
 
 It does **not** compare `fingerprint` or `materializer_version`.
 `fingerprint` covers `plan.legacy_document`, which contains the declared
@@ -3657,8 +3759,10 @@ comparing the materializer with itself proves the bytes.
 - No execution or emission of `type`/`profile` assets; a non-empty declaration
   is rejected, and `monasm-package/0.1` keeps that rejection permanently — H4
   needs an explicit later package format (§5).
-- No `bind(VerifiedBundle, ...)` and no `fmp-validate → fmp-definition`
-  dependency (H3).
+- No `bind(CheckedBundle, ...)` and no `fmp-validate → fmp-definition`
+  dependency (H3). H2's only bridge to the H1 entry is the compat adapter of §10,
+  which takes `&CheckedBundle` and returns an `Arc<Definition>`; it does not put a
+  bundle parameter on `bind` and does not move that dependency edge.
 - No target-subset acceptance in H2. `monasm-bundle/0.1` carries the facts the H3
   rule reads — `form_owners` and each package's declared cover — but H2 runs no
   owner-cover check and adds no subset cell; a definition format whose
@@ -3896,11 +4000,15 @@ comparing the materializer with itself proves the bytes.
   sealed definition as a one-way equality gate (`legacy-snapshot-mismatch`) that
   never enters a digest (§8.3).
 - An interrupted write (exit 2) can leave a temporary file and a lock/sealed pair
-  from different builds, but never a state `verify --all --check` accepts: the
-  guarantee is detectability, not a multi-file atomic rename. Output directories
-  are trusted, yet every output parent segment under `--root` obeys the same
-  no-follow rule as an input, and the committed lock and sealed bundle are
-  compared as a bounded stream inside the 1 MiB and 80 MiB budgets (§8.3, §12).
+  from different builds, but never a state that is both consistent and a release:
+  the guarantee is detectability, not a multi-file atomic rename. A mixed pair
+  fails `verify --all --check`; a missing optional cache passes it. That is why
+  `BuildSucceeded(r)` and `ArtifactsConsistent(T)` are stated separately and only
+  the first implies the second: `--check` proves the current pairing, never that
+  the last build operation succeeded (§8.3). Output directories are trusted, yet
+  every output parent segment under `--root` obeys the same no-follow rule as an
+  input, and the committed lock and sealed bundle are compared as a bounded
+  stream inside the 1 MiB and 80 MiB budgets (§8.3, §12).
 - A package's `enabled_extensions` is a conservative declared cover, not a
   minimal set. Over-declaration is legal and only narrows which bundles may
   select the package; under-declaration is `form-extension-mismatch`, and
@@ -3998,11 +4106,12 @@ comparing the materializer with itself proves the bytes.
   decision 14 and must record the row and target comparison.
 - The builder is offline and deterministic: no network, no author-directory
   reads, no package hooks, no execution of package scripts (`INV-05`).
-- H3 can replace `VerifiedBundle::definition()` with a bundle-bound `bind` and
-  add the subset-based plan target rule together with the versioned owner or
-  per-form requirement source (§4.1). The package and spec formats need not
-  change; the sealed bundle artifact is versioned, and the plan format is the H3
-  surface that changes.
+- H3 can add a bundle-bound entry alongside the unchanged H1 `bind`, and add the
+  subset-based plan target rule together with the versioned owner or per-form
+  requirement source (§4.1). The compat adapter of §10 stays: it is the replay
+  path for the H1 entry, not the H3 surface, and H3's entry must not be built by
+  composing it. The package and spec formats need not change; the sealed bundle
+  artifact is versioned, and the plan format is the H3 surface that changes.
 
 ## Alternatives rejected
 
@@ -4422,22 +4531,23 @@ comparing the materializer with itself proves the bytes.
 | Boundary positives come from `D_form`, not the raw range, and their count follows its cardinality (0 on a slot without a non-numeric path → `empty-form-domain`, 1, 2, ≥3); an `operand_value` slot with an empty numeric domain is not rejected because a fixup can cover it | specified; no package cases exist; the raw endpoints of the three examples are illegal | **specified, not implemented** — H2a/H2c |
 | `fmp-def/0.2` requires `requires_extensions` and rejects it in `0.1` | `bind_form` selects `FORM_FIELDS_V0_2` and `req`s the key; `FORM_FIELDS` rejects it as unknown | high (read) |
 | `check_form_id` accepts any known family but does not compare it to `target_identity.isa_family` | `fmp-model/src/definition.rs` `check_form_id` matches `x86`/`aarch64`/`riscv` and returns; `bind_target` reads `isa_family` independently | high (read) |
-| Builder determinism, digest reproduction, row equality and byte equality | not implemented | **unverified** — H2a/H2b must measure them |
-| `verify --package`, the standalone identity, the case/plan/form binding, the release evidence hash and the changed-path gate (including deletion/rename) | not implemented | **unverified** — H2a |
+| Builder determinism, digest reproduction, row equality and byte equality | not implemented | **unverified** — H2a must measure them |
+| `verify --package`, the standalone identity, the case/plan/form binding and the release evidence hash | not implemented | **unverified** — H2a |
+| The changed-path gate, including deletion and rename, and its base/head ordering | not implemented; the mapper belongs to the publication channel, not to the author layer | **unverified** — V-P |
 | The generic `family(form_id) == isa_family` rule and its cross-ISA negative | not implemented; `check_form_id` only checks the family in isolation | **unverified** — H2a |
 | Unknown-capability rejection, reserved-asset rejection, version-conflict rule and aggregate limits | not implemented | **unverified** — H2a |
 | Evidence completeness, `evidence_digest` and `release_digest`, including development-mode direct case hashing versus the release manifest | not implemented | **unverified** — H2a owns the mechanism; H2c adds assets only |
 | Case, evidence, spec and lock byte/count budgets, including the cumulative per-package asset budget and the single per-closure counter of §12.2 | not implemented | **unverified** — H2a |
 | Immutable published version directories, legacy target consistency, form-scope mutation coverage, complete diagnostic matching and level-specific projections | not implemented | **unverified** — H2a (legacy/form-scope/projections), V-P (published directories) |
-| Published-version registry, retirement survival and registry edit detection | not implemented | **unverified** — H2a |
-| First publication in the creating PR, with base-only immutability | specified; the old base-or-head rule would have rejected the creating PR | **specified, not implemented** — H2a |
-| Published-set authority is the target-branch tip `B`, not the merge base: `Published(B) ⊆ Published(H)` and equal tree bytes for every published path | specified; no changed-path mapper exists; the cross-branch publish-then-edit regression is untested | **specified, not implemented** — H2a |
-| Package directory segment equals the full `package_id`, so the path mapping is injective | specified; no mapper exists; two IDs with the same last segment are untested | **specified, not implemented** — H2a |
+| Published-version registry, retirement survival and registry edit detection | not implemented | **unverified** — V-P |
+| First publication in the creating PR, with base-only immutability | specified; the old base-or-head rule would have rejected the creating PR | **specified, not implemented** — V-P |
+| Published-set authority is the target-branch tip `B`, not the merge base: `Published(B) ⊆ Published(H)` and equal tree bytes for every published path | specified; no changed-path mapper exists; the cross-branch publish-then-edit regression is untested | **specified, not implemented** — V-P |
+| Package directory segment equals the full `package_id`, so the path mapping is injective | specified; the rule is a `monasm-package/0.1` format rule, but the mapper that consumes it is the publication gate; two IDs with the same last segment are untested | **specified, not implemented** — H2a (format rule), V-P (mapper) |
 | Global `(package_id, version)` uniqueness and the permanent path/digest binding | specified; per-closure uniqueness cannot exclude two paths for one logical version; V-P's registry does not exist yet | **specified, not implemented** — V-P |
 | Cross-spec `bundle_id` and `(namespace, version)` uniqueness | `Registry::find` returns `E-DEF-001` when two definitions share `(namespace, version)` (`fmp-model/src/definition.rs` 843–865); the builder does not yet reject the pair at spec level | **unverified** — H2a |
-| No-follow package reads (no symlink or reparse point on the resolved path under `--root`) | specified as a property of the open: a metadata pre-check followed by a path open is explicitly insufficient, and the implementation has no package reader yet | **specified, not implemented** — H2a |
-| Publication-history audit separate from `verify --all --check` | specified; no command exists | **unverified** — H2a |
-| Definition-identity history in the registry (`identities`) and permanent `(namespace, version)` → `definition_digest` binding | specified; no registry exists | **specified, not implemented** — H2a |
+| No-follow package reads (no symlink or reparse point on the resolved path under `--root`) | specified as a property of the open: a metadata pre-check followed by a path open is explicitly insufficient, and the implementation has no hardened reader yet; the author layer reads a trusted tree with ordinary opens (§8.5) | **specified, not implemented** — V-P |
+| Publication-history audit separate from `verify --all --check` | specified; no command exists | **unverified** — V-P |
+| Definition-identity history in the registry (`identities`) and permanent `(namespace, version)` → `definition_digest` binding | specified; no registry exists | **specified, not implemented** — V-P |
 | `requires_capabilities` derived from row structure and required to equal the declaration | specified; `bind_forms` requires non-empty `slots` and `bind_slot` non-empty `placements`, so every legal `fmp-def/0.1` form derives `field-placement/v1`; no implementation | **specified, not implemented** — H2a |
 | Release-shaped fixed vector with `evidence_digest` present (`evidence_digest` `e9473871…`, `release_digest` `45a4004e…`) | computed with Python over the bytes shown, not yet reproduced by a Rust implementation | **unverified on the Rust side** — H2a |
 | Value-defined case diff (member edit → member pointer; kind change → position; array length → array) | specified; no harness | **specified, not implemented** — H2a |
@@ -4448,19 +4558,19 @@ comparing the materializer with itself proves the bytes.
 | The no-follow open is achievable on Linux, macOS and Windows | not proved; `std::fs` has no portable no-follow open, so the V-P N1b PoC must measure a path layer on all three platforms as a standalone deliverable that records OS version, toolchain/API, fault injection and per-case result before the hardened reader | **unverified** — V-P N1b |
 | Identifier, path-segment and artifact-filename rules are format rejections before any open | specified; the builder has no package reader | **unverified** — H2a |
 | The same relative asset path in two different package roots is legal, and a folded root alias or repeated spec path is `path-lexical` | specified; no closure reader exists | **unverified** — H2a |
-| A declared lowercase path does not open a case-different on-disk entry, on intermediate directory or final file | specified as part of the open; no path layer exists | **unverified** — H2a N1 gate (Linux, macOS, Windows) |
-| Opening is bound to the directory entry that was name-checked, so a replacement between the two is not read | specified; no path layer exists; not yet measured on any platform | **unverified** — H2a N1 gate |
+| A declared lowercase path does not open a case-different on-disk entry, on intermediate directory or final file | specified as part of the open; no hardened path layer exists; the N1b gate proves it on Linux, macOS and Windows | **unverified** — V-P N1b |
+| Opening is bound to the directory entry that was name-checked, so a replacement between the two is not read | specified; no hardened path layer exists; not yet measured on any platform | **unverified** — V-P N1b |
 | `payload.reg` is a `u64`, so a negative register number is a `plan::read` rejection | `fmp-model/src/plan.rs` `bind_payload` calls `bind::u64_in`; `bind.rs` `u64_in` accepts only `0..=u64::MAX` | high (read) |
 | `check_target` keys the set relation on the definition format, not the plan format | `fmp-validate/src/lib.rs` `subset_rule = model.definition.definition_format() == DEFINITION_FORMAT_V0_2` | high (read) |
 | `E-OPERAND-004` carries `target_type`, `value` and `field_bits`, and `E-RANGE-004` carries `target_type`, `value` and `excluded` | `fmp-validate/src/lib.rs` `check_operand` and `excluded_diagnostic` | high (read) |
 | A modifier is `{name, value}`, so a single value change reports `…/modifiers/<i>/value` | `fmp-model/src/plan.rs` `bind_modifier` closes the object on `name` and `value` | high (read) |
-| Boundary evidence uses the final legal domain `D_form = {x ∈ D_Representable, L≤x≤U, x≡0 (mod 2^a)} \ E` (registers: `D_reg`), never a raw endpoint the form excludes, and records only emitted diagnostic fields | specified; the three packages and their cases do not exist; `x86:mov/rm8h-r8h/legacy`, `aarch64:add/w32-w32-w32-imm6-lsl` and `riscv:c.addi/rd-imm6` exclude their raw endpoints | **unverified** — H2a/H2b |
+| Boundary evidence uses the final legal domain `D_form = {x ∈ D_Representable, L≤x≤U, x≡0 (mod 2^a)} \ E` (registers: `D_reg`), never a raw endpoint the form excludes, and records only emitted diagnostic fields | specified; the three packages and their cases do not exist; `x86:mov/rm8h-r8h/legacy`, `aarch64:add/w32-w32-w32-imm6-lsl` and `riscv:c.addi/rd-imm6` exclude their raw endpoints | **unverified** — H2a (D_form rule), H2c (package cases) |
 | An empty numeric domain does not reject an `operand_value` slot that remains reachable through a fixup | `fmp-validate/src/lib.rs` `check_operand`: `SlotFrom::OperandValue` accepts `Payload::Empty` when a fixup covers the operand and `Payload::Symbol` on a `target` role with a matching fixup, so `empty-form-domain` cannot apply to that slot; the builder must match, not exceed, `Definition` + `bind` | high (read); builder behaviour **unverified** — H2a |
 | A register field wider than 64 bits binds and encodes 64/127/128/192-bit placements | `prototype/crates/fmp-materialize/tests/he1_wide_register.rs` calls `fmp_validate::bind` and `fmp_materialize::materialize` for each width and asserts bytes | high (measured by the H1 test) |
 | `verify --package` validates only the static case contract; `package_conformance` proves the first rejecting stage and the complete diagnostic set | specified; no package reader or conformance harness exists; a `stage: "bind"` case that `read` rejects passes the static check and must fail conformance | **specified, not implemented** — H2a |
 | The plan×definition matrix keeps `fmp/0.1` + `fmp-def/0.1` equality and `fmp/0.1` + `fmp-def/0.2` subset, and only a new plan protocol plus a versioned build rule lifts `h2-exact-target` | existing two cells read from `check_target`; the new-plan cell and the versioned build rule do not exist; `monasm-bundle-spec/0.1` has no builder yet | **partly measured, H3 gate** |
 | One loaded package value feeds the source digest, row/target comparison, per-package `read` and merge | specified; no reader exists | **unverified** — H2a |
-| First publication bootstraps without a registry cycle, and `build` validates every output before writing | specified; the order is build success → append rows → both `--check`s → commit, and publication is the merged commit; no builder exists | **unverified** — H2a |
+| First publication bootstraps without a registry cycle, and `build` validates every output before writing | specified; `build` validating outputs before writing is the author layer, the order build success → append rows → both `--check`s → commit is the publication channel, and publication is the merged commit; no builder exists | **unverified** — H2a (validate-before-write), V-P (publication order) |
 | `--check` proves the lock and sealed bundle, and compares a committed legacy snapshot with the sealed definition as a one-way equality gate (absence legal, no digest input) | specified; the write phase removes `<legacy>/definition.json` first and writes it last, so an interrupted write leaves it absent, not stale; no builder exists | **specified, not implemented** — H2a |
 | A committed legacy snapshot whose bytes differ from the sealed definition is `legacy-snapshot-mismatch` (exit 1) | specified; the gate compares canonical bytes without rebuilding the cache; no `--check` exists | **specified, not implemented** — H2a |
 | A definition-identity mismatch is not expressible as a `monasm-cases/0.1` case | the case requires the `$standalone` sentinel and the harness substitutes the correct identity, so a wrong digest is `case-plan-identity`; the derived-plan binding test carries the negative | **specified; reader behaviour read** — H2a |
@@ -4475,9 +4585,10 @@ comparing the materializer with itself proves the bytes.
 | `monasm-bundle/0.1` has exactly nine keys, carries the bundle-level `target`, each package's `enabled_extensions` and a complete `form_owners` map, and its `bundle_digest` is recomputable from the file | specified; this revision replaced the round-21 companion rule and the round-22 seven-key set; no sealed bundle exists, so the key-set, owner-map and self-verification tests are unrun | **specified, not implemented** — H2a |
 | `builder` records provenance but does not prove it; a change to `builder.version`/`build` can pass `--all --check` | specified; the drift projection excludes `builder` and no digest covers it; no lock exists, so the counterexample is unrun | **specified, not implemented** — H2a |
 | `monasm-package/0.1` rejects non-empty `exports.types`/`exports.profiles` permanently, independent of the builder version; a later format version owns the semantics | specified; no builder exists, and no later package format is written | **specified, not implemented** — H2a |
-| Input budgets apply in one order — lexical path, no-follow open, handle type check, same-handle size hint, bounded read, parse — and metadata size is never the boundary | specified; no reader exists; a file that grows between type check and read is covered by the cumulative counter | **specified, not implemented** — H2a |
+| Input budgets apply in one order — lexical path, no-follow open, handle type check, same-handle size hint, bounded read, parse — and metadata size is never the boundary | specified; the lexical and bounded-read steps are the author layer, the no-follow open and the handle type check are the hardened reader; a file that grows between type check and read is covered by the cumulative counter | **specified, not implemented** — H2a (lexical, bounded read), V-P (no-follow, handle type) |
 | A build never writes a legacy snapshot above its 16 MiB read budget; a legal closure above it builds with the snapshot omitted and passes `--all --check` | specified; no builder exists; the synthetic over-16 MiB definition case is untested | **specified, not implemented** — H2a |
-| Only a regular file is accepted at an opened leaf, checked on the handle, and a POSIX FIFO is rejected without blocking | specified; no path layer exists; the N1 gate must create a FIFO at a declared asset path on Linux/macOS and require `not-a-regular-file` (exit 1) rather than a blocking read or exit 2 | **specified, not implemented** — H2a N1 gate |
+| Only a regular file is accepted at an opened leaf, checked on the handle, and a POSIX FIFO is rejected without blocking | specified; no hardened path layer exists; the N1b gate must create a FIFO at a declared asset path on Linux/macOS and require `not-a-regular-file` (exit 1) rather than a blocking read or exit 2 | **specified, not implemented** — V-P N1b |
+| Every directory entry in a published version directory is enumerated and classified, so an unlisted symlink, reparse point, FIFO, socket or device node is rejected rather than skipped | specified; `snapshot_digest` would be unchanged by a skipped entry, so the entry set is part of the audit's claim; no audit exists | **specified, not implemented** — V-P |
 | A retired bundle's lock, sealed bundle and legacy snapshot leave the tree with its last spec, and `--all --check` rejects an orphan | specified; no builder and no `--all --check` exist; the one-to-one rule is untested | **specified, not implemented** — H2a |
 | Extension and capability arrays have one strictly increasing, duplicate-free spelling | specified; `extension-lexical`/`capability-lexical` are format rejections before the set relation | **specified, not implemented** — H2a |
 | The 64 MiB closure budget charges every package-root byte read, once per path, and rejects at the crossing read | specified; the counted set is manifest, declared assets, cases, evidence manifest and listed evidence files; no reader exists | **specified, not implemented** — H2a |
@@ -4486,8 +4597,8 @@ comparing the materializer with itself proves the bytes.
 | Form-scope negatives are `bind`-only and point at the mutated operand | specified; `fmp-materialize/src/lib.rs` emits `E-BYTE-001` at `/instructions/0/expected_digest` after encoding, so the counterexample is real | **specified, not implemented** — H2a |
 | A `plan::read` rejection has a legal case representation (`scope: "plan"` + `stage: "read"`), and the declared stage must be the first stage that rejects | `fmp-model/src/plan.rs` `read` returns `Result<Plan, Diagnostic>` and `bind_payload` calls `bind::u64_in`, so `{"reg":-1}` is `E-PLAN-002` at `/instructions/0/operands/<n>/payload/reg` before `bind`; no harness | **specified, reader behaviour read** — H2a |
 | `profile_id` is a nominal label inside one bundle; identity is the six-key `target.identity` | specified; no spec or bundle exists, and no cross-spec `(profile_id, identity)` rule is added | **specified, not implemented** — H2a |
-| Output parents under `--root` obey the no-follow rule, and the committed lock/sealed bundle are compared through a bounded streaming reader | specified; no writer and no path layer exist, so the `path-escape` and over-budget rejections are untested | **specified, not implemented** — H2a N1 |
-| An interrupted write may leave a mixed lock/sealed pair, and such a pair never passes `--check` | specified; the write phase and `--check` do not exist | **specified, not implemented** — H2a |
+| Output parents under `--root` obey the no-follow rule, and the committed lock/sealed bundle are compared through a bounded streaming reader | specified; the writer is author-layer work, the output-parent no-follow rule is the hardened path layer, and neither exists, so the `path-escape` and over-budget rejections are untested | **specified, not implemented** — H2a (bounded comparison), V-P (output parents) |
+| An interrupted write may leave a mixed lock/sealed pair, and such a pair never passes `--check` | specified; the write phase and `--check` do not exist; the other legal exit-2 state is the missing optional cache, which `--check` accepts and which is not proof of a successful build (`BuildSucceeded` and `ArtifactsConsistent` are separate) | **specified, not implemented** — H2a |
 | Dependency-closure status distinct from package structure, including transitive re-reading of a `--closure` lock, cycles and the dependent-package author path | not implemented | **unverified** — H2a |
 | Release evidence as a separate `--release-evidence` gate | not implemented | **unverified** — H2a |
 | Closed spec/lock/sealed shapes, `builder` omission and the lock drift projection | not implemented | **unverified** — H2a |

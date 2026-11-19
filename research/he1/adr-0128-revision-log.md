@@ -1,17 +1,26 @@
-# ADR-0128 revision log (fourteenth through twenty-fourth revision)
+# ADR-0128 revision log (fourteenth through twenty-fifth revision)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The normative entry is
 > `docs/adr/0128-package-and-bundle-contract.md`; its body and `Settles` list are
 > authoritative. These notes were moved out of the ADR opening by the
-> twenty-fifth revision so that a new implementer reads current decisions first.
+> twenty-sixth revision so that a new implementer reads current decisions first.
 
-The notes below are preserved from the twenty-fourth revision. Where they
+The notes below are preserved from the twenty-fifth revision. Where they
 conflict with the current ADR, the current ADR wins; in particular the
-twenty-fifth revision narrows the `empty-form-domain` rule and updates the
-platform-evidence wording.
+twenty-sixth revision moves the legacy bridge into the `compat` module, renames
+the bundle type to `CheckedBundle`, and reconciles the evidence and risk labels
+with the phase split of §8.5.
 
 ## Revision notes
+
+- Revision: twenty-fifth revision, 2026-11-19, after the empty-domain,
+  platform-evidence and scaling-summary audit. It scopes the `empty-form-domain`
+  rejection to slots that must encode a numeric value, so an `operand_value` slot
+  that stays reachable through a fixup or a symbol is not rejected; it records the
+  2026-11-19 branch-protection observations (403, empty ruleset list) as missing
+  evidence rather than as proof that no protection exists; and it keeps the
+  author-layer metric and the publication-channel scaling metric separate.
 
 - Revision: twenty-fourth revision, 2026-11-19, after the requirement-
   completeness, first-publication and summary-consistency audit. The H3

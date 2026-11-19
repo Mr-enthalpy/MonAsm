@@ -590,7 +590,7 @@ reference 前提，以及 `internal(...)` 分支的静态前提审计）。
 
 | # | 问题 | 决定（推荐） | 状态 | 备选与代价 |
 |---|---|---|---|---|
-| D1 | `Definition` 就地封闭还是改名 `VerifiedDefinition` | **就地封闭**；H2 由 `fmp-definition` 的 `VerifiedBundle` 包装 | 接受 | 现在改名会让 ~40 处调用点动一次，H2 再动一次 |
+| D1 | `Definition` 就地封闭还是改名 `VerifiedDefinition` | **就地封闭**；H2 由 `fmp-definition` 的 `CheckedBundle` 包装（H2 定名，见 `ADR-0128` §10；此处原记 `VerifiedBundle`） | 接受 | 现在改名会让 ~40 处调用点动一次，H2 再动一次 |
 | D2 | `Registry::find` 返回 `Arc<Definition>` | **是**；`Arc` 只给共享所有权，不给内部可变性 | 接受 | 返回 `&Definition` 则需要另一条「取所有权」的路径，等于两个入口 |
 | D3 | 身份覆盖「除 `provenance` 外全部解析字段」 | **是（含 `path`），但改名并限定**：类型为 `ParsedPlanIdentity`，文档称「解析快照身份」，算法名 `plan-identity/0.1`。不称「机器语义身份」，也**不是完整 legacy Artifact 的重放键**（见 D12） | 有条件接受 → 已修订 | 只覆盖影响字节的字段：身份更窄，逐字段反例更难写清；且会让「解析事实变了、字节没变」变成不可检测 |
 | D4 | 物化失败分类 | **三个变体**：`PostEncodeAssertion`、`Internal`、`HostFailure(HostFault)`。**删掉 `Rejected`**（`bind` 之后不应可达）；**保留 `HostFailure`**，因为 `emit` 的 `try_reserve_exact`（`:400`）是主机资源失败，设计 §8.3 要求单独分类。哪些错误码落进 `PostEncodeAssertion` 由 H1a **实测**决定 | 第二轮修订 → **第三轮再修订** | 把分配失败并进 `Internal`：`E-INTERNAL-001` 会变成「主机内存不够」，而计划的不变量并没有被破坏；并进 `Rejected` 会让同一份计划在不同主机上得到不同的「计划错误」 |

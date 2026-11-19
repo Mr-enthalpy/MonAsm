@@ -379,18 +379,18 @@ lock 仍单独校验包路径、`evidence_digest`、`release_digest` 与 builder
 逻辑接口示意：
 
 ```rust
-fn load_bundle(bytes: &[u8]) -> Result<VerifiedBundle, DefinitionErrors>;
+fn load_bundle(bytes: &[u8]) -> Result<CheckedBundle, DefinitionErrors>;
 
 fn bind_and_validate(
     plan_bytes: &[u8],
-    bundle: Arc<VerifiedBundle>,
+    bundle: Arc<CheckedBundle>,
 ) -> Result<ValidatedPlan, PlanErrors>;
 
 fn materialize(plan: &ValidatedPlan)
     -> Result<MaterializationResult, MaterializationFailure>;
 ```
 
-接口是设计约束示意，不是现成可编译代码；`VerifiedBundle`/`bind_and_validate` 是 H3 的目标形态，H2 仍以 `bind(Plan, Arc<Definition>)` 为唯一入口，只增加开发期构建器与回到 `Arc<Definition>` 的桥。实施可保留便捷 facade，但底层最终必须通过这一生命周期。
+接口是设计约束示意，不是现成可编译代码；`CheckedBundle`/`bind_and_validate` 是 H3 的目标形态。H2 的执行入口仍只有 `bind(Plan, Arc<Definition>)`；H3 另加 bundle 入口，不改 H1 的 `bind`。H2 只增加开发期构建器，以及把 `CheckedBundle` 收窄为 `Arc<Definition>` 的 `fmp_definition::compat::as_legacy_definition`；该适配器长期保留，不是待替代入口。实现可保留便捷 facade，但底层最终必须通过这一生命周期。`CheckedBundle` 只表示结构与闭包检查通过，不代表已发布、来源已验证或 V-P 通过（`ADR-0128` §10）。
 
 `ValidatedPlan` 表示结构和静态约束通过，不应虚称已经证明所有字节级断言。`MaterializationFailure` 至少区分生成字节后才能发现的确定性断言失败（例如 expected digest 不符）、主机故障和内部不变量错误。能够提前计算的 fixup 值和范围应尽量在验证阶段固定；无论在哪一阶段失败，都不得返回部分成功产物或尝试替代形式。
 

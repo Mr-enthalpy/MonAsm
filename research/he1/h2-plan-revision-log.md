@@ -1,18 +1,43 @@
-# H2 plan revision log (twelfth through twenty-fourth round notes)
+# H2 plan revision log (twelfth through twenty-sixth round notes)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The current plan is
 > `docs/architecture/he1-h2-plan.md`; current decisions live in its §3 and in
 > `docs/adr/0128-package-and-bundle-contract.md`. These notes were moved out of
-> the plan opening by the twenty-fifth revision.
+> the plan opening by the twenty-fifth revision; the twenty-fifth and twenty-sixth
+> round notes are added below.
 
 Where a note conflicts with the current plan or ADR, the current document wins.
-The twenty-fifth revision in particular narrows the `empty-form-domain` rule,
-records the missing platform evidence for the publication channel, and requires
-two separate scaling metrics in the H2 report.
+The twenty-sixth revision in particular moves the legacy bridge into the
+`compat` module, renames the bundle type to `CheckedBundle`, requires the
+published-directory audit to reject unreferenced non-regular entries, reconciles
+the evidence and risk labels with the phase split, and separates build success
+from artifact consistency.
 
 ## Round notes
 
+  第二十六轮固定：H2 到 H1 的桥移出 bundle 类型，放进
+  `fmp_definition::compat::as_legacy_definition`；`CheckedBundle` 只承诺结构与
+  闭包检查，不承诺已发布、来源或 V-P，类型不再叫 `VerifiedBundle`。兼容函数是
+  长期适配器，生命周期等于它所适配的 H1 `bind`，H3 另加 bundle 入口且不得由它
+  组合；没有反向构造，`fmp-validate`/`fmp-materialize` 不依赖它。已发布目录的
+  审计必须枚举每个目录项：未声明的符号链接、reparse point、FIFO、socket 或
+  设备节点一律 `not-a-regular-file`（退出 1），不能因为普通文件集合未变而跳过。
+  证据表与风险表按 `ADR-0128` §8.5 机械核对，硬化读取、发布登记、变更路径门禁
+  与全历史审计不再标成 H2a。`--check` 只证明 `ArtifactsConsistent(T)`，不证明
+  `BuildSucceeded(r)`：legacy 写失败后的缺失快照是合法的一致状态。
+  第二十五轮固定：`empty-form-domain` 只适用于必须编码数值、没有 fixup/符号
+  路径的槽位；`operand_value` 槽位可经 fixup 的 `Payload::Empty` 或 target 角色的
+  `Payload::Symbol` 满足，构建器不得多拒绝；`an_empty_numeric_domain_with_a_fixup_path_is_not_rejected`
+  与 `a_degenerate_legal_domain_needs_no_invented_positive` 分别守住两侧。
+  2026-11-19 的 `protected:false`、空 ruleset 与 403 记为缺失证据；作者层 PR
+  触碰率与发布 PR 串行成本是两个规模指标，不合并成一条结论。
+  第二十四轮固定：H3 的子集目标规则拆成两层——归属包的声明覆盖
+  `E_package(owner(form(i))) ⊆ E_plan` 对每条选中指令**无条件**生效；逐 form 需求
+  只在版本化契约证明完整时作为**附加合取项**，永远不能替代保守覆盖。V-P 首次启用
+  时，第一个发布候选重新验证并登记当时 HEAD 选中的**全部** spec（不只是 x86 切片）。
+  规范摘要不再保留已被取代的 sealed 伴随规则，变更路径示例分开「合并前预防」与
+  「合并后检测」。
   第二十三轮固定（取代第二十一、二十二轮关于 sealed 形状与 N1 时序的结论）：
   H2 分两个验收结论——**作者层 V-A** 与**发布通道 V-P**（`ADR-0128` §8.5）。
   V-A 只证明包能独立定义、校验、构建并产生相同机器事实，不依赖外部门禁；
