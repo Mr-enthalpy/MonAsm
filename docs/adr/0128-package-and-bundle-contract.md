@@ -5,137 +5,15 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: twenty-fourth revision, 2026-11-19, after the requirement-
-  completeness, first-publication and summary-consistency audit. The H3
-  target-subset rule is disambiguated: the owner package's declared cover is
-  mandatory (`E_package(owner(form(i))) ⊆ E_plan` for every selected
-  instruction), and a per-form requirement adds a conjunct but never replaces
-  the conservative cover until a versioned format proves the requirement
-  complete. First V-P activation re-verifies and registers every spec selected
-  at HEAD in one first-publication candidate, not only the initial x86 slice.
-  The normative summary no longer carries the superseded sealed-companion rule,
-  and the changed-path example now separates prevention before merge from
-  detection after merge.
-- Prior revision: twenty-third revision, 2026-11-19, after the scheduling and
-  frozen-format audit. Several decisions change shape, not wording.
-  First, H2 is judged by **two separate acceptance verdicts**: an author-layer
-  verdict that needs no external platform fact, and a publication-channel verdict
-  that carries the hardened reader, the registry, the merge-freshness proof and
-  the history audit. The author layer may proceed while the publication channel's
-  prerequisites are still open; no artifact may be called published, immutable or
-  trusted until the publication verdict passes.
-  Second, `monasm-bundle/0.1` stops being a companion that omits facts its own
-  digest covers. Because nothing has shipped, the format is fixed **once**, as a
-  self-contained artifact: it carries the bundle-level `target`, the declared
-  per-package cover, and a complete `form_owners` map, so `bundle_digest` is
-  recomputable from the file and H3 consumes these facts instead of introducing
-  another bundle version. The round-21 companion rule and the round-22 seven-key
-  set are superseded here, explicitly, rather than left as two descriptions a
-  reader has to arbitrate.
-  The registry entry also gains a `snapshot_digest` over every regular file in the
-  published version directory, so published evidence, cases and `NOTICE` are no
-  longer protected by the merge gate alone; the remaining trust boundary is stated
-  in §8.4.
-  Finally, the boundary-positive rule handles degenerate legal domains by
-  cardinality (§9.1), so a one- or two-element `D_form` no longer demands an
-  interior value that does not exist.
-- Prior revision: twenty-second revision, 2026-11-18, after the key-set, publication-
-  gate, registry-coordination and builder-provenance audit: `monasm-bundle/0.1`
-  had one closed key set of seven keys, with `packages` as the package list and
-  **no** bundle-level `target` (superseded by this revision's self-contained
-  nine-key form), and the text that called the
-  list `sources` or said the sealed bundle carries the spec's `target` is
-  removed rather than left for a reader to arbitrate; the publication verdict's N5
-  node does not close on a green CI run but only on a recorded merge mechanism
-  plus an executed stale-CI counterexample, and otherwise stops at that gate; independent package
-  authoring and independent publishing are separate claims, with H2 promising
-  correct serialized publication rather than coordination-free parallel
-  publishing; and `builder` is documented as an informational provenance record
-  whose change can pass `--all --check`, not as proof that the declared
-  implementation produced the bundle.
-- Prior revision: twenty-first revision, 2026-11-18 (superseded by this
-  revision's self-contained sealed form), after the sealed-bundle,
-  registry-scale and N1-prerequisite audit: `monasm-bundle/0.1` was a companion
-  artifact of its lock, not a self-verifying snapshot — its `bundle_digest`
-  preimage includes the bundle-level `target` (with `profile_id`) that the sealed
-  file does not store, so a consumer recomputes the value from the lock plus the
-  sealed bytes and never trusts the embedded claim, and H3 must verify the pair
-  or introduce a versioned sealed format; the single-file registry keeps its
-  full-history audit as a measured `O(N_published)` cost with a 1,000-version
-  budget and a recorded threshold that triggers a later ADR, not as a proven
-  scalability property; and the three-platform N1 PoC is a standalone
-  prerequisite deliverable with recorded platform, toolchain, API,
-  fault-injection and per-case results before any builder code.
-- Prior revision: twentieth revision, 2026-11-18, after the target-subset and
-  merge-mechanics audit: H3 may accept a subset plan only after proving every
-  selected instruction against the plan target
-  (`E_owner(form(i)) ⊆ E_plan`), which needs a versioned bundle owner/cover map
-  or another frozen source — the then-current `monasm-bundle/0.1` shape could
-  not supply it, and a form
-  without a proof is rejected rather than read as needing nothing; a publication
-  verdict is keyed on the base commit SHA and the tested candidate **tree** SHA
-  plus the merge mode, not on a pair of commit SHAs, so required up-to-date
-  checks alone are not accepted as tree-identity proof; and the HE-1 overview's
-  package/bundle examples are aligned with this ADR.
-- Prior revision: nineteenth revision, 2026-11-18, after the merge-timing and
-  version-boundary audit: a publication verdict authorizes only the
-  `(B_checked, H_checked)` pair it read, so an accepted publication requires
-  `B_checked = B_merge` and `H_checked = H_merge`, enforced by a merge queue or
-  strict up-to-date required checks and proved through the platform API;
-  `monasm-package/0.1` rejects non-empty `exports.types`/`exports.profiles`
-  permanently, with their semantics reserved to an explicit later package format;
-  the input order is fixed as lexical path, no-follow open, handle-level type
-  check, same-handle size hint, bounded read, parse; and a build omits the legacy
-  snapshot rather than writing one above its own 16 MiB read budget.
-- Prior revision: eighteenth revision, 2026-11-18, after the resource and artifact
-  lifecycle audit: only a regular file is accepted at an opened leaf — FIFO,
-  socket and device nodes are rejected as `not-a-regular-file` on the opened
-  handle, and the POSIX input open is non-blocking until the type is known; and a
-  retired bundle's lock, sealed bundle and legacy snapshot leave the tree with
-  its last spec, with `--all --check` rejecting an orphan, so no unselected
-  release artifact keeps an undefined status.
-- Prior revision: seventeenth revision, 2026-11-18, after the path-injectivity and
-  publication-authority audit: the package directory segment is the **full**
-  `package_id`, so the path mapping is injective and two owners whose IDs share a
-  last segment can coexist at one version; "already published" is decided at the
-  **target-branch tip `B`**, not the merge base, with
-  `Published(B) ⊆ Published(H)` and equal tree bytes for every published path;
-  a non-empty `dependencies` array is a closed three-key object with a fixed
-  digest vector; and `verify --package` is stated as executing
-  `fmp_model::definition::read` while never executing a case's
-  `plan::read`/`bind`/`materialize`.
-- Prior revision: sixteenth revision, 2026-11-18, after the migration-equivalence
-  and boundary-domain audit: `legacy_source` target equality is `TargetEq` —
-  every field strictly equal except `enabled_extensions`, which is compared as a
-  set — so a canonically ordered package can migrate a frozen legacy document
-  whose array is spelled differently; and boundary positives are taken from the
-  final legal domain `D_form` (range, alignment and exclusions applied), never
-  from a raw endpoint that the form excludes.
-- Prior revision: fifteenth revision, 2026-11-18, separated the static stage
-  declaration check from the executed first-rejecting-stage proof, so reports
-  record both statuses separately, and restated the register domain as
-  `D_reg = ([0, 2^w−1] ∩ [0, 2^64−1]) \ E` so slots wider than 64 bits keep the
-  H1-verified encoding capability and are tested without an unrepresentable
-  `2^w`.
-- Prior revision: fourteenth revision, 2026-11-17, required a committed legacy
-  snapshot to be byte-identical to the canonical sealed definition
-  (`legacy-snapshot-mismatch`) while entering no digest and remaining optional,
-  removed the inexpressible definition-identity case, required a versioned build
-  rule as well as a new plan protocol to lift `h2-exact-target`, and decided
-  base-registry containment before head-side `package.json` discovery.
-- Prior revisions: the thirteenth (plan-scope `stage: "read"` and the
-  first-rejecting-stage rule, interrupted-write detectability, output parents
-  trusted but no-follow-checked, bounded lock/sealed read, bundle-local
-  `profile_id`), the twelfth (first-publication order, derived legacy cache,
-  canonical set spelling, counted closure budget, the `E_form = ∅` acceptance
-  caveat), the eleventh (representability-scoped boundary evidence, the
-  plan×definition matrix, a single-modifier `mutates`, one-segment paths,
-  entry-replacement in the N1 gate) and the tenth and earlier (package-root
-  collisions, exact on-disk entry names, the versioned `h2-exact-target` lift,
-  ASCII identifier/path grammar, single loaded package value, cycle-free first
-  publication, conservative declared cover, value-defined case diff, legacy name
-  reservation, the publication audit's whole-directory coverage without a
-  provenance claim, open-time no-follow) remain in force.
+- Revision: twenty-fifth revision, 2026-11-19. The normative entry now keeps
+  only current decisions; per-revision audit notes (fourteenth through
+  twenty-fourth) are in `research/he1/adr-0128-revision-log.md`, which is
+  historical evidence and not a contract. Earlier decisions remain in force
+  except where this revision or the `Settles` list restates them. This revision
+  scopes the `empty-form-domain` rejection to slots that must encode a numeric
+  value and records that design approval does not make the publication channel
+  available before platform evidence exists.
+- History: `research/he1/adr-0128-revision-log.md`.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
   `monasm-lock/0.1`, `monasm-bundle/0.1` and `monasm-published/0.1` formats;
   immutable published package version directories and their append-only
@@ -1998,7 +1876,11 @@ operation the repository actually permits. **A 403, an empty ruleset list, or a
 setting the API will not return is not evidence that no protection exists**; it is
 an evidence step that has not been obtained, and the verdict fails until the
 mechanism is shown. The ADR neither asserts nor assumes that the current
-repository already has it.
+repository already has it. The observation recorded for this revision is
+`main` with `protected: false`, an empty repository-rulesets list, and a 403
+from the branch-protection detail endpoint. Per the previous sentence, that is
+an evidence gap, not a finding that no protection exists; it does not authorize
+a publication verdict.
 
 **A green CI run on the planning PR is not that evidence.** N5 cannot be closed
 by pointing at successful checks: they were produced for some `(B_checked,
@@ -2521,6 +2403,16 @@ the threshold above, and states the conditions that force sharding or incrementa
 audit. A localized package-change path is not evidence that the end-to-end
 publication path has no central bottleneck.
 
+**Both metrics are reported, and neither substitutes for the other.** The
+acceptance report lists (i) the **ordinary author PR central-file touch rate** —
+the fraction of ordinary package PRs that touch a central selection file
+(`bundles/specs/**`, `bundles/published.json`, or an index over either) together
+with the review handoffs those edits cause — and (ii) the **publication PR serial
+wait and CI cost** — rebase and re-run count, queue wait, and the wall time and
+resources of `build`, both `--check`s and the audit at the measured history. A low
+rate in (i) is evidence for the authoring path only; the report must not present
+it as the whole extension pipeline scaling horizontally.
+
 **That is a scale boundary, not a performance footnote.** H2 implements
 independent package development and deterministic composition; it does not claim,
 and must not be read as claiming, that independent package *publication* scales
@@ -2861,6 +2753,18 @@ a false claim:
 5. V-P failure stops the publication claim and the H2 exit, not the author layer.
    No post-merge audit, green CI run or after-the-fact review may substitute for
    a V-P prerequisite (§8.1).
+
+Merging the planning PR accepts the design in this ADR; it does **not** make V-P
+available and does not record a platform guarantee. As observed on 2026-11-19,
+`main` reported `protected: false`, the repository-rulesets list was empty, and
+the branch-protection detail endpoint returned 403 to the connection used. Those
+observations are recorded as **missing evidence**, not as proof that no
+protection exists (§8.1). Before H2b, an authorized repository owner or the
+publication automation must (a) name the effective merge mechanism and show that
+it enforces `B_landed = B_checked`, `C_landed = C_checked` and `mode(M) = mode`,
+and (b) execute the stale-CI counterexample end to end against that mechanism and
+record the result. Until both exist, V-P stays unavailable and no artifact is
+published; V-A is unaffected (rule 1).
 
 This is a scheduling split, not a weaker security rule. Every no-follow, naming
 and race requirement keeps its full strength; what changes is that only the
@@ -3241,6 +3145,21 @@ negative would ask for a `Plan` the reader refuses to build. The three stages
 exist so that each rejection is recorded where it happens; collapsing `read`
 into `bind` would either lose the case or name a stage that cannot run.
 
+**The domain and its empty-domain rejection describe the numeric path only.**
+`SlotFrom::RegNumber` always must encode a numeric value.
+`SlotFrom::OperandValue` normally encodes one, but it also accepts two
+non-numeric plan shapes: `Payload::Empty` when a fixup covers the operand, and
+`Payload::Symbol(id)` when `slot.role == "target"` and the covering fixup's
+target is that symbol (`prototype/crates/fmp-validate/src/lib.rs`, the operand
+check). Neither carries a value in `D_form`, so an empty numeric domain
+does not by itself prove the form unusable. The `empty-form-domain` rejection
+below therefore applies only when the slot must encode a numeric value and has no
+legal non-numeric path: a `reg_number` slot always has none, while an
+`operand_value` slot may be reached through a fixup. For an `operand_value` slot
+the builder must not reject the form for an empty domain — doing so would make it
+stricter than `Definition` + `bind` — and must not demand a numeric positive or
+count a fixup path as numeric coverage.
+
 For every shipped form with an immediately encoded or otherwise bounded operand,
 boundary cases are taken from the **final legal domain**, not the raw encoded
 range. For a slot with range `[L, U]`, alignment `a` (`align_bits`) and excluded
@@ -3259,7 +3178,7 @@ the `D_reg` above.
 
   | `D_form` size | Required positives |
   |---|---|
-  | 0 | none — the form is unusable and the builder rejects it (`empty-form-domain`, exit 1) instead of asking for a case no plan can satisfy |
+  | 0 | none. A `reg_number` slot has no non-numeric path, so the form is unusable and the builder rejects it (`empty-form-domain`, exit 1). An `operand_value` slot is not rejected here: a fixup may cover it with `Payload::Empty`, or a `target` role may carry `Payload::Symbol`, so no numeric positive is required and numeric boundary evidence is recorded as not applicable |
   | 1 | the single legal value, which is both minimum and maximum |
   | 2 | both legal values |
   | 3 or more | the minimum, the maximum and one representative interior value, distinct from both |
@@ -3269,11 +3188,15 @@ the `D_reg` above.
   `aarch64:add/w32-w32-w32-imm6-lsl` excludes `32..63`, so `31` is the positive
   maximum and `32` is a form negative; `riscv:c.addi/rd-imm6` excludes `rd = 0`,
   so `1` is the positive minimum and `0` is a form negative.
-- An empty `D_form` is a property of the encoded form, not of a plan: rejecting it
-  at build time keeps the case protocol satisfiable, and the rejection happens
-  before any case is generated or any coverage counted. A form that legitimately
-  accepts no value needs an explicit later format statement about what it is for;
-  `monasm-package/0.1` has none, so such a form cannot be published.
+- An empty numeric `D_form` on a slot with no legal non-numeric path is a
+  property of the encoded form, not of a plan: rejecting it at build time keeps
+  the case protocol satisfiable, and the rejection happens before any case is
+  generated or any coverage counted. A `reg_number` form that accepts no value
+  needs an explicit later format statement about what it is for;
+  `monasm-package/0.1` has none, so such a form cannot be published. An
+  `operand_value` slot is the exception above: the builder accepts the form,
+  requires no numeric positive, and does not count a fixup-covered empty or
+  target-symbol plan as numeric boundary coverage.
 - A representable excluded value is a `scope: "form"` negative rejected by
   `E-RANGE-004` at the mutated operand.
 - An adjacent out-of-range value (`min−1`/`max+1`, or `2^w` for a register) is a
@@ -3464,7 +3387,7 @@ does not pretend to be `fmp/0.1` diagnostics.
 
 | Class | Examples | Exit |
 |---|---|---|
-| Deterministic rejection | manifest shape (required/optional keys), identifier/path lexical violation, a reversed or duplicated `enabled_extensions`/`requires_capabilities` array, artifact filename mismatch, empty forms, path escape, a symlink/reparse point on a package path or on an output parent path under `--root`, an opened leaf that is not a regular file (FIFO, socket, device, a directory where a file is required, or a non-directory where a directory is required), or an opened entry whose name differs from the declared segment, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), a form whose final legal operand domain is empty (`empty-form-domain`), a sealed bundle whose `form_owners` is incomplete, duplicated or names an absent form or a package outside `packages` (`bundle-owner-incomplete`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, committed legacy snapshot differing from the sealed definition (`legacy-snapshot-mismatch`), legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, case scope/stage mismatch (form-scope `read`/`materialize`, or a declared stage that is not the first rejecting stage), form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, snapshot digest mismatch, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit (including a committed lock, sealed bundle or legacy snapshot over its byte budget), orphan bundle artifact | 1 |
+| Deterministic rejection | manifest shape (required/optional keys), identifier/path lexical violation, a reversed or duplicated `enabled_extensions`/`requires_capabilities` array, artifact filename mismatch, empty forms, path escape, a symlink/reparse point on a package path or on an output parent path under `--root`, an opened leaf that is not a regular file (FIFO, socket, device, a directory where a file is required, or a non-directory where a directory is required), or an opened entry whose name differs from the declared segment, declared-vs-derived capability mismatch, a form requirement outside the package declaration (`form-extension-mismatch`), a form whose final legal numeric domain is empty on a slot with no fixup or symbol path (`empty-form-domain`), a sealed bundle whose `form_owners` is incomplete, duplicated or names an absent form or a package outside `packages` (`bundle-owner-incomplete`), missing/duplicate/cyclic dependency, dependency digest mismatch, two versions of one package ID, cross-spec `bundle_id` or definition-identity conflict, reuse of a reserved legacy definition name, digest mismatch, ownership conflict, row mismatch, committed legacy snapshot differing from the sealed definition (`legacy-snapshot-mismatch`), legacy target mismatch, form-family mismatch, unknown capability, non-empty reserved asset, evidence mismatch or incompleteness, missing/uncovered case, unsupported case format, case/plan/form binding, case baseline or mutation, case scope/stage mismatch (form-scope `read`/`materialize`, or a declared stage that is not the first rejecting stage), form-scope diagnostic not on the mutated operand, incomplete diagnostic set, wrong expectation projection, unmapped package path, published snapshot modification, registry modification, global identity duplication, incompleteness or invalidity, snapshot digest mismatch, path/version mismatch, reserved identity, closure aggregate limit, `read` rejection, resource limit (including a committed lock, sealed bundle or legacy snapshot over its byte budget), orphan bundle artifact | 1 |
 | Host / I/O / internal | unreadable file, unwritable lock, internal invariant break, materializer `Internal`/`HostFailure` during conformance | 2 |
 | Success | build or verify passed, digest printed | 0 |
 
@@ -3767,7 +3690,9 @@ comparing the materializer with itself proves the bytes.
 - No claim that independent package authoring and independent publishing scale
   together. H2 provides the authoring basis and correct serialized publication;
   uncoordinated parallel publishing is not guaranteed and needs a later ADR
-  (§8.3).
+  (§8.3). The acceptance report lists the ordinary author PR central-file touch
+  rate and the publication PR serial wait/CI cost as two separate metrics; the
+  first is not whole-pipeline horizontal scaling.
 - No claim that `builder` proves provenance. It records which implementation
   wrote the lock; it is excluded from the definition identity, and a change to it
   can pass `--all --check`. Trusted build provenance needs a separate attestation
@@ -3817,10 +3742,16 @@ comparing the materializer with itself proves the bytes.
   x ≡ 0 (mod 2^a)} \ E`, not the raw encoded range: positive values are chosen by
   the domain's cardinality — one value, both endpoints, or minimum, maximum and an
   interior value — so an excluded or unaligned endpoint is never a positive and a
-  degenerate domain never demands a value that does not exist. An empty domain is
-  `empty-form-domain` (exit 1). A representable excluded value is
-  a form negative; an out-of-range value is a form negative only when the plan can
-  represent it. A register field's encoded width `w` comes from `field_bits` and
+  degenerate domain never demands a value that does not exist. An empty numeric
+  domain is `empty-form-domain` (exit 1) only when the slot has no legal
+  non-numeric path: `SlotFrom::RegNumber` always must encode a number, while
+  `SlotFrom::OperandValue` still accepts a fixup-covered `Payload::Empty` and a
+  target-role `Payload::Symbol` (`prototype/crates/fmp-validate/src/lib.rs`), so
+  the builder must not reject such a form; it requires no numeric positive and
+  records numeric boundary evidence as not applicable. A representable excluded
+  value is a form negative; an out-of-range value is a form negative only when
+  the plan can represent it. A register field's encoded width `w` comes from
+  `field_bits` and
   may exceed 64; its domain is
   `D_reg = ([0, 2^w − 1] ∩ [0, 2^64 − 1]) \ E`, so for `w ≥ 64` the maximum
   positive is `u64::MAX` and `2^w` is never a test input. A negative register is
@@ -4488,7 +4419,7 @@ comparing the materializer with itself proves the bytes.
 | A frozen legacy extension array is not in the canonical package spelling | `definitions/rv64/0.6.0.json` declares `["rv64i","rv64c"]`; §1's canonical spelling is `["rv64c","rv64i"]`; `fmp-validate/src/lib.rs` `check_target` compares both sides as `BTreeSet` | high (read and measured) |
 | `TargetEq` (set equality of `enabled_extensions`, strict equality elsewhere) is satisfiable; raw array equality is not | specified; no builder exists; a canonical package migrating an `rv64/0.6.0` row would fail both a raw-array legacy check and `extension-lexical` under the opposite spelling | **specified, not implemented** — H2a |
 | Form exclusions hit raw boundary endpoints | `x86:mov/rm8h-r8h/legacy` has a 3-bit field and `excluded [0,1,2,3]`; `aarch64:add/w32-w32-w32-imm6-lsl` excludes `32..63`; `riscv:c.addi/rd-imm6` excludes `0` | high (read) |
-| Boundary positives come from `D_form`, not the raw range, and their count follows its cardinality (0 → `empty-form-domain`, 1, 2, ≥3) | specified; no package cases exist; the raw endpoints of the three examples are illegal | **specified, not implemented** — H2a/H2c |
+| Boundary positives come from `D_form`, not the raw range, and their count follows its cardinality (0 on a slot without a non-numeric path → `empty-form-domain`, 1, 2, ≥3); an `operand_value` slot with an empty numeric domain is not rejected because a fixup can cover it | specified; no package cases exist; the raw endpoints of the three examples are illegal | **specified, not implemented** — H2a/H2c |
 | `fmp-def/0.2` requires `requires_extensions` and rejects it in `0.1` | `bind_form` selects `FORM_FIELDS_V0_2` and `req`s the key; `FORM_FIELDS` rejects it as unknown | high (read) |
 | `check_form_id` accepts any known family but does not compare it to `target_identity.isa_family` | `fmp-model/src/definition.rs` `check_form_id` matches `x86`/`aarch64`/`riscv` and returns; `bind_target` reads `isa_family` independently | high (read) |
 | Builder determinism, digest reproduction, row equality and byte equality | not implemented | **unverified** — H2a/H2b must measure them |
@@ -4524,6 +4455,7 @@ comparing the materializer with itself proves the bytes.
 | `E-OPERAND-004` carries `target_type`, `value` and `field_bits`, and `E-RANGE-004` carries `target_type`, `value` and `excluded` | `fmp-validate/src/lib.rs` `check_operand` and `excluded_diagnostic` | high (read) |
 | A modifier is `{name, value}`, so a single value change reports `…/modifiers/<i>/value` | `fmp-model/src/plan.rs` `bind_modifier` closes the object on `name` and `value` | high (read) |
 | Boundary evidence uses the final legal domain `D_form = {x ∈ D_Representable, L≤x≤U, x≡0 (mod 2^a)} \ E` (registers: `D_reg`), never a raw endpoint the form excludes, and records only emitted diagnostic fields | specified; the three packages and their cases do not exist; `x86:mov/rm8h-r8h/legacy`, `aarch64:add/w32-w32-w32-imm6-lsl` and `riscv:c.addi/rd-imm6` exclude their raw endpoints | **unverified** — H2a/H2b |
+| An empty numeric domain does not reject an `operand_value` slot that remains reachable through a fixup | `fmp-validate/src/lib.rs` `check_operand`: `SlotFrom::OperandValue` accepts `Payload::Empty` when a fixup covers the operand and `Payload::Symbol` on a `target` role with a matching fixup, so `empty-form-domain` cannot apply to that slot; the builder must match, not exceed, `Definition` + `bind` | high (read); builder behaviour **unverified** — H2a |
 | A register field wider than 64 bits binds and encodes 64/127/128/192-bit placements | `prototype/crates/fmp-materialize/tests/he1_wide_register.rs` calls `fmp_validate::bind` and `fmp_materialize::materialize` for each width and asserts bytes | high (measured by the H1 test) |
 | `verify --package` validates only the static case contract; `package_conformance` proves the first rejecting stage and the complete diagnostic set | specified; no package reader or conformance harness exists; a `stage: "bind"` case that `read` rejects passes the static check and must fail conformance | **specified, not implemented** — H2a |
 | The plan×definition matrix keeps `fmp/0.1` + `fmp-def/0.1` equality and `fmp/0.1` + `fmp-def/0.2` subset, and only a new plan protocol plus a versioned build rule lifts `h2-exact-target` | existing two cells read from `check_target`; the new-plan cell and the versioned build rule do not exist; `monasm-bundle-spec/0.1` has no builder yet | **partly measured, H3 gate** |
@@ -4537,8 +4469,9 @@ comparing the materializer with itself proves the bytes.
 | A publication verdict authorizes only the `(B_checked, C_checked, mode)` triple it read: a stale green result cannot authorize a merge after another PR publishes first | specified; requires a merge queue or an operation that writes the recorded candidate, and V-P must prove the setting through the platform API; no workflow or settings evidence exists | **specified, not implemented** — V-P N5 |
 | H3 target subsets check `E_package(owner(form(i))) ⊆ E_plan` for every selected instruction, from `form_owners` plus the owner's declared cover, and add a per-form conjunct only when the format proves that requirement complete; a form without a proof is rejected | specified; `monasm-bundle/0.1` carries the owner map and covers, but H2 builds no subset cell and no H3 plan or consumer exists; the `c.addi`/`rv64i` case is untested | **specified, not implemented** — H3 |
 | `monasm-bundle/0.1` is self-verifying: `bundle_digest` is recomputed from the file's own `target`, per-package `enabled_extensions`, `form_owners` and `definition` | specified; the §7 preimage is complete inside the nine-key file, the lock is checked separately for paths, evidence and builder, and the §8 vectors were recomputed from that preimage; no sealed bundle or consumer exists | **specified, not implemented** — H2a (build), H3 (consume) |
-| Required up-to-date checks alone do not prove the landed tree equals the tested tree; a 403 or empty ruleset list is missing evidence, not absence of protection | specified; an API read attempt during review returned 403 and the ruleset query was inconclusive, and no merge-queue evidence has been recorded | **unobtained; V-P must record API evidence** |
+| Required up-to-date checks alone do not prove the landed tree equals the tested tree; a 403 or empty ruleset list is missing evidence, not absence of protection | specified; on 2026-11-19 `main` reported `protected: false`, the repository-rulesets list was empty, and the branch-protection detail endpoint returned 403; no merge-queue evidence has been recorded | **unobtained; V-P must record API evidence** |
 | N5 cannot close on a green CI run: the effective merge mechanism must be recorded and the stale-CI counterexample executed, or the publication verdict stops at the gate | specified; `Gates`/`Determinism` succeeded on the planning PR, but a green run is a verdict for its own `(B_checked, C_checked, mode)` and does not demonstrate the mechanism; no counterexample has been run | **unobtained; V-P N5** |
+| Merging the planning PR accepts the design only; it does not make V-P available | §8.5; V-P still requires an authorized repository owner or the publication automation to name the effective merge mechanism and run the stale-CI counterexample end to end; the 2026-11-19 settings observation is an evidence gap, not a guarantee | **unobtained; V-P N5** |
 | `monasm-bundle/0.1` has exactly nine keys, carries the bundle-level `target`, each package's `enabled_extensions` and a complete `form_owners` map, and its `bundle_digest` is recomputable from the file | specified; this revision replaced the round-21 companion rule and the round-22 seven-key set; no sealed bundle exists, so the key-set, owner-map and self-verification tests are unrun | **specified, not implemented** — H2a |
 | `builder` records provenance but does not prove it; a change to `builder.version`/`build` can pass `--all --check` | specified; the drift projection excludes `builder` and no digest covers it; no lock exists, so the counterexample is unrun | **specified, not implemented** — H2a |
 | `monasm-package/0.1` rejects non-empty `exports.types`/`exports.profiles` permanently, independent of the builder version; a later format version owns the semantics | specified; no builder exists, and no later package format is written | **specified, not implemented** — H2a |
