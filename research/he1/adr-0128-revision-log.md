@@ -1,17 +1,27 @@
-# ADR-0128 revision log (fourteenth through twenty-sixth revision)
+# ADR-0128 revision log (fourteenth through twenty-seventh revision)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The normative entry is
 > `docs/adr/0128-package-and-bundle-contract.md`; its body and `Settles` list are
 > authoritative. These notes were moved out of the ADR opening by the
-> twenty-seventh revision so that a new implementer reads current decisions first.
+> twenty-eighth revision so that a new implementer reads current decisions first.
 
-The notes below are preserved from the twenty-sixth revision. Where they conflict
-with the current ADR, the current ADR wins; in particular the twenty-seventh
-revision splits the artifact and registry predicates, scopes the H3 entry, and
-defines the separate acceptance event.
+The notes below are preserved from the twenty-seventh revision. Where they
+conflict with the current ADR, the current ADR wins; in particular the
+twenty-eighth revision splits per-bundle from whole-tree artifact consistency,
+defines `R(T)` from registry fields only, scopes the evidence-only digest example
+to candidates, extends filename portability to the whole snapshot, and requires
+the merge mode from a platform record.
 
 ## Revision notes
+
+- Revision: twenty-seventh revision, 2026-11-20, after the predicate-conflict,
+  acceptance-cycle, gate-provenance, H3-scope and PR-description audit. It splits
+  artifact pairing, registry completeness and publication readiness into `A(T)`,
+  `R(T)` and `P(T)`; separates the acceptance change (H2-0) from H2a; requires
+  the verdict to record the provenance of the gate logic; and scopes the H3
+  bundle entry's guarantee to its own callers. The next revision splits `A` per
+  bundle and tightens `R`.
 
 - Revision: twenty-sixth revision, 2026-11-19, after the bridging-API,
   unpublished-snapshot, evidence-label and predicate audit. It moves the legacy
@@ -22,8 +32,8 @@ defines the separate acceptance event.
   requires a published-directory audit to reject every unreferenced non-regular
   entry instead of skipping it, reconciles the evidence and risk rows with the
   §8.5 phase split, and separates `BuildSucceeded(r)` from
-  `ArtifactsConsistent(T)` — the latter is split again by the twenty-seventh
-  revision.
+  `ArtifactsConsistent(T)` — the latter is split again by the twenty-eighth
+  revision into `A_β(T)` and `A(T)`.
 
 - Revision: twenty-fifth revision, 2026-11-19, after the empty-domain,
   platform-evidence and scaling-summary audit. It scopes the `empty-form-domain`

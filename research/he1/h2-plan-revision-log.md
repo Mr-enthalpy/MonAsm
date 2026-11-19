@@ -1,19 +1,29 @@
-# H2 plan revision log (twelfth through twenty-seventh round notes)
+# H2 plan revision log (twelfth through twenty-eighth round notes)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The current plan is
 > `docs/architecture/he1-h2-plan.md`; current decisions live in its §3 and in
 > `docs/adr/0128-package-and-bundle-contract.md`. These notes were moved out of
 > the plan opening by the twenty-fifth revision; the twenty-fifth through
-> twenty-seventh round notes are added below.
+> twenty-eighth round notes are added below.
 
 Where a note conflicts with the current plan or ADR, the current document wins.
-The twenty-seventh revision in particular splits `A(T)`, `R(T)` and `P(T)`,
-defines the separate acceptance change, requires the provenance of the gate logic,
-and scopes the H3 entry's guarantee.
+The twenty-eighth revision in particular splits `A_β(T)` from `A(T)`, defines
+`R(T)` from registry fields only, confines the evidence-only digest example to
+candidates, extends filename portability to the whole snapshot, and requires the
+merge mode from a platform record.
 
 ## Round notes
 
+  第二十八轮固定：`BuildSucceeded(r, β)` 只推出 `A_β(T_r)`（该 bundle 的工件
+  配对），不推出 `A(T_r)`（全树合取）——另一个 spec 的 lock 过期时构建仍成功，
+  `a_single_bundle_build_does_not_prove_the_whole_tree` 固定该方向。`R(T)` 拆成
+  `R_packages ∧ R_identities`，只读登记表已有字段；`release_digest` 在 lock 里由
+  `A_β` 重算，登记表没有也不新增该字段。「仅证据变化、`bundle_digest` 不变」只
+  存在于未发布候选；已发布目录改证据必须换版本，`bundle_digest` 随之改变。快照
+  目录的每个条目（含未被引用的普通文件）都受 §1.3 词法、设备名与折叠唯一性约束，
+  `an_unreferenced_case_fold_collision_in_a_published_directory_is_rejected` 固定
+  该规则。合并模式 `mode(M)` 取自平台合并记录并保存事件标识，不由提交对象反推。
   第二十七轮固定：`BuildSucceeded(r)` 只推出 `A(T_r)`（工件配对），不推出
   `R(T_r)`（登记完整）或 `P(T_r)`（发布就绪）；已有登记表时，新 spec 在追加行
   之前 `--all --check` 报 `published-registry-incomplete`，
