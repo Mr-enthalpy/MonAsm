@@ -1,21 +1,28 @@
-# H2 plan revision log (twelfth through twenty-sixth round notes)
+# H2 plan revision log (twelfth through twenty-seventh round notes)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The current plan is
 > `docs/architecture/he1-h2-plan.md`; current decisions live in its §3 and in
 > `docs/adr/0128-package-and-bundle-contract.md`. These notes were moved out of
-> the plan opening by the twenty-fifth revision; the twenty-fifth and twenty-sixth
-> round notes are added below.
+> the plan opening by the twenty-fifth revision; the twenty-fifth through
+> twenty-seventh round notes are added below.
 
 Where a note conflicts with the current plan or ADR, the current document wins.
-The twenty-sixth revision in particular moves the legacy bridge into the
-`compat` module, renames the bundle type to `CheckedBundle`, requires the
-published-directory audit to reject unreferenced non-regular entries, reconciles
-the evidence and risk labels with the phase split, and separates build success
-from artifact consistency.
+The twenty-seventh revision in particular splits `A(T)`, `R(T)` and `P(T)`,
+defines the separate acceptance change, requires the provenance of the gate logic,
+and scopes the H3 entry's guarantee.
 
 ## Round notes
 
+  第二十七轮固定：`BuildSucceeded(r)` 只推出 `A(T_r)`（工件配对），不推出
+  `R(T_r)`（登记完整）或 `P(T_r)`（发布就绪）；已有登记表时，新 spec 在追加行
+  之前 `--all --check` 报 `published-registry-incomplete`，
+  `a_successful_build_does_not_complete_the_registry` 固定该中间状态。ADR 的
+  `accepted` 改为 PR #4 合并后的独立 docs-only H2-0 接受变更，H2a 不携带也不
+  依赖自己的启动前提。发布结论还要记录门禁逻辑来源：workflow、变更路径 mapper
+  与审计脚本来自受保护控制面或独立审批，否则写明信任假设；head 改过的门禁不能
+  为同一 PR 授权。H3 的 bundle 入口只保证经它执行的计划，旧 `bind` 仍是公开的
+  legacy 能力，字节相同不等于证明强度相同。
   第二十六轮固定：H2 到 H1 的桥移出 bundle 类型，放进
   `fmp_definition::compat::as_legacy_definition`；`CheckedBundle` 只承诺结构与
   闭包检查，不承诺已发布、来源或 V-P，类型不再叫 `VerifiedBundle`。兼容函数是

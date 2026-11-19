@@ -2,20 +2,25 @@
 
 - Status: proposed
 - Date: 2026-11-14
-- Review: this is a proposal, not a frozen decision. It stays `proposed` until
-  the H2 planning PR is reviewed and merged; `accepted` is written only after
-  that review, and H2a does not start before it.
-- Revision: twenty-sixth revision, 2026-11-19. The normative entry now keeps
+- Review: this is a proposal, not a frozen decision. Review of the H2 planning
+  PR approves the design, but merging that PR does **not** flip the status: the
+  ADR stays `proposed` in the merged tree. A separate docs-only acceptance change
+  then edits only the status lines here and in the plan, cites the review record,
+  and lands on the target branch. H2a starts only after that acceptance change is
+  merged, and no H2a commit contains it, so the work never satisfies and depends
+  on its own precondition. A later design change reopens `proposed` and needs the
+  same sequence again.
+- Revision: twenty-seventh revision, 2026-11-20. The normative entry now keeps
   only current decisions; per-revision audit notes (fourteenth through
-  twenty-fifth) are in `research/he1/adr-0128-revision-log.md`, which is
+  twenty-sixth) are in `research/he1/adr-0128-revision-log.md`, which is
   historical evidence and not a contract. Earlier decisions remain in force
   except where this revision or the `Settles` list restates them. This revision
-  moves the legacy bridge into a `compat` module with a long-term lifecycle and
-  renames the bundle type to `CheckedBundle` so its name claims only structure
-  and closure checks; requires a published-directory audit to reject every
-  unreferenced non-regular entry; reconciles every evidence and risk row with the
-  §8.5 phase split; and separates `BuildSucceeded(r)` from
-  `ArtifactsConsistent(T)`.
+  splits artifact pairing, registry completeness and publication readiness into
+  `A(T)`, `R(T)` and `P(T)` so a successful build is not claimed to complete the
+  registry; requires the publication verdict to record the provenance of the gate
+  logic itself; scopes the H3 bundle entry's guarantee to its own callers while
+  the legacy entry stays public; and defines a separate acceptance event instead
+  of letting H2a own its own start condition.
 - History: `research/he1/adr-0128-revision-log.md`.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
   `monasm-lock/0.1`, `monasm-bundle/0.1` and `monasm-published/0.1` formats;
@@ -65,7 +70,9 @@
   publication authority (`Published(B) ⊆ Published(H)` with tree-byte equality);
   the merge-freshness rule that a verdict is keyed on the base commit SHA, the
   tested candidate tree SHA and the merge mode, and must be re-established when
-  any of them moves; the permanent
+  any of them moves, with the provenance of the gate logic that produced it; the
+  three-way split between `A(T)`, `R(T)` and `P(T)`, where a successful build
+  implies only `A(T)`; the permanent
   `monasm-package/0.1` rejection of non-empty `exports.types`/`exports.profiles`
   with their semantics reserved to an explicit later package format; the ordered
   input pipeline (lexical path, no-follow open, handle type check, same-handle
@@ -76,8 +83,10 @@
   ISA-family consistency; package ownership and conflict rules; which legacy
   definition version a re-homed form is compared against; transitive dependency
   closure and release-evidence status; the `CheckedBundle` name and its single
-  compat adapter to the H1 entry, which has no reverse conversion and is not
-  replaced by the H3 entry; the builder's error and exit behaviour;
+  compat adapter to the H1 entry, which has no reverse conversion, is not
+  replaced by the H3 entry, and leaves the H3 entry's guarantee scoped to its own
+  callers while the legacy entry stays public; the builder's error and exit
+  behaviour;
   and the boundary between H2 and H3/H4
 - Supersedes: none
 - Superseded by: none
@@ -1856,6 +1865,27 @@ merge the right commit:
   tree is `C_checked` by construction, and a moved target makes the operation
   fail instead of landing a different tree.
 
+**The gate logic is a trusted input, not something the judged PR may redefine.**
+The equations say the merged tree is the tested tree; they do not say the test was
+the approved one. A PR that edits `.github/workflows/**`, the changed-path mapper
+or an audit script in the same commit as the package bytes can keep
+`C_landed = C_checked` while weakening what the check means. The publication
+verdict therefore records where the executed gate definition came from, and
+accepts one of three states:
+
+- the workflow and gate code are read from the protected base `B_checked` or a
+  protected ref, and changing them needs an approval the same PR cannot give;
+- the platform requires an owner review for the gate paths, and that requirement
+  is recorded as platform evidence — merely listing a workflow path in the same
+  PR's changed-path map is not such evidence;
+- the repository states an explicit trust assumption, such as "only trusted
+  maintainers can merge", and records it as a boundary of the claim. That is
+  honest scoping, not evidence of protection.
+
+In every state the report names the revision of the gate logic that produced the
+verdict. A verdict produced by a head-modified gate is not evidence about the
+unmodified gate, even when both eventually print the same triple.
+
 **Required up-to-date checks are not equivalent to either.** They make the
 platform re-run checks when the base advances, which bounds staleness, but they
 do not promise that the commit finally written has the tree that was tested, and
@@ -2508,28 +2538,47 @@ closure inside the §12 budgets would then be unbuildable, making a published
 limit depend on a development cache. A hand-committed snapshot above 16 MiB
 remains `resource-limit` (exit 1) on `--check`, because the builder cannot read it
 under its own budget, and `build` never produces one.
-Two different propositions are involved, and the contract keeps them separate:
+
+Three propositions are involved, and the contract keeps them separate:
 
 - `BuildSucceeded(r)` — the build operation `r` ran to completion and exited 0.
   It read one set of inputs, wrote a lock and a sealed bundle derived from them,
   and wrote the legacy snapshot when the canonical definition is inside the
-  16 MiB read budget.
-- `ArtifactsConsistent(T)` — the tree state `T` satisfies the invariants
-  `verify --all --check` tests: the lock and the sealed bundle are the pair a
-  fresh rebuild of the same closure produces (the lock compared without
-  `builder`), a committed legacy snapshot equals the sealed definition's
-  canonical bytes, and every file is inside its budget.
+  16 MiB read budget. It never writes a registry row.
+- `ArtifactPairConsistent(T)` (`A(T)`) — three checks hold on the committed bytes
+  in tree `T`: the lock and sealed bundle are the pair a fresh rebuild of the same
+  selected closure produces (the lock compared without `builder`); a committed
+  legacy snapshot equals the sealed definition's canonical bytes; and every
+  committed file is inside its budget. This is the artifact-pair part of `--check`;
+  it says nothing about `bundles/published.json`.
+- `RegistryComplete(T)` (`R(T)`) — every spec selected at `T` has complete
+  publication rows: each closure package appears in `published` with a matching
+  `release_digest` and `snapshot_digest`, and its `identities` history is intact.
+  A missing row is `published-registry-incomplete`. `R(T)` is vacuous when no
+  registry exists on either the base or the head (§8.5 rule 3).
 
-For any accepted input, `BuildSucceeded(r)` implies `ArtifactsConsistent(T_r)` on
-the tree `r` wrote. The converse does **not** hold, and the contract does not
-claim it: `ArtifactsConsistent(T)` describes the current bytes, not the last
-operation. Three states show the gap. A valid closure whose legacy write failed
-(new lock and sealed, snapshot absent, exit 2) is consistent, because absence is
-legal. A tree checked out of git after such a failure is consistent. A lock/sealed
-pair restored from git with matching bytes is consistent although no build ran in
-that working tree. `--check` therefore proves that the artifact pair in front of
-it is self-consistent; it never proves that the most recent build succeeded, and
-no report may cite a green `--check` as evidence about a build operation.
+`PublicationReady(T)` (`P(T)`) is `A(T) ∧ R(T)` plus the merge-freshness and
+gate-provenance conditions of §8.1, which are properties of the merge operation
+rather than of the tree alone. No tree-only predicate can carry them.
+
+For any accepted input, `BuildSucceeded(r)` implies `A(T_r)` on the tree `r`
+wrote. It does **not** imply `R(T_r)` or `P(T_r)`: `build` never writes registry
+rows, so a legally successful build of a new spec in a tree that already has a
+registry leaves that spec without a row. That intermediate tree is exactly what
+the publication flow orders — build, then append rows, then run both `--check`s,
+then commit (§8.5) — and before the append `--all --check` reports
+`published-registry-incomplete` although `BuildSucceeded(r)` and `A(T_r)` both
+hold. `a_successful_build_does_not_complete_the_registry` fixes this direction.
+
+The converse of the first implication also fails: `A(T)` describes the current
+bytes, not the last operation. Three states show the gap. A valid closure whose
+legacy write failed (new lock and sealed, snapshot absent, exit 2) satisfies
+`A(T)`, because absence is legal. A tree checked out of git after such a failure
+also satisfies it. A lock/sealed pair restored from git with matching bytes
+satisfies it although no build ran in that working tree. `--check` therefore
+proves `A(T)` — and `R(T)` only when a registry is in scope — but it never proves
+the most recent build succeeded, and no report may cite a green `--check` as
+evidence about a build operation.
 
 An I/O or internal failure during this phase (exit 2) may leave a temporary file,
 a missing snapshot, or a **pair of files from different builds**: a new lock with
@@ -2544,9 +2593,9 @@ committed bytes against a fresh rebuild of the same closure. An interrupted writ
 therefore leaves only two consistent states — both new (a valid build, with the
 optional cache possibly missing) or both old (the previous build, with the new
 files not yet renamed into place) — plus states that `--check` rejects.
-"Consistent" here includes the legal exit-2 state with a missing cache, so a
-failed build is not always visible to `--check`; only its exit code and the
-mixed-pair states are.
+"Consistent" here means `A(T)` and includes the legal exit-2 state with a missing
+cache, so a failed build is not always visible to the pair check; only its exit
+code and the mixed-pair states are.
 
 **Output directories are trusted inputs with a checked path, not a sandbox.**
 `bundles/locks/`, `bundles/sealed/` and `bundles/legacy/` are
@@ -2597,9 +2646,9 @@ story simple: an exit-2 write leaves it absent, which passes because absence is
 legal, so the next `--definitions` read fails loudly instead of returning the
 previous build's rows. A stale snapshot from an interrupted write now fails the
 equality gate instead of being silently readable. Both outcomes are "not a
-successful release", but only the first is `¬BuildSucceeded(r)` with
-`ArtifactsConsistent(T)` still true: the missing cache is exactly the state that
-`--check` accepts, so it reports consistency, not the failed operation. The
+successful release", but only the first is `¬BuildSucceeded(r)` with `A(T)` still
+true: the missing cache is exactly the state that `--check` accepts, so it reports
+consistency, not the failed operation. The
 stale-snapshot outcome is the other shape, an inconsistent tree that `--check`
 rejects. Counterexample if the legacy snapshot were written in place
 before the lock: a crash after the new lock and sealed bundle but before the
@@ -2762,16 +2811,19 @@ H2 is therefore accepted through **two verdicts**, recorded separately:
   ownership, the four digest layers with their fixed vectors, cases and evidence
   protocol, conformance, Level 0/1 projections, build determinism and byte
   equality, the build write phase with its bounded streaming comparison, the
-  legacy-snapshot equality gate, `verify --package` and `verify --all --check`
-  over the committed specs. V-A has no external prerequisite and does not wait
-  for V-P.
+  legacy-snapshot equality gate, `verify --package`, and the `A(T)` part of
+  `verify --all --check` over the committed specs. A V-A report cites `A(T)`;
+  `R(T)` is vacuous before a registry exists and belongs to V-P, so V-A never
+  turns a green `--all --check` on a tree with a registry into evidence. V-A has
+  no external prerequisite and does not wait for V-P.
 - **V-P, publication channel.** The hardened reader (open-time no-follow, exact
   directory-entry names, replacement-race binding, regular-file-only leaves) with
   its three-platform PoC, `bundles/published.json` with `identities` and
-  `snapshot_digest`, append-only and retirement rules, the full-history audit
-  including the rejection of every unreferenced non-regular directory entry, the
-  changed-path gate, the merge-freshness proof with the executed stale-CI
-  counterexample (§8.1), and the ~1,000-version measurement with its threshold.
+  `snapshot_digest`, append-only and retirement rules, `R(T)` and `P(T)`, the
+  full-history audit including the rejection of every unreferenced non-regular
+  directory entry, the changed-path gate, the merge-freshness proof with the
+  executed stale-CI counterexample and the provenance of the gate logic itself
+  (§8.1), and the ~1,000-version measurement with its threshold.
 
 The ordering rules are part of the contract, because either misordering would be
 a false claim:
@@ -2798,7 +2850,10 @@ a false claim:
    them with it, even when the bytes are identical to a V-A build. The first
    candidate is **all-or-nothing over its head spec set**: it registers every
    selected package closure and definition identity in that one commit, not only
-   the initial x86 slice (§8.3).
+   the initial x86 slice (§8.3). A build produces `A(T)`; only the registry append
+   plus both `--check`s produce `R(T)`; `P(T)` additionally needs the merge
+   evidence of §8.1. No report may promote one predicate to the next because the
+   bytes look right.
 5. V-P failure stops the publication claim and the H2 exit, not the author layer.
    No post-merge audit, green CI run or after-the-fact review may substitute for
    a V-P prerequisite (§8.1).
@@ -3480,6 +3535,15 @@ contract rather than an implementation note:
    composition discards exactly those facts; the H3 acceptance test asserts that
    the new entry rejects a plan the bundle's owner cover cannot support even
    though the narrowed definition alone would bind it.
+6. **Its guarantee is scoped to the entry, not to the system.** H3's bundle entry
+   guarantees that every plan executed *through it* was checked against the
+   bundle's ownership and target cover. While `bind(Plan, Arc<Definition>)` is
+   still a public entry, H3 does not claim that every possible execution passes
+   that check: the legacy entry is an intentionally retained capability that
+   carries no bundle identity. Output bytes being identical does not make the two
+   proofs equal, and no report may cite a legacy-entry run as bundle-ownership
+   evidence. Removing the legacy entry, if ever, is a separate ADR under point 2;
+   H2 neither removes it nor weakens its documented status.
 
 ### 11. Errors and exit codes are the builder's own
 
@@ -3762,7 +3826,9 @@ comparing the materializer with itself proves the bytes.
 - No `bind(CheckedBundle, ...)` and no `fmp-validate → fmp-definition`
   dependency (H3). H2's only bridge to the H1 entry is the compat adapter of §10,
   which takes `&CheckedBundle` and returns an `Arc<Definition>`; it does not put a
-  bundle parameter on `bind` and does not move that dependency edge.
+  bundle parameter on `bind` and does not move that dependency edge. H3's bundle
+  entry proves its own callers only; while the legacy entry is public, H3 makes no
+  system-wide "every execution passed bundle ownership" claim (§10 point 6).
 - No target-subset acceptance in H2. `monasm-bundle/0.1` carries the facts the H3
   rule reads — `form_owners` and each package's declared cover — but H2 runs no
   owner-cover check and adds no subset cell; a definition format whose
@@ -4002,10 +4068,14 @@ comparing the materializer with itself proves the bytes.
 - An interrupted write (exit 2) can leave a temporary file and a lock/sealed pair
   from different builds, but never a state that is both consistent and a release:
   the guarantee is detectability, not a multi-file atomic rename. A mixed pair
-  fails `verify --all --check`; a missing optional cache passes it. That is why
-  `BuildSucceeded(r)` and `ArtifactsConsistent(T)` are stated separately and only
-  the first implies the second: `--check` proves the current pairing, never that
-  the last build operation succeeded (§8.3). Output directories are trusted, yet
+  fails the pair check; a missing optional cache passes it. That is why
+  `BuildSucceeded(r)` and `A(T)` are stated separately and only the first implies
+  the second: `--check` proves the current pairing, never that the last build
+  operation succeeded (§8.3). Registry completeness `R(T)` is a third, separate
+  predicate: a successful build of a new spec in a tree that already has a
+  registry leaves `R(T)` false until the publisher appends the row, so
+  `--all --check` reports `published-registry-incomplete` in between. Output
+  directories are trusted, yet
   every output parent segment under `--root` obeys the same no-follow rule as an
   input, and the committed lock and sealed bundle are compared as a bounded
   stream inside the 1 MiB and 80 MiB budgets (§8.3, §12).
@@ -4571,7 +4641,8 @@ comparing the materializer with itself proves the bytes.
 | The plan×definition matrix keeps `fmp/0.1` + `fmp-def/0.1` equality and `fmp/0.1` + `fmp-def/0.2` subset, and only a new plan protocol plus a versioned build rule lifts `h2-exact-target` | existing two cells read from `check_target`; the new-plan cell and the versioned build rule do not exist; `monasm-bundle-spec/0.1` has no builder yet | **partly measured, H3 gate** |
 | One loaded package value feeds the source digest, row/target comparison, per-package `read` and merge | specified; no reader exists | **unverified** — H2a |
 | First publication bootstraps without a registry cycle, and `build` validates every output before writing | specified; `build` validating outputs before writing is the author layer, the order build success → append rows → both `--check`s → commit is the publication channel, and publication is the merged commit; no builder exists | **unverified** — H2a (validate-before-write), V-P (publication order) |
-| `--check` proves the lock and sealed bundle, and compares a committed legacy snapshot with the sealed definition as a one-way equality gate (absence legal, no digest input) | specified; the write phase removes `<legacy>/definition.json` first and writes it last, so an interrupted write leaves it absent, not stale; no builder exists | **specified, not implemented** — H2a |
+| `--check` proves the lock and sealed bundle, and compares a committed legacy snapshot with the sealed definition as a one-way equality gate (absence legal, no digest input) | specified; that is `A(T)`, independent of registry rows; the write phase removes `<legacy>/definition.json` first and writes it last, so an interrupted write leaves it absent, not stale; no builder exists | **specified, not implemented** — H2a |
+| A successful build does not complete the registry: `BuildSucceeded(r)` implies `A(T_r)`, not `R(T_r)` or `P(T_r)` | specified; `build` never writes a registry row; with an existing registry, a new spec is `published-registry-incomplete` between the build and the append; `a_successful_build_does_not_complete_the_registry` is the acceptance test | **specified, not implemented** — H2a (predicate), V-P (registry) |
 | A committed legacy snapshot whose bytes differ from the sealed definition is `legacy-snapshot-mismatch` (exit 1) | specified; the gate compares canonical bytes without rebuilding the cache; no `--check` exists | **specified, not implemented** — H2a |
 | A definition-identity mismatch is not expressible as a `monasm-cases/0.1` case | the case requires the `$standalone` sentinel and the harness substitutes the correct identity, so a wrong digest is `case-plan-identity`; the derived-plan binding test carries the negative | **specified; reader behaviour read** — H2a |
 | The base registry (target-branch tip `B`) decides published-path containment before head-side `package.json` discovery | specified; no changed-path mapper exists, so a nested manifest masking an ancestor is untested | **specified, not implemented** — V-P |
@@ -4598,7 +4669,9 @@ comparing the materializer with itself proves the bytes.
 | A `plan::read` rejection has a legal case representation (`scope: "plan"` + `stage: "read"`), and the declared stage must be the first stage that rejects | `fmp-model/src/plan.rs` `read` returns `Result<Plan, Diagnostic>` and `bind_payload` calls `bind::u64_in`, so `{"reg":-1}` is `E-PLAN-002` at `/instructions/0/operands/<n>/payload/reg` before `bind`; no harness | **specified, reader behaviour read** — H2a |
 | `profile_id` is a nominal label inside one bundle; identity is the six-key `target.identity` | specified; no spec or bundle exists, and no cross-spec `(profile_id, identity)` rule is added | **specified, not implemented** — H2a |
 | Output parents under `--root` obey the no-follow rule, and the committed lock/sealed bundle are compared through a bounded streaming reader | specified; the writer is author-layer work, the output-parent no-follow rule is the hardened path layer, and neither exists, so the `path-escape` and over-budget rejections are untested | **specified, not implemented** — H2a (bounded comparison), V-P (output parents) |
-| An interrupted write may leave a mixed lock/sealed pair, and such a pair never passes `--check` | specified; the write phase and `--check` do not exist; the other legal exit-2 state is the missing optional cache, which `--check` accepts and which is not proof of a successful build (`BuildSucceeded` and `ArtifactsConsistent` are separate) | **specified, not implemented** — H2a |
+| An interrupted write may leave a mixed lock/sealed pair, and such a pair never passes the pair check | specified; the write phase and `--check` do not exist; the other legal exit-2 state is the missing optional cache, which `A(T)` accepts and which is not proof of a successful build (`BuildSucceeded` and `A(T)` are separate) | **specified, not implemented** — H2a |
+| The publication verdict records where the gate logic came from, not only what tree it tested | specified; no gate exists; the report must name the gate revision, and a head-modified gate is not evidence about the unmodified gate (§8.1); `a_pr_cannot_weaken_the_gate_that_judges_it` is the acceptance test | **specified, not implemented** — V-P |
+| The H3 bundle entry's guarantee is scoped to its own callers while the legacy entry stays public | specified; no H3 entry exists; the legacy entry is an intentionally retained capability without bundle identity, and identical bytes do not equal identical proof strength (§10 point 6) | **specified, not implemented** — H3 |
 | Dependency-closure status distinct from package structure, including transitive re-reading of a `--closure` lock, cycles and the dependent-package author path | not implemented | **unverified** — H2a |
 | Release evidence as a separate `--release-evidence` gate | not implemented | **unverified** — H2a |
 | Closed spec/lock/sealed shapes, `builder` omission and the lock drift projection | not implemented | **unverified** — H2a |

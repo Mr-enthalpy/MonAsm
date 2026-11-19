@@ -1,18 +1,29 @@
-# ADR-0128 revision log (fourteenth through twenty-fifth revision)
+# ADR-0128 revision log (fourteenth through twenty-sixth revision)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The normative entry is
 > `docs/adr/0128-package-and-bundle-contract.md`; its body and `Settles` list are
 > authoritative. These notes were moved out of the ADR opening by the
-> twenty-sixth revision so that a new implementer reads current decisions first.
+> twenty-seventh revision so that a new implementer reads current decisions first.
 
-The notes below are preserved from the twenty-fifth revision. Where they
-conflict with the current ADR, the current ADR wins; in particular the
-twenty-sixth revision moves the legacy bridge into the `compat` module, renames
-the bundle type to `CheckedBundle`, and reconciles the evidence and risk labels
-with the phase split of §8.5.
+The notes below are preserved from the twenty-sixth revision. Where they conflict
+with the current ADR, the current ADR wins; in particular the twenty-seventh
+revision splits the artifact and registry predicates, scopes the H3 entry, and
+defines the separate acceptance event.
 
 ## Revision notes
+
+- Revision: twenty-sixth revision, 2026-11-19, after the bridging-API,
+  unpublished-snapshot, evidence-label and predicate audit. It moves the legacy
+  bridge out of the bundle type into
+  `fmp_definition::compat::as_legacy_definition`, gives it a lifecycle equal to
+  the H1 `bind` and no reverse conversion, and renames the bundle type to
+  `CheckedBundle` so its name claims only structure and closure checks. It
+  requires a published-directory audit to reject every unreferenced non-regular
+  entry instead of skipping it, reconciles the evidence and risk rows with the
+  §8.5 phase split, and separates `BuildSucceeded(r)` from
+  `ArtifactsConsistent(T)` — the latter is split again by the twenty-seventh
+  revision.
 
 - Revision: twenty-fifth revision, 2026-11-19, after the empty-domain,
   platform-evidence and scaling-summary audit. It scopes the `empty-form-domain`

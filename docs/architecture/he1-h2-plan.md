@@ -1,26 +1,30 @@
 # H2 实施计划：目标包作者层与确定性定义构建
 
 - 状态：**待审提案**（2026-11-16；同日按八轮审计 P1/P2 修订，2026-11-17 至
-  2026-11-19 按第九轮至第二十六轮审计修订）。规范决策见
+  2026-11-20 按第九轮至第二十七轮审计修订）。规范决策见
   `docs/adr/0128-package-and-bundle-contract.md`，该 ADR 仍为 `proposed`；
   评审合并前本文和 ADR 都不是冻结依据。本文保留为实施计划与验收映射。
   **H2 尚未实现，本文不把任何 H2/H3/H4/H5 项目算作已完成。**
-  当前有效约束（逐轮记录第十二轮至第二十五轮见
+  当前有效约束（逐轮记录第十二轮至第二十六轮见
   `research/he1/h2-plan-revision-log.md`，历史证据，不是契约）：
   H2 分 **作者层 V-A** 与 **发布通道 V-P** 两个独立验收结论（`ADR-0128` §8.5）；
   V-A 不依赖外部平台事实，V-P 才承担硬化读取、发布登记、合并竞态与全历史审计，
   V-P 通过前任何产物都不是已发布、不可变或可信。bundle 类型叫
   `CheckedBundle`，只承诺结构与闭包检查；到 H1 的唯一桥是
   `fmp_definition::compat::as_legacy_definition`，长期保留，H3 另加入口且不得
-  由它组合。`--check` 只证明当前工件配对一致（`ArtifactsConsistent(T)`），
-  不证明最近一次构建成功（`BuildSucceeded(r)`）。`monasm-bundle/0.1` 恰好九键、
+  由它组合；H3 入口只保证经它执行的计划，旧 `bind` 仍是公开的 legacy 能力。
+  谓词分三层：`A(T)` 工件配对自洽、`R(T)` 登记完整、`P(T)` 发布就绪；
+  `BuildSucceeded(r)` 只推出 `A(T_r)`，不推出 `R(T_r)` 或 `P(T_r)`——已有登记
+  表时，新 spec 在追加行之前 `--all --check` 报
+  `published-registry-incomplete`。`monasm-bundle/0.1` 恰好九键、
   自包含、可独立重算 `bundle_digest`，登记项含覆盖整目录的 `snapshot_digest`，
   目录里未声明的非普通条目一律拒绝；单文件登记与 O(N) 全历史审计是明确的规模
   边界，约 1,000 版本测量属于 V-P。H3 的归属包覆盖
   `E_package(owner(form(i))) ⊆ E_plan` 无条件生效，逐 form 需求只在版本化契约证明
-  完整时作为附加合取项。发布门禁以 `(B_checked, C_checked, mode)` 为准；403 或
-  空 ruleset 是未取到证据，不是没有保护。其余早期决定保持有效，除非与
-  `ADR-0128` 的 `Settles` 或本文 §3 冲突。
+  完整时作为附加合取项。发布门禁以 `(B_checked, C_checked, mode)` 与门禁逻辑
+  自身的受保护来源为准；403 或空 ruleset 是未取到证据，不是没有保护。ADR 的
+  `proposed → accepted` 是 PR #4 评审通过后的独立 docs-only 接受变更，不属于
+  H2a。其余早期决定保持有效，除非与 `ADR-0128` 的 `Settles` 或本文 §3 冲突。
 - 基线：`fefb463`（H1 合并提交；工作树干净）。
 - 上游：`ADR-0125` 决策 1–6；`docs/architecture/he1-horizontal-extension.md`
   §4–§8、§11–§13、§14、§15.1；`ADR-0127`；`research/he1/H1-report.md` §11。
@@ -116,7 +120,9 @@ bundles/sealed/<bundle_id>.bundle.json # 合并定义 + target + 归属/覆盖�
 
 H2 的 `CheckedBundle` 只是在 `Arc<Definition>` 外面加包/闭包/归属元数据；
 `bind` 仍接收 `Arc<Definition>`。H3 另加 bundle 入口，不改 H1 的 `bind`；
-两个入口并存，H1 入口的适配器不因 H3 落地而消失。
+两个入口并存，H1 入口的适配器不因 H3 落地而消失。H3 入口的保证只覆盖**经它
+执行**的计划；只要旧 `bind` 还是公开入口，就不能声称「所有执行都经过 bundle
+归属检查」，字节相同也不等于证明强度相同（`ADR-0128` §10 第 6 条）。
 
 ### 2.2 三个新类型（都在 `fmp-definition`）
 
@@ -1420,11 +1426,13 @@ spec 已把闭包每个成员恰好列一次，重复的 `packages[].path` 本�
   写阶段先删除旧的 `definition.json`，再依次替换 lock、sealed，最后写 legacy；
   所以「第三个文件写失败」（退出码 2）留下的是**缺失**（合法、`--check` 通过），
   而不是仍可被读成当前构建的旧文件；若留下旧文件，等价门禁会拒绝它。这里必须分清
-  两个命题：`BuildSucceeded(r)` 是「这次构建操作完整成功」，`ArtifactsConsistent(T)`
-  是「该目录状态满足 `--check` 的不变量」；前者蕴含后者，反之不成立。`--check`
-  绿只证明当前 lock/sealed 配对与可选的 legacy 等价门禁成立，**不证明最近一次
-  构建成功**（`ADR-0128` §8.3）。退出 2 之后经 `--definitions` 读到的字节不能作为
-  当前构建的证据，必须重新 `build`。
+  三个谓词：`BuildSucceeded(r)`（构建操作完整成功）、`A(T)`（工件配对自洽）、
+  `R(T)`（当前选中的每个 spec 都有完整登记行）。构建只推出 `A(T_r)`；它不写
+  登记行，所以已有登记表时，新 spec 在追加前 `R(T)` 为假，`--all --check` 报
+  `published-registry-incomplete`，补齐后才通过。`A(T)` 也不反过来证明最近一次
+  构建成功；`--check` 绿只证明当前配对（有登记表时再加登记完整性），**不证明
+  构建操作成功**（`ADR-0128` §8.3）。退出 2 之后经 `--definitions` 读到的字节
+  不能作为当前构建的证据，必须重新 `build`。
 - **构建绝不写自己读不了的快照（第十九轮 P2-2）。** canonical 定义 ≤ 16 MiB
   才写；超过时省略快照并在同一写阶段删除旧副本，仍退出 0。省略只取决于字节，
   不取决于文件系统或上一次构建，所以同一闭包两次构建一致；`--all --check` 对
@@ -1765,7 +1773,7 @@ A/B 工作流合并留给 H5。
 | `an_evidence_entry_must_stay_inside_the_package_and_match_its_hash` | evidence manifest 列 `../` 或错误 sha256 → `evidence-mismatch`，退出 1 | `H2-D8` |
 | `release_digest_tracks_the_release_not_the_builder` | 同 bundle 不同证据 → release 摘要不同；builder 版本变化 → release 摘要不变 | `H2-D8` |
 | `the_legacy_snapshot_is_readable_by_load_dir` | 生成 `bundles/legacy/<bundle_id>/definition.json` → `Registry::load_dir` 可读；sealed bundle 放入定义目录被拒绝 | `H2-D9`、`H2-D12` |
-| `a_build_never_writes_a_snapshot_it_cannot_read` | 合成闭包：合并后的 canonical 定义略高于 16 MiB（包与闭包都在 64/80 MiB 预算内）→ `build` 退出 0、**不写** `bundles/legacy/<bundle_id>/definition.json`（若先前存在则被删除），随后的 `verify --all --check` 通过；手工放入同尺寸快照 → `--check` 报 `resource-limit`（退出 1）。同一闭包两次构建结果一致，且 lock/sealed/摘要不变 | 第十九轮 P2-2、`ADR-0128` §8.3/§12、`H2-D11`/`H2-D12` |
+| `a_build_never_writes_a_snapshot_it_cannot_read` | 合成闭包：合并后的 canonical 定义略高于 16 MiB（包与闭包都在 64/80 MiB 预算内）→ `build` 退出 0、**不写** `bundles/legacy/<bundle_id>/definition.json`（若先前存在则被删除），在无登记表的树中，随后 `verify --all --check` 通过（只证明 `A(T)`）；手工放入同尺寸快照 → `--check` 报 `resource-limit`（退出 1）。同一闭包两次构建结果一致，且 lock/sealed/摘要不变 | 第十九轮 P2-2、`ADR-0128` §8.3/§12、`H2-D11`/`H2-D12` |
 | `changing_the_legacy_source_changes_the_source_digest` | `legacy_source` 从 `0.1.0` 改成 `0.78.0` → 源摘要变化；行未改时行相等测试失败 | `H2-D8`、`HE-AC-11` |
 | `the_builder_identity_is_not_part_of_the_definition_digest` | 两个 builder 版本 → 同 definition/bundle 摘要，lock 的 builder 不同；`verify --check` 不把 builder 差异算作失败 | `HE-T19` |
 | `a_builder_field_change_is_not_a_provenance_proof` | 手改已提交 lock 的 `builder.version`/`builder.build`（其余字节不变）→ `verify --all --check` 通过，`definition_digest`/`bundle_digest` 不变；改 `definition_digest` → 失败。断言该测试只证明 `builder` 不在身份里、**不**证明构建来源；可信来源需要独立构建证明或签名（文档结论，无运行时实现） | 第二十二轮 builder 保证范围、`ADR-0128` §7、第四轮 P2-2 |
@@ -1786,10 +1794,12 @@ A/B 工作流合并留给 H5。
 | `first_publication_bootstraps_without_registry_cycle` | 新包/新 spec 尚无 registry 行：`build` 成功并打印 `definition_digest`（不要求该行）；追加 `published` 与 `identities` 后 `verify --all --check` 与 `verify --published --check` 通过，两项都通过后才允许提交；`build` 从不写 registry。把追加放到任一 `--check` 之后会使 `--all --check` 报 `published-registry-incomplete`，因此不存在「先 check 后写行」的第二种顺序；合并提交才使该行成为 base 发布 | 第九轮 P2-3、第十二轮 P1-1、`ADR-0128` §8.3、`H2-D9` |
 | `failed_build_leaves_no_published_partial_artifact` | 注入写阶段 I/O 失败 → 退出 2，registry 未改，未报告成功；lock/sealed 一新一旧时 `--check` 失败；修复后重建并通过。确定性拒绝发生在写任何文件之前，也不删除 legacy 快照 | 第九轮 P2-3、第十二轮 P2-1、`ADR-0128` §8.3、`H2-D9` |
 | `a_failed_legacy_write_leaves_no_stale_snapshot` | 故障注入让第三个输出 `bundles/legacy/<bundle_id>/definition.json` 的临时写入或重命名失败 → 退出 2；lock 与 sealed 都是新字节且互相一致，旧 legacy 在写阶段开始时已被删除，因此路径缺失——缺失对等价门禁合法，`--check` 仍通过；`--definitions` 读取失败而不是返回上一版行；重新 `build` 后快照恢复且 `--check` 仍通过。断言不存在「新 lock + sealed、旧 legacy 仍可读」的组合；若实现留下旧文件，等价门禁必须以 `legacy-snapshot-mismatch` 拒绝 | 第十二轮 P2-1、第十四轮 P1、`ADR-0128` §7/§8.3、`H2-D12` |
-| `a_passing_check_does_not_prove_the_last_build_succeeded` | 注入 legacy 写失败 → 退出 2，lock/sealed 为新且互相一致、快照缺失，随后 `verify --all --check` 通过；断言这次通过只证明 `ArtifactsConsistent(T)`，不证明 `BuildSucceeded(r)`，任何把它报告成「最近一次构建成功」的检查都失败。两个反例固定方向：把 lock 换回旧版本、sealed 保持新版本 → `--check` 拒绝（混合对可检测）；一个所有字节都与重建一致、但从 git 检出而非本地构建写出的目录 → `--check` 仍通过（它证明当前配对，不证明操作历史） | 第二十六轮 P2-4、`ADR-0128` §8.3、`H2-D9`/`H2-D12` |
+| `a_passing_check_does_not_prove_the_last_build_succeeded` | 注入 legacy 写失败 → 退出 2，lock/sealed 为新且互相一致、快照缺失，随后 `verify --all --check` 通过；断言这次通过只证明 `A(T)`，不证明 `BuildSucceeded(r)`，任何把它报告成「最近一次构建成功」的检查都失败。两个反例固定方向：把 lock 换回旧版本、sealed 保持新版本 → `--check` 拒绝（混合对可检测）；一个所有字节都与重建一致、但从 git 检出而非本地构建写出的目录 → `--check` 仍通过（它证明当前配对，不证明操作历史） | 第二十六轮 P2-4、`ADR-0128` §8.3、`H2-D9`/`H2-D12` |
+| `a_successful_build_does_not_complete_the_registry` | 树中已有 `bundles/published.json`；新增一个包与一个新 spec，`build` 退出 0，lock/sealed/legacy 使 `A(T)` 成立（逐字节对重建一致）；在追加登记前 `verify --all --check` 以 `published-registry-incomplete`（退出 1）失败，而不是 `snapshot-mismatch` 或 `legacy-snapshot-mismatch`；追加 `published` 与 `identities` 行后同一命令通过。再删掉该行 → 回到同一拒绝，证明差异只在 `R(T)`。断言 `build` 从未写入 registry，且报告不得把这一步的 `build` 成功写成「发布就绪」 | 第二十七轮 P1-1、`ADR-0128` §8.3/§8.5、`H2-D9` |
 | `a_modified_committed_legacy_snapshot_fails_the_bridge_gate` | 对一个正确的已提交 bundle，只改 `bundles/legacy/<bundle_id>/definition.json` 的一个 opcode，不改 spec、lock、sealed 或源包 → `verify --all --check` 以 `legacy-snapshot-mismatch`（退出 1）失败，尽管全部已记录摘要仍匹配；改回 canonical 字节后通过，删掉该文件也通过（缺失合法）。门禁不重建缓存、不把快照字节喂给任何摘要 | 第十四轮 P1、`ADR-0128` §8/§8.3/§12、`H2-D9`、`H2-D12` |
 | `a_nested_package_manifest_cannot_mask_a_published_ancestor` | base registry 已发布 `packages/x86/monasm.isa.x86/0.1.0/`；同一 PR 在该目录内新增更深的 `package.json` 并修改同目录的 form → 变更路径门禁先按 base registry 判定包含，直接 `published-package-modified`（退出 1），不按 head 侧最近的 `package.json` 重新归类；把同一新增 `package.json` 放到 base 未登记的新版本目录则按首次发布处理 | 第十四轮 P2-3、`ADR-0128` §8.1/§8.3 |
 | `lifting_the_transition_needs_a_versioned_build_rule` | H3 验收：同一份不相等的 `fmp-def/0.1` 选择，用 `monasm-bundle-spec/0.1` 构建仍被 `h2-exact-target` 拒绝（退出 1）；只有新的版本化构建规则版本能构建成功，且得到的 bundle 能绑定目标集合为子集的计划。断言 Builder 软件升级本身不改变 `0.1` 的结论 | 第十四轮 P2-2、`ADR-0128` §4.1、`H2-D4` |
+| `the_legacy_entry_does_not_claim_bundle_coverage` | H3 验收：一个归属包覆盖不支持的 plan 在 bundle 入口被拒绝，但经 `bind(Plan, Arc<Definition>)` 仍能执行；旧入口的报告只记 legacy 能力，不得写成经过 bundle 归属检查；两者字节相同也不改变结论。断言系统级「所有执行都经过 bundle 检查」的说法在旧入口仍公开时不成立 | 第二十七轮 P2-2、`ADR-0128` §10 第 6 条 |
 | `a_base_published_version_cannot_be_edited_with_a_registry_change` | base 已登记 `0.1.0`；同一 PR 改 `0.1.0/` 的 form 并同时改写/删除/替换该登记项 → 包改动是 `published-package-modified`，登记改动是 `published-registry-modified`，退出 1 | 第六轮 P1-1、`ADR-0128` §8.1/§8.3 |
 | `a_retired_published_version_is_still_immutable` | PR A 删除最后一个引用 `0.1.0` 的 spec，但保留 registry 条目；PR B 只改旧 `0.1.0/` 目录 → 按 base registry 判为已发布，`published-package-modified` | 第五轮 P1-2、`ADR-0128` §1.1/§8.3 |
 | `a_concurrent_publish_freezes_the_old_commit_side` | A、B 从同一个旧提交 `M0` 分叉（`M0` 已有 `P/0.1.0` 目录但未登记）；B 先发布 `P/0.1.0`（追加 registry 条目）并合入目标分支；A 随后只改 `P/0.1.0/README.md` 这类不进 `source_package_digest` 的辅助文件 → 门禁以**目标分支尖端 `B`** 为权威，判定 `Published(B) ∋ P/0.1.0` 而 `TreeBytes_B(P) ≠ TreeBytes_H(P)`，报 `published-package-modified`（退出 1）。用 merge-base（仍是 `M0`）会把它当作未发布候选而放行；`verify --published --check` 的 `snapshot_digest` 会独立发现同一改动，但门禁仍必须在合并前拒绝。同一 PR 若同时改 form → 仍是同一条拒绝 | 第十七轮 P1-2、第二十三轮 P2、`ADR-0128` §8.1/§8.3 |
@@ -1893,6 +1903,15 @@ lock/sealed。两者分开，未选中包不会混入 bundle 构建，退役版�
 （`ADR-0128` §8.4）。在 V-P 通过、登记表存在之前，第一条把每个选中路径报告为
 开发产物，不报 `published-registry-incomplete`（`ADR-0128` §8.5）。
 
+第一条命令证明的是 `A(T)`：工件配对、legacy 等价与预算。若树中已有
+`published.json`，`--all --check` 还要求 `R(T)`（当前选中的每个 spec 都有完整
+登记行），缺行是 `published-registry-incomplete`；`build` 成功只产生 `A(T)`，
+不产生 `R(T)`，所以发布流程必须在 build 之后追加行再跑检查（`ADR-0128`
+§8.3/§8.5）。发布门禁本身还要求 `P(T)` 的合并证据与门禁逻辑来源：判定所用的
+workflow、变更路径 mapper 与审计脚本必须来自受保护的控制面，或该路径的修改受
+同一 PR 无法自行授予的独立审批；否则报告只能记为明示的信任假设。判定必须记录
+产生它的门禁逻辑修订，head 改过的门禁不能为同一 PR 出具授权（`ADR-0128` §8.1）。
+
 普通扩展还需要独立门禁，且必须同时证明结构和机器码。作者的默认路径不要求先
 改全局 spec，也不因包声明了依赖就被卡住：
 
@@ -1993,8 +2012,9 @@ H2a。
 
 | 提交 | 内容 | 必过 |
 |---|---|---|
-| H2a 作者层（V-A） | `ADR-0128` 评审通过后接受 + 本文状态更新 + `fmp-definition` crate（manifest、spec、build、digest、error、CLI）+ `monasm-standalone/0.1` 独立身份 + 可信树包读取 + **完整的单包发布证据与摘要机制**（`tests/cases.json` 入清单、`NOTICE`、`sources`、`oracle.status`/skip、`evidence_digest`/`release_digest`、跨语言摘要向量、用例/证据/spec/lock 预算与单包累计资产预算）+ **spec 严格排序 + 跨 spec `bundle_id`/定义身份唯一** + **`bundle_id` 可移动、`(bundle_id, bundle_digest)` 为 bundle 内容标签、`release_digest` 为证据完备发布身份** + **九键 sealed（含 `target`、逐包 `enabled_extensions`、`form_owners`，由文件自身重算 `bundle_digest`）及 `bundle-owner-incomplete`** + **已提交 lock/sealed 的有界流式比较** + **`requires_capabilities` 声明等于推导** + **冻结 legacy 定义名保留** + **form ⊆ 包 ⊆ bundle 与合并前逐包 `read`**（含 `form-extension-mismatch`） + **`structure`/`--release-evidence`/`dependency_closure` 三态**（含传递闭包重读、缺项/摘要错/环检测）+ **legacy 目标一致性（`TargetEq`）** + **边界正例按 `D_form` 基数取（0 且无非数值路径为 `empty-form-domain`、1、2、≥3）** + **`scope:"form"` 仅 `bind` 拒绝、诊断落在变异操作数上、禁止 `E-BYTE-001`/`E-SIZE-001`** + **用例 stage 三态且声明阶段必须是第一个拒绝阶段；`verify --package` 只验静态契约，`package_conformance` 验执行阶段与完整诊断集** + **Level 0/1 精确投影** + **值定义用例差分** + `verify --package`、`verify --all --check`（无 registry 时把选中路径报告为开发产物，不报 `published-registry-incomplete`）+ 写阶段先内存校验、受信任输出路径、legacy 等价门禁 + **`CheckedBundle` 类型与 `compat::as_legacy_definition`（无 `definition()` 方法、无反向构造、H3 不得由它组合入口）** + x86 `mov-register` 包（`0.1.0/`）及其 `tests/cases.json`/`evidence` + 无 `legacy_source` 的合成包契约测试 + 错误 opcode 与错误 form 声明反例 + 构建器单测 + X86-P1 字节等价 + `bundles/` 的 x86 spec/lock/sealed/legacy snapshot（**开发产物，不登记**）+ `gates.yml` 的 `verify --all --check` 与 conformance | fmt、workspace test（含 `package_conformance`）、`check_ids`、`check_definition`、baseline、whitespace；**V-A** |
-| H2b 发布通道（V-P） | **三平台 no-follow PoC（N1b，先于本提交的硬化读取器）** + 硬化包读取（打开动作本身拒绝跟随、已打开父句柄上的精确名字查找、目录项替换绑定、普通文件叶子、`--root` 下输出父目录）+ `bundles/published.json`（`published` 五键含 `snapshot_digest`、`identities`、append-only、退役不可变、首次发布无登记循环）+ `verify --published --check`（重算源摘要、枚举整目录并拒绝未声明的非普通条目、重算快照）+ 变更路径门禁（base-first、删除/重命名、registry 变更）+ **N5 合并新鲜度**（`(B_checked, C_checked, mode)`，平台 API 证据 + stale-CI 反例）+ 约 1,000 版本成本曲线 + `gates.yml` 的发布门禁（`--published --check` 与变更路径检查，取消其一即门禁失败）+ **首次发布为当前 HEAD 的全部 spec 闭包**：x86 以及已作为开发产物存在的 AArch64/RV64，经硬化读取器重新验证后在同一候选里登记（不得只登记 x86） | H2a 全绿 + 本提交全部证据（**V-P**） |
+| H2-0 设计接受（docs-only） | PR #4 的评审记录 → `ADR-0128` 的 `proposed → accepted` 与本文状态行更新；只改状态/日期元数据，不改规范正文、计数或测试 | PR #4 已合并且评审通过；`check_ids`、`check_definition`、whitespace |
+| H2a 作者层（V-A） | **H2-0 已合入** + `fmp-definition` crate（manifest、spec、build、digest、error、CLI）+ `monasm-standalone/0.1` 独立身份 + 可信树包读取 + **完整的单包发布证据与摘要机制**（`tests/cases.json` 入清单、`NOTICE`、`sources`、`oracle.status`/skip、`evidence_digest`/`release_digest`、跨语言摘要向量、用例/证据/spec/lock 预算与单包累计资产预算）+ **spec 严格排序 + 跨 spec `bundle_id`/定义身份唯一** + **`bundle_id` 可移动、`(bundle_id, bundle_digest)` 为 bundle 内容标签、`release_digest` 为证据完备发布身份** + **九键 sealed（含 `target`、逐包 `enabled_extensions`、`form_owners`，由文件自身重算 `bundle_digest`）及 `bundle-owner-incomplete`** + **已提交 lock/sealed 的有界流式比较** + **`requires_capabilities` 声明等于推导** + **冻结 legacy 定义名保留** + **form ⊆ 包 ⊆ bundle 与合并前逐包 `read`**（含 `form-extension-mismatch`） + **`structure`/`--release-evidence`/`dependency_closure` 三态**（含传递闭包重读、缺项/摘要错/环检测）+ **legacy 目标一致性（`TargetEq`）** + **边界正例按 `D_form` 基数取（0 且无非数值路径为 `empty-form-domain`、1、2、≥3）** + **`scope:"form"` 仅 `bind` 拒绝、诊断落在变异操作数上、禁止 `E-BYTE-001`/`E-SIZE-001`** + **用例 stage 三态且声明阶段必须是第一个拒绝阶段；`verify --package` 只验静态契约，`package_conformance` 验执行阶段与完整诊断集** + **Level 0/1 精确投影** + **值定义用例差分** + `verify --package`、`verify --all --check`（无 registry 时把选中路径报告为开发产物，不报 `published-registry-incomplete`）+ 写阶段先内存校验、受信任输出路径、legacy 等价门禁 + **`CheckedBundle` 类型与 `compat::as_legacy_definition`（无 `definition()` 方法、无反向构造、H3 不得由它组合入口）** + x86 `mov-register` 包（`0.1.0/`）及其 `tests/cases.json`/`evidence` + 无 `legacy_source` 的合成包契约测试 + 错误 opcode 与错误 form 声明反例 + 构建器单测 + X86-P1 字节等价 + `bundles/` 的 x86 spec/lock/sealed/legacy snapshot（**开发产物，不登记**）+ `gates.yml` 的 `verify --all --check` 与 conformance | fmt、workspace test（含 `package_conformance`）、`check_ids`、`check_definition`、baseline、whitespace；**V-A** |
+| H2b 发布通道（V-P） | **三平台 no-follow PoC（N1b，先于本提交的硬化读取器）** + 硬化包读取（打开动作本身拒绝跟随、已打开父句柄上的精确名字查找、目录项替换绑定、普通文件叶子、`--root` 下输出父目录）+ `bundles/published.json`（`published` 五键含 `snapshot_digest`、`identities`、append-only、退役不可变、首次发布无登记循环）+ `verify --published --check`（重算源摘要、枚举整目录并拒绝未声明的非普通条目、重算快照）+ 变更路径门禁（base-first、删除/重命名、registry 变更）+ **N5 合并新鲜度**（`(B_checked, C_checked, mode)`，平台 API 证据 + stale-CI 反例 + 门禁逻辑来源与修订记录）+ 约 1,000 版本成本曲线 + `gates.yml` 的发布门禁（`--published --check` 与变更路径检查，取消其一即门禁失败）+ **首次发布为当前 HEAD 的全部 spec 闭包**：x86 以及已作为开发产物存在的 AArch64/RV64，经硬化读取器重新验证后在同一候选里登记（不得只登记 x86） | H2a 全绿 + 本提交全部证据（**V-P**） |
 | H2c 覆盖 | aarch64 `add-immediate`（`0.1.0/`）+ rv64 `integer-alu`（`0.1.0/`）+ 三 ISA conformance harness + 这两个包的 cases/evidence/NOTICE 资产 + 跨 ISA/跨包测试 + 全部 lock/sealed/legacy snapshot + 各自 registry 登记项（V-P 已通过时在本阶段登记；未通过时由首次发布候选统一登记）+ `research/he1/H2-report.md` + `STATUS.md` 的 H2 记录 | 同上 + oracle |
 
 H2a 必须先全绿再开 H2c：先证明一个包的构建、摘要、完整证据和字节等价，再证明
@@ -2002,6 +2022,11 @@ H2a 必须先全绿再开 H2c：先证明一个包的构建、摘要、完整证
 开发产物，`bundles/published.json` 不存在，任何文档不得称其已发布。H2a 的
 `--release` 必须已经具备完整的来源、`NOTICE`、oracle 状态和用例证据校验；H2c
 不回头补齐 H2a 的信任边界，只增加 AArch64/RV64 资产和跨包测试。
+
+H2-0 不是 H2a 的一个子提交，也不由 H2a 的完成定义覆盖：它只把 PR #4 的评审
+结论落到状态行，失败时没有实现工作可以开始。评审记录必须指向 PR #4 的合并提交
+与审阅意见，不能由 H2-0 自己产生；H2-0 若改到任何规范正文、计数或测试，就退回
+普通评审，而不是“接受变更”。
 
 H2b 与 H2c 的合入顺序有两种合法形态，二者必须得到同一个发布登记结果。若
 H2c 先合入，它的 AArch64/RV64 spec 与 lock/sealed 作为开发产物存在，
@@ -2090,9 +2115,10 @@ spec；H2c 落地时再在自己的 PR 登记自己的闭包。两种顺序都�
 （N1a/N2/N3/N4a）不等待 V-P；V-P 节点（N1b/N4b/N5）任一失败只停止发布结论与
 H2 退出，不回退作者层已证明的事实。N4b/N5 的发布门禁不能推迟到 H2c。
 
-`ADR-0128` 目前在 PR #4 中为 `proposed`；评审合并后才写 `accepted`，H2a 也从
-那里开始实现。`ADR-0130` 不在 H2 内，除非 H2c 决定增加 per-package job matrix。
-若增加，先写 `ADR-0130`，再改 workflow。
+`ADR-0128` 目前在 PR #4 中为 `proposed`；PR #4 评审合并后，由独立的 H2-0
+docs-only 接受变更写 `accepted` 并更新本文状态行，H2a 才从 H2-0 合入之后开始。
+接受变更不包含任何实现、计数或规范正文改动。`ADR-0130` 不在 H2 内，除非 H2c
+决定增加 per-package job matrix。若增加，先写 `ADR-0130`，再改 workflow。
 
 ## 7. 风险与回滚
 
@@ -2134,6 +2160,9 @@ H2 退出，不回退作者层已证明的事实。N4b/N5 的发布门禁不能�
 | 已发布包被原地改写，旧 spec 无法重建 | 版本目录是发布快照；`bundles/published.json` 永久登记已发布路径；只有 `B` 中已发布的条目在 PR 内不可变，同一 PR 首次创建并登记合法；旧目录禁止修改/删除；新版本用同级新目录；CI 按目标分支尖端判 `published-package-modified`，删除 spec 不清除登记；删除 base 条目本身是 `published-registry-modified` |
 | 旧绿色结果在目标分支前进后仍被当作授权，或落地树与被测树不同 | 门禁结论绑定 `(B_checked, C_checked, mode)`；在落地提交上重算 `B_landed`/`Tree(M)`/`mode`，不一致即失败并重跑；用 merge queue 或写入记录候选的合并操作；普通 up-to-date 检查不单独作为证明；平台设置由 H2b 通过 API 证明（属 V-P，不是 H2a 的完成门槛），403/空 ruleset 视为未取到证据；post-merge 运行只提供可检测性 |
 | 把规划 PR 的批准当成发布通道可用 | 合并 PR #4 只接受设计，不使 V-P 可用；2026-11-19 观察 `main` `protected:false`、rulesets `[]`、branch-protection 详情 403，记为**缺失证据**而不是「没有保护」；H2b 必须由有权限的仓库 owner 或发布自动化记录实际合并机制并执行 stale-CI 反例，否则 V-P 停在 N5，H2a/H2c 作者层不受影响 |
+| 判定的门禁逻辑被同一 PR 削弱 | 发布结论除 `(B_checked, C_checked, mode)` 外，还记录产生它的门禁逻辑修订；workflow、变更路径 mapper 与审计脚本必须来自受保护的控制面，或该路径的修改受同一 PR 无法自行授予的独立审批。做不到时只能把「只有可信维护者可合并」写成明示信任假设，不能当作已证明的保护；head 改过的门禁不得为同一 PR 出具授权；`a_pr_cannot_weaken_the_gate_that_judges_it` 待写 |
+| `build` 成功被当成登记完成或发布就绪 | 谓词分三层：`A(T)` 工件配对、`R(T)` 登记完整、`P(T)` 发布就绪。`BuildSucceeded(r)` 只推出 `A(T_r)`；已有登记表时，新 spec 在追加行之前 `--all --check` 报 `published-registry-incomplete`，`a_successful_build_does_not_complete_the_registry` 固定该中间状态。顺序固定为 build → 追加 → 两项 `--check` → 提交；报告不得把 `build` 退出 0 写成已登记或可发布 |
+| H3 入口的保证被扩大成系统级保证 | H3 的 bundle 入口只保证经它执行的计划通过归属与目标覆盖检查；旧的 `bind(Plan, Arc<Definition>)` 是公开的 legacy 能力，不携带 bundle 身份。验收报告不得写「所有执行都经过 bundle 检查」，字节相同也不得把 legacy 运行当成归属证据（`ADR-0128` §10 第 6 条） |
 | 退役后留下无 spec 的 lock/sealed，语义不明 | 派生产物与 spec 一一对应：删除最后一个 spec 的同一 PR 删除 lock/sealed/legacy；`--all --check` 双向检查，孤儿是 `orphan-bundle-artifact`（退出 1）；包快照与登记项保留，退役字节由 git 历史保存；不定义归档格式，不留下未选中 sealed 文件 |
 | 首次发布被登记顺序卡死，或写失败留下半成品 | 三个时点分开：候选输出（`build` 退出 0）、registry 追加（publisher 用打印出的摘要写 `published`/`identities`）、发布（合并提交）。顺序固定为 build → 追加 → 两项 `--check` → 提交；`--all --check` 要求行已存在，所以不存在「先 check 后写行」。`build` 先内存校验全部输出，再写临时文件并重命名，确定性拒绝不写文件，写阶段失败退出 2 且不写 registry；lock/sealed 一新一旧必被 `--check` 拒绝；`build` 从不写 registry |
 | legacy 快照被当成发布身份，或提交后与 sealed 漂移 | 它是派生开发缓存，不进入四个摘要、缺失合法；但提交副本要与已校验 sealed 内 `definition` 的 canonical 字节完全一致，不同是 `legacy-snapshot-mismatch`（退出 1），该门禁不重建缓存也不喂摘要；写阶段先删旧 `definition.json`，最后写新文件，第三个文件写失败留下缺失而不是旧行；退出 2 后读到的字节不算当前构建证据 |
@@ -2300,7 +2329,7 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | O34 | 退役 spec 后 lock/sealed 留在树里还是删除 | **与 spec 一一对应，随最后一个 spec 删除**：同一 PR 删除 lock/sealed/legacy，`--all --check` 双向检查一一对应，孤儿是 `orphan-bundle-artifact`（退出 1）；包快照与登记项保留，退役字节由 git 历史保存，不定义归档格式 | 留下未选中的 sealed 没有任何门禁重建，改字节或过期都不可检测，状态语义不明；另立归档格式等于为只被 `git log` 读取的字节增加第二生命周期和第二门禁 |
 | O35 | 发布门禁的绿色结果在目标分支前进后是否仍有效 | **只对读到的 `(B_checked, C_checked, mode)` 有效**：`B_checked` 是基线提交 SHA，`C_checked` 是被测候选**树** SHA，`mode` 是合并模式；落地提交 `M` 必须满足 `B_landed = B_checked`、`Tree(M) = C_checked`、`mode(M) = mode`；自动化检查在落地提交上重算，不一致即失败并重跑；用 merge queue（在 merge-group 候选上跑并只合并该候选）或写入记录候选的合并操作；普通 up-to-date required checks 只约束基线新鲜度，不证明落地树相等，不能单独授权；H2a 通过平台 API 读取设置并把端点、生效配置与允许的合并操作写进报告，403/空 ruleset 即未取到证据、本轮失败；post-merge 运行只提供可检测性。**N5 的关闭条件是机制证据加反例，不是绿色 CI**：必须记录实际生效的 merge queue/候选树锁定操作，并在临时仓库或等价沙箱执行 stale-CI 反例（旧绿结果在新基线上必须被拒绝并重跑）；记录不到或跑不通就停在 N5，不能用 post-merge 审计替代前置授权 | 复用旧绿色结果会让「A 改未发布包的 `README.md`、B 先发布该版本并合入、A 用旧结果合并」改动刚发布的目录，而 A 跑过的检查当时都正确；只做合并后审计能发现却已无法阻止；用提交 SHA 对代替树还会在每种合并模式下都必然失配（临时 test-merge 提交不是最终写入的提交） |
 | O36 | `monasm-package/0.1` 的非空 `exports.types`/`profiles` 是否随构建器升级放宽 | **不放宽，`0.1` 永久拒绝**：接受语义属于清单声明的 `package_format`，不属于读取它的工具版本；升级不得把同一份未改动 `0.1` 从拒绝变成接受；H4 必须引入显式新包格式（如 `monasm-package/0.2`），在版本内定义 type/profile 语义、归属/冲突规则、摘要输入和验证；既有键名、`{id, path}` 形状、排序和摘要输入可直接复用，但复用不放宽 `0.1`，与 `h2-exact-target` 在 `monasm-bundle-spec/0.1` 的永久拒绝同理 | 按「新构建器认识该字段」放宽会让重放依赖二进制版本，同一份旧文档的接受语义随工具升级而变；现在就设计完整类型系统会超出 H2/H4 边界 |
-| O37 | canonical 定义超过 legacy 快照 16 MiB 读取上限时 build 怎么办 | **省略快照，不失败**：闭包 64 MiB、sealed 80 MiB 都允许更大的 canonical 定义；`build` 依据内存中的 canonical 字节决定，≤ 16 MiB 才写 `bundles/legacy/<bundle_id>/definition.json`，超过则省略并在同一写阶段删除旧副本，仍退出 0 并在人类可读输出中说明；`--all --check` 对缺失本就合法，对手工提交的超限快照仍是 `resource-limit`（退出 1）；因此 build 成功意味着所写树的 `--all --check` 通过。加合成测试：合并定义略高于 16 MiB | 让 build 失败会使 64/80 MiB 预算内的合法闭包不可构建，等于让可选缓存决定有效上限；写超限快照会让 build 产出自己的 check 拒绝的树，失败要到发布者提交后才暴露；引入压缩或归档格式需要新的读取路径和门禁 |
+| O37 | canonical 定义超过 legacy 快照 16 MiB 读取上限时 build 怎么办 | **省略快照，不失败**：闭包 64 MiB、sealed 80 MiB 都允许更大的 canonical 定义；`build` 依据内存中的 canonical 字节决定，≤ 16 MiB 才写 `bundles/legacy/<bundle_id>/definition.json`，超过则省略并在同一写阶段删除旧副本，仍退出 0 并在人类可读输出中说明；`--all --check` 对缺失本就合法，对手工提交的超限快照仍是 `resource-limit`（退出 1）；因此 build 成功意味着所写树的 `A(T)` 成立（登记完整性 `R(T)` 是另一谓词，不由此推出）。加合成测试：合并定义略高于 16 MiB | 让 build 失败会使 64/80 MiB 预算内的合法闭包不可构建，等于让可选缓存决定有效上限；写超限快照会让 build 产出自己的 check 拒绝的树，失败要到发布者提交后才暴露；引入压缩或归档格式需要新的读取路径和门禁 |
 | O38 | sealed bundle 能否独立重算自己的 `bundle_digest` | **能，自 `0.1` 起就是自包含产物**（第二十三轮改判）：九键 sealed 含 bundle 级 `target`、逐包 `enabled_extensions` 与 `form_owners`，预映像的每个字段都在文件里；消费者独立重算 `definition_digest` 与 `bundle_digest`，并检查 `target.identity == definition.target`。lock 仍单独校验包路径、`evidence_digest`、`release_digest` 与 builder 记录，成对比较保留；自校验证明 bundle 说了什么，`bind` 仍不接受 sealed | 只发布无法自校验的 `0.1`、再在 H3 冻结一个只多这些数据的 `0.2`，会制造没有语义差异的版本边界；把归属表放在摘要之外则可被同摘要改写 |
 | O39 | 单文件 `bundles/published.json` 如何面对长期横向扩容 | **保留单文件与全量历史审计，并把它写成明确的规模边界**：V-P 用约 1,000 个已发布版本测普通包变更、bundle 发布、全量审计各三次（耗时/峰值内存/读取字节，审计含整目录 `snapshot_digest` 重算），报告记录曲线与版本数/时间/字节阈值，以及每 job 的 CI 成本上限；越阈触发新 ADR 讨论分片或增量审计。H2 只声称**独立包开发**与确定性组合可横向扩展，**不**声称独立包发布吞吐可横向扩展；无协调并行发布不保证（同一追加文件，后来者 rebase 并重跑两项 `--check`） | 现在分片会新增格式与一致性风险，且没有实测成本作依据；把 `--published` 并入 `--all` 会把历史耦合回 bundle 构建；把包变更路径局部化当成整条发布路径无瓶颈，会掩盖首次发布的集中协调点 |
 | O40 | N1 三平台 PoC 放在哪个交付阶段 | **V-P 的第一项独立交付物，先于硬化读取器**（第二十三轮改判）：逐平台记录 OS 版本、工具链与 crate 版本、API/系统调用、故障注入方法和逐例结果；缺行、结论不明确或某平台只能跟随打开/拒绝所有读取，都停止 **V-P**。它不先于作者层的可信树读取 | 把 PoC 并入硬化读取器会让平台失败推迟到大量代码之后；把它排在作者层之前会让一个外部平台事实阻塞数据模型、摘要与确定性测试 |
@@ -2309,6 +2338,9 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | O43 | H2 用一个验收结论还是两个 | **两个独立结论：V-A 作者层、V-P 发布通道**（`ADR-0128` §8.5）：V-A 只证明包能独立定义、校验、构建并产生相同机器事实，无外部前置；V-P 才承担硬化读取、不可变登记、合并新鲜度与历史审计。V-A 可在 V-P 前置未取到时推进，但任何产物在 V-P 通过前都不得称为已发布/不可变/可信，`bundles/published.json` 也不存在 | 单一大门禁会把数据模型、摘要与确定性工作绑在跨平台文件系统与仓库设置上；反过来把所有检查都降级成「以后再说」会丢掉安全标准——所以只拆验收结论，不拆规则的强度 |
 | O44 | 发布登记是否需要整目录内容摘要 | **需要，新增 `snapshot_digest`**：`sha256("monasm-snapshot/0.1" ++ 0x00 ++ canonical(sorted [{path, sha256}]))` 覆盖版本目录下每个普通文件，独立于四个执行/证据摘要；`--published --check` 重算，不符是 `snapshot-mismatch`（退出 1）。剩余信任边界写明：不证明首值来源，不能抵抗历史重写或绕过门禁的推送，那些由 V-P 的平台证据承担 | 没有它，`--published --check` 看不见 README/NOTICE/用例/证据的改动，只能依赖一个尚未证明不可绕过的变更路径门禁；把它塞进 `definition_digest` 会污染执行身份 |
 | O45 | 合法域很小时边界正例怎么取 | **按 `D_form` 基数**：0 且槽位没有非数值路径 → `empty-form-domain`（退出 1）；0 的 `operand_value` 槽位可由 fixup 覆盖的 `Payload::Empty` 或 target 符号路径满足，不在此拒绝、不要求数值正例；1 → 测唯一值；2 → 测两个值；≥3 → 最小、最大和一个内部值。`D_reg` 同规则 | 固定要求「最小/最大/内部」三点会让基数 1 或 2 的形式出现不可满足的验收要求；基数 0 且无非数值路径则连正例都无法构造 |
+| O46 | ADR 的 `accepted` 在 PR #4 内翻转还是合并后单独变更 | **合并后独立 docs-only 接受变更（H2-0）**：PR #4 只评审设计，合并树中 ADR 仍是 `proposed`；H2-0 只改 ADR/计划的状态与日期并引用 PR #4 的合并提交和审阅记录，落在目标分支后 H2a 才启动。H2-0 修改任何规范正文即退回普通评审 | 在 PR #4 内翻转会让评审对象包含“自己的状态转换”，且合并动作本身成为未评审的规范变更；让 H2a 携带接受步骤则工作同时依赖并满足自己的启动前提 |
+| O47 | `build` 成功是否等于 `--all --check` 通过 | **只等于 `A(T)`（工件配对）**：`R(T)` 要求当前选中 spec 的登记行完整，`P(T)` 还要合并新鲜度与门禁逻辑来源；`build` 从不写 registry，所以已有登记表时新 spec 在追加行之前是 `published-registry-incomplete` | 把登记完整性并进 `A(T)` 会让合法 build 违反自己的后置条件；把 `--check` 绿说成构建成功则混淆当前字节与操作历史 |
+| O48 | 发布门禁逻辑本身的授权来源 | **受保护控制面或独立审批，否则写成明示信任假设**：报告记录产生判定的门禁修订；同一 PR 改 workflow/mapper/审计脚本后不能用自己的版本为自身出具授权 | 只比较 `(B, C, mode)` 看不见检查语义被同一 PR 削弱；为未声明的攻击模型新建安全系统则超出 H2 边界 |
 
 ## 10. 证据状态
 
@@ -2402,7 +2434,10 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | 解析前 JSON 深度拒绝 | 尚未实现；H0 探针只证明现有递归解析器会栈溢出 | **未验证** — H2a 加迭代预算 |
 | `CheckedBundle` 只承诺结构与闭包检查，不承诺已发布、来源或 V-P | 类型契约见 `ADR-0128` §10；没有 `definition()`；V-P 通过前树里每个值都是开发产物 | **specified, not implemented** — H2a |
 | `compat::as_legacy_definition` 是长期适配器，且没有反向构造 | 契约见 `ADR-0128` §10：自由函数、独立模块、生命周期等于 H1 `bind`；H3 入口不得由它组合；`the_compat_bridge_cannot_widen_back` 待写 | **specified, not implemented** — H2a |
-| `BuildSucceeded(r)` 与 `ArtifactsConsistent(T)` 不等价：`--check` 通过不证明最近一次构建成功 | 文字规则见 `ADR-0128` §8.3；legacy 写失败（退出 2）后快照缺失、`--check` 通过；`a_passing_check_does_not_prove_the_last_build_succeeded` 待写 | **specified, not implemented** — H2a |
+| `BuildSucceeded(r)`、`A(T)`、`R(T)`、`P(T)` 是四个不同谓词：构建成功只推出 `A(T_r)`，不推出登记完整或发布就绪 | 文字规则见 `ADR-0128` §8.3/§8.5；已有登记表时新 spec 在追加前是 `published-registry-incomplete`；`a_successful_build_does_not_complete_the_registry` 与 `a_passing_check_does_not_prove_the_last_build_succeeded` 待写 | **specified, not implemented** — H2a（A）/ H2b（R、P） |
+| 发布结论记录门禁逻辑来源，head 改过的门禁不能为同一 PR 授权 | 文字规则见 `ADR-0128` §8.1；没有 workflow 或 mapper；必须有受保护控制面、独立审批或明示信任假设，报告记录产生判定的修订 | **specified, not implemented** — H2b（V-P） |
+| `ADR-0128` 的 `proposed → accepted` 是 PR #4 合并后的独立 docs-only 变更（H2-0），不属于 H2a | 只有文字约定；H2-0 只改状态/日期并引用 PR #4 评审，H2a 在其合入后才启动 | **specified, not implemented** — H2-0 |
+| H3 的 bundle 入口只保证经它执行的计划，旧 `bind` 仍是公开的 legacy 能力 | 契约见 `ADR-0128` §10 第 6 条；H3 入口不存在；验收不得声称全系统执行都经过 bundle 归属检查 | **specified, not implemented** — H3 |
 | 已发布目录里任何未声明的非普通条目都被审计拒绝，而不是被跳过 | 文字规则见 `ADR-0128` §3/§8.3；`snapshot_digest` 只含普通文件，跳过条目会让摘要保持不变；`a_published_snapshot_rejects_unlisted_nonregular_entries` 待写 | **specified, not implemented** — H2b（V-P） |
 | 深层 JSON 鲁棒性 | H0 探针已测栈溢出；H2 不改 `fmp` 解析器 | **未验证/不在 H2** — H4 |
 | 完整的 per-package CI matrix | 未实现；H2 只做单命令 | **未实现** — `ADR-0130`/H5 |
