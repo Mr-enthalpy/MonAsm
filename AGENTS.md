@@ -74,7 +74,7 @@ not roll into coverage work.
 | `schema/` | Machine-readable FMP schema (draft) |
 | `definitions/` | Pinned encoding definitions (`x86_64/0.1.0.json` is canonical) |
 | `packages/` | Target packages (from H2, `ADR-0128`); an ordinary extension's whole change |
-| `bundles/` | Explicit bundle specs, locks and the append-only published-version registry (from H2); never discovered by scanning |
+| `bundles/` | Explicit bundle specs, locks and the append-only published-version registry (from H2). No directory scan may implicitly decide which packages a bundle selects or which definition runs at runtime; `verify --all` enumerating `bundles/specs/*.json` and orphan scans of derived-artifact directories are legal |
 | `fixtures/` | Per-ISA plans, expected bytes, oracle metadata |
 | `research/` | Evidence index and disposable external snapshots |
 | `research/he1/` | HE-1 baseline and per-phase reports; evidence only, never a build input |

@@ -5,7 +5,18 @@
 - Review: this is a proposal, not a frozen decision. It stays `proposed` until
   the H2 planning PR is reviewed and merged; `accepted` is written only after
   that review, and H2a does not start before it.
-- Revision: twenty-third revision, 2026-11-19, after the scheduling and
+- Revision: twenty-fourth revision, 2026-11-19, after the requirement-
+  completeness, first-publication and summary-consistency audit. The H3
+  target-subset rule is disambiguated: the owner package's declared cover is
+  mandatory (`E_package(owner(form(i))) ⊆ E_plan` for every selected
+  instruction), and a per-form requirement adds a conjunct but never replaces
+  the conservative cover until a versioned format proves the requirement
+  complete. First V-P activation re-verifies and registers every spec selected
+  at HEAD in one first-publication candidate, not only the initial x86 slice.
+  The normative summary no longer carries the superseded sealed-companion rule,
+  and the changed-path example now separates prevention before merge from
+  detection after merge.
+- Prior revision: twenty-third revision, 2026-11-19, after the scheduling and
   frozen-format audit. Several decisions change shape, not wording.
   First, H2 is judged by **two separate acceptance verdicts**: an author-layer
   verdict that needs no external platform fact, and a publication-channel verdict
@@ -59,7 +70,8 @@
   merge-mechanics audit: H3 may accept a subset plan only after proving every
   selected instruction against the plan target
   (`E_owner(form(i)) ⊆ E_plan`), which needs a versioned bundle owner/cover map
-  or another frozen source — `monasm-bundle/0.1` cannot supply it, and a form
+  or another frozen source — the then-current `monasm-bundle/0.1` shape could
+  not supply it, and a form
   without a proof is rejected rather than read as needing nothing; a publication
   verdict is keyed on the base commit SHA and the tested candidate **tree** SHA
   plus the merge mode, not on a pair of commit SHAs, so required up-to-date
@@ -122,17 +134,19 @@
   collisions, exact on-disk entry names, the versioned `h2-exact-target` lift,
   ASCII identifier/path grammar, single loaded package value, cycle-free first
   publication, conservative declared cover, value-defined case diff, legacy name
-  reservation, narrowed publication-audit claim, open-time no-follow) remain in
-  force.
+  reservation, the publication audit's whole-directory coverage without a
+  provenance claim, open-time no-follow) remain in force.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
   `monasm-lock/0.1`, `monasm-bundle/0.1` and `monasm-published/0.1` formats;
   immutable published package version directories and their append-only
   registry, including global `(package_id, version)` identity binding, the
   permanent `(namespace, version)` → `definition_digest` history, the movable
   `bundle_id` release line, and the separate publication-history audit; the
-  sealed bundle's companion rule that a consumer recomputes `bundle_digest` from
-  its lock instead of trusting the embedded value, with H3 choosing a verified
-  pair or a versioned sealed format; the declared-versus-derived capability set;
+  self-contained nine-key `monasm-bundle/0.1` that recomputes its own definition
+  and `bundle_digest` from the bytes it carries, and the lock pairing that
+  separately verifies source paths, release evidence and the builder record —
+  H3 needs no new sealed format for self-verification; the declared-versus-derived
+  capability set;
   the release-shaped digest vector; the value-defined case diff; the digest
   layering and its byte-level preimages; the reservation of every frozen legacy
   definition name; the form/package/bundle extension inclusion and the per-package
@@ -153,7 +167,8 @@
   plan×definition target-compatibility
   matrix; the single loaded-package value shared by digest, comparison, `read`
   and merge; the cycle-free first-publication order (build success, then the
-  registry append, then both `--check`s, then commit), in-memory output
+  registry append, then both `--check`s, then commit) and the all-or-nothing
+  first candidate that registers every spec selected at HEAD, in-memory output
   validation and the derived legacy cache with its equality-only bridge gate;
   the one canonical spelling of
   extension and capability arrays, with migration equivalence `TargetEq`
@@ -161,8 +176,10 @@
   the counted closure byte budget; package
   target covers versus bundle target selection; the H3 condition for accepting a
   subset target (a versioned build rule, a plan protocol, and a per-instruction
-  owner/requirement source, with `E_owner(form(i)) ⊆ E_plan` for every selected
-  instruction and default rejection when the proof is absent);
+  owner/requirement source that always checks the owner's declared cover
+  `E_package(owner(form(i))) ⊆ E_plan` and adds a per-form requirement only when
+  its format version proves that requirement complete, with default rejection
+  when the proof is absent);
   the injective full-`package_id` directory mapping and target-tip
   publication authority (`Published(B) ⊆ Published(H)` with tree-byte equality);
   the merge-freshness rule that a verdict is keyed on the base commit SHA, the
@@ -1158,17 +1175,30 @@ selected form and its owner decide execution, not the bundle. H3 must therefore
 check every selected instruction against the plan target:
 
 ```text
-∀ i ∈ Plan.instructions: E_owner(form(i)) ⊆ E_plan
+∀ i ∈ Plan.instructions: E_package(owner(form(i))) ⊆ E_plan
 ```
 
-`E_owner` is the per-form requirement where the executable definition carries a
-versioned one, and the owning package's declared cover (the table at the start of
-this section) otherwise. The
-cover is conservative — it can reject a row that would have needed less — but it
-cannot accept an instruction whose owner declared more than the plan provides.
-Deriving a requirement from a mnemonic or an ISA name is forbidden (`INV-01`,
-`INV-06`); a per-form rule is more precise only when its own version defines the
-key as complete for target gating, with evidence.
+The left side is the **owner cover**, and it is always the baseline check.
+`E_package(owner(f))` is the owning package's declared cover from the table at
+the start of this section. The cover is conservative — it can reject a row that
+would have needed less — but it cannot accept an instruction whose owner declared
+more than the plan provides.
+
+A **per-form requirement** `E_form(f)` may be checked as an additional conjunct.
+It may replace the conservative cover only when the definition format version
+that carries it defines the key as a complete statement of that form's target
+compatibility, with evidence. Deriving a requirement from a mnemonic or an ISA
+name is forbidden (`INV-01`, `INV-06`).
+
+A per-form requirement that is not proven complete must never narrow the check.
+Counterexample: a package declares `{rv64i, rv64c}`, `fmp-def/0.2`'s
+`requires_extensions` for the selected form lists only `{rv64i}`, and the plan
+declares `{rv64i}`. The per-form conjunct passes, yet the format does not define
+the key as complete and the row may really need `rv64c`. Preferring the per-form
+set would accept a form the owner cover rejects; the owner cover is therefore
+required unconditionally, and the plan stays rejected until it declares `rv64c`
+or the owner narrows its own declaration through a new
+`source_package_digest`.
 
 The existing `fmp-def/0.2` reader already checks a form's `requires_extensions`
 against the **plan** set (`fmp-validate/src/lib.rs`, `E-TARGET-003`, step 6), so
@@ -1188,13 +1218,13 @@ bundle stores the merged definition, a sorted `packages` list whose entries also
 carry the owner's declared cover (`enabled_extensions`, the same spelling the
 manifest uses), and a `form_owners` list with exactly one
 `{form_id, package_id}` row per merged form (§8.2). Together they give
-`E_owner(form(i))` without reading package sources: the owner names the package,
+the owner cover without reading package sources: the owner names the package,
 and that package's declared cover is the `E_package` of the table above. Both
 lists are inside the `bundle_digest` preimage (§7), so a cover or owner row cannot
 change without changing the bundle identity.
 
 What the artifact deliberately does **not** do is decide the subset relation. H2
-builds no subset cell and runs no `E_owner ⊆ E_plan` check. A consumer that finds
+builds no subset cell and runs no owner-cover check. A consumer that finds
 a selected form missing from `form_owners`, an owner with no `packages` entry, or
 a `packages` entry without `enabled_extensions` must treat the requirement as
 **unproved** and reject; it may not read the absence as `∅` (see below).
@@ -1210,7 +1240,7 @@ data now costs one extra key and one completeness rule; the rule is testable in 
 even though the consumer is H3 (§8.2).
 
 Adding `fmp/0.2` alone is still not enough, because the plan validator sees
-neither map: the `E_owner` check is the new protocol's obligation. H3 reads
+neither map: the owner-cover check is the new protocol's obligation. H3 reads
 `form_owners` and the package cover from the bundle it already verifies and adds
 the comparison; it does not need a second artifact, and it may not reinterpret the
 map as something other than what §8.2 defines.
@@ -1879,12 +1909,15 @@ forks from `M0` and edits `P/0.1.0/README.md`; branch B publishes `P/0.1.0`,
 appends the registry entry and merges to the target branch; A then merges. A's
 merge base is still `M0`, whose registry lacks `P`, so a merge-base check treats
 the edit as an unpublished candidate and accepts it. The other gates do not catch
-it either: `source_package_digest` covers neither `README.md` nor other auxiliary
-files, and `verify --published --check` re-hashes the manifest and executable
-assets, not the whole directory. Only the tip-based comparison rejects A with
-`published-package-modified`. The merge base remains usable for ancestry
-questions (which commits introduced a path) but never for "which versions are
-published now".
+it at merge time either: `source_package_digest` covers neither `README.md` nor
+other auxiliary files. `snapshot_digest` does cover the whole directory, so
+`verify --published --check` detects the edit on the next full-history audit
+(§8.3, §8.4) — but detecting a violation after it merged is a different guarantee
+from preventing it. Only the tip-based comparison rejects A before merge with
+`published-package-modified`, and that prevention is why the changed-path gate
+keeps its place even though the audit now sees auxiliary files. The merge base
+remains usable for ancestry questions (which commits introduced a path) but never
+for "which versions are published now".
 
 **The verdict is valid only for the base commit and candidate tree it read.**
 Let `B_checked` be the target-branch commit SHA whose registry and published
@@ -2166,10 +2199,12 @@ not there. Its rules:
   (§4.1), so the row records a decision the builder made, not a new derivation;
 - a form exported by two packages is the existing ownership conflict, rejected
   before the map is written, so the map cannot need a tie-break;
-- `packages[].enabled_extensions` is the cover for every form that package owns
-  under `fmp-def/0.1`; a versioned definition format whose forms carry their own
-  requirement keeps that per-form value as the more precise fact, and the cover
-  remains the fallback (§4.1).
+- `packages[].enabled_extensions` is the cover for every form that package owns.
+  Under `fmp-def/0.1` it is the only requirement. A versioned definition format
+  whose forms carry their own requirement adds that requirement as an additional
+  conjunct, and may replace the cover only when that format version proves the
+  per-form key complete for target compatibility; until then the cover stays
+  mandatory (§4.1).
 
 Both `form_owners` and the per-package cover are inside the `bundle_digest`
 preimage (§7), so a rewritten map is a different bundle identity rather than a
@@ -2319,6 +2354,24 @@ A spec may reference an existing entry by the same `path` and
 `source_package_digest` in any number of bundles; that is one published version
 selected by several bundles, not two publications. Unknown or duplicate keys are
 rejected (`INV-07`).
+
+**First publication registers every existing development bundle in one
+candidate.** The commit that creates `bundles/published.json` is not a place to
+publish only the slice that happens to be the current milestone. It enumerates
+every `bundles/specs/*.json` present at its own head, re-verifies each selected
+package closure through the hardened reader a published build uses, and registers
+every `published` row (`path`, `package_id`, `version`,
+`source_package_digest`, `snapshot_digest`) and every `identities` row in the
+same candidate. The completeness rule makes this mandatory rather than
+stylistic: a spec that publishes without a row is
+`published-registry-incomplete`, so registering only x86 while an AArch64 or
+RV64 spec already exists cannot pass `verify --all --check`. The migration has
+one legal shape whether the publication channel lands before or after the other
+targets' specs: the first candidate is the whole head spec set, and a spec that
+lands afterwards publishes itself in its own later PR. Development artifacts
+built before V-P are re-verified by the hardened reader rather than trusted
+(§8.5 rule 4), so an artifact that predates the channel is not registered on
+the strength of its V-A build alone.
 
 **`snapshot_digest` covers the whole published directory, not only the execution
 assets.** The `source_package_digest` deliberately excludes `README.md`, `NOTICE`,
@@ -2801,7 +2854,10 @@ a false claim:
    head-selected path needs a head row (§8.1, §8.3).
 4. A development artifact is not promoted by relabelling. The first V-P
    publication rebuilds its inputs through the hardened reader, or re-verifies
-   them with it, even when the bytes are identical to a V-A build.
+   them with it, even when the bytes are identical to a V-A build. The first
+   candidate is **all-or-nothing over its head spec set**: it registers every
+   selected package closure and definition identity in that one commit, not only
+   the initial x86 slice (§8.3).
 5. V-P failure stops the publication claim and the H2 exit, not the author layer.
    No post-merge audit, green CI run or after-the-fact review may substitute for
    a V-P prerequisite (§8.1).
@@ -3682,7 +3738,7 @@ comparing the materializer with itself proves the bytes.
   dependency (H3).
 - No target-subset acceptance in H2. `monasm-bundle/0.1` carries the facts the H3
   rule reads — `form_owners` and each package's declared cover — but H2 runs no
-  `E_owner ⊆ E_plan` check and adds no subset cell; a definition format whose
+  owner-cover check and adds no subset cell; a definition format whose
   per-form requirement is absent still relies on the conservative cover (§4.1).
 - No claim that a bundle is executable because it verifies. `bundle_digest` is
   recomputable from the sealed file alone, and that proves what the bundle says,
@@ -4479,7 +4535,7 @@ comparing the materializer with itself proves the bytes.
 | The base registry (target-branch tip `B`) decides published-path containment before head-side `package.json` discovery | specified; no changed-path mapper exists, so a nested manifest masking an ancestor is untested | **specified, not implemented** — V-P |
 | A version published on the target branch after a feature branch forked still freezes that branch's edits | specified; the counterexample is a fork from `M0`, publication of `P/0.1.0` on the target branch, then an edit to `P/0.1.0/README.md`; tip-based `Published(B) ⊆ Published(H)` plus tree-byte equality rejects it, and `snapshot_digest` independently detects the edit in the audit | **specified, not implemented** — V-P |
 | A publication verdict authorizes only the `(B_checked, C_checked, mode)` triple it read: a stale green result cannot authorize a merge after another PR publishes first | specified; requires a merge queue or an operation that writes the recorded candidate, and V-P must prove the setting through the platform API; no workflow or settings evidence exists | **specified, not implemented** — V-P N5 |
-| H3 target subsets check `E_owner(form(i)) ⊆ E_plan` for every selected instruction, from `form_owners` plus the owner's declared cover; a form without a proof is rejected | specified; `monasm-bundle/0.1` carries the owner map and covers, but H2 builds no subset cell and no H3 plan or consumer exists; the `c.addi`/`rv64i` case is untested | **specified, not implemented** — H3 |
+| H3 target subsets check `E_package(owner(form(i))) ⊆ E_plan` for every selected instruction, from `form_owners` plus the owner's declared cover, and add a per-form conjunct only when the format proves that requirement complete; a form without a proof is rejected | specified; `monasm-bundle/0.1` carries the owner map and covers, but H2 builds no subset cell and no H3 plan or consumer exists; the `c.addi`/`rv64i` case is untested | **specified, not implemented** — H3 |
 | `monasm-bundle/0.1` is self-verifying: `bundle_digest` is recomputed from the file's own `target`, per-package `enabled_extensions`, `form_owners` and `definition` | specified; the §7 preimage is complete inside the nine-key file, the lock is checked separately for paths, evidence and builder, and the §8 vectors were recomputed from that preimage; no sealed bundle or consumer exists | **specified, not implemented** — H2a (build), H3 (consume) |
 | Required up-to-date checks alone do not prove the landed tree equals the tested tree; a 403 or empty ruleset list is missing evidence, not absence of protection | specified; an API read attempt during review returned 403 and the ruleset query was inconclusive, and no merge-queue evidence has been recorded | **unobtained; V-P must record API evidence** |
 | N5 cannot close on a green CI run: the effective merge mechanism must be recorded and the stale-CI counterexample executed, or the publication verdict stops at the gate | specified; `Gates`/`Determinism` succeeded on the planning PR, but a green run is a verdict for its own `(B_checked, C_checked, mode)` and does not demonstrate the mechanism; no counterexample has been run | **unobtained; V-P N5** |
@@ -4603,8 +4659,10 @@ comparing the materializer with itself proves the bytes.
   fault-injection and result rows; it does not gate the author layer (§3, §8.5).
 - Someone lifts `h2-exact-target` by adding `fmp/0.2` and checking only
   `E_plan ⊆ E_bundle`: stop. Every selected instruction must satisfy
-  `E_owner(form(i)) ⊆ E_plan`, from `form_owners` plus the owner's declared cover;
-  H2 freezes those facts but runs no subset cell (§4.1).
+  `E_package(owner(form(i))) ⊆ E_plan`, from `form_owners` plus the owner's
+  declared cover, and a per-form conjunct may replace that cover only when the
+  format proves the requirement complete; H2 freezes those facts but runs no
+  subset cell (§4.1).
 - Someone reads a legacy form's absent `requires_extensions` as the empty set and
   lets any subset plan select it: stop. Absent means unproved; the subset
   composition is rejected until the artifact supplies the proof (§4.1).
