@@ -1,24 +1,43 @@
-# H2 plan revision log (twelfth through thirty-first round notes)
+# H2 plan revision log (twelfth through thirty-second round notes)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The current plan is
 > `docs/architecture/he1-h2-plan.md`; current decisions live in its §3 and in
 > `docs/adr/0128-package-and-bundle-contract.md`. These notes were moved out of
 > the plan opening by the twenty-fifth revision; the twenty-fifth through
-> thirty-first round notes are added below.
+> thirty-second round notes are added below.
 
 Where a note conflicts with the current plan or ADR, the current document wins.
 The twenty-ninth revision makes `target_profile`/`profile_id` descriptive
 labels that never decide composition, defines affected-set and full conformance
 modes with the `Σ C_i` scaling boundary, and scopes the compat adapter to the API
-layer. The thirty-first revision adds `C(T)` (artifact closure with no orphan derived
-artifact), `H(T)` (an existing registry audited over every registered version),
-pre-merge `Q(B,T,e)`, and post-merge `P(B,T,e,M)`. The thirtieth revision replaced
+layer. The thirty-second revision splits `H(T)` into published-snapshot validity, identity
+record well-formedness and current-definition matching, so a retired definition is
+not claimed to be recomputable from the current tree, and adds
+`GateEvidenceValid(B,T,e)` to `Q`. The thirty-first revision added `C(T)` (artifact
+closure with no orphan derived artifact), `H(T)` (an existing registry audited over
+every registered version), pre-merge `Q(B,T,e)`, and post-merge `P(B,T,e,M)`. The
+thirtieth revision replaced
 `P(T)` with `P(B,T,e,M)`, kept `R(T)` tree-only, separated the audit's three
 claims, and ordered publication as N4b/N5a/N5b.
 
 ## Round notes
 
+  第三十二轮固定：`H(T)` 不再声称能凭当前树重算退役定义的 `definition_digest`。
+  它拆成 `AllPublishedSnapshotsValid(T)`（重算每个登记版本的包与
+  `snapshot_digest`，含退役版本）、`AllIdentityRecordsWellFormed(T)`（只检查
+  `identities` 行的唯一性、排序、语法、单摘要与保留名）与
+  `CurrentDefinitionsMatchRegistry(T)`（只把当前 spec 仍在发布的身份与当前构建
+  结果比较）。退役身份的不可变性由 `PreservesPublished(B,T)`、受保护合并路径与
+  Git 历史承担；H2 不扩充登记格式，也不保留退役闭包描述。
+  `Q(B,T,e)` 增加 `GateEvidenceValid(B,T,e) = (e.base = B) ∧
+  (e.tree = Tree(T)) ∧ TrustedGateRevision(e) ∧ AuthorizedGateRun(e)`：错误的
+  基线、候选树 SHA、head 侧门禁修订或未授权/复用运行都会使 `Q` 假，即使树相同。
+  `P = Q ∧ AuthorizedMerge`，因此 `P` 的六个合取项分别由工件闭包、当前登记、
+  历史记录、变更路径门禁、门禁证据与平台记录建立。新增三个测试：
+  `a_retired_definition_is_not_rebuilt_from_the_current_tree`、
+  `a_retired_identity_digest_cannot_be_rewritten` 与
+  `candidate_readiness_binds_gate_evidence`。
   第三十一轮固定：发布门禁写成可分别测试的谓词：`C(T) = A(T) ∧ NoOrphan(T)`
   覆盖每个选中 spec 的 lock/sealed 配对并拒绝无 spec 的孤儿派生产物；
   `H(T) = RegistryExists ∧ RegistryWellFormed ∧ HistoryAudit` 要求登记表存在、

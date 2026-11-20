@@ -1,4 +1,4 @@
-# ADR-0128 revision log (fourteenth through thirty-first revision)
+# ADR-0128 revision log (fourteenth through thirty-second revision)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The normative entry is
@@ -8,15 +8,30 @@
 
 The notes below are preserved from the twenty-ninth revision. Where they
 conflict with the current ADR, the current ADR wins; in particular the
-thirty-first revision makes the publication gate layered: `C(T)` adds the
-no-orphan direction to `A(T)`, `H(T)` requires an existing registry audited over
-all registered versions, `Q(B,T,e)` is the pre-merge candidate predicate, and
-`P(B,T,e,M) = Q(B,T,e) ∧ AuthorizedMerge(B,T,e,M)` is the post-merge verdict.
-The thirtieth revision had replaced the tree-only `P(T)` with `P(B,T,e,M)`, kept
-`R(T)` tree-only, separated the publication audit's three claims, and restored H3
-to consuming the nine-key bundle's ownership facts.
+thirty-second revision splits `H(T)` into published-snapshot validity, identity
+record well-formedness and current-definition matching, so a retired definition
+is not claimed to be recomputable from the current tree, and makes
+`GateEvidenceValid(B,T,e)` a conjunct of `Q(B,T,e)`. The thirty-first revision
+had made the gate layered with `C(T)`, `H(T)`, `Q(B,T,e)` and
+`P(B,T,e,M) = Q(B,T,e) ∧ AuthorizedMerge(B,T,e,M)`. The thirtieth revision had
+replaced the tree-only `P(T)` with `P(B,T,e,M)`, kept `R(T)` tree-only, separated
+the publication audit's three claims, and restored H3 to consuming the nine-key
+bundle's ownership facts.
 
 ## Revision notes
+
+- Revision: thirty-second revision, 2026-11-20, after the retired-identity and
+  gate-evidence audit. It replaces `HistoryAudit(T)` with
+  `AllPublishedSnapshotsValid(T) ∧ AllIdentityRecordsWellFormed(T) ∧
+  CurrentDefinitionsMatchRegistry(T)`: package snapshots are recomputed for every
+  registered version, identity records are checked for shape and uniqueness, and
+  only identities a current spec still publishes are compared with a build. A
+  retired `definition_digest` is therefore not claimed to be recomputable; its
+  immutability is carried by `PreservesPublished`, the protected merge path and
+  Git history, without expanding the registry format. It also adds
+  `GateEvidenceValid(B,T,e) = (e.base = B) ∧ (e.tree = Tree(T)) ∧
+  TrustedGateRevision(e) ∧ AuthorizedGateRun(e)` as a conjunct of `Q`, and adds
+  the retired-definition, retired-identity-rewrite and gate-evidence tests.
 
 - Revision: thirty-first revision, 2026-11-20, after the publication-predicate
   sufficiency, V-P evidence and ordinary-PR critical-path audit. It splits the

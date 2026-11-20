@@ -1,11 +1,11 @@
 # H2 实施计划：目标包作者层与确定性定义构建
 
 - 状态：**待审提案**（2026-11-16；同日按八轮审计 P1/P2 修订，2026-11-17 至
-  2026-11-20 按第九轮至第三十一轮审计修订）。规范决策见
+  2026-11-20 按第九轮至第三十二轮审计修订）。规范决策见
   `docs/adr/0128-package-and-bundle-contract.md`，该 ADR 仍为 `proposed`；
   评审合并前本文和 ADR 都不是冻结依据。本文保留为实施计划与验收映射。
   **H2 尚未实现，本文不把任何 H2/H3/H4/H5 项目算作已完成。**
-  当前有效约束（逐轮记录第十二轮至第三十轮见
+  当前有效约束（逐轮记录第十二轮至第三十一轮见
   `research/he1/h2-plan-revision-log.md`，历史证据，不是契约）：
   H2 分 **作者层 V-A** 与 **发布通道 V-P** 两个独立验收结论（`ADR-0128` §8.5）；
   V-A 不依赖外部平台事实，V-P 才承担硬化读取、发布登记、合并竞态与全历史审计，
@@ -21,9 +21,12 @@
   `ArtifactClosed(T)`（`C(T) = A(T) ∧ NoOrphan(T)`，含无孤儿派生产物）、
   `R(T)` 登记完整（`R_packages ∧ R_identities`，登记表没有 `release_digest`
   字段，它在 lock 里由 `A_β` 重算）、`PublishedHistoryValid(T)`（`H(T)`：登记表
-  存在、格式合法，且对全部登记版本含退役版本执行完整 snapshot/source 审计）、
-  合并前候选就绪 `Q(B,T,e) = C(T) ∧ R(T) ∧ H(T) ∧ PreservesPublished(B,T)`、
-  合并后发布结论 `P(B,T,e,M) = Q(B,T,e) ∧ AuthorizedMerge(B,T,e,M)`；
+  存在、格式合法，已发布快照（含退役版本）重算，身份记录按格式/唯一性检查，
+  当前定义与登记比较；不声称能重算退役定义的 `definition_digest`）、
+  合并前候选就绪 `Q(B,T,e) = C(T) ∧ R(T) ∧ H(T) ∧ PreservesPublished(B,T) ∧
+  GateEvidenceValid(B,T,e)`，其中 `GateEvidenceValid` 绑定被测基线、候选树 SHA、
+  受保护门禁修订与已授权运行；合并后发布结论
+  `P(B,T,e,M) = Q(B,T,e) ∧ AuthorizedMerge(B,T,e,M)`；
   其中 `BuildSucceeded(r, β)` 只推出 `A_β(T_r)`——不推出 `A(T_r)`（另一个 spec
   可能过期），也不推出 `C`、`R`、`H`、`Q` 或 `P`；没有登记表的开发树 `R(T)` 真
   但 `H(T)` 假，因此不满足 `Q` 或 `P`。已有登记表时，新 spec 在追加行之前
@@ -1456,12 +1459,15 @@ spec 已把闭包每个成员恰好列一次，重复的 `packages[].path` 本�
   写阶段先删除旧的 `definition.json`，再依次替换 lock、sealed，最后写 legacy；
   所以「第三个文件写失败」（退出码 2）留下的是**缺失**（合法、`--check` 通过），
   而不是仍可被读成当前构建的旧文件；若留下旧文件，等价门禁会拒绝它。这里必须分清
-  六个谓词：`BuildSucceeded(r, β)`（某次针对 spec `β` 的构建完整成功）、
+  七个谓词：`BuildSucceeded(r, β)`（某次针对 spec `β` 的构建完整成功）、
   `A_β(T)`（该 bundle 的工件配对自洽）、`A(T)`（树中每个选中 spec 的 `A_β` 都
   成立）、`C(T)`（`A(T)` 且无孤儿派生产物）、`R(T)`（当前选中的每个 spec 都有
-  完整登记行）、`H(T)`（登记表存在且全部历史版本通过审计）。发布就绪分两步：
-  合并前 `Q(B,T,e) = C(T) ∧ R(T) ∧ H(T) ∧ PreservesPublished(B,T)`，合并后
-  `P(B,T,e,M) = Q(B,T,e) ∧ AuthorizedMerge(B,T,e,M)`。构建只推出 `A_β(T_r)`：
+  完整登记行）、`H(T)`（登记表存在，已发布快照、身份记录与当前定义分别按
+  可执行规则验证）、`GateEvidenceValid(B,T,e)`（证据绑定被测基线、候选树 SHA、
+  受保护门禁修订与已授权运行）。发布就绪分两步：合并前
+  `Q(B,T,e) = C(T) ∧ R(T) ∧ H(T) ∧ PreservesPublished(B,T) ∧ GateEvidenceValid(B,T,e)`，
+  合并后 `P(B,T,e,M) = Q(B,T,e) ∧ AuthorizedMerge(B,T,e,M)`。构建只推出
+  `A_β(T_r)`：
   它只写一个闭包，另一个 spec 的 lock 过期时 `A(T_r)` 仍为假；它也不写登记行，
   所以已有登记表时，新 spec 在追加前 `R(T)` 为假，`--all --check` 报
   `published-registry-incomplete`，补齐后才通过；没有登记表的开发树 `R(T)` 真
@@ -1841,7 +1847,10 @@ A/B 工作流合并留给 H5。
 | `a_retired_published_version_is_still_immutable` | PR A 删除最后一个引用 `0.1.0` 的 spec，但保留 registry 条目；PR B 只改旧 `0.1.0/` 目录 → 按 base registry 判为已发布，`published-package-modified` | 第五轮 P1-2、`ADR-0128` §1.1/§8.3 |
 | `a_concurrent_publish_freezes_the_old_commit_side` | A、B 从同一个旧提交 `M0` 分叉（`M0` 已有 `P/0.1.0` 目录但未登记）；B 先发布 `P/0.1.0`（追加 registry 条目）并合入目标分支；A 随后只改 `P/0.1.0/README.md` 这类不进 `source_package_digest` 的辅助文件 → 门禁以**目标分支尖端 `B`** 为权威，判定 `Published(B) ∋ P/0.1.0` 而 `TreeBytes_B(P) ≠ TreeBytes_H(P)`，报 `published-package-modified`（退出 1）。用 merge-base（仍是 `M0`）会把它当作未发布候选而放行；`verify --published --check` 的 `snapshot_digest` 会独立发现同一改动，但门禁仍必须在合并前拒绝。同一 PR 若同时改 form → 仍是同一条拒绝 | 第十七轮 P1-2、第二十三轮 P2、`ADR-0128` §8.1/§8.3 |
 | `a_stale_publication_verdict_cannot_authorize_a_merge` | A 在 `P/0.1.0` 未发布时改 `P/README.md` 并通过门禁（记录的 `B_checked = B_A`，`Published(B_A) = ∅`）；随后 B 登记并合入 `P/0.1.0`，目标尖端变成 `B'`；合并检查在落地提交上重算 `B_landed` 和 `Tree(M)` → `B_landed ≠ B_checked`，拒绝复用（非零退出），必须在新尖端重跑门禁；重跑后同一 diff 报 `published-package-modified`（退出 1）。另测：基线不变但落地树 `Tree(M) ≠ C_checked`（例如合并方式产生不同树）同样拒绝。只有 `(B_checked, C_checked, mode)` 与落地提交相符才授权；仅做 post-merge 审计可检测但不能授权 | 第十九、二十轮 P1-1、第三十轮 P1-4、`ADR-0128` §8.1、N5a |
-| `a_publication_verdict_is_not_a_tree_predicate` | 同一棵树 `T` 两种到达方式：经 N5a 记录的合并操作（`B_landed = B_checked`、`Tree(M) = C_checked`、`mode(M) = mode`，门禁修订来自受保护控制面）→ `Q(B,T,e)` 与 `P(B,T,e,M)` 的五个合取项 `C`、`R`、`H`、`PreservesPublished`、`AuthorizedMerge` 都为真；同一 `T` 由绕过门禁的写入或过期 green 结果落地 → `C(T)`、`R(T)`、`H(T)` 仍可为真而 `AuthorizedMerge(B,T,e,M)` 为假，结论必须是未授权。测试断言报告分别列出 `C`、`R`、`H`、`PreservesPublished`、`AuthorizedMerge`，并把合并前的记录标为 `Q` 而不是 `P`；不得把 `verify --all --check` 的绿色写成发布就绪，也不得从树内容推出 `AuthorizedMerge` | 第三十、三十一轮 P2-1、`ADR-0128` §8.3/§8.5 |
+| `a_publication_verdict_is_not_a_tree_predicate` | 同一棵树 `T` 两种到达方式：经 N5a 记录的合并操作（`B_landed = B_checked`、`Tree(M) = C_checked`、`mode(M) = mode`，门禁修订来自受保护控制面，运行已授权）→ `Q(B,T,e)` 与 `P(B,T,e,M)` 的六个合取项 `C`、`R`、`H`、`PreservesPublished`、`GateEvidenceValid`、`AuthorizedMerge` 都为真；同一 `T` 由绕过门禁的写入或过期 green 结果落地 → `C(T)`、`R(T)`、`H(T)` 与 `PreservesPublished` 仍可为真，但 `GateEvidenceValid` 与 `AuthorizedMerge` 至少一个为假，结论必须是未授权。测试断言报告分别列出 `C`、`R`、`H`、`PreservesPublished`、`GateEvidenceValid`、`AuthorizedMerge`，并把合并前的记录标为 `Q` 而不是 `P`；不得把 `verify --all --check` 的绿色写成发布就绪，也不得从树内容推出 `AuthorizedMerge` | 第三十至三十二轮 P1/P2、`ADR-0128` §8.3/§8.5 |
+| `a_retired_definition_is_not_rebuilt_from_the_current_tree` | 发布 `P/0.1.0` 及其定义身份 `(N,V) → D` 后，删除最后一个引用该身份的 spec，并在同一 PR 删除对应的 lock/sealed/legacy；包版本目录与 registry 行保留。`verify --published --check` 通过：它重算包与 `snapshot_digest`、检查 `identities` 记录格式，但不读取已删除的闭包、不重建 `D`；`--all --check` 因没有选中 spec 而通过，`C(T)` 真。断言审计报告不得写「已重算该退役定义」，`H(T)` 只在记录与快照合法时为真；若删掉身份行或写坏格式则失败 | 第三十二轮 P1、`ADR-0128` §8.3/§8.4 |
+| `a_retired_identity_digest_cannot_be_rewritten` | base `B` 有退役身份 `(N,V) → D1`（无当前 spec 选择它）；候选 `T` 原样保留包快照，只把 `identities` 行的 `D1` 改成 `D2`。`--published --check` 单独看只能验证记录格式，检测不到历史改写；`PreservesPublished(B,T)` 因 base 登记行被改写而为假 → `published-registry-modified`。另一分支：新 spec 重新使用 `(N,V)` 并构出 `D2` → `definition-identity-conflict`。断言退役身份的不可变性由跨提交门禁承担，不由当前树重算承担 | 第三十二轮 P1、`ADR-0128` §8.3/§8.4 |
+| `candidate_readiness_binds_gate_evidence` | 固定同一棵树 `T` 与相同的 `C`、`R`、`H`、`PreservesPublished`：证据 `e` 的 `base = B`、`tree = Tree(T)`、门禁修订来自受保护控制面、运行已授权且未复用 → `Q(B,T,e)` 真。分别把 `e.base` 改为另一提交、`e.tree` 改为另一棵树的 SHA、门禁修订改为 head 侧未受保护改动、运行改为未授权或复用旧结果 → 四种情况下 `Q` 都为假，`P` 也都不成立。断言 `GateEvidenceValid` 的四个合取项分别可测，不得因为 `T` 相同就接受证据，也不得把 `Q` 当作树谓词 | 第三十二轮 P2、`ADR-0128` §8.3/§8.5 |
 | `a_development_tree_without_a_registry_is_not_publication_ready` | 开发树 `T` 中所有选中 spec 的 lock/sealed 逐字节一致、legacy 等价、无孤儿，因此 `C(T)` 真；`bundles/published.json` 不存在，故 `R(T)` 按定义为真而 `H(T)` 假；基线也没有已发布版本，`PreservesPublished` 空真。断言 `Q(B,T,e)` 与 `P(B,T,e,M)` 都为假，`verify --published --check` 以非零退出拒绝（登记表缺失，`H(T)` 假），报告不得把该树写成已发布或发布就绪；只有 N5b 的真实首次发布能产生 registry | 第三十一轮 P1、`ADR-0128` §8.3/§8.5 |
 | `a_tampered_retired_version_fails_the_publication_predicate` | base `B` 已包含一个退役版本 `P/0.1.0/`，其登记行记录的 `snapshot_digest` 与目录中 `README.md` 的字节不符（坏快照在 base 上已经存在）；候选 `T` 原样保留该退役目录，只改一个无关包，当前 spec 全部通过 `--all --check`，`C(T)`、`R(T)` 与 `PreservesPublished(B,T)` 都为真（`T` 没有改动 base 的已发布字节）；`verify --published --check` 重算退役目录 → `H(T)` 假（`snapshot-mismatch`），故 `Q`/`P` 为假。修复退役目录或登记行后才通过。断言审计覆盖退役版本，不用当前 spec 集合缩小范围，也不靠 `PreservesPublished` 发现该历史损坏 | 第三十一轮 P1、`ADR-0128` §8.3/§8.4 |
 | `an_orphan_sealed_artifact_fails_artifact_closed` | 树中每个选中 spec 的 lock/sealed 都正确，但 `bundles/sealed/<bundle_id>.json` 留下一个未被任何 spec 选中的孤儿文件 → 各 `A_β(T)` 与 `A(T)` 为真，`NoOrphan(T)` 为假，故 `C(T)` 为假，`verify --all --check` 以 `orphan-bundle-artifact`（退出 1）拒绝；删除孤儿文件后 `C(T)` 才为真。断言 `A(T)` 不能替代 `C(T)`，并单独断言 `Q`/`P` 不成立 | 第三十一轮 P1、`ADR-0128` §8.3 |
@@ -1963,7 +1972,8 @@ lock/sealed。两者分开，未选中包不会混入 bundle 构建，退役版�
 `release_digest` 字段，它属于 lock，由 `A_β` 重算。`build` 成功只产生自己那个
 bundle 的 `A_β(T)`，不产生 `C(T)`、`R(T)` 或 `H(T)`，所以发布流程必须在 build
 之后追加行再跑检查（`ADR-0128` §8.3/§8.5）。合并前门禁建立
-`Q(B,T,e) = C(T) ∧ R(T) ∧ H(T) ∧ PreservesPublished(B,T)`；合并记录落地后再由
+`Q(B,T,e) = C(T) ∧ R(T) ∧ H(T) ∧ PreservesPublished(B,T) ∧ GateEvidenceValid(B,T,e)`；
+合并记录落地后再由
 `AuthorizedMerge` 组成 `P(B,T,e,M)`。门禁本身要求
 `PreservesPublished`、合并证据与门禁逻辑来源：判定所用的
 workflow、变更路径 mapper 与审计脚本必须来自受保护的控制面，或该路径的修改受
@@ -2257,7 +2267,7 @@ docs-only 接受变更写 `accepted` 并更新本文状态行，H2a 才从 H2-0 
 | 旧绿色结果在目标分支前进后仍被当作授权，或落地树与被测树不同 | 门禁结论绑定 `(B_checked, C_checked, mode)`；在落地提交上重算 `B_landed`/`Tree(M)`/`mode`，不一致即失败并重跑；用 merge queue 或写入记录候选的合并操作；普通 up-to-date 检查不单独作为证明；平台设置由 H2b 通过 API 证明（属 V-P，不是 H2a 的完成门槛），403/空 ruleset 视为未取到证据；post-merge 运行只提供可检测性 |
 | 把规划 PR 的批准当成发布通道可用 | 合并 PR #4 只接受设计，不使 V-P 可用；2026-11-19 观察 `main` `protected:false`、rulesets `[]`、branch-protection 详情 403，记为**缺失证据**而不是「没有保护」；H2b 必须由有权限的仓库 owner 或发布自动化记录实际合并机制并执行 stale-CI 反例，否则 V-P 停在 N5a，H2a/H2c 作者层不受影响 |
 | 判定的门禁逻辑被同一 PR 削弱 | 发布结论除 `(B_checked, C_checked, mode)` 外，还记录产生它的门禁逻辑修订；workflow、变更路径 mapper 与审计脚本必须来自受保护的控制面，或该路径的修改受同一 PR 无法自行授予的独立审批。做不到时只能把「只有可信维护者可合并」写成明示信任假设，不能当作已证明的保护；head 改过的门禁不得为同一 PR 出具授权；`a_pr_cannot_weaken_the_gate_that_judges_it` 待写 |
-| `build` 成功被当成整树通过、登记完成或发布就绪 | 谓词分层：`A_β(T)` 单个 bundle 工件配对、`A(T)` 全树合取、`C(T)` 工件闭包（含无孤儿）、`R(T)` 登记完整、`H(T)` 历史有效、合并前 `Q(B,T,e)`、合并后 `P(B,T,e,M)`。`BuildSucceeded(r, β)` 只推出 `A_β(T_r)`；另一个 spec 过期时 `A(T_r)` 仍假，`a_single_bundle_build_does_not_prove_the_whole_tree` 固定这一层。已有登记表时，新 spec 在追加行之前 `--all --check` 报 `published-registry-incomplete`，`a_successful_build_does_not_complete_the_registry` 固定该中间状态。没有登记表的开发树 `R(T)` 真但 `H(T)` 假，`a_development_tree_without_a_registry_is_not_publication_ready` 固定该反例。顺序固定为 build → 追加 → 两项 `--check` → 提交；报告不得把 `build` 退出 0 写成整树通过、已登记或可发布 |
+| `build` 成功被当成整树通过、登记完成或发布就绪 | 谓词分层：`A_β(T)` 单个 bundle 工件配对、`A(T)` 全树合取、`C(T)` 工件闭包（含无孤儿）、`R(T)` 登记完整、`H(T)` 历史有效、`GateEvidenceValid(B,T,e)` 证据有效、合并前 `Q(B,T,e)`、合并后 `P(B,T,e,M)`。`BuildSucceeded(r, β)` 只推出 `A_β(T_r)`；另一个 spec 过期时 `A(T_r)` 仍假，`a_single_bundle_build_does_not_prove_the_whole_tree` 固定这一层。已有登记表时，新 spec 在追加行之前 `--all --check` 报 `published-registry-incomplete`，`a_successful_build_does_not_complete_the_registry` 固定该中间状态。没有登记表的开发树 `R(T)` 真但 `H(T)` 假，`a_development_tree_without_a_registry_is_not_publication_ready` 固定该反例。顺序固定为 build → 追加 → 两项 `--check` → 提交；报告不得把 `build` 退出 0 写成整树通过、已登记或可发布 |
 | 合并模式被当成可从提交对象复原 | `mode(M)` 从平台合并记录读取并保存事件标识；父提交数量、`git log` 或分支名都不足以区分 squash/rebase/fast-forward；无记录时 V-P 停在 N5a，不猜一个能通过等式的 mode |
 | 登记完整性谓词引用登记表没有的字段 | `R(T)` 只由 `R_packages`（`path`/`package_id`/`version`/`source_package_digest`/`snapshot_digest`）与 `R_identities`（`definition_digest`）组成；`release_digest` 只在 lock 里，由 `A_β` 重算。封闭登记格式不因谓词描述而增加字段 |
 | 把「仅证据变化、bundle 不变」当成可发布的第二份 release | 该情形只存在于未发布候选；已发布版本目录不可变，改证据必须新建版本，`source_package_digest` 与 `bundle_digest` 随之改变。四层摘要的分工不变，但合法发布历史里不存在同一 `(bundle_id, bundle_digest)` 对应两个 `release_digest` |
@@ -2439,7 +2449,7 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | O44 | 发布登记是否需要整目录内容摘要 | **需要，新增 `snapshot_digest`**：`sha256("monasm-snapshot/0.1" ++ 0x00 ++ canonical(sorted [{path, sha256}]))` 覆盖版本目录下每个普通文件，独立于四个执行/证据摘要；`--published --check` 重算，不符是 `snapshot-mismatch`（退出 1）。剩余信任边界写明：不证明首值来源，不能抵抗历史重写或绕过门禁的推送，那些由 V-P 的平台证据承担 | 没有它，`--published --check` 看不见 README/NOTICE/用例/证据的改动，只能依赖一个尚未证明不可绕过的变更路径门禁；把它塞进 `definition_digest` 会污染执行身份 |
 | O45 | 合法域很小时边界正例怎么取 | **按 `D_form` 基数**：0 且槽位没有非数值路径 → `empty-form-domain`（退出 1）；0 的 `operand_value` 槽位可由 fixup 覆盖的 `Payload::Empty` 或 target 符号路径满足，不在此拒绝、不要求数值正例；1 → 测唯一值；2 → 测两个值；≥3 → 最小、最大和一个内部值。`D_reg` 同规则 | 固定要求「最小/最大/内部」三点会让基数 1 或 2 的形式出现不可满足的验收要求；基数 0 且无非数值路径则连正例都无法构造 |
 | O46 | ADR 的 `accepted` 在 PR #4 内翻转还是合并后单独变更 | **合并后独立 docs-only 接受变更（H2-0）**：PR #4 只评审设计，合并树中 ADR 仍是 `proposed`；H2-0 只改 ADR/计划的状态与日期并引用 PR #4 的合并提交和审阅记录，落在目标分支后 H2a 才启动。H2-0 修改任何规范正文即退回普通评审 | 在 PR #4 内翻转会让评审对象包含“自己的状态转换”，且合并动作本身成为未评审的规范变更；让 H2a 携带接受步骤则工作同时依赖并满足自己的启动前提 |
-| O47 | `build` 成功是否等于 `--all --check` 通过 | **不等于：只等于自己 bundle 的 `A_β(T)`**：`C(T)` 还要求全树合取且无孤儿派生产物；`R(T)` 要求登记行完整；`H(T)` 要求登记表存在且全历史审计通过，没有登记表的开发树 `H(T)` 为假；`Q(B,T,e)` 另含 `PreservesPublished`，`P(B,T,e,M)` 还要合并新鲜度与门禁逻辑来源；`build` 从不写 registry，所以已有登记表时新 spec 在追加行之前是 `published-registry-incomplete` | 把树级配对、历史审计或登记完整性并进 build 的后置条件会让一次合法 build 违反自己的声明；把 `--check` 绿说成构建成功则混淆当前字节与操作历史 |
+| O47 | `build` 成功是否等于 `--all --check` 通过 | **不等于：只等于自己 bundle 的 `A_β(T)`**：`C(T)` 还要求全树合取且无孤儿派生产物；`R(T)` 要求登记行完整；`H(T)` 要求登记表存在、已发布快照与身份记录按可执行规则验证，且当前定义与登记一致，没有登记表的开发树 `H(T)` 为假；`Q(B,T,e)` 另含 `PreservesPublished` 与 `GateEvidenceValid`；`P(B,T,e,M)` 还要合并新鲜度与门禁逻辑来源；`build` 从不写 registry，所以已有登记表时新 spec 在追加行之前是 `published-registry-incomplete` | 把树级配对、历史审计或登记完整性并进 build 的后置条件会让一次合法 build 违反自己的声明；把 `--check` 绿说成构建成功则混淆当前字节与操作历史 |
 | O48 | 发布门禁逻辑本身的授权来源 | **受保护控制面或独立审批，否则写成明示信任假设**：报告记录产生判定的门禁修订；同一 PR 改 workflow/mapper/审计脚本后不能用自己的版本为自身出具授权 | 只比较 `(B, C, mode)` 看不见检查语义被同一 PR 削弱；为未声明的攻击模型新建安全系统则超出 H2 边界 |
 | O49 | `R(T)` 能否要求登记行提供 `release_digest` | **不能**：`R(T) = R_packages ∧ R_identities`，只读封闭登记格式已有的字段；`release_digest` 在 lock 里，由 `A_β` 重算并比较 | 登记表是封闭对象，实现者不能自行加字段；把 lock 的事实写成登记行会同时改变格式、摘要向量和不可变性规则 |
 | O50 | squash/rebase/fast-forward 的 `mode` 从哪里观察 | **平台合并记录**：保存 merge/merge-queue 事件标识及其 mode；`B_landed` 与 `Tree(M)` 仍由 git 对象重算 | 三种模式可以落地父结构相同的树，单看提交对象无法唯一恢复操作；猜一个 mode 会让等式在错误的证据上通过 |
@@ -2540,13 +2550,13 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | 解析前 JSON 深度拒绝 | 尚未实现；H0 探针只证明现有递归解析器会栈溢出 | **未验证** — H2a 加迭代预算 |
 | `CheckedBundle` 只承诺结构与闭包检查，不承诺已发布、来源或 V-P | 类型契约见 `ADR-0128` §10；没有 `definition()`；V-P 通过前树里每个值都是开发产物 | **specified, not implemented** — H2a |
 | `compat::as_legacy_definition` 是 `fmp-definition` 唯一的具类型 H1 适配 API，且没有反向构造 | 契约见 `ADR-0128` §10：自由函数、独立模块、生命周期等于 H1 `bind`；H3 入口不得由它组合；它不是系统级排他性（`bundle_json()` + `definition::read` 仍可绕过，但无 bundle 证据）；`the_compat_bridge_cannot_widen_back` 待写 | **specified, not implemented** — H2a |
-| `BuildSucceeded(r, β)`、`A_β(T)`、`A(T)`、`C(T)`、`R(T)`、`H(T)`、`Q(B,T,e)`、`P(B,T,e,M)` 是不同谓词：构建成功只推出 `A_β(T_r)`，不推出全树配对、工件闭包、登记完整、历史有效或发布就绪 | 文字规则见 `ADR-0128` §8.3/§8.5；另一个 spec 过期时 `A(T_r)` 为假；孤儿 sealed 使 `C(T)` 假；没有登记表的开发树 `H(T)` 假；已有登记表时新 spec 在追加前是 `published-registry-incomplete`；`a_single_bundle_build_does_not_prove_the_whole_tree`、`a_successful_build_does_not_complete_the_registry`、`a_passing_check_does_not_prove_the_last_build_succeeded`、`an_orphan_sealed_artifact_fails_artifact_closed` 与 `a_development_tree_without_a_registry_is_not_publication_ready` 待写 | **specified, not implemented** — H2a（A/C）/ H2b（R/H/Q/P） |
+| `BuildSucceeded(r, β)`、`A_β(T)`、`A(T)`、`C(T)`、`R(T)`、`H(T)`、`GateEvidenceValid(B,T,e)`、`Q(B,T,e)`、`P(B,T,e,M)` 是不同谓词：构建成功只推出 `A_β(T_r)`，不推出全树配对、工件闭包、登记完整、历史有效、证据有效或发布就绪 | 文字规则见 `ADR-0128` §8.3/§8.5；另一个 spec 过期时 `A(T_r)` 为假；孤儿 sealed 使 `C(T)` 假；没有登记表的开发树 `H(T)` 假；错误证据使 `Q` 假；已有登记表时新 spec 在追加前是 `published-registry-incomplete`；`a_single_bundle_build_does_not_prove_the_whole_tree`、`a_successful_build_does_not_complete_the_registry`、`a_passing_check_does_not_prove_the_last_build_succeeded`、`an_orphan_sealed_artifact_fails_artifact_closed`、`a_development_tree_without_a_registry_is_not_publication_ready`、`a_retired_definition_is_not_rebuilt_from_the_current_tree`、`a_retired_identity_digest_cannot_be_rewritten` 与 `candidate_readiness_binds_gate_evidence` 待写 | **specified, not implemented** — H2a（A/C）/ H2b（R/H/Q/P） |
 | `R(T)` 只用登记格式已有字段（`R_packages` 的 path/package/version/source digest/snapshot、`R_identities` 的 definition digest），不要求 `release_digest` | 文字规则见 `ADR-0128` §8.3；登记表是封闭对象，没有该字段；`release_digest` 在 lock 里由 `A_β` 重算 | **specified, not implemented** — H2b（registry）/ H2a（lock） |
 | 证据只变、`bundle_digest` 不变的情形只存在于未发布候选；已发布目录改证据必须换版本 | `ADR-0128` §1.1/§7.1 与 §8 的说明；`the_published_version_directory_is_immutable` 覆盖改证据被拒；没有第二个 release 向量测试 | **specified, not implemented** — H2a/H2b |
 | 快照目录的每个条目（含未引用普通文件）都受 §1.3 词法与折叠唯一性约束 | 文字规则见 `ADR-0128` §1.3/§8.3；`an_unreferenced_case_fold_collision_in_a_published_directory_is_rejected` 待写 | **specified, not implemented** — H2b（V-P） |
 | `mode(M)` 来自平台合并记录并保存事件标识，不由提交对象反推 | 文字规则见 `ADR-0128` §8.1；没有 workflow 或平台证据；无记录时 V-P 停在 N5a | **未取得证据** — H2b N5a |
 | 发布结论记录门禁逻辑来源，head 改过的门禁不能为同一 PR 授权 | 文字规则见 `ADR-0128` §8.1；没有 workflow 或 mapper；必须有受保护控制面、独立审批或明示信任假设，报告记录产生判定的修订 | **specified, not implemented** — H2b（V-P） |
-| `P(B,T,e,M)` 的五个合取项分别由工件闭包检查、当前登记、全历史审计、变更路径门禁与平台记录建立，任何单一命令不得提升为发布结论；合并前只能记录 `Q` | 文字规则见 `ADR-0128` §8.3/§8.5；`a_publication_verdict_is_not_a_tree_predicate`、`a_tampered_retired_version_fails_the_publication_predicate`、`a_development_tree_without_a_registry_is_not_publication_ready` 与 `an_orphan_sealed_artifact_fails_artifact_closed` 待写；没有 workflow 或平台证据 | **specified, not implemented** — H2b（N5a） |
+| `P(B,T,e,M)` 的六个合取项分别由工件闭包检查、当前登记、全历史审计、变更路径门禁、门禁证据有效性与平台记录建立，任何单一命令不得提升为发布结论；合并前只能记录 `Q` | 文字规则见 `ADR-0128` §8.3/§8.5；`a_publication_verdict_is_not_a_tree_predicate`、`a_tampered_retired_version_fails_the_publication_predicate`、`a_development_tree_without_a_registry_is_not_publication_ready`、`an_orphan_sealed_artifact_fails_artifact_closed`、`a_retired_definition_is_not_rebuilt_from_the_current_tree`、`a_retired_identity_digest_cannot_be_rewritten` 与 `candidate_readiness_binds_gate_evidence` 待写；没有 workflow 或平台证据 | **specified, not implemented** — H2b（N5a） |
 | 首次真实 `bundles/published.json` 只在 N5a 验证的通道中由 N5b 提交，N4b 与 N5a 的树都没有真实 registry | 文字规则见 §6 节点 6–8；`the_first_publication_lands_through_the_verified_channel` 待写；没有 workflow 或平台记录 | **specified, not implemented** — H2b（N4b/N5a/N5b） |
 | 删除 base 登记不让 `R(T)` 依赖过去，而是 `PreservesPublished(B,T)` 失败；没有登记表的树 `R(T)` 真但 `H(T)` 假 | 文字规则见 `ADR-0128` §8.3/§8.5；`a_base_registry_deletion_fails_preserves_published` 与 `a_development_tree_without_a_registry_is_not_publication_ready` 待写；登记表尚不存在 | **specified, not implemented** — H2b（V-P） |
 | `ADR-0128` 的 `proposed → accepted` 是 PR #4 合并后的独立 docs-only 变更（H2-0），不属于 H2a | 只有文字约定；H2-0 只改状态/日期并引用 PR #4 评审，H2a 在其合入后才启动 | **specified, not implemented** — H2-0 |
