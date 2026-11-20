@@ -1,19 +1,29 @@
-# ADR-0128 revision log (fourteenth through twenty-seventh revision)
+# ADR-0128 revision log (fourteenth through twenty-eighth revision)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The normative entry is
 > `docs/adr/0128-package-and-bundle-contract.md`; its body and `Settles` list are
 > authoritative. These notes were moved out of the ADR opening by the
-> twenty-eighth revision so that a new implementer reads current decisions first.
+> twenty-ninth revision so that a new implementer reads current decisions first.
 
-The notes below are preserved from the twenty-seventh revision. Where they
+The notes below are preserved from the twenty-eighth revision. Where they
 conflict with the current ADR, the current ADR wins; in particular the
-twenty-eighth revision splits per-bundle from whole-tree artifact consistency,
-defines `R(T)` from registry fields only, scopes the evidence-only digest example
-to candidates, extends filename portability to the whole snapshot, and requires
-the merge mode from a platform record.
+twenty-ninth revision removes the `target_profile`/`profile_id` equality
+condition, defines two conformance modes, and scopes the compat adapter claim to
+the API layer.
 
 ## Revision notes
+
+- Revision: twenty-eighth revision, 2026-11-20, after the per-bundle-artifact,
+  registry-field, evidence-history, snapshot-name and merge-mode audit. It splits
+  `A(T)` into per-bundle `A_β(T)` and the whole-tree conjunction, so
+  `BuildSucceeded(r, β)` implies only `A_β(T_r)`; defines
+  `R(T) = R_packages ∧ R_identities` from registry fields only; confines the
+  evidence-only digest example to an unpublished candidate; extends §1.3 name
+  and case-fold rules to every entry a snapshot covers; and requires `mode(M)`
+  from a platform merge record. The next revision removes the profile-label
+  equality condition, adds the two conformance modes, and narrows the compat
+  claim.
 
 - Revision: twenty-seventh revision, 2026-11-20, after the predicate-conflict,
   acceptance-cycle, gate-provenance, H3-scope and PR-description audit. It splits

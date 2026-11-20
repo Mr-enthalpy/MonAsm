@@ -1,20 +1,30 @@
-# H2 plan revision log (twelfth through twenty-eighth round notes)
+# H2 plan revision log (twelfth through twenty-ninth round notes)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The current plan is
 > `docs/architecture/he1-h2-plan.md`; current decisions live in its §3 and in
 > `docs/adr/0128-package-and-bundle-contract.md`. These notes were moved out of
 > the plan opening by the twenty-fifth revision; the twenty-fifth through
-> twenty-eighth round notes are added below.
+> twenty-ninth round notes are added below.
 
 Where a note conflicts with the current plan or ADR, the current document wins.
-The twenty-eighth revision in particular splits `A_β(T)` from `A(T)`, defines
-`R(T)` from registry fields only, confines the evidence-only digest example to
-candidates, extends filename portability to the whole snapshot, and requires the
-merge mode from a platform record.
+The twenty-ninth revision in particular makes `target_profile`/`profile_id`
+descriptive labels that never decide composition, defines affected-set and full
+conformance modes with the `Σ C_i` scaling boundary, and scopes the compat
+adapter to the API layer.
 
 ## Round notes
 
+  第二十九轮固定：`target_profile` 与 `target.profile_id` 都是描述性名义标签，
+  仍进入各自清单/摘要，但构建器不比较二者；组合只由 `definition_format` 与六键
+  `target.identity` 决定，`two_packages_with_equal_target_identity_and_distinct_profile_labels_can_compose`
+  固定「identity 相同、标签不同也能组合」。若要让标签成为需要事先协调的全局承诺，
+  必须版本化并明确写出。conformance 分两种模式：普通 package-only PR 跑变更包加
+  显式 `dependencies` 可达的受影响集；读取器/验证器/物化器/路径层/harness 变更、
+  发布门禁与定期任务跑全量，成本 `Σ C_i` 写成规模边界，H2c 增记作者 PR 的
+  conformance 耗时。`compat::as_legacy_definition` 表述为 `fmp-definition` 提供的
+  唯一具类型 H1 适配 API，不是系统级排他性（`bundle_json()` 加
+  `definition::read` 可绕过，但无 bundle 证据）。
   第二十八轮固定：`BuildSucceeded(r, β)` 只推出 `A_β(T_r)`（该 bundle 的工件
   配对），不推出 `A(T_r)`（全树合取）——另一个 spec 的 lock 过期时构建仍成功，
   `a_single_bundle_build_does_not_prove_the_whole_tree` 固定该方向。`R(T)` 拆成

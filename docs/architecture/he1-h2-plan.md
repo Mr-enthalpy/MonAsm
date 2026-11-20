@@ -1,23 +1,27 @@
 # H2 实施计划：目标包作者层与确定性定义构建
 
 - 状态：**待审提案**（2026-11-16；同日按八轮审计 P1/P2 修订，2026-11-17 至
-  2026-11-20 按第九轮至第二十八轮审计修订）。规范决策见
+  2026-11-20 按第九轮至第二十九轮审计修订）。规范决策见
   `docs/adr/0128-package-and-bundle-contract.md`，该 ADR 仍为 `proposed`；
   评审合并前本文和 ADR 都不是冻结依据。本文保留为实施计划与验收映射。
   **H2 尚未实现，本文不把任何 H2/H3/H4/H5 项目算作已完成。**
-  当前有效约束（逐轮记录第十二轮至第二十七轮见
+  当前有效约束（逐轮记录第十二轮至第二十八轮见
   `research/he1/h2-plan-revision-log.md`，历史证据，不是契约）：
   H2 分 **作者层 V-A** 与 **发布通道 V-P** 两个独立验收结论（`ADR-0128` §8.5）；
   V-A 不依赖外部平台事实，V-P 才承担硬化读取、发布登记、合并竞态与全历史审计，
   V-P 通过前任何产物都不是已发布、不可变或可信。bundle 类型叫
-  `CheckedBundle`，只承诺结构与闭包检查；到 H1 的唯一桥是
-  `fmp_definition::compat::as_legacy_definition`，长期保留，H3 另加入口且不得
+  `CheckedBundle`，只承诺结构与闭包检查；`fmp-definition` 提供的唯一具类型 H1
+  适配 API 是 `fmp_definition::compat::as_legacy_definition`（不是系统里唯一能
+  产生 `Arc<Definition>` 的路径：`bundle_json()` 加公开的
+  `fmp_model::definition::read` 也能绕过，但那样失去 bundle 身份与摘要绑定），
+  长期保留，H3 另加入口且不得
   由它组合；H3 入口只保证经它执行的计划，旧 `bind` 仍是公开的 legacy 能力。
-  谓词分四层：`A_β(T)` 单个 bundle 的工件配对、`A(T)` 所有选中 spec 的合取、
+  谓词分五个：`BuildSucceeded(r, β)` 某次针对一个 spec 的构建成功、
+  `A_β(T)` 单个 bundle 的工件配对、`A(T)` 所有选中 spec 的合取、
   `R(T)` 登记完整（`R_packages ∧ R_identities`，登记表没有 `release_digest`
   字段，它在 lock 里由 `A_β` 重算）、`P(T)` 发布就绪；
-  `BuildSucceeded(r, β)` 只推出 `A_β(T_r)`——不推出 `A(T_r)`（另一个 spec 可能
-  过期），也不推出 `R(T_r)` 或 `P(T_r)`；已有登记表时，新 spec 在追加行之前
+  其中 `BuildSucceeded(r, β)` 只推出 `A_β(T_r)`——不推出 `A(T_r)`（另一个 spec
+  可能过期），也不推出 `R(T_r)` 或 `P(T_r)`；已有登记表时，新 spec 在追加行之前
   `--all --check` 报 `published-registry-incomplete`。发布目录里的每个条目（含
   未被引用的普通文件）都受 §1.3 的可移植名字与折叠唯一性约束；合并模式
   `mode(M)` 取自平台合并记录，不由提交对象反推。`monasm-bundle/0.1` 恰好九键、
@@ -152,7 +156,11 @@ pub fn bundle_json(&self) -> Json;
 这个值携带（`ADR-0128` §10）。所以类型不叫 `VerifiedBundle`，也不叫
 `BuiltBundle`——后者在 `verify --all --check` 产出值时并不成立。
 
-H2 到 H1 的唯一桥是独立兼容层里的一个自由函数：
+`fmp-definition` 提供的**唯一具类型 H1 适配 API** 是独立兼容层里的一个自由函数
+（这是 API 层级的陈述，不是「系统中唯一能产生 `Arc<Definition>`」的排他性保证：
+`bundle_json()` 暴露 sealed 文档，调用者仍可配合公开的
+`fmp_model::definition::read` 自行读取，只是失去 bundle 身份、归属与摘要绑定，
+不能作为 bundle 证据）：
 
 ```rust
 pub fn fmp_definition::compat::as_legacy_definition(
@@ -911,13 +919,19 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   0.1/legacy form 被拒而不是当作空集、两个旧格子保持 H2 结果。H2 只冻结事实并做
   `bundle-owner-incomplete` 的完整性检查，不实现子集规则；义务现在写入，避免冻结
   H2 后让 H3 无法证明。
-- `target.profile_id` 必须与每个包的 `target_profile` 一致，否则构建失败。
-  这是一次**包内名义标签**检查，不是全局目标身份：两个 spec 可以用同一个
-  `profile_id` 搭配不同的 `target.identity`，H2 视之为不同目标，兼容性、生成
-  文档以及 lock 与 sealed 内合并定义的权威身份都是六键 `target.identity`。H2 不加
-  `(profile_id, identity)` 的跨 spec 唯一性，也不建中央 profile 表；否则
-  「同名多义」会被误读成已发布的全局事实。若后续阶段要让 `profile_id` 唯一
-  指向一份目标事实，必须走版本化格式变更，不能假设 H2 已经如此。
+- `target.profile_id` 与包的 `target_profile` 都是**描述性名义标签**，构建器不比较
+  二者，也不比较两个包的标签。它们仍进入各自的清单/摘要（包的标签在
+  `source_package_digest` 里），但可组合性只由 `definition_format` 与六键
+  `target.identity` 决定：两个包 identity 相同、标签不同仍可同处一个 bundle，
+  否则独立作者必须先协商一个非语义拼写，正是 §4.1 要消除的跨包同步。
+  两个 spec 仍可用同一个 `profile_id` 搭配不同的 `target.identity`，H2 视之为不同
+  目标，兼容性、生成文档以及 lock 与 sealed 内合并定义的权威身份都是六键
+  `target.identity`。H2 不加 `(profile_id, identity)` 的跨 spec 唯一性，也不建中央
+  profile 表，否则「同名多义」会被误读成已发布的全局事实。若后续阶段要让
+  `profile_id` 成为需要事先协调的兼容承诺或唯一指向一份目标事实，必须走版本化
+  格式变更并明确承认其全局协调语义，不能假设 H2 已经如此。
+  `two_packages_with_equal_target_identity_and_distinct_profile_labels_can_compose`
+  固定本条。
 - **form 家族一致性（第二轮 P1-3）。** 每个导出 form 的 `form_id` 前缀（`:` 前）
   必须等于包声明的 `target_identity.isa_family`。这是一条字符串相等不变量，
   不是包格式里的 ISA 白名单：H2 的 `fmp_model::definition::read` 仍只认识
@@ -968,7 +982,8 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   digest 错误、重复身份、依赖环或任何边不符都是 `dependency-mismatch`；只检查
   直接依赖不算 verified。闭包深度仍受 §12 的 64 层限制。
 - 普通作者路径不要求先改全局 spec：未选中包跑 `verify --package`（结构）和
-  `package_conformance`；所有变更包还跑 `--release-evidence`，它要求完整发布
+  `package_conformance` 的受影响集模式（§5.3）；所有变更包还跑
+  `--release-evidence`，它要求完整发布
   证据但不声称闭包。`--release` 是 `--release-evidence` 加闭包：依赖为空时直接
   通过，依赖非空时没有 `--closure <lock>` 就是 `dependency-unverified`（退出码
   1）。作者可以在自己的 PR 里带一个精确的本地 lock 来跑 release；只有被发布
@@ -1416,8 +1431,12 @@ spec 已把闭包每个成员恰好列一次，重复的 `packages[].path` 本�
 - `fmp` CLI 不改；构建器在 canonical 定义不超过缓存读取上限时输出
   `bundles/legacy/<bundle_id>/definition.json`，现有 `--definitions <dir>` 可以
   读取它；sealed bundle 本身不是定义文档。
-- **H2 到 H1 的桥只在兼容层。** `CheckedBundle` 没有 `definition()`；唯一收窄是
+- **H2 到 H1 的桥只在兼容层。** `CheckedBundle` 没有 `definition()`；
+  `fmp-definition` 提供的唯一具类型 H1 适配 API 是
   `fmp_definition::compat::as_legacy_definition(&bundle) -> Arc<Definition>`。
+  这是 API 层陈述，不是系统级排他性：`bundle_json()` 加公开的
+  `fmp_model::definition::read` 仍能自行得到 `Arc<Definition>`，但不携带 bundle
+  身份、归属或摘要绑定，不得作为 bundle 证据。
   它是自由函数、独立模块、不是 crate 根再导出；长期保留，生命周期等于它所适配的
   H1 `bind`，H3 另加 bundle 入口且不得经过它（`ADR-0128` §10）。
 - **legacy 快照是派生开发缓存、不是发布身份，但提交时受等价门禁（第十四轮
@@ -1743,7 +1762,7 @@ A/B 工作流合并留给 H5。
 | `two_versions_of_one_package_id_conflict` | 同一 `package_id` 两个版本、导出不相交 → `version-conflict` | `H2-D5` |
 | `a_package_without_legacy_source_is_verified_from_its_own_target` | 合成包无 `legacy_source` → 按自述目标、`read` 和用例通过，不需要 spec | `H2-D2`、`H2-D4`、§4.1 |
 | `a_file_form_id_must_match_its_export` | 交换两个 form 文件 → 归属不匹配，拒绝 | `H2-D2` |
-| `the_target_profile_must_match_the_spec` | 包的 `target_profile` 与 spec 不一致 → 拒绝 | `H2-D4` |
+| `two_packages_with_equal_target_identity_and_distinct_profile_labels_can_compose` | 包 A 声明 `target_profile: "monasm.target.x86_64"`，包 B 声明 `target_profile: "vendor.target.x8664"`；两者 `definition_format` 与六键 `target.identity` 相同，spec 的 `target.profile_id` 取任意合法标签 → 构建通过，生成文档/lock/sealed 的身份是共享的 `target.identity`，不是任一标签。只改 B 的 `target.identity` 一个字段 → 拒绝（目标不一致），证明决定可组合性的是身份而非标签。两包标签各自进入 `source_package_digest`：只改标签会改变该包的源摘要，但不阻止组合 | 第二十九轮 P1、`ADR-0128` §4/§4.1、`H2-D4` |
 | `the_standalone_identity_is_derived_from_the_package` | 复制包到不同目录、换 cwd、无 spec → 同一 `monasm.standalone.*`/`standalone+*` 和同一独立 `definition_digest` | `H2-D5`、§2.4、第一轮 P1-1 |
 | `a_standalone_identity_cannot_be_written_into_a_spec` | spec 的 `namespace`/`version` 使用保留前缀 → `reserved-identity`，退出 1 | `H2-D5`、§2.4 |
 | `a_frozen_legacy_definition_name_cannot_be_reused` | spec 用 `monasm.isa.x86`/`0.1.0` 只导出两条 mov 行 → 即使当前 spec 集合无冲突、登记表无行，仍是 `reserved-identity`；改用 H2 自己的 `0.1.0-h2` → 通过。`identities` 登记 `monasm.isa.riscv`/`0.1.0` → 同样 `reserved-identity`。保留集合读自 `<root>/definitions/*/*.json` 的 `namespace`/`version`，不进入任何摘要 | 第八轮 P1-2、`ADR-0128` §8 |
@@ -1785,7 +1804,7 @@ A/B 工作流合并留给 H5。
 | `the_builder_identity_is_not_part_of_the_definition_digest` | 两个 builder 版本 → 同 definition/bundle 摘要，lock 的 builder 不同；`verify --check` 不把 builder 差异算作失败 | `HE-T19` |
 | `a_builder_field_change_is_not_a_provenance_proof` | 手改已提交 lock 的 `builder.version`/`builder.build`（其余字节不变）→ `verify --all --check` 通过，`definition_digest`/`bundle_digest` 不变；改 `definition_digest` → 失败。断言该测试只证明 `builder` 不在身份里、**不**证明构建来源；可信来源需要独立构建证明或签名（文档结论，无运行时实现） | 第二十二轮 builder 保证范围、`ADR-0128` §7、第四轮 P2-2 |
 | `the_generated_definition_is_read_by_fmp_model` | 坏 form 行 → `fmp_model::definition::read` 拒绝，构建器包装该拒绝 | `H2-D12` |
-| `the_compat_bridge_cannot_widen_back` | `CheckedBundle` 没有 `definition()`；唯一收窄是 `fmp_definition::compat::as_legacy_definition`。不存在 `TryFrom<Arc<Definition>> for CheckedBundle`，也没有公开构造器：从一份手写 `Definition` 得到 bundle 类型的 doctest 必须 `compile_fail`；`fmp-validate`/`fmp-materialize` 的依赖图不含 `fmp-definition`；把 H3 入口实现成 `bind(plan, compat::as_legacy_definition(bundle))` 的变异版本必须在 H3 反例上失败 | 第二十六轮 P1、`ADR-0128` §10/§16 |
+| `the_compat_bridge_cannot_widen_back` | `CheckedBundle` 没有 `definition()`；`fmp-definition` 提供的唯一具类型 H1 适配 API 是 `fmp_definition::compat::as_legacy_definition`。不存在 `TryFrom<Arc<Definition>> for CheckedBundle`，也没有公开构造器：从一份手写 `Definition` 得到 bundle 类型的 doctest 必须 `compile_fail`；`fmp-validate`/`fmp-materialize` 的依赖图不含 `fmp-definition`；把 H3 入口实现成 `bind(plan, compat::as_legacy_definition(bundle))` 的变异版本必须在 H3 反例上失败。另断言 `bundle_json()` + `fmp_model::definition::read` 的绕过路径能编译（说明这不是系统级排他性），但它的产物不得被报告当作 bundle 证据 | 第二十六轮 P1、第二十九轮 P2、`ADR-0128` §10/§16 |
 | `the_output_is_canonical_json` | lock/sealed 无空白、键排序、无尾随换行；与 Python canonical 一致 | `H2-D7` |
 | `the_spec_lock_and_sealed_shapes_are_closed` | 三者的未知键/重复键被拒；`builder.build` 缺省时键省略而不是 `null`；lock 去掉 `builder` 后比较，sealed 逐字节比较 | `ADR-0128` §8.2、第四轮 P2-2 |
 | `a_sealed_bundle_verifies_its_own_digest` | 只拿 sealed 字节：重算 `definition_digest = sha256(canonical(definition))` 与 `bundle_digest`，两者都等于文件记录值，且 `target.identity` 逐字段等于 `definition.target`；无需 lock。把 sealed 的 `bundle_digest` 改成另一个合法十六进制值、其余不变 → 自校验失败（退出 1）；把 `form_owners` 的某行删掉或换成 `packages` 之外的 owner → `bundle-owner-incomplete`。自校验只证明 bundle 说了什么，不证明计划可用；`bind` 仍只接受 `Definition` | 第二十三轮 P1/P2、`ADR-0128` §7/§8.2、`H2-D9` |
@@ -1862,6 +1881,7 @@ A/B 工作流合并留给 H5。
 | `a_synthetic_package_without_legacy_source_is_accepted` | 沿用现有 ISA family、form ID 不在 legacy 目录 → 清单/目标/`read` 通过，证明协议不依赖历史定义 | §4.1 |
 | `a_wrong_opcode_in_a_structurally_valid_row_fails_the_package_gate` | 改错 opcode 保持 JSON 合法 → `read` 仍通过，`package_conformance` 的正例字节比较失败 | `HE-T18`、第一轮 P1-2 |
 | `the_conformance_harness_discovers_packages_without_a_central_list` | 新增包但不动任何中心文件 → harness 自动发现并执行它的 cases | `HE-T14`、第一轮 P1-2 |
+| `a_package_pr_runs_only_the_affected_conformance_set` | 三个包 A/B/C，B 的 `dependencies` 指向 A，C 与二者无关；只改 A → 受影响集是 `{A, B}`，harness 打印执行清单且不含 C；只改 C → 只执行 C。再改 `fmp-model`/`fmp-validate`/`fmp-materialize`/路径层/harness 自身 → 不带过滤，执行全部包（含没有任何 spec 选中的包）。断言过滤只影响执行集合，不改变任何用例断言，也不影响 lock/sealed/摘要 | 第二十九轮 P2、`ADR-0128` §9.1、`HE-T14` |
 | `a_copied_package_yields_the_same_standalone_check` | 在不同目录/不同 cwd 对副本跑 `verify --package` → 同一身份、同一诊断、同一独立摘要 | 第一轮 P1-1 |
 | `a_cross_isa_form_is_rejected_before_read` | 包声明 aarch64、导出 x86 form → `form-family-mismatch`，不进入合并文档 | 第二轮 P1-3 |
 | `a_case_form_claim_is_bound_to_the_executed_plan` | 两个 form 的包里把 case 的 `form_id` 改成 B、计划仍编码 A → `package_conformance` 失败（`case-form-mismatch`），不把 B 记成已覆盖 | `HE-T18`、`ADR-0128` §9.1、第二轮 P1-2 |
@@ -1935,10 +1955,26 @@ head 改过的门禁不能为同一 PR 出具授权（`ADR-0128` §8.1）。
 ```text
 cargo run -p fmp-definition -- verify --package <changed-package-path>
 cargo run -p fmp-definition -- verify --package --release-evidence <changed-package-path>
+# 普通包 PR：只跑变更包 + 显式 dependencies 可达的受影响包
+# （过滤参数名为示例，精确形状由 H2a 固定）
+cargo test -p fmp-definition --test package_conformance -- --affected <changed-path-list>
+# 全量模式（读取器/验证器/物化器/harness 变更、发布门禁、定期任务）
 cargo test -p fmp-definition --test package_conformance
 # 无依赖的包还跑完整发布检查；有依赖时加 --closure <lock>
 cargo run -p fmp-definition -- verify --package --release <changed-package-path>
 ```
+
+**conformance 有两种运行模式，同一套用例与断言。** 普通 package-only PR 只跑
+变更包，加上沿清单 `dependencies` 显式可达的受影响包；这个集合是**测试输入**，
+由清单派生，不参与 bundle 选择、lock、sealed 或任何摘要，因此不违反「bundle
+选择不依赖目录扫描」。全量模式跑 `packages/*/*/*/package.json` 下的每个包（含
+没有任何 spec 选中的包），在 `fmp-model`、`fmp-validate`、`fmp-materialize`、
+路径层或 harness 自身变更时，以及发布门禁与定期任务上必须运行。两种模式执行同一
+批 case 文档和同一批断言，过滤只决定执行哪些包目录，所以「过滤后的运行」对它所
+执行的包并不更弱；被过滤跳过的包仍由全量运行覆盖，不存在永久未检查的集合。
+全量成本是 `Σ C_i`（`N` 个包、包 `i` 有 `C_i` 条用例），这是**明确的规模边界**，
+不是常数成本门禁；H2c 报告必须分别记录普通作者 PR 的 conformance 实际耗时与执行
+用例数，以及全量运行的耗时与资源，不能只报中央文件触碰率。
 
 `verify --package` 用 `monasm-standalone/0.1` 独立身份，校验清单、路径/版本目录
 一致、导出、`fmp_model::definition::read`、自述目标、legacy 目标一致性、用例
@@ -2122,12 +2158,15 @@ spec；H2c 落地时再在自己的 PR 登记自己的闭包。两种顺序都�
    登记项（V-P 已通过时在本节点登记；未通过时由 N4b/N5 的首次发布候选统一登记）、
    H2 报告（V-A/V-P 结论分开记录；含 N1b PoC 三平台表、1,000 版本成本曲线与阈值、
    发布作业 CI 延迟预算，以及 sealed 九键与自校验/成对校验的结论）。
-   **两个规模指标必须分列，不得互相替代**：(i) **普通作者 PR 的中央文件触碰率** —
+   **三个规模指标必须分列，不得互相替代**：(i) **普通作者 PR 的中央文件触碰率** —
    触碰 `bundles/specs/**`、`bundles/published.json` 或覆盖它们的索引的普通包 PR
-   比例，以及这些改动带来的 review 协调次数；(ii) **发布 PR 的串行等待与 CI 成本**
-   — rebase/重跑次数、排队时间，以及 `build`、两项 `--check` 和审计的耗时与资源。
-   结论分开写：**独立包开发可横向扩展**与**包发布仍需串行协调**；不得用 (i) 的
-   改善表述整条扩展流水线已横向扩容。
+   比例，以及这些改动带来的 review 协调次数；(ii) **普通作者 PR 的 conformance
+   成本** — 受影响集模式的执行包数、`Σ C_i` 中的实际用例数与墙钟耗时，以及它与
+   全量运行耗时之比（证明作者等待不随 `N` 线性增长）；(iii) **发布 PR 的串行等待
+   与 CI 成本** — rebase/重跑次数、排队时间，以及 `build`、两项 `--check`、
+   全量 conformance 和审计的耗时与资源。结论分开写：**独立包开发可横向扩展**与
+   **包发布仍需串行协调**；不得用 (i) 的改善表述整条扩展流水线已横向扩容，也不得
+   只报 (i) 而省略 (ii) 的 CI 成本。
 
 每个节点是一个独立 PR（N1a、N2、N3、N4a 各自一个，N1b/N4b/N5 同），各自带失败
 反例和门禁；实现 PR 不需要再次修改 `ADR-0128`，规范缺口单独提交。V-A 节点
@@ -2201,7 +2240,7 @@ docs-only 接受变更写 `accepted` 并更新本文状态行，H2a 才从 H2-0 
 | 发布线推进被误当成身份冲突 | `bundle_id` 是可移动的发布线，退役后可由新 spec 推进到新定义；不可变的 bundle 内容标签是 `(bundle_id, bundle_digest)`，由 lock/sealed 与 git 历史记录；证据完备的发布身份是 `release_digest` |
 | 复用冻结 `definitions/` 的名字产生第二份同名定义 | 构建器把 `<root>/definitions/*/*.json` 的 `(namespace, version)` 作为只读保留集合；spec 或 `identities` 命中即 `reserved-identity`；H2 自己的 bundle 用 `0.1.0-h2`，不占用旧名 |
 | 更宽的 bundle 让欠声明的包变合法 | 每个包先按自己的 `target_identity` 生成文档并 `read`，再合并；form 需求超出包声明是 `form-extension-mismatch`；`verify --package` 与 `verify --all` 对同一包结论一致 |
-| 把 `profile_id` 当成全局目标身份 | 它只是包内名义标签；兼容性、生成文档、lock/sealed 与摘要都用六键 `target.identity`；同名的两个 spec 可声明不同 identity，H2 不加跨 spec 唯一性，也不建中央 profile 表 |
+| 把 `profile_id` 当成全局目标身份或组合条件 | 它只是 bundle 内名义标签，构建器不比较它与包的 `target_profile`；兼容性、生成文档、lock/sealed 与摘要都用六键 `target.identity`；identity 相同、标签不同的包可组合，同名的两个 spec 可声明不同 identity，H2 不加跨 spec 唯一性，也不建中央 profile 表 |
 | 把保守覆盖当成最小集合，或擅自裁剪声明 | 契约只证明 `⋃E_form ⊆ E_package ⊆ E_bundle`；高报合法且只缩小可选 bundle 范围；构建器不裁剪声明（否则 `source_package_digest` 与作者写的不同，包会无编辑变可选）；精确性留待后续版本化规则 |
 | 路径层在某个平台没有 no-follow 打开 | V-P 的 N1b 是三平台可行性门禁：中间目录链接、末段链接、reparse point、检查后替换都必须被拒绝；某平台做不到就停止 V-P，不以「拒绝所有读取」或「跟随打开」通过。作者层的可信树读取不等这条门禁 |
 | N1 的「理论上可行」被当成三平台证据 | 三平台 PoC 是 V-P 的第一项交付物，排在硬化读取器之前；逐平台记录 OS/工具链/API/故障注入/结果，缺行或结论不明确与失败同等处理，一个平台通过不外推 |
@@ -2367,6 +2406,7 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | O49 | `R(T)` 能否要求登记行提供 `release_digest` | **不能**：`R(T) = R_packages ∧ R_identities`，只读封闭登记格式已有的字段；`release_digest` 在 lock 里，由 `A_β` 重算并比较 | 登记表是封闭对象，实现者不能自行加字段；把 lock 的事实写成登记行会同时改变格式、摘要向量和不可变性规则 |
 | O50 | squash/rebase/fast-forward 的 `mode` 从哪里观察 | **平台合并记录**：保存 merge/merge-queue 事件标识及其 mode；`B_landed` 与 `Tree(M)` 仍由 git 对象重算 | 三种模式可以落地父结构相同的树，单看提交对象无法唯一恢复操作；猜一个 mode 会让等式在错误的证据上通过 |
 | O51 | `snapshot_digest` 是否只约束已声明路径的名字 | **约束目录内每个条目**：含未被 manifest/spec/case 引用的普通文件，都要满足 §1.3 词法、设备名与折叠唯一性 | 两个仅大小写不同的未引用文件能在 ext4 上共存并进入摘要，却无法在大小写不敏感卷上重放；摘要会绑定不可移植的目录 |
+| O52 | `target_profile`/`profile_id` 是否作为包与 bundle 的组合条件 | **不作为**：两者都是描述性名义标签，仍进入各自清单/摘要，但构建器不比较；组合只由 `definition_format` 与六键 `target.identity` 决定。若要让标签承担全局协调语义，必须版本化并明确写出 | 等值条件会让 identity 相同、标签不同的独立包无法组合，作者必须先协商一个非语义拼写；这正是包/扩展拆分要消除的跨包同步 |
 
 ## 10. 证据状态
 
@@ -2445,7 +2485,7 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | 发布结论只对读到的 `(B_checked, C_checked, mode)` 有效，基线或落地树不同即不能授权合并；N5 不以绿色 CI 关闭 | 尚未实现；`mode` 必须从平台合并记录读取并保存事件标识，不由提交对象反推；仓库的 branch protection/merge queue 设置无法从树内读出，审核期间的 API 读取返回 403、ruleset 查询无结论，这是未取到证据而非没有保护；规划 PR 的 `Gates`/`Determinism` 成功只是它自己那个三元组的结果；`a_stale_publication_verdict_cannot_authorize_a_merge`、机制记录与反例执行都待做 | **未验证** — H2b N5 必须补机制证据与 stale-CI 反例 |
 | 合并规划 PR 只接受设计，不使 V-P 可用 | 2026-11-19 观察 `main` `protected:false`、rulesets `[]`、branch-protection 详情 403；403/空列表不是「没有保护」；`ADR-0128` §8.1/§8.5 要求有权限的 owner 或发布自动化记录实际机制并执行 stale-CI 反例 | **未取得证据** — H2b N5 |
 | 空数值域只拒绝没有非数值路径的槽位 | `fmp-validate/src/lib.rs` `check_operand` 已读：`operand_value` 接受 fixup 覆盖的 `Payload::Empty` 与 target 角色的 `Payload::Symbol`；构建器尚无；`an_empty_numeric_domain_with_a_fixup_path_is_not_rejected` 待写 | 高（验证器已读）；构建器 **未验证** — H2a |
-| 两个规模指标分列：普通作者 PR 中央文件触碰率、发布 PR 串行等待与 CI 成本 | 文档规则；没有 H2 报告；前者只证明作者层，不能表述为整条流水线横向扩容 | **未测量** — H2c 报告 |
+| 三个规模指标分列：普通作者 PR 中央文件触碰率、普通作者 PR 的 conformance 成本（受影响集 vs 全量）、发布 PR 串行等待与 CI 成本 | 文档规则；没有 H2 报告；第一项只证明作者层，第二项证明作者等待是否随包数增长，都不能表述为整条流水线横向扩容 | **未测量** — H2c 报告 |
 | `monasm-package/0.1` 永久拒绝非空 `exports.types`/`profiles`，与构建器版本无关 | 只有文档规则；`a_non_empty_reserved_asset_is_refused_forever_under_0_1` 待写；后续包格式版本未写 | **未验证** — H2a |
 | 输入顺序固定为词法校验→no-follow 打开→句柄类型检查→同句柄大小提示→有界读取→解析，元数据大小不是边界 | 尚未实现；可信树读取用普通打开（V-A），不跟随打开属 V-P；「类型检查后文件增长」由累计计数器覆盖，测试待写 | **未验证** — H2a（词法）/ H2b（no-follow） |
 | 超过 16 MiB 的 canonical 定义由 `build` 省略快照并删除旧副本，`--all --check` 通过；手工超限快照是 `resource-limit` | 尚未实现；闭包内 64/80 MiB 预算允许该尺寸；`a_build_never_writes_a_snapshot_it_cannot_read` 待写 | **未验证** — H2a |
@@ -2453,14 +2493,14 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | 非空依赖对象是封闭三键结构，固定向量 `637edab0…` | 已用 Python `hashlib` 与 .NET `SHA256` 对文中字节算出同一值；Rust 侧复现待写；`a_dependency_object_is_closed_and_keeps_its_vector` 待写 | **部分验证（Python/.NET）** — H2a 补 Rust |
 | `verify --package` 执行 `definition::read`、不执行 `plan::read`/`bind`/`materialize` | 规则已写入 `ADR-0128` §9.1 与本文 §5.3；命令不存在；`verify_package_reads_the_definition_not_the_plan` 待写 | **未验证** — H2a |
 | 目标兼容矩阵保持 `fmp/0.1`+`fmp-def/0.1` 相等、`fmp/0.1`+`fmp-def/0.2` 子集，新计划协议**加版本化构建规则、再加逐指令归属来源**才加格子 | 前两格可从 `check_target` 读出；新计划格子与构建规则不存在；归属/覆盖事实已冻结在九键 sealed 中，但 `monasm-bundle-spec/0.1` 尚无 Builder；`a_target_subset_requires_per_form_ownership` 待写 | **部分验证** — H3 门禁 |
-| `profile_id` 是包内名义标签，身份是六键 `target.identity` | 文字规则；没有 spec 或 bundle 可测，也不新增跨 spec 唯一性 | **specified, not implemented** — H2a |
+| `profile_id` 与包的 `target_profile` 都是描述性名义标签，不参与组合判定；身份是六键 `target.identity` | 文字规则；没有 spec 或 bundle 可测，也不新增跨 spec 唯一性；`two_packages_with_equal_target_identity_and_distinct_profile_labels_can_compose` 待写 | **specified, not implemented** — H2a |
 | 边界证据只在 `D_Representable` 内取，寄存器用 `D_reg = ([0, 2^w−1] ∩ [0, 2^64−1]) \ E`，且只记录诊断实际字段 | 尚未实现；三个包与用例不存在；`w ≥ 64` 的公式与 H1 宽字段证据一致 | **未验证** — H2a/H2c |
 | 127/192 位寄存器槽位在包级协议中仍可 `bind` 与 `materialize` | `prototype/crates/fmp-materialize/tests/he1_wide_register.rs` 已对 64/127/128/192 位调用 `bind`/`materialize` 并校验字节；包级测试待写 | **H1 已测量；H2 包级测试未实现** — H2a |
 | `structure`/`--release-evidence`/`dependency_closure` 三态分离与传递闭包重读 | 尚未实现 | **未验证** — H2a |
 | 证据完整性、`evidence_digest` 与 release 摘要分层 | 尚未实现 | **未验证** — H2a（机制）；H2c 只增加资产 |
 | 解析前 JSON 深度拒绝 | 尚未实现；H0 探针只证明现有递归解析器会栈溢出 | **未验证** — H2a 加迭代预算 |
 | `CheckedBundle` 只承诺结构与闭包检查，不承诺已发布、来源或 V-P | 类型契约见 `ADR-0128` §10；没有 `definition()`；V-P 通过前树里每个值都是开发产物 | **specified, not implemented** — H2a |
-| `compat::as_legacy_definition` 是长期适配器，且没有反向构造 | 契约见 `ADR-0128` §10：自由函数、独立模块、生命周期等于 H1 `bind`；H3 入口不得由它组合；`the_compat_bridge_cannot_widen_back` 待写 | **specified, not implemented** — H2a |
+| `compat::as_legacy_definition` 是 `fmp-definition` 唯一的具类型 H1 适配 API，且没有反向构造 | 契约见 `ADR-0128` §10：自由函数、独立模块、生命周期等于 H1 `bind`；H3 入口不得由它组合；它不是系统级排他性（`bundle_json()` + `definition::read` 仍可绕过，但无 bundle 证据）；`the_compat_bridge_cannot_widen_back` 待写 | **specified, not implemented** — H2a |
 | `BuildSucceeded(r, β)`、`A_β(T)`、`A(T)`、`R(T)`、`P(T)` 是五个不同谓词：构建成功只推出 `A_β(T_r)`，不推出全树配对、登记完整或发布就绪 | 文字规则见 `ADR-0128` §8.3/§8.5；另一个 spec 过期时 `A(T_r)` 为假；已有登记表时新 spec 在追加前是 `published-registry-incomplete`；`a_single_bundle_build_does_not_prove_the_whole_tree`、`a_successful_build_does_not_complete_the_registry` 与 `a_passing_check_does_not_prove_the_last_build_succeeded` 待写 | **specified, not implemented** — H2a（A）/ H2b（R、P） |
 | `R(T)` 只用登记格式已有字段（`R_packages` 的 path/package/version/source digest/snapshot、`R_identities` 的 definition digest），不要求 `release_digest` | 文字规则见 `ADR-0128` §8.3；登记表是封闭对象，没有该字段；`release_digest` 在 lock 里由 `A_β` 重算 | **specified, not implemented** — H2b（registry）/ H2a（lock） |
 | 证据只变、`bundle_digest` 不变的情形只存在于未发布候选；已发布目录改证据必须换版本 | `ADR-0128` §1.1/§7.1 与 §8 的说明；`the_published_version_directory_is_immutable` 覆盖改证据被拒；没有第二个 release 向量测试 | **specified, not implemented** — H2a/H2b |

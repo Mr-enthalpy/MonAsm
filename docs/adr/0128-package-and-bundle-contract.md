@@ -10,18 +10,17 @@
   merged, and no H2a commit contains it, so the work never satisfies and depends
   on its own precondition. A later design change reopens `proposed` and needs the
   same sequence again.
-- Revision: twenty-eighth revision, 2026-11-20. The normative entry now keeps
+- Revision: twenty-ninth revision, 2026-11-20. The normative entry now keeps
   only current decisions; per-revision audit notes (fourteenth through
-  twenty-seventh) are in `research/he1/adr-0128-revision-log.md`, which is
+  twenty-eighth) are in `research/he1/adr-0128-revision-log.md`, which is
   historical evidence and not a contract. Earlier decisions remain in force
   except where this revision or the `Settles` list restates them. This revision
-  splits artifact consistency into per-bundle `A_β(T)` and whole-tree `A(T)`, so
-  one build proves only its own bundle; defines `R(T)` from the fields the
-  registry actually has (`R_packages ∧ R_identities`, never `release_digest`);
-  confines the evidence-only digest example to an unpublished candidate; extends
-  the portable-name rules to every entry a snapshot covers; and requires the
-  merge mode to come from a platform record instead of being inferred from the
-  landed commit.
+  removes the label-equality condition between a package's `target_profile` and
+  the bundle's `target.profile_id`, so composition depends only on
+  `definition_format` and the six-key `target.identity`; defines two conformance
+  modes for ordinary package-only PRs and for reader/validator/materializer
+  changes; and states the compat adapter as the only typed H1 adapter in
+  `fmp-definition` rather than a process-global exclusivity claim.
 - History: `research/he1/adr-0128-revision-log.md`.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
   `monasm-lock/0.1`, `monasm-bundle/0.1` and `monasm-published/0.1` formats;
@@ -42,7 +41,10 @@
   `verify --package`; the
   mandatory package case and evidence gate with `bind`-only form-scope mutation
   and complete diagnostic sets, with static declaration validation separate from
-  the executed first-rejecting-stage proof; the representable register domain for
+  the executed first-rejecting-stage proof, and the two conformance modes
+  (affected set for an ordinary package-only PR, full enumeration for reader,
+  validator, materializer, path-layer and harness changes, the release gate and a
+  periodic schedule); the representable register domain for
   a field wider than 64 bits; exact Level 0/Level 1 machine-output projections;
   portable identifier, path-segment and artifact-filename lexical rules; the
   package-root and repository-relative domains of path collision; exact on-disk
@@ -61,7 +63,9 @@
   extension and capability arrays, with migration equivalence `TargetEq`
   comparing `enabled_extensions` as a set and every other target field strictly;
   the counted closure byte budget; package
-  target covers versus bundle target selection; the H3 condition for accepting a
+  target covers versus bundle target selection; the descriptive-only status of
+  `target_profile` and `target.profile_id`, which are kept in manifests and
+  digests but never decide composition; the H3 condition for accepting a
   subset target (a versioned build rule, a plan protocol, and a per-instruction
   owner/requirement source that always checks the owner's declared cover
   `E_package(owner(form(i))) ⊆ E_plan` and adds a per-form requirement only when
@@ -85,8 +89,8 @@
   base-registry-first changed-path containment; package/form
   ISA-family consistency; package ownership and conflict rules; which legacy
   definition version a re-homed form is compared against; transitive dependency
-  closure and release-evidence status; the `CheckedBundle` name and its single
-  compat adapter to the H1 entry, which has no reverse conversion, is not
+  closure and release-evidence status; the `CheckedBundle` name and its only
+  typed H1 compat adapter, which has no reverse conversion, is not
   replaced by the H3 entry, and leaves the H3 entry's guarantee scoped to its own
   callers while the legacy entry stays public; the builder's error and exit
   behaviour;
@@ -874,16 +878,21 @@ old spec's lock or sealed bundle.
 
 The spec's `target.identity` and `definition_format` must agree with every
 listed package's declarations; they are compared as data, not derived from
-`legacy_source`. `definition_format`, `target_profile`, `isa_family`,
-`isa_variant`, `execution_mode`, `byte_order` and `address_width` must be equal.
-`enabled_extensions` is different: a package's list is its declared cover and
-the bundle's list is the selected target, so the package list must be a subset
-of the bundle list, without a minimality claim (§4.1). Both lists are written in
-the one canonical spelling of §1 — strictly increasing and duplicate-free; a
-reversed or duplicated array is `extension-lexical` (exit 1) before the subset
-test runs. The lock and sealed bundle copy the spec's array verbatim, so a second
-spelling of the same target is a byte mismatch, not an alternative target.
-Every package's `target_profile` must equal `target.profile_id`. A closure
+`legacy_source`. `definition_format` and the five non-extension identity fields
+(`isa_family`, `isa_variant`, `execution_mode`, `byte_order`, `address_width`)
+must be equal. `enabled_extensions` is different: a package's list is its
+declared cover and the bundle's list is the selected target, so the package list
+must be a subset of the bundle list, without a minimality claim (§4.1). Both
+lists are written in the one canonical spelling of §1 — strictly increasing and
+duplicate-free; a reversed or duplicated array is `extension-lexical` (exit 1)
+before the subset test runs. The lock and sealed bundle copy the spec's array
+verbatim, so a second spelling of the same target is a byte mismatch, not an
+alternative target.
+
+`target_profile` is a descriptive author field, not a composition condition: it
+enters `source_package_digest`, but no equality is required between two packages'
+labels or between a package label and `target.profile_id`. Compatibility is
+decided by `definition_format` and `target.identity` alone. A closure
 whose packages disagree on the structural target fields or on
 `definition_format` is rejected; the builder does not pick a winner and does
 not convert a package. A package with `legacy_source` is additionally checked
@@ -979,22 +988,33 @@ explicitly that **"the package target cover relation is verified" does not mean
 versioned rule may narrow a cover, and until then any such narrowing is an
 author edit with a new `source_package_digest`.
 
-**`profile_id` is a nominal label, not a target identity.** The spec's
-`target.profile_id` and each package's `target_profile` must be equal, but the
-equality is a name check inside one bundle. Two specs may use the same
-`profile_id` with different `target.identity` objects, and H2 treats them as
-different targets: the identity that decides compatibility, enters the generated
-document, the lock and the sealed bundle is the six-key `target.identity`, never
-the profile name. H2 adds no cross-spec uniqueness rule for
-`(profile_id, identity)` and no central profile table, because a name that is
+**`profile_id` is a nominal label, not a target identity and not a composition
+condition.** The spec's `target.profile_id` names the bundle's target for humans
+and is copied into the sealed bundle; each package's `target_profile` is an
+author description kept inside `source_package_digest`. Neither label is compared
+with the other, and two packages may carry different labels and still compose
+when their `target.identity` and `definition_format` agree. Requiring equality
+would make every independent author coordinate a non-semantic spelling with
+every other author before any bundle could select their packages — the same
+cross-package synchronisation this section removes for extensions. Two specs may
+use the same `profile_id` with different `target.identity` objects, and H2 treats
+them as different targets: the identity that decides compatibility, enters the
+generated document, the lock and the sealed bundle is the six-key
+`target.identity`, never the profile name. H2 adds no cross-spec uniqueness rule
+for `(profile_id, identity)` and no central profile table, because a name that is
 allowed to differ per bundle must not be read as a global fact. A consumer that
 needs a target identity keys on the full identity; a later phase that wants
-`profile_id` to name exactly one global target has to add that rule through a
-versioned format change and cannot assume H2 already publishes it. Counterexample
-for reading the name as identity: two bundles both say
-`monasm.target.x86_64` while selecting different `enabled_extensions`; a consumer
-that looked up the profile name to decide compatibility would accept or reject
-the same plan depending on which bundle it read first.
+`profile_id` to name exactly one global target, or to act as a coordinated
+compatibility commitment, has to add that rule through a versioned format change
+and cannot assume H2 already publishes it. Counterexample for reading the name as
+identity: two bundles both say `monasm.target.x86_64` while selecting different
+`enabled_extensions`; a consumer that looked up the profile name to decide
+compatibility would accept or reject the same plan depending on which bundle it
+read first. Counterexample for the opposite mistake: package A declares
+`target_profile: "monasm.target.x86_64"` and package B declares
+`target_profile: "vendor.target.x8664"` while both identity objects are equal; a
+label-equality rule would reject the composition although every compatibility
+fact agrees.
 
 `fmp_model::definition::read` checks a form's `requires_extensions` against the
 **generated definition's** target set, which is the bundle's. A package can
@@ -2578,7 +2598,7 @@ limit depend on a development cache. A hand-committed snapshot above 16 MiB
 remains `resource-limit` (exit 1) on `--check`, because the builder cannot read it
 under its own budget, and `build` never produces one.
 
-Four propositions are involved, and the contract keeps them separate:
+Five propositions are involved, and the contract keeps them separate:
 
 - `BuildSucceeded(r, β)` — the build operation `r` for spec `β` ran to completion
   and exited 0. It read one closure, wrote that closure's lock and sealed bundle,
@@ -2608,10 +2628,9 @@ Four propositions are involved, and the contract keeps them separate:
   `--published --check` recomputes each recorded value (`snapshot-mismatch`,
   `published-registry-invalid`). `R(T)` is vacuous when
   no registry exists on either the base or the head (§8.5 rule 3).
-
-`PublicationReady(T)` (`P(T)`) is `A(T) ∧ R(T)` plus the merge-freshness and
-gate-provenance conditions of §8.1, which are properties of the merge operation
-rather than of the tree alone. No tree-only predicate can carry them.
+- `PublicationReady(T)` (`P(T)`) — `A(T) ∧ R(T)` plus the merge-freshness and
+  gate-provenance conditions of §8.1, which are properties of the merge operation
+  rather than of the tree alone. No tree-only predicate can carry them.
 
 For any accepted input, `BuildSucceeded(r, β)` implies `A_β(T_r)` on the tree `r`
 wrote, and nothing wider. It does **not** imply `A(T_r)`: a build touches one
@@ -3451,12 +3470,28 @@ observed diagnostic set. It enumerates
 that enumeration is test-only, never feeds bundle selection and cannot change a
 bundle digest, so it does not reopen `HE-AC-05`.
 
-**CI.** `cargo test -p fmp-definition --test package_conformance` runs in the
-workspace gate and covers every package, including one no spec selects.
-`cargo run -p fmp-definition -- verify --package --release-evidence <changed>`
-runs for every changed package, so a dependent package still gets the complete
-evidence bar. A package whose `dependencies` is empty also runs
-`--release <changed>`; a dependent package is release-verified through
+**CI runs two modes over the same harness.** The harness accepts an optional
+package filter. An ordinary package-only PR runs the changed packages plus every
+package whose explicit `dependencies` reach a changed package — the affected set.
+That selection is a test input derived from manifests, not bundle discovery: it
+never feeds a lock, sealed bundle or digest. The unfiltered run — every package
+under `packages/*/*/*/package.json`, including one no spec selects — is required
+when `fmp-model`, `fmp-validate`, `fmp-materialize`, the path layer or the
+harness itself changes, and on the release gate and a periodic schedule. Both
+modes use the same case documents and assertions; the filter changes only which
+package directories execute, so a filtered run is never a weaker proof about the
+packages it does execute. A package outside a filtered run remains covered by the
+full run, so the split creates no unchecked set. `cargo test -p fmp-definition
+--test package_conformance` with no filter is the full mode; the filtered mode is
+the same test binary with the changed-path list. A full run costs
+`Σ C_i` case executions over `N` packages and is therefore a stated scaling
+boundary, not a constant-cost gate: the H2c report measures an ordinary package
+PR's conformance wall time and executed case count separately from the full run.
+
+`verify --package --release-evidence <changed>` and
+`--release <changed>` still run for the changed packages; the conformance filter
+does not narrow the evidence gate. A package whose `dependencies` is empty also
+runs `--release <changed>`; a dependent package is release-verified through
 `--all --check` or an explicit `--closure` (§8), so the author gate does not
 require a global spec edit. A structurally valid row whose
 opcode was flipped fails the positive case's byte comparison even when `read`
@@ -3565,7 +3600,18 @@ pub fn fmp_definition::compat::as_legacy_definition(
 
 It is deliberately not a method and not a crate-root re-export: every call site
 must read `compat::`, no glob import reaches it by accident, and no other crate
-can present it as part of the bundle's own surface. Its lifecycle is part of the
+can present it as part of the bundle's own surface. Its guarantee is an API-layer
+statement, and the contract must not overstate it: `compat::as_legacy_definition`
+is the only **typed H1 adapter** `fmp-definition` provides, not a process-global
+exclusivity claim that no other code can obtain an `Arc<Definition>`.
+`CheckedBundle::bundle_json()` exposes the sealed document, and
+`fmp_model::definition::read` is public, so a caller can extract the `definition`
+object and read it without the adapter. That bypass is legal but proves less: it
+loses the bundle's identity, ownership cover and digest binding, so no report may
+cite the resulting `Arc<Definition>` as bundle evidence, and the H3 guarantee
+stays scoped to the entry it defines (point 6). The adapter's value is that the
+executed value is the digested value, not that the type system forbids every
+other path. Its lifecycle is part of the
 contract rather than an implementation note:
 
 1. **It is retained, not replaced.** It is the adapter from a checked bundle to
@@ -4150,10 +4196,11 @@ comparing the materializer with itself proves the bytes.
   declaration, and the package inside the bundle's selection. A wider bundle
   cannot make an under-declared package legal: the package is read under its own
   target before the merge, so `verify --package` and `verify --all` agree on it.
-- `profile_id` is a nominal label inside one bundle: it must equal the package's
-  `target_profile`, but compatibility, identity and digests use the six-key
-  `target.identity`. Two bundles may share the name with different identities, and
-  H2 adds no global profile table (§4.1).
+- `profile_id` is a nominal label inside one bundle and is not compared with any
+  package's `target_profile`; compatibility, identity and digests use the six-key
+  `target.identity`. Two packages may carry different labels and still compose,
+  and two bundles may share the name with different identities; H2 adds no global
+  profile table (§4.1).
 - `requires_capabilities` is a checked fact, not a comment: the builder derives
   the set from the row structure and rejects a declaration that differs in either
   direction, so a later consumer cannot under-provision a package that silently
@@ -4734,7 +4781,7 @@ comparing the materializer with itself proves the bytes.
 | `enabled_extensions` is a conservative declared cover, not a minimal required set | specified; `fmp-def/0.1` forms have no requirement key and no builder exists | **unverified** — H2a |
 | Form-scope negatives are `bind`-only and point at the mutated operand | specified; `fmp-materialize/src/lib.rs` emits `E-BYTE-001` at `/instructions/0/expected_digest` after encoding, so the counterexample is real | **specified, not implemented** — H2a |
 | A `plan::read` rejection has a legal case representation (`scope: "plan"` + `stage: "read"`), and the declared stage must be the first stage that rejects | `fmp-model/src/plan.rs` `read` returns `Result<Plan, Diagnostic>` and `bind_payload` calls `bind::u64_in`, so `{"reg":-1}` is `E-PLAN-002` at `/instructions/0/operands/<n>/payload/reg` before `bind`; no harness | **specified, reader behaviour read** — H2a |
-| `profile_id` is a nominal label inside one bundle; identity is the six-key `target.identity` | specified; no spec or bundle exists, and no cross-spec `(profile_id, identity)` rule is added | **specified, not implemented** — H2a |
+| `profile_id` is a nominal bundle-local label and is not compared with a package's `target_profile`; identity is the six-key `target.identity` | specified; no spec or bundle exists, and no cross-spec `(profile_id, identity)` rule is added | **specified, not implemented** — H2a |
 | Output parents under `--root` obey the no-follow rule, and the committed lock/sealed bundle are compared through a bounded streaming reader | specified; the writer is author-layer work, the output-parent no-follow rule is the hardened path layer, and neither exists, so the `path-escape` and over-budget rejections are untested | **specified, not implemented** — H2a (bounded comparison), V-P (output parents) |
 | An interrupted write may leave a mixed lock/sealed pair, and such a pair never passes the pair check | specified; the write phase and `--check` do not exist; the other legal exit-2 state is the missing optional cache, which `A(T)` accepts and which is not proof of a successful build (`BuildSucceeded` and `A(T)` are separate) | **specified, not implemented** — H2a |
 | The publication verdict records where the gate logic came from, not only what tree it tested | specified; no gate exists; the report must name the gate revision, and a head-modified gate is not evidence about the unmodified gate (§8.1); `a_pr_cannot_weaken_the_gate_that_judges_it` is the acceptance test | **specified, not implemented** — V-P |
@@ -4978,9 +5025,9 @@ comparing the materializer with itself proves the bytes.
   builder (§4.1).
 - Someone keys compatibility, a definition lookup or a digest on `profile_id`
   alone, or requires one global meaning for a profile name: stop. `profile_id`
-  is a nominal label equal to the package's `target_profile` inside one bundle;
-  the identity is the six-key `target.identity`, and no cross-spec uniqueness for
-  `(profile_id, identity)` exists in H2 (§4.1).
+  is a nominal bundle-local label and is not compared with a package's
+  `target_profile`; the identity is the six-key `target.identity`, and no
+  cross-spec uniqueness for `(profile_id, identity)` exists in H2 (§4.1).
 - Someone lets a retired `(namespace, version)` come back with a different
   `definition_digest`, or treats `bundle_id` as an immutable release identity:
   stop. The definition name is permanent and the bundle ID is a movable release
