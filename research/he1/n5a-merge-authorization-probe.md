@@ -49,6 +49,12 @@ Neither carried an approving review.
    build GitHub's synthetic merge commit for that event; nothing records that
    the commit which later lands has the same tree. A plain merge after the base
    advances can produce a different tree with the same green checks.
+5. **Required-check names are not yet unique.** `determinism.yml` names its
+   matrix jobs `ubuntu-latest`, `macos-latest` and `windows-latest`. The first
+   version of `n1b-poc.yml` reused the same names, so a required check with one
+   of those names could be satisfied by the much smaller PoC workflow. The PoC
+   jobs are now `n1b-poc (<os>)`; this collision must be kept out of the required
+   set when a ruleset is enabled.
 
 ## N5a verdict
 
@@ -68,7 +74,8 @@ decision; it is not N5a evidence.
 A minimal demonstration would need all of the following recorded in one trial:
 
 - a branch ruleset on `main` with required status checks for the existing gate
-  jobs, required pull request, blocked force pushes and blocked deletion;
+  jobs under names that are unique across workflows, required pull request,
+  blocked force pushes and blocked deletion;
 - merge queue enabled, with a `merge_group` trigger on the gate workflows and a
   workflow that builds the queued tree;
 - SHA-pinned action references (or repository policy requiring them) so the
