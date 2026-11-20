@@ -104,6 +104,10 @@ Consequences, stated plainly:
   between them — is therefore not available and not claimed. The closest
   available substitute is the strict up-to-date policy described in §4.
 
+Resolved later the same day: the repository was transferred to the
+`Teancher-H` organization and the queue was enabled — see §7. Everything above
+remains accurate about the repository as it was owned by `Mr-enthalpy`.
+
 ## 3. Observed negative evidence
 
 Both attempts were made with the owner credential, after the ruleset was active.
@@ -228,3 +232,58 @@ policy would have refused the merge if it had.
 Again `tree(tested) == tree(landed)` and `base == parent_1(landed)`. The second
 entry was produced by an ordinary change after the first had landed, so the
 result does not depend on the ruleset having been freshly created.
+
+## 7. Merge queue after the organization transfer
+
+Later on 2026-11-20 the repository was transferred from `Mr-enthalpy/MonAsm` to
+`Teancher-H/MonAsm`. It stays public; the organization is on the free plan and
+the actor is an organization owner. This is the change §2 said would be needed.
+
+The transfer changed the owner and left everything else in place: `main` stayed
+at `01fdd50966aaed5c15c642fcf8f1a51385d3b64c`, ruleset `27723469` kept its
+existing rules and its empty bypass list, and the old URLs redirect.
+
+Re-sending the same `PUT /repos/Teancher-H/MonAsm/rulesets/27723469` payload that
+§2 recorded as rejected was accepted. `GET /rules/branches/main` now returns
+`deletion, non_fast_forward, pull_request, required_status_checks, merge_queue`,
+and `current_user_can_bypass` is still `never`.
+
+The enabled rule, verbatim:
+
+```json
+{
+  "type": "merge_queue",
+  "parameters": {
+    "check_response_timeout_minutes": 60,
+    "grouping_strategy": "ALLGREEN",
+    "max_entries_to_build": 5,
+    "max_entries_to_merge": 5,
+    "merge_method": "MERGE",
+    "min_entries_to_merge": 1,
+    "min_entries_to_merge_wait_minutes": 5
+  }
+}
+```
+
+- `merge_method` is `MERGE` and the `pull_request` rule still allows only
+  `merge`, so a queued entry lands as a merge commit.
+- `ALLGREEN` means every entry in a group must pass the required checks, not
+  just the group head. A group of one is the case exercised first.
+- The `merge_group` triggers added to `gates.yml` and `determinism.yml` by PR #8
+  stop being dormant here: they are what reports the seven required contexts for
+  a queued build.
+
+### Procedure for a queued entry
+
+1. Open the pull request and wait for the seven required checks on the pull
+   request itself.
+2. Enqueue with `gh pr merge <n> --merge --auto`; direct merges are refused by
+   the queue rule.
+3. Record the `merge_group` workflow runs: run id, `head_sha`, conclusion.
+4. After the entry lands, assert `origin/main == merge_group.head_sha`. For a
+   single-entry group this is the strongest form of the property: the commit the
+   gates ran on *is* the commit on `main`, not merely one with the same tree.
+5. Cross-check `origin/main^{tree}` against `refs/pull/<n>/merge^{tree}`.
+
+The first queued merge is entry 3; its values are recorded by the change that
+follows it, as §6 explains.
