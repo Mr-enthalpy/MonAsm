@@ -1,22 +1,38 @@
-# H2 plan revision log (twelfth through thirtieth round notes)
+# H2 plan revision log (twelfth through thirty-first round notes)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The current plan is
 > `docs/architecture/he1-h2-plan.md`; current decisions live in its §3 and in
 > `docs/adr/0128-package-and-bundle-contract.md`. These notes were moved out of
 > the plan opening by the twenty-fifth revision; the twenty-fifth through
-> thirtieth round notes are added below.
+> thirty-first round notes are added below.
 
 Where a note conflicts with the current plan or ADR, the current document wins.
 The twenty-ninth revision makes `target_profile`/`profile_id` descriptive
 labels that never decide composition, defines affected-set and full conformance
 modes with the `Σ C_i` scaling boundary, and scopes the compat adapter to the API
-layer. The thirtieth revision replaces `P(T)` with `P(B,T,e,M)`, keeps `R(T)`
-tree-only, separates the audit's three claims, and orders publication as
-N4b/N5a/N5b.
+layer. The thirty-first revision adds `C(T)` (artifact closure with no orphan derived
+artifact), `H(T)` (an existing registry audited over every registered version),
+pre-merge `Q(B,T,e)`, and post-merge `P(B,T,e,M)`. The thirtieth revision replaced
+`P(T)` with `P(B,T,e,M)`, kept `R(T)` tree-only, separated the audit's three
+claims, and ordered publication as N4b/N5a/N5b.
 
 ## Round notes
 
+  第三十一轮固定：发布门禁写成可分别测试的谓词：`C(T) = A(T) ∧ NoOrphan(T)`
+  覆盖每个选中 spec 的 lock/sealed 配对并拒绝无 spec 的孤儿派生产物；
+  `H(T) = RegistryExists ∧ RegistryWellFormed ∧ HistoryAudit` 要求登记表存在、
+  格式合法，并对全部登记版本（含已退役、当前无 spec 引用的版本）重算
+  `snapshot_digest` 与来源；没有登记表的开发树 `R(T)` 真但 `H(T)` 假，因此不再
+  满足发布门禁。合并前候选就绪是
+  `Q(B,T,e) = C(T) ∧ R(T) ∧ H(T) ∧ PreservesPublished(B,T)`，合并后才有
+  `P(B,T,e,M) = Q(B,T,e) ∧ AuthorizedMerge(B,T,e,M)`；报告不得把 `Q` 写成 `P`。
+  新增三个反例：无 registry 的开发树不是发布就绪、当前 spec 全绿但退役版本被改
+  导致 `H` 假、当前 spec 全绿但孤儿 sealed 使 `C` 假。V-P 结论不得用 CI 全绿
+  代替 N1b PoC、平台合并机制记录与 stale-CI 反例；H2c 增加第四个规模指标
+  `T_ordinary_PR,total(N_packages, N_published)`，分列 conformance、spec 验证与
+  全历史审计的贡献，把「不改中央文件」与「等待不随全局规模增长」分开证明，不要求
+  H2 立即实现增量审计。
   第三十轮固定：`monasm-bundle/0.1` 的九键 sealed 已携带并由 `bundle_digest`
   绑定 `form_owners` 与 `packages[].enabled_extensions`；H3 只新增计划兼容规则
   与验证入口，不再新增 sealed 格式或 companion source。发布审计拆成三个互不

@@ -10,19 +10,20 @@
   merged, and no H2a commit contains it, so the work never satisfies and depends
   on its own precondition. A later design change reopens `proposed` and needs the
   same sequence again.
-- Revision: thirtieth revision, 2026-11-20. The normative entry now keeps
+- Revision: thirty-first revision, 2026-11-20. The normative entry now keeps
   only current decisions; per-revision audit notes (fourteenth through
-  twenty-ninth) are in `research/he1/adr-0128-revision-log.md`, which is
+  thirtieth) are in `research/he1/adr-0128-revision-log.md`, which is
   historical evidence and not a contract. Earlier decisions remain in force
   except where this revision or the `Settles` list restates them. This revision
-  makes the publication verdict the four-argument predicate
-  `P(B,T,e,M) = A(T) ∧ R(T) ∧ PreservesPublished(B,T) ∧ AuthorizedMerge(B,T,e,M)`,
-  keeps `R(T)` a predicate of the tree alone, separates current snapshot
-  consistency from pre-merge authorization and provenance trust, states that H3
-  consumes the ownership facts the nine-key bundle already carries instead of
-  adding a sealed format, and orders publication work as registry format and
-  audit with synthetic tests (N4b), a protected merge mechanism (N5a), then the
-  first real publication (N5b).
+  closes the formal gap between the publication predicate and the actual gate:
+  it adds `ArtifactClosed(T)` (pairwise artifacts plus no orphan derived
+  artifact), `PublishedHistoryValid(T)` (registry exists, is well formed, and
+  every registered version, including retired ones, passes the full snapshot and
+  source audit), and splits pre-merge candidate readiness from the post-merge
+  verdict that reads the landed operation `M`. The publication verdict is now
+  `P(B,T,e,M) = C(T) ∧ R(T) ∧ H(T) ∧ PreservesPublished(B,T) ∧
+  AuthorizedMerge(B,T,e,M)`. This revision also records the ordinary-PR total
+  critical-path measurement as a separate H2c metric.
 - History: `research/he1/adr-0128-revision-log.md`.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
   `monasm-lock/0.1`, `monasm-bundle/0.1` and `monasm-published/0.1` formats;
@@ -82,9 +83,12 @@
   tested candidate tree SHA and the merge mode, and must be re-established when
   any of them moves, with the provenance of the gate logic that produced it and a
   mode read from the platform's merge record; the per-bundle artifact predicate
-  `A_β(T)`, the whole-tree conjunction `A(T)`, `R(T)` as
-  `R_packages ∧ R_identities` over the tree alone, and the four-argument
-  publication verdict `P(B,T,e,M) = A(T) ∧ R(T) ∧ PreservesPublished(B,T) ∧
+  `A_β(T)`, the whole-tree conjunction `A(T)`, the artifact-closure predicate
+  `C(T) = A(T) ∧ NoOrphan(T)`, `R(T)` as `R_packages ∧ R_identities` over the
+  tree alone, the history predicate `H(T)` that requires an existing, well-formed
+  registry audited over every registered version, the pre-merge candidate
+  predicate `Q(B,T,e) = C(T) ∧ R(T) ∧ H(T) ∧ PreservesPublished(B,T)`, and the
+  post-merge publication verdict `P(B,T,e,M) = Q(B,T,e) ∧
   AuthorizedMerge(B,T,e,M)`, where a successful build implies only `A_β(T)`; the
   permanent
   `monasm-package/0.1` rejection of non-empty `exports.types`/`exports.profiles`
@@ -2605,7 +2609,7 @@ limit depend on a development cache. A hand-committed snapshot above 16 MiB
 remains `resource-limit` (exit 1) on `--check`, because the builder cannot read it
 under its own budget, and `build` never produces one.
 
-Five propositions are involved, and the contract keeps them separate:
+The predicates are layered, and the contract keeps them separate:
 
 - `BuildSucceeded(r, β)` — the build operation `r` for spec `β` ran to completion
   and exited 0. It read one closure, wrote that closure's lock and sealed bundle,
@@ -2620,8 +2624,15 @@ Five propositions are involved, and the contract keeps them separate:
   `release_digest` is recomputed from the lock and the packages and compared
   here; it is not a registry field.
 - `ArtifactPairConsistent(T)` (`A(T)`) — `A_β(T)` holds for **every** spec
-  selected in `T`. This is the whole-tree predicate `verify --all --check`
-  proves, and it is a conjunction, not the result of any single build.
+  selected in `T`. This is the pairwise conjunction, not the result of any single
+  build.
+- `ArtifactClosed(T)` (`C(T)`) — `A(T) ∧ NoOrphan(T)`. `A(T)` already requires a
+  committed lock and sealed bundle for every selected spec, because a missing pair
+  is not the pair a fresh rebuild produces, and checks the optional legacy
+  snapshot. `NoOrphan(T)` adds the other direction: every committed lock, sealed
+  bundle or legacy snapshot names a spec selected in `T`; an artifact without a
+  spec is `orphan-bundle-artifact`. A green `verify --all --check` establishes
+  `C(T)`, not merely `A(T)`.
 - `RegistryComplete(T)` (`R(T)`) — `R_packages(T) ∧ R_identities(T)` over the
   specs selected at `T`. `R_packages(T)`: each selected closure package has a
   `published` row whose `path`, `package_id`, `version` and
@@ -2629,40 +2640,55 @@ Five propositions are involved, and the contract keeps them separate:
   `snapshot_digest` equals the recorded value. `R_identities(T)`: each selected
   `(namespace, version)` has an `identities` row carrying the digest the build
   produces. A missing row is `published-registry-incomplete`. The registry has
-  no `release_digest` field, and `R(T)` never reads one. The publication gate
-  establishes `R(T)` with both commands: `--all --check` rejects a missing row
-  for a selected spec (`published-registry-incomplete`), and
-  `--published --check` recomputes each recorded value (`snapshot-mismatch`,
-  `published-registry-invalid`). `R(T)` is a predicate of the tree alone: when
-  `T` has no registry it is **true by definition** (there is nothing to be
-  incomplete), and when `T` has one, every selected spec needs its rows. `R(T)`
-  does not read the base commit; the rule that a base registry may not be dropped
-  is `PreservesPublished(B, T)` below, not an implicit dependency of `R` on the
-  past.
-- `PublicationReady(B, T, e, M)` (`P(B,T,e,M)`) — four conjuncts, deliberately
-  separated because they answer different questions:
-  - `A(T)` — the current artifacts are pairwise consistent;
-  - `R(T)` — the current registry completes the current selection;
-  - `PreservesPublished(B, T)` — the state transition from the base commit `B` to
-    the candidate tree `T` is legal: `Published(B) ⊆ Published(T)`, every path
-    published in `B` still exists in `T` with equal bytes, and no base registry
-    row is deleted, rewritten or reordered (§8.1);
-  - `AuthorizedMerge(B, T, e, M)` — that transition was authorized by evidence
-    `e` and by the landed operation `M`. `e` binds the tested base commit, the
-    tested candidate **tree** SHA, the gate-logic revision and the gate's
-    authorization source; `e` is not freely substitutable. `M` is the actual
-    landed operation: `B_landed = B_checked`, `Tree(M) = C_checked`,
-    `mode(M) = mode`, where the mode comes from the platform's merge record
-    (§8.1) and not from the commit's parent list.
+  no `release_digest` field, and `R(T)` never reads one. `R(T)` is a predicate of
+  the tree alone: when `T` has no registry it is **true by definition** (there is
+  nothing to be incomplete), and when `T` has one, every selected spec needs its
+  rows. `R(T)` does not read the base commit; the rule that a base registry may
+  not be dropped is `PreservesPublished(B, T)` below, not an implicit dependency
+  of `R` on the past.
+- `PublishedHistoryValid(T)` (`H(T)`) — the conjunction of
+  `RegistryExists(T)`, `RegistryWellFormed(T)` and `HistoryAudit(T)`.
+  `RegistryExists(T)`: `bundles/published.json` exists in `T`.
+  `RegistryWellFormed(T)`: the closed shape, unique rows, canonical order and
+  digest syntax hold. `HistoryAudit(T)`: every `published` and `identities` row is
+  resolved to its version directory — including versions that no spec selected at
+  `T` references — and `snapshot_digest` is recomputed over every regular file and
+  the entry set, with `source_package_digest`, identity, path lexical rules and
+  the rejection of unlisted non-regular entries checked. This is the
+  `verify --published --check` conjunct. `H(T)` is **false** when `T` has no
+  registry; a development tree cannot be publication-ready by having nothing to
+  audit. `R(T)` covers the current selection and `H(T)` covers all history, so
+  neither implies the other.
+- `PreservesPublished(B, T)` — the state transition from the base commit `B` to
+  the candidate tree `T` is legal: `Published(B) ⊆ Published(T)`, every path
+  published in `B` still exists in `T` with equal bytes, and no base registry row
+  is deleted, rewritten or reordered (§8.1). It constrains the transition; it does
+  not assert that `B`'s history was already valid, which is `H(B)` and is checked
+  on the current tree by `H(T)`.
+- `AuthorizedMerge(B, T, e, M)` — the transition was authorized by evidence `e`
+  and by the landed operation `M`. `e` binds the tested base commit, the tested
+  candidate **tree** SHA, the merge mode, the gate-logic revision and the gate's
+  authorization source; `e` is not freely substitutable. `M` is the actual landed
+  operation: `B_landed = B_checked`, `Tree(M) = C_checked`, `mode(M) = mode`,
+  where the mode comes from the platform's merge record (§8.1) and not from the
+  commit's parent list.
+- `CandidateReady(B, T, e)` (`Q(B,T,e)`) — `C(T) ∧ R(T) ∧ H(T) ∧
+  PreservesPublished(B,T)`, together with the gate evidence `e` for that candidate.
+  This is the **pre-merge** predicate a gate can establish over `(B, T)` and
+  record. `e` is not a future merge event.
+- `PublicationReady(B, T, e, M)` (`P(B,T,e,M)`) — `Q(B,T,e) ∧
+  AuthorizedMerge(B,T,e,M)`. This is the **post-merge** acceptance predicate: it
+  becomes evaluable only after the landed operation exists.
 
-  `P` is therefore not a function of `T` alone: the same tree can arrive through
-  an authorized merge or be written around the gate, and only the evidence and the
-  landed operation distinguish them. No tree-only command can establish
-  `AuthorizedMerge`; `verify --all --check` and `verify --published --check`
-  establish `A(T)` and `R(T)`, the changed-path gate establishes
-  `PreservesPublished` before the merge, and the platform record establishes the
-  landed operation and mode. A report must name which conjuncts it actually
-  checked and must not promote a tree check to a publication verdict.
+`Q` is therefore not a function of the tree alone, because it reads the base `B`
+and the evidence `e`; `P` additionally reads `M`. The same tree can arrive through
+an authorized merge or be written around the gate, and only the evidence and the
+landed operation distinguish them. The pre-merge gate establishes `Q`, not `P`:
+`verify --all --check` establishes `C(T)` and `R(T)`, `verify --published --check`
+establishes `H(T)`, the changed-path gate establishes `PreservesPublished(B,T)`,
+and the platform record plus the landed commit establish `AuthorizedMerge`. A
+report must name which predicate and which conjuncts it actually checked, must
+not cite `Q` as `P`, and must not promote a tree check to a publication verdict.
 
 For any accepted input, `BuildSucceeded(r, β)` implies `A_β(T_r)` on the tree `r`
 wrote, and nothing wider. It does **not** imply `A(T_r)`: a build touches one
@@ -2670,8 +2696,8 @@ spec, so a second selected spec whose committed lock is stale keeps `A(T_r)`
 false, and `verify --all --check` fails on that bundle even though `r` exited 0.
 `a_single_bundle_build_does_not_prove_the_whole_tree` fixes this direction, and
 it is the reason the implication is stated per bundle rather than over the tree.
-It also does **not** imply `R(T_r)` or the publication verdict
-`P(B,T_r,e,M)`: `build` never writes registry
+It also does **not** imply `C(T_r)`, `R(T_r)`, `H(T_r)`, candidate readiness
+`Q` or the publication verdict `P(B,T_r,e,M)`: `build` never writes registry
 rows, so a legally successful build of a new spec in a tree that already has a
 registry leaves that spec without a row. That intermediate tree is exactly what
 the publication flow orders — build, then append rows, then run both `--check`s,
@@ -2922,20 +2948,22 @@ H2 is therefore accepted through **two verdicts**, recorded separately:
   ownership, the four digest layers with their fixed vectors, cases and evidence
   protocol, conformance, Level 0/1 projections, build determinism and byte
   equality, the build write phase with its bounded streaming comparison, the
-  legacy-snapshot equality gate, `verify --package`, and the `A(T)` part of
-  `verify --all --check` over the committed specs. A V-A report cites `A(T)`;
-  when `T` itself has no registry, `R(T)` is true by definition and belongs to
-  V-P, so V-A never turns a green `--all --check` on a tree with a registry into
-  evidence. V-A has no external prerequisite and does not wait for V-P.
+  legacy-snapshot equality gate, `verify --package`, and the artifact part of
+  `verify --all --check` over the committed specs. A V-A report cites `A(T)`
+  and `C(T)` (artifact closure, including the no-orphan direction); it does not
+  cite `R(T)`, `H(T)`, `Q` or `P`. When `T` itself has no registry, `R(T)` is
+  true by definition but `H(T)` is false, so V-A never turns a green
+  `--all --check` on a tree with a registry into evidence. V-A has no external
+  prerequisite and does not wait for V-P.
 - **V-P, publication channel.** The hardened reader (open-time no-follow, exact
   directory-entry names, replacement-race binding, regular-file-only leaves) with
   its three-platform PoC, `bundles/published.json` with `identities` and
-  `snapshot_digest`, append-only and retirement rules, `R(T)` and
-  `P(B,T,e,M)`, the
-  full-history audit including the rejection of every unreferenced non-regular
-  directory entry, the changed-path gate, the merge-freshness proof with the
-  executed stale-CI counterexample and the provenance of the gate logic itself
-  (§8.1), and the ~1,000-version measurement with its threshold.
+  `snapshot_digest`, append-only and retirement rules, `R(T)`, `H(T)`,
+  `Q(B,T,e)` and `P(B,T,e,M)`, the full-history audit including the rejection
+  of every unreferenced non-regular directory entry, the changed-path gate, the
+  merge-freshness proof with the executed stale-CI counterexample and the
+  provenance of the gate logic itself (§8.1), and the ~1,000-version
+  measurement with its threshold.
 
 The ordering rules are part of the contract, because either misordering would be
 a false claim:
@@ -2950,10 +2978,11 @@ a false claim:
 3. `bundles/published.json` does not exist before V-P. Creating it early would
    assert an immutability the channel cannot yet enforce, and `verify --published
    --check` is not a CI gate before then. While `T` has no registry, `R(T)` is
-   true by definition and `verify --all --check` verifies the lock, the sealed
-   bundle and the legacy equality gate and reports every selected path
-   as a **development artifact**; it does not report
-   `published-registry-incomplete`, because nothing claims to be published. A
+   true by definition but `H(T)` is false, so no `Q` or `P` holds; `verify
+   --all --check` verifies the lock, the sealed bundle and the legacy equality
+   gate and reports every selected path as a **development artifact**; it does
+   not report `published-registry-incomplete`, because nothing claims to be
+   published. A
    branch whose base `B` has a registry cannot use that state: deleting or
    bypassing it fails `PreservesPublished(B,T)` and is
    `published-registry-modified`, and from then on every
@@ -2965,10 +2994,12 @@ a false claim:
    selected package closure and definition identity in that one commit, not only
    the initial x86 slice (§8.3). A build produces `A_β(T)` for its own bundle; the
    whole-tree `A(T)` is the conjunction over every selected spec and is not a
-   product of one build. Only the registry append plus both `--check`s produce
-   `R(T)`; `P(B,T,e,M)` additionally needs `PreservesPublished(B,T)` and the merge
-   evidence of §8.1. No report may
-   promote one predicate to the next because the bytes look right.
+   product of one build. `--all --check` produces `C(T)` and `R(T)`; the full
+   audit produces `H(T)`; together with `PreservesPublished(B,T)` and the gate
+   evidence they produce `Q`, and only the landed operation adds
+   `AuthorizedMerge` to produce `P`. A report must not
+   promote one predicate to the next because the bytes look right, and must not
+   present `Q` as `P` before the merge record exists.
 5. V-P failure stops the publication claim and the H2 exit, not the author layer.
    No post-merge audit, green CI run or after-the-fact review may substitute for
    a V-P prerequisite (§8.1).
@@ -4227,10 +4258,15 @@ comparing the materializer with itself proves the bytes.
   implies the second: `--check` proves the current pairing, never that the last
   build operation succeeded (§8.3). One build also implies nothing about another
   bundle, so `A(T)` is the conjunction over every selected spec, not a product of
-  any single `build`. Registry completeness `R(T)` is a further, separate
-  predicate: a successful build of a new spec in a tree that already has a
-  registry leaves `R(T)` false until the publisher appends the row, so
-  `--all --check` reports `published-registry-incomplete` in between. Output
+  any single `build`; artifact closure `C(T)` adds the no-orphan direction.
+  Registry completeness `R(T)` is a further, separate predicate: a successful
+  build of a new spec in a tree that already has a registry leaves `R(T)` false
+  until the publisher appends the row, so `--all --check` reports
+  `published-registry-incomplete` in between. History validity `H(T)` is
+  separate again: it needs an existing registry audited over every registered
+  version, including retired ones, so a development tree with no registry fails
+  `H(T)` even though `R(T)` is true. The pre-merge gate establishes `Q`, and only
+  the landed operation composes `P` (§8.3/§8.5). Output
   directories are trusted, yet
   every output parent segment under `--root` obeys the same no-follow rule as an
   input, and the committed lock and sealed bundle are compared as a bounded
@@ -4805,8 +4841,8 @@ comparing the materializer with itself proves the bytes.
 | The plan×definition matrix keeps `fmp/0.1` + `fmp-def/0.1` equality and `fmp/0.1` + `fmp-def/0.2` subset, and only a new plan protocol plus a versioned build rule lifts `h2-exact-target` | existing two cells read from `check_target`; the new-plan cell and the versioned build rule do not exist; `monasm-bundle-spec/0.1` has no builder yet | **partly measured, H3 gate** |
 | One loaded package value feeds the source digest, row/target comparison, per-package `read` and merge | specified; no reader exists | **unverified** — H2a |
 | First publication bootstraps without a registry cycle, and `build` validates every output before writing | specified; `build` validating outputs before writing is the author layer, the order build success → append rows → both `--check`s → commit is the publication channel, and publication is the merged commit; no builder exists | **unverified** — H2a (validate-before-write), V-P (publication order) |
-| `--check` proves the lock and sealed bundle, and compares a committed legacy snapshot with the sealed definition as a one-way equality gate (absence legal, no digest input) | specified; per bundle that is `A_β(T)`, and over every selected spec `A(T)`, independent of registry rows; the write phase removes `<legacy>/definition.json` first and writes it last, so an interrupted write leaves it absent, not stale; no builder exists | **specified, not implemented** — H2a |
-| A successful build proves only its own bundle: `BuildSucceeded(r, β)` implies `A_β(T_r)`, not `A(T_r)`, `R(T_r)` or `P(B,T_r,e,M)` | specified; `build` writes one closure's artifacts and never a registry row; with an existing registry, a new spec is `published-registry-incomplete` between the build and the append; with a second stale spec, `--all --check` still fails; `a_single_bundle_build_does_not_prove_the_whole_tree` and `a_successful_build_does_not_complete_the_registry` are the acceptance tests | **specified, not implemented** — H2a (predicate), V-P (registry) |
+| `--check` proves the lock and sealed bundle, and compares a committed legacy snapshot with the sealed definition as a one-way equality gate (absence legal, no digest input) | specified; per bundle that is `A_β(T)`, and over every selected spec `A(T)`; `C(T)` adds the no-orphan direction, so an artifact with no selected spec is `orphan-bundle-artifact`; the write phase removes `<legacy>/definition.json` first and writes it last, so an interrupted write leaves it absent, not stale; no builder exists | **specified, not implemented** — H2a |
+| A successful build proves only its own bundle: `BuildSucceeded(r, β)` implies `A_β(T_r)`, not `A(T_r)`, `C(T_r)`, `R(T_r)`, `H(T_r)`, `Q(B,T_r,e)` or `P(B,T_r,e,M)` | specified; `build` writes one closure's artifacts and never a registry row; with an existing registry, a new spec is `published-registry-incomplete` between the build and the append; with a second stale spec or an orphan derived artifact, `--all --check` still fails; `a_single_bundle_build_does_not_prove_the_whole_tree`, `a_successful_build_does_not_complete_the_registry` and `an_orphan_sealed_artifact_fails_artifact_closed` are the acceptance tests | **specified, not implemented** — H2a (artifact predicates), V-P (registry/history) |
 | `R(T)` uses only registry fields: `R_packages` checks `path`/`package_id`/`version`/`source_package_digest`/`snapshot_digest`, `R_identities` checks the permanent digest binding; `release_digest` is not a registry field | specified; `release_digest` lives in the lock and is recomputed inside `A_β(T)`; no registry or lock exists | **specified, not implemented** — H2b (registry), H2a (lock) |
 | An evidence-only change keeps `bundle_digest` and moves `release_digest` only for an unpublished candidate; a published version cannot change evidence without a new version that also changes `bundle_digest` | §1.1 freezes the version directory and §7.1 puts evidence in `evidence_digest`; the candidate case is stated, and the published case is unreachable by construction | **specified** — H2a (digests), V-P (immutability) |
 | A committed legacy snapshot whose bytes differ from the sealed definition is `legacy-snapshot-mismatch` (exit 1) | specified; the gate compares canonical bytes without rebuilding the cache; no `--check` exists | **specified, not implemented** — H2a |
@@ -4814,8 +4850,13 @@ comparing the materializer with itself proves the bytes.
 | The base registry (target-branch tip `B`) decides published-path containment before head-side `package.json` discovery | specified; no changed-path mapper exists, so a nested manifest masking an ancestor is untested | **specified, not implemented** — V-P |
 | A version published on the target branch after a feature branch forked still freezes that branch's edits | specified; the counterexample is a fork from `M0`, publication of `P/0.1.0` on the target branch, then an edit to `P/0.1.0/README.md`; tip-based `Published(B) ⊆ Published(H)` plus tree-byte equality rejects it, and `snapshot_digest` independently detects the edit in the audit | **specified, not implemented** — V-P |
 | A publication verdict authorizes only the `(B_checked, C_checked, mode)` triple it read: a stale green result cannot authorize a merge after another PR publishes first | specified; requires a merge queue or an operation that writes the recorded candidate, and V-P must prove the setting through the platform API; no workflow or settings evidence exists | **specified, not implemented** — V-P N5a |
-| The publication verdict is `P(B,T,e,M) = A(T) ∧ R(T) ∧ PreservesPublished(B,T) ∧ AuthorizedMerge(B,T,e,M)`, not a function of the tree alone | specified; the same tree can be reached by an authorized merge or written around the gate; no tree-only command establishes `AuthorizedMerge`, and a report must name the conjuncts it actually checked | **specified, not implemented** — V-P N5a |
-| `R(T)` is a predicate of the tree alone: true by definition when `T` has no registry, otherwise requiring every selected spec's `published` and `identities` rows; dropping a base registry is a separate `PreservesPublished(B,T)` failure | specified; `R` never reads the base commit; deleting the table or a row is `published-registry-modified` even though the head tree then has no registry; `a_base_registry_deletion_fails_preserves_published` is the acceptance test | **specified, not implemented** — V-P |
+| Artifact closure is `C(T) = A(T) ∧ NoOrphan(T)`: every selected spec has a consistent lock/sealed pair and every committed lock, sealed bundle or legacy snapshot names a selected spec | specified; `A(T)` is the pairwise conjunction and already requires each selected pair, so `C(T)` adds only the reverse direction; a green `verify --all --check` establishes `C(T)` and `R(T)`; no builder exists | **specified, not implemented** — H2a |
+| Publication history is `H(T) = RegistryExists(T) ∧ RegistryWellFormed(T) ∧ HistoryAudit(T)`, and `H(T)` is false when `T` has no registry | specified; `HistoryAudit` resolves every registered version, including retired versions no current spec selects, and recomputes `snapshot_digest`, source digests and lexical rules over it; a development tree with consistent lock/sealed files but no `bundles/published.json` therefore fails `H(T)` even though `R(T)` is true; no registry exists | **specified, not implemented** — V-P |
+| Pre-merge readiness and the post-merge verdict are distinct: `Q(B,T,e) = C(T) ∧ R(T) ∧ H(T) ∧ PreservesPublished(B,T)`, and `P(B,T,e,M) = Q(B,T,e) ∧ AuthorizedMerge(B,T,e,M)` | specified; `Q` reads the tested base, tree and evidence and can be recorded before merge; `P` becomes evaluable only after the landed operation exists, and the same tree can be reached by an authorized merge or written around the gate; no tree-only command establishes `AuthorizedMerge`, and a report must name the conjuncts it actually checked and must not present `Q` as `P` | **specified, not implemented** — V-P N5a |
+| A development tree whose lock/sealed pairs are all consistent but which has no registry is not publication-ready | specified; `C(T)` and `R(T)` can hold, but `H(T)` is false because no registry exists, so `Q` and `P` are false; only N5b can create the first real registry through the N5a mechanism; `a_development_tree_without_a_registry_is_not_publication_ready` is the acceptance test | **specified, not implemented** — V-P |
+| A tampered retired version fails the publication predicate even when every current spec is green | specified; the retired directory is outside `A(T)` and `R(T)`, but `HistoryAudit(T)` recomputes its `snapshot_digest` and rejects the mismatch, so `H(T)`, `Q` and `P` are false; the base `B` already contains the bad bytes and `T` leaves them untouched, so `PreservesPublished(B,T)` is true and cannot be the conjunct that catches it; `a_tampered_retired_version_fails_the_publication_predicate` is the acceptance test | **specified, not implemented** — V-P |
+| An orphan sealed artifact fails artifact closure even when every selected spec is green | specified; `A(T)` holds for each selected spec, but `NoOrphan(T)` is false and `verify --all --check` reports `orphan-bundle-artifact`, so `C(T)` and therefore `Q`/`P` are false; `an_orphan_sealed_artifact_fails_artifact_closed` is the acceptance test | **specified, not implemented** — H2a |
+| `R(T)` is a predicate of the tree alone: true by definition when `T` has no registry, otherwise requiring every selected spec's `published` and `identities` rows; dropping a base registry is a separate `PreservesPublished(B,T)` failure, and the absent registry is still `H(T) = false` | specified; `R` never reads the base commit; deleting the table or a row is `published-registry-modified` even though the head tree then has no registry; `a_base_registry_deletion_fails_preserves_published` is the acceptance test | **specified, not implemented** — V-P |
 | Three publication claims stay distinct: `snapshot_digest` re-proves current byte and entry-set consistency; the changed-path gate forbids modifying a published version before merge against target tip `B`; a protected merge mechanism establishes who authorized the landed transition | specified; the audit cannot prove the gate ran, the original recorder was honest, or history was not rewritten; neither the audit nor the gate alone carries all three | **specified, not implemented** — V-P |
 | Publication work is ordered N4b (registry format, audit code and synthetic tests; no real `bundles/published.json`), N5a (establish and verify the protected merge mechanism; no real registry commit), N5b (first publication of every HEAD spec through that mechanism) | specified; N4b and N5a use synthetic trees or a scratch repository; a PR that edits the publication gate cannot authorize itself; no workflow exists | **specified, not implemented** — V-P N4b/N5a/N5b |
 | H3 target subsets check `E_package(owner(form(i))) ⊆ E_plan` for every selected instruction, from `form_owners` plus the owner's declared cover, and add a per-form conjunct only when the format proves that requirement complete; a form without a proof is rejected | specified; `monasm-bundle/0.1` already carries the owner map and covers inside `bundle_digest`, so H3 adds the plan-compatibility rule and verification entry, not a new sealed format; H2 builds no subset cell and no H3 plan or consumer exists; the `c.addi`/`rv64i` case is untested | **specified, not implemented** — H3 |

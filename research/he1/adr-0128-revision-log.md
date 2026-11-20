@@ -1,4 +1,4 @@
-# ADR-0128 revision log (fourteenth through twenty-ninth revision)
+# ADR-0128 revision log (fourteenth through thirty-first revision)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The normative entry is
@@ -8,11 +8,26 @@
 
 The notes below are preserved from the twenty-ninth revision. Where they
 conflict with the current ADR, the current ADR wins; in particular the
-thirtieth revision replaces the tree-only `P(T)` with `P(B,T,e,M)`, keeps `R(T)`
-tree-only, separates the publication audit's three claims, and restores H3 to
-consuming the nine-key bundle's ownership facts.
+thirty-first revision makes the publication gate layered: `C(T)` adds the
+no-orphan direction to `A(T)`, `H(T)` requires an existing registry audited over
+all registered versions, `Q(B,T,e)` is the pre-merge candidate predicate, and
+`P(B,T,e,M) = Q(B,T,e) ∧ AuthorizedMerge(B,T,e,M)` is the post-merge verdict.
+The thirtieth revision had replaced the tree-only `P(T)` with `P(B,T,e,M)`, kept
+`R(T)` tree-only, separated the publication audit's three claims, and restored H3
+to consuming the nine-key bundle's ownership facts.
 
 ## Revision notes
+
+- Revision: thirty-first revision, 2026-11-20, after the publication-predicate
+  sufficiency, V-P evidence and ordinary-PR critical-path audit. It splits the
+  gate into `ArtifactClosed(T) = A(T) ∧ NoOrphan(T)` and
+  `PublishedHistoryValid(T) = RegistryExists ∧ RegistryWellFormed ∧ HistoryAudit`;
+  makes `H(T)` false for a development tree with no registry; defines pre-merge
+  `Q(B,T,e) = C(T) ∧ R(T) ∧ H(T) ∧ PreservesPublished(B,T)` separately from the
+  post-merge verdict `P(B,T,e,M) = Q(B,T,e) ∧ AuthorizedMerge(B,T,e,M)`; adds the
+  no-registry, tampered-retired-version and orphan-sealed counterexamples; and
+  adds the ordinary-PR total critical-path metric to H2c while forbidding a green
+  CI run from standing in for V-P.
 
 - Revision: thirtieth revision, 2026-11-20, after the sealed-format,
   publication-audit-scope, build-postcondition and publication-order audit. It
