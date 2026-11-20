@@ -1,11 +1,11 @@
 # H2 实施计划：目标包作者层与确定性定义构建
 
 - 状态：**待审提案**（2026-11-16；同日按八轮审计 P1/P2 修订，2026-11-17 至
-  2026-11-20 按第九轮至第三十二轮审计修订）。规范决策见
+  2026-11-20 按第九轮至第三十三轮审计修订）。规范决策见
   `docs/adr/0128-package-and-bundle-contract.md`，该 ADR 仍为 `proposed`；
   评审合并前本文和 ADR 都不是冻结依据。本文保留为实施计划与验收映射。
   **H2 尚未实现，本文不把任何 H2/H3/H4/H5 项目算作已完成。**
-  当前有效约束（逐轮记录第十二轮至第三十一轮见
+  当前有效约束（逐轮记录第十二轮至第三十三轮见
   `research/he1/h2-plan-revision-log.md`，历史证据，不是契约）：
   H2 分 **作者层 V-A** 与 **发布通道 V-P** 两个独立验收结论（`ADR-0128` §8.5）；
   V-A 不依赖外部平台事实，V-P 才承担硬化读取、发布登记、合并竞态与全历史审计，
@@ -886,10 +886,14 @@ spec 的 `namespace` 不得以 `monasm.standalone.` 开头，`version` 不得以
   能绑定目标集合为子集的计划；第一条是 `0.1` 语义未漂移的证据，第二条才在
   Builder 端（而不只是计划校验器端）解开 H5。
   H3 必须用同一包、不同扩展集合跑矩阵：旧格子保持结果，新格子只在自身规则
-  允许处接受子集；「删掉检查后能构建成功」不是新规则的证据。这些规则必须在 H5
-  并行扩展演练之前生效，否则先修订 ADR，不得直接开始 H5。H2 不声称这个等号
-  是最终组合规则。`h2-exact-target` 与上面的 form ⊆ 包检查互不替代：前者比较
-  包与 bundle，后者比较行与包。
+  允许处接受子集；「删掉检查后能构建成功」不是新规则的证据。这三项——版本化
+  构建规则、计划目标兼容协议、逐指令归属检查
+  `∀ i ∈ Plan.instructions: E_package(owner(form(i))) ⊆ E_plan`——是 **H5 并行
+  扩展演练的硬门槛**，必须全部生效；缺任一项时先修订 ADR，不得开始 H5。H2 可见
+  的「作者独立提交包」不等于运行期可组合：在 `fmp-def/0.1` 下，`rv64i`-only 包与
+  `rv64i`+`rv64c` 包仍可能因 `h2-exact-target` 等值要求被拒绝，验收报告不得把
+  前者写成后者。H2 不声称这个等号是最终组合规则。`h2-exact-target` 与上面的
+  form ⊆ 包检查互不替代：前者比较包与 bundle，后者比较行与包。
 - **H3 的子集规则必须逐指令证明，且不能丢掉包级保守覆盖（第二十四轮 P1-1）。**
   只查 `E_plan ⊆ E_bundle` 不够：bundle 选 `{rv64i, rv64c}`、包 A 覆盖 `{rv64i}`、
   包 B 覆盖 `{rv64c, rv64i}` 时，声明 `{rv64i}` 的计划仍可选中 `c.addi`，而它的
@@ -1253,10 +1257,12 @@ Rust 与 Python 都必须复现开发向量和发布向量这两个值。差别�
   `--check`）、全量历史审计（`verify --published --check`，含每个
   `snapshot_digest` 的重算），记录耗时、峰值内存、读取字节数及机器/OS/工具链
   版本；验收报告记录曲线、触发新 ADR 的版本数/时间/字节阈值，以及每 job 的 CI
-  成本上限。越阈或超预算才是分片、增量审计或新登记格式的触发条件，不是 H2 可以
-  声称的性质；三个代表包通过不构成规模证据。H2 明确**不**声称独立包发布吞吐已
-  能横向扩展：一个追加文件加 O(N) 全历史审计就是设计边界，多团队并发大量发布
-  属于后续 ADR，不是 H2 内的调优项。
+  成本上限。报告必须给出**数值阈值**，而不只是增长曲线：每次发布与每个普通作者
+  PR 可接受的最大审计读取字节数、发布作业与 `T_ordinary_PR,total` 的 CI 墙钟
+  预算，以及各自被越过的已发布版本数。越阈或超预算才是分片、增量审计或新登记
+  格式的触发条件，不是 H2 可以声称的性质；三个代表包通过不构成规模证据。H2 明确
+  **不**声称独立包发布吞吐已能横向扩展：一个追加文件加 O(N) 全历史审计就是设计
+  边界，多团队并发大量发布属于后续 ADR，不是 H2 内的调优项。
 - **并行开发与并行发布是两种能力，H2 只承诺前者加串行化正确性（第二十二轮）。**
   包作者在各自 `package_id` 版本目录与显式 spec 下并行开发、互不改全局选择文件，
   这由 H2 打基础，端到端并发实证属 H5；两个发布者无需集中协调地并行发布，H2
@@ -1729,6 +1735,12 @@ H2 报告必须把这些状态分开写，不能合并成「已验证」：
 | 证据文件可追溯 | 文件存在且摘要一致 | 记录的 oracle 结果真实 |
 | 独立 oracle 已复验 | 本机实际重跑外部工具并核对 | H2 对新包做到这一项 |
 
+这些行不能合并，也不能把「证据可追溯」写成「编码正确」：作者可以同时提交错误的
+定义、由同一错误产生的期望字节和与之匹配的证据摘要，`--release-evidence` 与
+`package_conformance` 仍会通过。H2 验证证据存在、引用关系、哈希与用例执行；
+**独立的 ISA 编码正确性证明是 H4/H5 的剩余义务**（重跑外部汇编器、硬件核验或其他
+oracle），不是 H2 已建立的性质。
+
 除「独立 oracle 已复验」外，其余各行互不推出；尤其「用例文档静态有效」不推出
 「用例阶段与诊断已验证」，因为前者不执行计划。H2 只做声明范围内的检查与执行；
 报告不得写成「本机重算」。
@@ -1743,6 +1755,13 @@ H2 不提交第二个 x86 真实包；`HE-T16` 的 H2 部分用同一合法 spec
 A/B 工作流合并留给 H5。
 
 ## 5. 测试计划
+
+H2a 启动时，把 §5.1–§5.3 的测试表直接转成**逐节点验收清单**：每条规范性质
+对应负责的 N 节点、明确的测试名，以及必要时的跨语言/跨平台证据（例如摘要向量、
+N1b 三平台 PoC）。清单是执行索引，不是第二套语义权威：`ADR-0128` 仍是唯一规范
+来源，计划和研究日志只映射到它，不得独立改变语义；发现规范缺口时提交 ADR 修订，
+而不是在清单里另立一条规则。清单必须在 H2a 第一个实现 PR 之前建立，避免多个
+实现 PR 各自满足局部测试却遗漏跨章节约束。
 
 ### 5.1 构建器
 
@@ -1865,7 +1884,7 @@ A/B 工作流合并留给 H5。
 | `a_bundle_id_may_advance_to_a_new_definition` | 同一 `bundle_id` 退役后由新 spec 选中新包版本 → 通过；新 lock/sealed 的 `bundle_digest` 不同，`(bundle_id, bundle_digest)` 是 bundle 内容标签，`release_digest` 是证据完备发布身份；同时存活的两个 spec 共用 `bundle_id` 仍 `bundle-id-conflict` | 第七轮 P2-2、第八轮 P2-3、`ADR-0128` §8 |
 | `two_specs_cannot_share_a_bundle_or_definition_identity` | 两个 spec 共用 `bundle_id` → `bundle-id-conflict`；共用 `(namespace, version)` 但 `definition_digest` 不同或相同 → `definition-identity-conflict`；三项都合法后 `verify --all --check` 通过 | 第六轮 P2-1、`ADR-0128` §8 |
 | `the_publication_audit_reads_retired_entries` | 退役 spec 后 `verify --all --check` 不读旧包；`verify --published --check` 仍检查旧条目，改旧目录或写错摘要 → `published-registry-invalid`；审计不进入 lock/bundle，未选中包不影响 `--all` | 第六轮 P2-3、`ADR-0128` §8.4 |
-| `the_published_registry_cost_is_measured_at_one_thousand_versions` | 合成约 1,000 个已发布版本：普通包变更、bundle 发布、全量历史审计各跑三次，记录耗时、峰值内存、读取字节、机器/OS/工具链版本，写入 H2 验收报告并给出触发新 ADR 的阈值；断言三次运行完成且读数完整，不以三个包通过代替规模结论。该测量属于 V-P，不出现在 H2a 的退出门槛 | 第二十一轮 P2-2、第二十三轮 P2、`ADR-0128` §8.3/§8.4、`H2-D9` |
+| `the_published_registry_cost_is_measured_at_one_thousand_versions` | 合成约 1,000 个已发布版本：普通包变更、bundle 发布、全量历史审计各跑三次，记录耗时、峰值内存、读取字节、机器/OS/工具链版本，写入 H2 验收报告，并给出**数值阈值**：每次发布/普通 PR 的最大审计读取字节、发布作业与普通 PR 总关键路径的 CI 墙钟预算、各自被越过的版本数；只给曲线不给阈值即报告不合格；断言三次运行完成且读数完整，不以三个包通过代替规模结论。该测量属于 V-P，不出现在 H2a 的退出门槛 | 第二十一轮 P2-2、第二十三轮 P2、`ADR-0128` §8.3/§8.4、`H2-D9` |
 | `the_publication_audit_covers_every_file_in_a_published_directory` | 已退役版本改 `package.json` 或 form 资产且不同步登记 → 审计 `published-registry-invalid`；改 `README.md`/`NOTICE`/`tests/cases.json`/`evidence/**` 而其余不动 → 重算的 `snapshot_digest` 不同，审计 `snapshot-mismatch`（退出 1），不再依赖变更路径门禁才能看见；把登记项的 `snapshot_digest` 改成另一个合法值而目录不变 → 同一拒绝；新建空目录不改变文件集。未声明的非普通条目由下一条单独覆盖：`files` 不变不构成通过 | 第二十三轮 P2、`ADR-0128` §8.3/§8.4 |
 | `a_published_snapshot_rejects_unlisted_nonregular_entries` | 已登记版本目录里新增一个**没有被任何 manifest/spec/case 引用**的条目：符号链接（POSIX）、reparse point（Windows）、FIFO 或 socket（POSIX）→ `verify --published --check` 以 `not-a-regular-file`（退出 1）拒绝，不跳过、不因为普通文件集合未变而重算出与登记相同的 `snapshot_digest`。断言拒绝发生在摘要比较之前或独立于它，且不写任何文件；去掉该条目后审计恢复通过。只测被引用路径上的链接不算覆盖本规则 | 第二十六轮 P2-2、`ADR-0128` §3/§8.3、N1b |
 | `an_unreferenced_case_fold_collision_in_a_published_directory_is_rejected` | 已登记版本目录里同时放两个**未被任何文件引用**的普通文件 `notes/Manual.md` 与 `notes/manual.md`（大小写敏感卷上可共存，且都会进入快照）→ `verify --published --check` 以 `path-lexical`（退出 1）拒绝，理由固定为折叠冲突，不是 `snapshot-mismatch`；删掉一个后审计恢复通过。另测一个未被引用的 `notes/NUL.md` 或 `notes/trailing.` 同样被词法规则拒绝。断言该规则覆盖快照目录的每个条目，而不是只覆盖已声明路径 | 第二十八轮 P2-2、`ADR-0128` §1.3/§8.3 |
@@ -2197,8 +2216,9 @@ spec；H2c 落地时再在自己的 PR 登记自己的闭包。两种顺序都�
    发布门禁。
 9. **N6 覆盖（H2c）**：aarch64 与 rv64 包、三 ISA conformance、跨包测试、各自
    登记项（V-P 已通过时在本节点登记；未通过时由 N5b 的首次发布候选统一登记）、
-   H2 报告（V-A/V-P 结论分开记录；含 N1b PoC 三平台表、1,000 版本成本曲线与阈值、
-   发布作业 CI 延迟预算，以及 sealed 九键与自校验/成对校验的结论）。V-P 结论必须
+   H2 报告（V-A/V-P 结论分开记录；含 N1b PoC 三平台表、1,000 版本成本曲线与
+   **数值阈值**——最大审计读取字节、CI 墙钟预算与触发版本数，发布作业 CI 延迟
+   预算，以及 sealed 九键与自校验/成对校验的结论）。V-P 结论必须
    引用 N1b PoC、平台合并机制记录与 stale-CI 反例执行结果；CI 全绿只是某个
    `(B_checked, C_checked, mode)` 的运行结果，不能代替 V-P 通过。
    **四个规模指标必须分列，不得互相替代**：(i) **普通作者 PR 的中央文件触碰率** —
@@ -2220,6 +2240,11 @@ spec；H2c 落地时再在自己的 PR 登记自己的闭包。两种顺序都�
 反例和门禁；实现 PR 不需要再次修改 `ADR-0128`，规范缺口单独提交。V-A 节点
 （N1a/N2/N3/N4a）不等待 V-P；V-P 节点（N1b/N4b/N5a/N5b）任一失败只停止发布结论与
 H2 退出，不回退作者层已证明的事实。N4b/N5a/N5b 的发布门禁不能推迟到 H2c。
+
+**N1b 与 N5a 是最早的技术可行性验证，不是覆盖工作之后的收尾项。** 作者层可以
+并行推进，但 V-P 的平台可行性与合并授权必须在 H2b 开头就实测；不得等到全部目标包
+或 H2c 覆盖完成才验证发布通道是否可实现。任一先决条件失败，V-P 与 H5 并行扩展
+演练都不得开始；失败不推翻作者层已证明的事实，但也不得被后续覆盖率掩盖。
 
 `ADR-0128` 目前在 PR #4 中为 `proposed`；PR #4 评审合并后，由独立的 H2-0
 docs-only 接受变更写 `accepted` 并更新本文状态行，H2a 才从 H2-0 合入之后开始。
@@ -2317,6 +2342,7 @@ docs-only 接受变更写 `accepted` 并更新本文状态行，H2a 才从 H2-0 
 | 删除/重命名包逃过路径门禁 | 删除在 base 树解析包根；删除 `package.json`/包目录必须同步改 spec；无法映射是 `unmapped-package-path` |
 | 深 JSON 先解析后测深度 | 迭代扫描在 `json::parse` 之前执行；≤1 MiB 数万层反例不得栈溢出 |
 | 证据完整性只是名义存在 | `--release-evidence` 要求 `tests/cases.json`、`NOTICE`、`sources`、`oracle.status`、skip 理由；证据清单进入 `evidence_digest`；`--release` 在此基础上加闭包 |
+| 证据可追溯被当成 ISA 编码正确性证明 | 作者同时提交错误定义、由同一错误产生的期望字节和匹配的证据摘要时，`--release-evidence` 与 `package_conformance` 仍可通过；H2 只验证存在性、引用、哈希与用例执行，独立 oracle/硬件复验留给 H4/H5；报告必须写成剩余义务，不得写成已验证 |
 | 作者层被发布通道缺证据拖住，或反过来提前宣称已发布 | H2a 先交付单包完整证据、摘要与确定性，不依赖三平台 PoC 或仓库合并机制；V-P 通过前不存在 `bundles/published.json`，H2a/H2c 的 lock/sealed/legacy 都是开发产物，文档不得称其不可变或可信 |
 | 退役版本漏检，或未选中包混入 bundle | `verify --all --check` 只读当前 spec 的精确闭包；`verify --published --check` 单独审计 registry 全部条目；两者都由 CI 运行，且在 H2b 之后都是 `gates.yml` 的必过项（不是可选命令），互不选择 |
 | 包文件改动漏进 legacy | `definitions/` 只读；`payload_root`/`definitions_root` 复跑；PR diff 检查 |
@@ -2441,7 +2467,7 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | O36 | `monasm-package/0.1` 的非空 `exports.types`/`profiles` 是否随构建器升级放宽 | **不放宽，`0.1` 永久拒绝**：接受语义属于清单声明的 `package_format`，不属于读取它的工具版本；升级不得把同一份未改动 `0.1` 从拒绝变成接受；H4 必须引入显式新包格式（如 `monasm-package/0.2`），在版本内定义 type/profile 语义、归属/冲突规则、摘要输入和验证；既有键名、`{id, path}` 形状、排序和摘要输入可直接复用，但复用不放宽 `0.1`，与 `h2-exact-target` 在 `monasm-bundle-spec/0.1` 的永久拒绝同理 | 按「新构建器认识该字段」放宽会让重放依赖二进制版本，同一份旧文档的接受语义随工具升级而变；现在就设计完整类型系统会超出 H2/H4 边界 |
 | O37 | canonical 定义超过 legacy 快照 16 MiB 读取上限时 build 怎么办 | **省略快照，不失败**：闭包 64 MiB、sealed 80 MiB 都允许更大的 canonical 定义；`build` 依据内存中的 canonical 字节决定，≤ 16 MiB 才写 `bundles/legacy/<bundle_id>/definition.json`，超过则省略并在同一写阶段删除旧副本，仍退出 0 并在人类可读输出中说明；`--all --check` 对缺失本就合法，对手工提交的超限快照仍是 `resource-limit`（退出 1）；**build 成功只保证本次构建 bundle 的 `A_β(T_r)`，全树的 `A(T_r)` 必须由 `verify --all --check` 另行证明**（`R(T)`、`P(B,T,e,M)` 同样不由此推出）。加合成测试：合并定义略高于 16 MiB | 让 build 失败会使 64/80 MiB 预算内的合法闭包不可构建，等于让可选缓存决定有效上限；写超限快照会让 build 产出自己的 check 拒绝的树，失败要到发布者提交后才暴露；把一次 build 写成全树 `A(T)` 会把「另一个 spec 的 lock 过期」误报为通过，直接扭曲验收量词；引入压缩或归档格式需要新的读取路径和门禁 |
 | O38 | sealed bundle 能否独立重算自己的 `bundle_digest` | **能，自 `0.1` 起就是自包含产物**（第二十三轮改判）：九键 sealed 含 bundle 级 `target`、逐包 `enabled_extensions` 与 `form_owners`，预映像的每个字段都在文件里；消费者独立重算 `definition_digest` 与 `bundle_digest`，并检查 `target.identity == definition.target`。lock 仍单独校验包路径、`evidence_digest`、`release_digest` 与 builder 记录，成对比较保留；自校验证明 bundle 说了什么，`bind` 仍不接受 sealed | 只发布无法自校验的 `0.1`、再在 H3 冻结一个只多这些数据的 `0.2`，会制造没有语义差异的版本边界；把归属表放在摘要之外则可被同摘要改写 |
-| O39 | 单文件 `bundles/published.json` 如何面对长期横向扩容 | **保留单文件与全量历史审计，并把它写成明确的规模边界**：V-P 用约 1,000 个已发布版本测普通包变更、bundle 发布、全量审计各三次（耗时/峰值内存/读取字节，审计含整目录 `snapshot_digest` 重算），报告记录曲线与版本数/时间/字节阈值，以及每 job 的 CI 成本上限；越阈触发新 ADR 讨论分片或增量审计。H2 只声称**独立包开发**与确定性组合可横向扩展，**不**声称独立包发布吞吐可横向扩展；无协调并行发布不保证（同一追加文件，后来者 rebase 并重跑两项 `--check`） | 现在分片会新增格式与一致性风险，且没有实测成本作依据；把 `--published` 并入 `--all` 会把历史耦合回 bundle 构建；把包变更路径局部化当成整条发布路径无瓶颈，会掩盖首次发布的集中协调点 |
+| O39 | 单文件 `bundles/published.json` 如何面对长期横向扩容 | **保留单文件与全量历史审计，并把它写成明确的规模边界**：V-P 用约 1,000 个已发布版本测普通包变更、bundle 发布、全量审计各三次（耗时/峰值内存/读取字节，审计含整目录 `snapshot_digest` 重算），报告记录曲线，并给出数值阈值——每次发布/普通 PR 的最大审计读取字节、发布作业与普通 PR 总关键路径的 CI 墙钟预算、各自被越过的版本数——以及每 job 的 CI 成本上限；越阈触发新 ADR 讨论分片或增量审计。H2 只声称**独立包开发**与确定性组合可横向扩展，**不**声称独立包发布吞吐可横向扩展；无协调并行发布不保证（同一追加文件，后来者 rebase 并重跑两项 `--check`） | 现在分片会新增格式与一致性风险，且没有实测成本作依据；把 `--published` 并入 `--all` 会把历史耦合回 bundle 构建；把包变更路径局部化当成整条发布路径无瓶颈，会掩盖首次发布的集中协调点 |
 | O40 | N1 三平台 PoC 放在哪个交付阶段 | **V-P 的第一项独立交付物，先于硬化读取器**（第二十三轮改判）：逐平台记录 OS 版本、工具链与 crate 版本、API/系统调用、故障注入方法和逐例结果；缺行、结论不明确或某平台只能跟随打开/拒绝所有读取，都停止 **V-P**。它不先于作者层的可信树读取 | 把 PoC 并入硬化读取器会让平台失败推迟到大量代码之后；把它排在作者层之前会让一个外部平台事实阻塞数据模型、摘要与确定性测试 |
 | O41 | `monasm-bundle/0.1` 的封闭键集以哪套说法为准 | **唯一键集：恰好九个键**——`bundle_format`/`bundle_id`/`definition_format`/`definition_digest`/`bundle_digest`/`target`/`definition`/`packages`/`form_owners`；`packages` 项含 `enabled_extensions`，`form_owners` 每个合并 form 一行；`sources`、`path`、`builder`、`release_digest` 出现在 sealed 即未知键（退出 1）。ADR、HE-1 总览、本文与示例统一为此，第二十一/二十二轮的两套说法删除；`the_sealed_bundle_key_set_is_exactly_nine_keys` 与 `the_form_owner_map_is_complete_and_inside_the_digest` 固定断言 | 保留两套说法会让同一个封闭格式有两套必需键集，读者或实现只能自行仲裁；只加字段不进预映像，则归属与覆盖可被同摘要改写 |
 | O42 | `builder` 字段的保证范围 | **信息性来源记录，不是来源证明**：它不进 `definition_digest`/`bundle_digest`，也不进 lock 的 drift 投影，因此改动 `builder.version`/`build` 可不使 `--all --check` 失败；契约只声称 lock 记录了写它的实现，不声称该实现确实生成了这些字节。可信构建来源另立构建证明或发布工件签名，绑定 `bundle_digest`/`release_digest`，不把版本塞回定义摘要 | 把 builder 当证明会让「改 lock 的 builder 仍过检查」变成隐性错误；把 builder 混入定义摘要会让工具升级误报定义漂移（`HE-T19`）；签名或证明需要密钥与验证路径，属另一轮设计 |
@@ -2558,6 +2584,10 @@ H2 不定义归档格式，也不提供恢复已退役 bundle 的工具；至于
 | 发布结论记录门禁逻辑来源，head 改过的门禁不能为同一 PR 授权 | 文字规则见 `ADR-0128` §8.1；没有 workflow 或 mapper；必须有受保护控制面、独立审批或明示信任假设，报告记录产生判定的修订 | **specified, not implemented** — H2b（V-P） |
 | `P(B,T,e,M)` 的六个合取项分别由工件闭包检查、当前登记、全历史审计、变更路径门禁、门禁证据有效性与平台记录建立，任何单一命令不得提升为发布结论；合并前只能记录 `Q` | 文字规则见 `ADR-0128` §8.3/§8.5；`a_publication_verdict_is_not_a_tree_predicate`、`a_tampered_retired_version_fails_the_publication_predicate`、`a_development_tree_without_a_registry_is_not_publication_ready`、`an_orphan_sealed_artifact_fails_artifact_closed`、`a_retired_definition_is_not_rebuilt_from_the_current_tree`、`a_retired_identity_digest_cannot_be_rewritten` 与 `candidate_readiness_binds_gate_evidence` 待写；没有 workflow 或平台证据 | **specified, not implemented** — H2b（N5a） |
 | 首次真实 `bundles/published.json` 只在 N5a 验证的通道中由 N5b 提交，N4b 与 N5a 的树都没有真实 registry | 文字规则见 §6 节点 6–8；`the_first_publication_lands_through_the_verified_channel` 待写；没有 workflow 或平台记录 | **specified, not implemented** — H2b（N4b/N5a/N5b） |
+| N1b 与 N5a 是最早的技术可行性验证，不推迟到覆盖率完成之后 | 计划 §6 节点顺序：N1b 是 H2b 第一个提交，N5a 紧随其后；作者层可并行；没有 PoC 或平台记录 | **未取得证据** — H2b（N1b/N5a）；不阻断 PR #4 设计合并 |
+| 发布登记成本报告给出数值阈值，而不只是曲线 | 文字规则见 `ADR-0128` §8.3 与 §6 节点 9：最大审计读取字节、CI 墙钟预算、触发版本数；尚未测量 | **未取得证据** — H2b/H2c（V-P） |
+| H2 包级证据不证明 ISA 编码正确性，独立复验是 H4/H5 的剩余义务 | 文字规则见 `ADR-0128` §7.1/§9.1；错误定义加一致的期望字节与证据摘要仍可通过 `--release-evidence` 与 `package_conformance`；H2 不重跑新包 oracle | **specified; remains H4/H5** |
+| H3 的版本化构建规则、计划兼容协议与逐指令归属检查是 H5 并行扩展演练的硬门槛 | 文字规则见 `ADR-0128` §4.1 与计划 §3；三项未全部生效时先修订 ADR，不得开始 H5 | **specified, not implemented** — H3 |
 | 删除 base 登记不让 `R(T)` 依赖过去，而是 `PreservesPublished(B,T)` 失败；没有登记表的树 `R(T)` 真但 `H(T)` 假 | 文字规则见 `ADR-0128` §8.3/§8.5；`a_base_registry_deletion_fails_preserves_published` 与 `a_development_tree_without_a_registry_is_not_publication_ready` 待写；登记表尚不存在 | **specified, not implemented** — H2b（V-P） |
 | `ADR-0128` 的 `proposed → accepted` 是 PR #4 合并后的独立 docs-only 变更（H2-0），不属于 H2a | 只有文字约定；H2-0 只改状态/日期并引用 PR #4 评审，H2a 在其合入后才启动 | **specified, not implemented** — H2-0 |
 | H3 的 bundle 入口只保证经它执行的计划，旧 `bind` 仍是公开的 legacy 能力 | 契约见 `ADR-0128` §10 第 6 条；H3 入口不存在；验收不得声称全系统执行都经过 bundle 归属检查 | **specified, not implemented** — H3 |

@@ -1,19 +1,22 @@
-# H2 plan revision log (twelfth through thirty-second round notes)
+# H2 plan revision log (twelfth through thirty-third round notes)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The current plan is
 > `docs/architecture/he1-h2-plan.md`; current decisions live in its §3 and in
 > `docs/adr/0128-package-and-bundle-contract.md`. These notes were moved out of
 > the plan opening by the twenty-fifth revision; the twenty-fifth through
-> thirty-second round notes are added below.
+> thirty-third round notes are added below.
 
 Where a note conflicts with the current plan or ADR, the current document wins.
 The twenty-ninth revision makes `target_profile`/`profile_id` descriptive
 labels that never decide composition, defines affected-set and full conformance
 modes with the `Σ C_i` scaling boundary, and scopes the compat adapter to the API
-layer. The thirty-second revision splits `H(T)` into published-snapshot validity, identity
+layer. The thirty-third revision schedules N1b/N5a as early feasibility checks,
+requires numeric cost thresholds, separates evidence traceability from encoding
+correctness, and makes H3's three conditions the hard gate for H5. The
+thirty-second revision split `H(T)` into published-snapshot validity, identity
 record well-formedness and current-definition matching, so a retired definition is
-not claimed to be recomputable from the current tree, and adds
+not claimed to be recomputable from the current tree, and added
 `GateEvidenceValid(B,T,e)` to `Q`. The thirty-first revision added `C(T)` (artifact
 closure with no orphan derived artifact), `H(T)` (an existing registry audited over
 every registered version), pre-merge `Q(B,T,e)`, and post-merge `P(B,T,e,M)`. The
@@ -23,6 +26,18 @@ claims, and ordered publication as N4b/N5a/N5b.
 
 ## Round notes
 
+  第三十三轮固定：N1b（三平台 no-follow 路径 PoC）与 N5a（受保护合并授权）是 V-P
+  最早的技术可行性验证，排在 H2b 开头，不得等全部目标包或 H2c 覆盖完成才做；作者层
+  可并行，但两项任一失败时 V-P 与 H5 并行扩展演练都不得开始，失败不推翻作者层已
+  证明的事实。1,000 版本成本报告必须给出数值阈值：每次发布/普通 PR 的最大审计读取
+  字节、发布作业与 `T_ordinary_PR,total` 的 CI 墙钟预算、各自被越过的版本数；只给
+  曲线不给阈值不合格。证据可追溯不等于 ISA 编码正确性：作者可同时提交错误定义、由
+  同一错误产生的期望字节和匹配的证据摘要，`--release-evidence` 与
+  `package_conformance` 仍可通过；独立 oracle/硬件复验是 H4/H5 的剩余义务。H2 不
+  证明任意兼容扩展集合可运行期组合；H3 的版本化构建规则、计划目标兼容协议与逐指令
+  `E_package(owner(form(i))) ⊆ E_plan` 是 H5 并行扩展演练的硬门槛。H2a 启动时把
+  测试表转成逐节点验收清单（规范性质 → N 节点 → 测试名 → 跨语言/跨平台证据），
+  `ADR-0128` 仍是唯一语义权威，清单不是第二套规范。
   第三十二轮固定：`H(T)` 不再声称能凭当前树重算退役定义的 `definition_digest`。
   它拆成 `AllPublishedSnapshotsValid(T)`（重算每个登记版本的包与
   `snapshot_digest`，含退役版本）、`AllIdentityRecordsWellFormed(T)`（只检查

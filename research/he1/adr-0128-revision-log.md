@@ -1,4 +1,4 @@
-# ADR-0128 revision log (fourteenth through thirty-second revision)
+# ADR-0128 revision log (fourteenth through thirty-third revision)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The normative entry is
@@ -8,9 +8,12 @@
 
 The notes below are preserved from the twenty-ninth revision. Where they
 conflict with the current ADR, the current ADR wins; in particular the
-thirty-second revision splits `H(T)` into published-snapshot validity, identity
-record well-formedness and current-definition matching, so a retired definition
-is not claimed to be recomputable from the current tree, and makes
+thirty-third revision schedules `N1b` and `N5a` as early feasibility checkpoints,
+requires numeric thresholds for the registry cost measurement, and records that
+evidence traceability is not an ISA encoding-correctness proof. The thirty-second
+revision had split `H(T)` into published-snapshot validity, identity record
+well-formedness and current-definition matching, so a retired definition was not
+claimed to be recomputable from the current tree, and made
 `GateEvidenceValid(B,T,e)` a conjunct of `Q(B,T,e)`. The thirty-first revision
 had made the gate layered with `C(T)`, `H(T)`, `Q(B,T,e)` and
 `P(B,T,e,M) = Q(B,T,e) ∧ AuthorizedMerge(B,T,e,M)`. The thirtieth revision had
@@ -19,6 +22,22 @@ the publication audit's three claims, and restored H3 to consuming the nine-key
 bundle's ownership facts.
 
 ## Revision notes
+
+- Revision: thirty-third revision, 2026-11-20, after the V-P feasibility,
+  composability-boundary and encoding-correctness audit. It states that `N1b`
+  (three-platform no-follow path PoC) and `N5a` (protected merge authorization)
+  are the earliest technical-feasibility validations of the publication
+  channel, scheduled at the start of H2b and not deferred until coverage work
+  ends. It requires the 1,000-version cost report to give numeric thresholds —
+  maximum audit read bytes per publication and per ordinary PR, CI wall-clock
+  budgets, and the version count at which each is crossed — rather than only a
+  curve. It records that matching evidence hashes can bind a wrong definition
+  and wrong expected bytes, so H2 package gates do not prove ISA encoding
+  correctness and independent oracle or hardware re-verification remains an
+  H4/H5 obligation. It also states that H2 does not prove arbitrary compatible
+  extension-set composition: H3's versioned build rule, plan-target
+  compatibility and per-instruction owner-cover check are the hard gate for the
+  H5 parallel extension drill.
 
 - Revision: thirty-second revision, 2026-11-20, after the retired-identity and
   gate-evidence audit. It replaces `HistoryAudit(T)` with

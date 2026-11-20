@@ -10,19 +10,22 @@
   merged, and no H2a commit contains it, so the work never satisfies and depends
   on its own precondition. A later design change reopens `proposed` and needs the
   same sequence again.
-- Revision: thirty-second revision, 2026-11-20. The normative entry now keeps
+- Revision: thirty-third revision, 2026-11-20. The normative entry now keeps
   only current decisions; per-revision audit notes (fourteenth through
-  thirty-first) are in `research/he1/adr-0128-revision-log.md`, which is
+  thirty-second) are in `research/he1/adr-0128-revision-log.md`, which is
   historical evidence and not a contract. Earlier decisions remain in force
-  except where this revision or the `Settles` list restates them. This revision
-  aligns `H(T)` with what the registry actually records: it splits the history
-  predicate into `AllPublishedSnapshotsValid(T)`,
+  except where this revision or the `Settles` list restates them. The entry
+  keeps the `H(T)` split into `AllPublishedSnapshotsValid(T)`,
   `AllIdentityRecordsWellFormed(T)` and `CurrentDefinitionsMatchRegistry(T)`, so
   a retired definition identity is not claimed to be recomputable from the
-  current tree; its immutability is a cross-commit property. It also makes
-  `GateEvidenceValid(B,T,e)` a conjunct of `Q(B,T,e)`, so a candidate verdict
+  current tree; its immutability is a cross-commit property. It also keeps
+  `GateEvidenceValid(B,T,e)` as a conjunct of `Q(B,T,e)`, so a candidate verdict
   binds the tested base, the candidate tree SHA, a trusted gate revision and an
-  authorized run. The post-merge verdict remains
+  authorized run. This revision schedules `N1b` and `N5a` as the earliest
+  technical-feasibility validations of the publication channel, requires the
+  cost measurement to state numeric thresholds rather than only a curve, and
+  records that evidence traceability is not an ISA encoding-correctness proof.
+  The post-merge verdict remains
   `P(B,T,e,M) = Q(B,T,e) ∧ AuthorizedMerge(B,T,e,M)`.
 - History: `research/he1/adr-0128-revision-log.md`.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
@@ -108,7 +111,9 @@
   typed H1 compat adapter, which has no reverse conversion, is not
   replaced by the H3 entry, and leaves the H3 entry's guarantee scoped to its own
   callers while the legacy entry stays public; the builder's error and exit
-  behaviour;
+  behaviour; the early N1b/N5a feasibility checkpoints and the numeric
+  thresholds of the registry-cost measurement; the rule that evidence
+  traceability is not an ISA encoding-correctness proof;
   and the boundary between H2 and H3/H4
 - Supersedes: none
 - Superseded by: none
@@ -832,6 +837,16 @@ possible with a no-follow open" is not evidence: a row without a platform
 version, an API name or an observed result is missing, and a missing or
 inconclusive row stops the publication verdict exactly like a failing one. One
 green platform is never extrapolated to the other two.
+
+**N1b is an early feasibility checkpoint, not a late implementation task.** It
+and N5a are the two earliest technical-feasibility validations of the
+publication channel. Author-layer work may proceed in parallel, but V-P
+feasibility must be exercised before target-package coverage is treated as the
+remaining work: a platform that cannot satisfy the open-time guarantee, or a
+repository that cannot demonstrate merge authorization, is a design failure
+that must surface at the start of H2b rather than after the package set is
+complete. No amount of later coverage evidence repairs it, and a PoC failure
+does not invalidate author-layer facts already proved (§8.5).
 
 ### 4. The spec lists the full closure; the builder never scans packages
 
@@ -1989,7 +2004,10 @@ repository already has it. The observation recorded for this revision is
 `main` with `protected: false`, an empty repository-rulesets list, and a 403
 from the branch-protection detail endpoint. Per the previous sentence, that is
 an evidence gap, not a finding that no protection exists; it does not authorize
-a publication verdict.
+a publication verdict, and it is not evidence that the protection is
+sufficient either. N5a is the second early feasibility checkpoint: it is
+scheduled at the start of the publication channel, not after coverage work,
+because an undemonstrated merge mechanism changes what the channel can promise.
 
 **A green CI run on the planning PR is not that evidence.** N5a cannot be closed
 by pointing at successful checks: they were produced for some `(B_checked,
@@ -2492,10 +2510,12 @@ gate), (b) a bundle publication (`build` and both `--check`s) and (c) the
 full-history audit (`verify --published --check`, including re-hashing every
 `snapshot_digest`): wall time, peak memory and
 bytes read, with the machine, OS and toolchain version. Its acceptance
-report records the measured curve, states the documented threshold — a version
-count, a wall-time budget or a bytes-read budget — at which the single-file
-registry and the full re-read audit must be revisited, and fixes a per-job CI
-cost bound so the history-only job cannot silently dominate the required checks.
+report records the measured curve and states **numeric thresholds** — a
+published-version count, a wall-time budget and a bytes-read budget — at which
+the single-file registry and the full re-read audit must be revisited, and fixes
+a per-job CI cost bound so the history-only job cannot silently dominate the
+required checks. A curve without those numbers is not an executable evolution
+condition.
 Crossing a recorded threshold or a CI budget overrun is the trigger for a new ADR
 on sharding, incremental audit or a different registry format; it is not a
 scaling property H2 may claim, and three representative packages are no evidence
@@ -2906,8 +2926,14 @@ bundle build would read every historical package and an unrelated retired packag
 could break an old spec, which is the discovery coupling H2 removes.
 
 The audit's cost therefore grows with published history rather than with the
-changed set. §8.3 fixes the 1,000-version measurement and the threshold that
-triggers a new ADR, so neither gate may be described as a constant-cost check.
+changed set. §8.3 fixes the 1,000-version measurement, so neither gate may be
+described as a constant-cost check. The measurement must report **numeric
+thresholds**, not only a growth curve: a maximum acceptable audit read-byte
+budget (per publication and per ordinary author PR), a CI wall-clock budget for
+the publication job and for `T_ordinary_PR,total`, and the published-version
+count at which each budget is crossed. Crossing any stated threshold is the
+trigger for a new ADR on sharding, incremental audit or a new registry format;
+a curve without those numbers does not form an executable evolution condition.
 
 **A derived artifact exists only while its spec exists.** A lock, a sealed
 bundle and a legacy snapshot are outputs of one spec, not independent releases.
@@ -2997,14 +3023,18 @@ H2 is therefore accepted through **two verdicts**, recorded separately:
   of every unreferenced non-regular directory entry, the changed-path gate, the
   merge-freshness proof with the executed stale-CI counterexample and the
   provenance of the gate logic itself (§8.1), and the ~1,000-version
-  measurement with its threshold.
+  measurement with its numeric thresholds.
 
 The ordering rules are part of the contract, because either misordering would be
 a false claim:
 
 1. V-A work may proceed while V-P prerequisites are open. A single external API
    returning 403 must not block the data model, the digests, the determinism
-   tests or the first real package.
+   tests or the first real package. N1b and N5a are still the earliest
+   feasibility checkpoints of V-P: they are scheduled first in H2b and may not
+   be deferred until every target package or coverage item is complete, because
+   their outcome decides whether the publication channel is implementable at
+   all.
 2. No artifact is **published**, and no wording calls one immutable, trusted or
    released, until V-P passes. Until then a lock, sealed bundle or legacy
    snapshot is a development artifact: reproducible, checked for internal
@@ -3636,6 +3666,18 @@ label these claims separately:
 None of the first seven implies the last. H2 records evidence and executes the
 declared cases; it does not claim a fresh oracle run for a new package.
 
+**Evidence traceability is not ISA encoding correctness.** A package can be
+self-consistent and still wrong: an author can commit a mistaken opcode, the
+expected bytes produced by that same mistake, and an evidence manifest whose
+hashes match those files. `verify --package --release-evidence` and
+`package_conformance` then pass, because they verify existence, references,
+hashes and execution against the declared expectation, not the truth of the
+encoding. Independent re-verification — re-running an external assembler, a
+hardware check or another oracle for the new package — is a remaining
+correctness obligation for H4/H5, not a property H2 establishes. H2 reports
+must state this limit rather than present a green package gate as an encoding
+proof (§9.1).
+
 H2 does not add per-ISA branches to the harness. It dispatches from
 `tests/cases.json` and `package.json` only (`HE-T14`).
 
@@ -4049,6 +4091,18 @@ comparing the materializer with itself proves the bytes.
   rule reads — `form_owners` and each package's declared cover — but H2 runs no
   owner-cover check and adds no subset cell; a definition format whose
   per-form requirement is absent still relies on the conservative cover (§4.1).
+  H2 therefore does not prove that arbitrary compatible extension sets compose
+  at run time: under `fmp-def/0.1` the transitional `h2-exact-target` equality
+  rule can still reject a `rv64i`-only package beside a `rv64i`+`rv64c`
+  package. Independent authoring must not be reported as runtime
+  composability; H3's versioned build rule, plan-target compatibility and
+  per-instruction owner-cover check are the hard gate for the H5 parallel
+  extension drill (§4.1).
+- No claim that evidence traceability proves ISA encoding correctness. Matching
+  hashes can bind a wrong definition, wrong expected bytes and a consistent
+  evidence record; the package gate rejects accidental and unilateral errors,
+  and independent oracle or hardware re-verification remains a correctness
+  obligation for H4/H5 (§7.1, §9.1).
 - No claim that a bundle is executable because it verifies. `bundle_digest` is
   recomputable from the sealed file alone, and that proves what the bundle says,
   not that a plan may use it; `bind` takes a `Definition`, never a bundle, and the
@@ -4862,8 +4916,9 @@ comparing the materializer with itself proves the bytes.
 | Form ⊆ package ⊆ bundle extension inclusion and the per-package `read` before merge | specified; `bind_forms` checks a 0.2 form against the merged target, so the merged-only check is the gap | **specified, not implemented** — H2a |
 | Reserved legacy definition names from `definitions/*/*.json` | specified; the index is readable today, the builder has no reserved-set check | **specified, not implemented** — H2a |
 | The publication audit covers every file in a published version directory, while still not proving provenance | `snapshot_digest` is recomputed by `verify --published --check` over every regular file; a mismatch is `snapshot-mismatch`. Who produced the first value, and a history rewrite or bypassed gate, remain outside the digest | **specified, not implemented** — V-P |
-| The single-file registry's audit cost is recorded at ~1,000 published versions, with a threshold that triggers a later ADR | not measured; the registry does not exist; V-P must run three runs each for a package change, a publication and a full audit (including snapshot re-hashing), recording time, memory and bytes read | **unverified** — V-P |
+| The single-file registry's audit cost is recorded at ~1,000 published versions, with numeric thresholds (bytes read, wall time and version count) that trigger a later ADR | not measured; the registry does not exist; V-P must run three runs each for a package change, a publication and a full audit (including snapshot re-hashing), record time, memory and bytes read, and state the budgets and the version count that crosses them | **unverified** — V-P |
 | The no-follow open is achievable on Linux, macOS and Windows | not proved; `std::fs` has no portable no-follow open, so the V-P N1b PoC must measure a path layer on all three platforms as a standalone deliverable that records OS version, toolchain/API, fault injection and per-case result before the hardened reader | **unverified** — V-P N1b |
+| Evidence traceability is not ISA encoding correctness, and independent re-verification remains an H4/H5 obligation | §7.1/§9.1; a self-consistent package with a wrong definition, matching expected bytes and matching evidence hashes passes `--release-evidence` and `package_conformance`; H2 does not re-run a new package's oracle | **specified; remains H4/H5** |
 | Identifier, path-segment and artifact-filename rules are format rejections before any open | specified; the builder has no package reader | **unverified** — H2a |
 | The same relative asset path in two different package roots is legal, and a folded root alias or repeated spec path is `path-lexical` | specified; no closure reader exists | **unverified** — H2a |
 | A declared lowercase path does not open a case-different on-disk entry, on intermediate directory or final file | specified as part of the open; no hardened path layer exists; the N1b gate proves it on Linux, macOS and Windows | **unverified** — V-P N1b |
