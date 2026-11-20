@@ -197,8 +197,8 @@ Entries are appended by a change that merges *after* the one being described,
 because a commit cannot contain its own merge SHAs. The table records every
 merge completed under this channel up to the change that wrote it; the merge
 that lands the newest entry is checked by the same procedure and becomes the next
-entry when one is added. Three consecutive entries show this is not a single-run
-accident: two merges under strict up-to-date and one through the queue. Every
+entry when one is added. Four consecutive entries show this is not a single-run
+accident: two merges under strict up-to-date and two through the queue. Every
 merge after entry 1 went through this channel.
 
 | Entry | PR | Tested tree | Landed commit | Landed tree | Equal |
@@ -206,6 +206,7 @@ merge after entry 1 went through this channel.
 | 1 | #9 | `88c65951b350a513247338a3fdda1d470d677933` | `c9ae2648e5230f0ba79c6be4919806b20763959d` | `88c65951b350a513247338a3fdda1d470d677933` | yes |
 | 2 | #10 | `cdcbd458b6508080e99f5605da139060de5b6c0c` | `e3fef895fb464a123eff6c8bc375f23cbc5b1a30` | `cdcbd458b6508080e99f5605da139060de5b6c0c` | yes |
 | 3 | #12 | `b5cbcd7f9aa120cc5f07099992a6d531b690fd71` | `cc7674206da2032eb6602c94fa760ca5a16fb60e` | `b5cbcd7f9aa120cc5f07099992a6d531b690fd71` | yes |
+| 4 | #13 | `4f5322d81b0a7561cd6450f413dd88ce32fbeb4e` | `0d07288aabd5b38b4e155b2ef92c923cee8b3917` | `4f5322d81b0a7561cd6450f413dd88ce32fbeb4e` | yes |
 
 ### Entry 1, PR #9
 
@@ -264,8 +265,25 @@ of one is landed by fast-forwarding the branch to the commit the queue built.
 The tested commit and the landed commit are the same object.
 
 The strict up-to-date policy from §1 is still on. With a queue it is redundant —
-the queue re-tests against the current base — but it is kept so entries 1 to 3
+the queue re-tests against the current base — but it is kept so entries 1 to 4
 were produced under one unchanged configuration.
+
+### Entry 4, PR #13 — second queued merge
+
+- Base: `cc7674206da2032eb6602c94fa760ca5a16fb60e` (entry 3's landed commit).
+- Head: `664f3e104f587a4c756d826f13cc65efbd161fc3`.
+- Seven required checks green on the pull request, then `gh pr merge 13 --auto`
+  put it at queue position 1.
+- `merge_group` runs on head `0d07288aabd5b38b4e155b2ef92c923cee8b3917`:
+  `44742138161` (`gates`) and `44742138424` (`determinism`), both `success`.
+- The queue merged at 2026-11-20T13:16:45Z.
+- Landed commit `0d07288aabd5b38b4e155b2ef92c923cee8b3917`, tree
+  `4f5322d81b0a7561cd6450f413dd88ce32fbeb4e`, first parent
+  `cc7674206da2032eb6602c94fa760ca5a16fb60e`.
+
+Again `origin/main` is exactly the `merge_group` head. Two consecutive queued
+merges now show the property, and entry 4 was queued after entry 3 had landed,
+so it does not depend on a freshly enabled queue.
 
 ## 7. Merge queue after the organization transfer
 
@@ -319,5 +337,5 @@ The enabled rule, verbatim:
    gates ran on *is* the commit on `main`, not merely one with the same tree.
 5. Cross-check `origin/main^{tree}` against `refs/pull/<n>/merge^{tree}`.
 
-The first queued merge is entry 3; its values are recorded by the change that
-follows it, as §6 explains.
+The first two queued merges are entries 3 and 4; their values are recorded by the
+changes that follow them, as §6 explains.
