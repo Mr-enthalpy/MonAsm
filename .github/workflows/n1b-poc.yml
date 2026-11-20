@@ -1,0 +1,44 @@
+name: N1b path PoC
+
+on:
+  push:
+    branches: [he1/n1b-feasibility]
+    paths:
+      - "research/he1/n1b-poc/**"
+      - ".github/workflows/n1b-poc.yml"
+  pull_request:
+    paths:
+      - "research/he1/n1b-poc/**"
+      - ".github/workflows/n1b-poc.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  poc:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and run (POSIX)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=gnu11 -O2 -Wall -Wextra -o n1b_poc research/he1/n1b-poc/n1b_poc.c
+          ./n1b_poc "$RUNNER_TEMP/n1b"
+
+      - name: Build and run (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          clang -std=c11 -O2 -Wall -Wextra -o n1b_poc.exe research/he1/n1b-poc/n1b_poc.c
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\n1b_poc.exe "$env:RUNNER_TEMP\n1b"
+          exit $LASTEXITCODE
