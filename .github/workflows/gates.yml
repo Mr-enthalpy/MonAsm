@@ -37,6 +37,12 @@ name: gates
 # `--profile minimal` does not install `rustfmt`, and a shallow checkout has no
 # `HEAD^` to diff against. The oracle install names the exact release asset
 # because `apt.llvm.org` tracks the newest 23.x (it served 23.1.6 on that run).
+#
+# Every `uses:` is pinned to a full commit, not a moving tag, and the repository
+# setting `sha_pinning_required` is on, so a tag reference does not run. The
+# comment beside each pin names the release that commit belongs to. See
+# `research/he1/n5a-protected-merge-trial.md` §5 for why this is a gate-input
+# property rather than a style preference.
 
 on:
   push:
@@ -60,13 +66,13 @@ jobs:
     name: document and definition gates
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # The whitespace gate diffs the range the event names, which needs the
           # commits behind `github.event.before`; a shallow clone has none.
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
 
@@ -113,7 +119,7 @@ jobs:
     name: workspace tests
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # `HE-T20`/`ADR-0127` D9: the receipt is compiled with
       # `option_env!("FMP_BUILD_ID")`, so the label must name the commit this
@@ -195,7 +201,7 @@ jobs:
     name: H0 payload baseline
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # Same label as the workspace job: the baseline binary is a shipped build,
       # and its receipt should name the commit this job built.
@@ -219,7 +225,7 @@ jobs:
             echo "| PR head | \`${head}\` |"
           } >> "${GITHUB_STEP_SUMMARY}"
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
 
@@ -257,7 +263,7 @@ jobs:
     name: oracle rerun
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # The records name `llvm-mc 23.1.2`. The release asset is installed and
       # checked against the digest in its signed attestation, because the
