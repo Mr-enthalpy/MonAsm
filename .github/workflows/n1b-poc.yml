@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   poc:
-    name: ${{ matrix.os }}
+    name: n1b-poc (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
