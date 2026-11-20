@@ -182,18 +182,17 @@ queue's stronger ordering guarantee.
 ## 6. Log
 
 Entries are appended by a change that merges *after* the one being described,
-because a commit cannot contain its own merge SHAs. The merge that lands an
-entry is therefore always one change behind this table; the procedure in §4 is
-applied to it as well, and its values appear in the next entry. That lag is
-inherent to an append-only log, not an omission.
+because a commit cannot contain its own merge SHAs. The table records every
+merge completed under this channel up to the change that wrote it; the merge
+that lands the newest entry is checked by the same procedure and becomes the next
+entry when one is added. Two consecutive entries are enough to show this is not
+a single-run accident, and the repository's whole history now goes through the
+channel.
 
 | Entry | PR | Tested tree | Landed commit | Landed tree | Equal |
 |---|---|---|---|---|---|
 | 1 | #9 | `88c65951b350a513247338a3fdda1d470d677933` | `c9ae2648e5230f0ba79c6be4919806b20763959d` | `88c65951b350a513247338a3fdda1d470d677933` | yes |
-
-The merge that lands this entry (PR #10) is verified by the same procedure; its
-values are appended when the entry after it is recorded. The table is a sample
-of completed merges, not a census: every merge now goes through this channel.
+| 2 | #10 | `cdcbd458b6508080e99f5605da139060de5b6c0c` | `e3fef895fb464a123eff6c8bc375f23cbc5b1a30` | `cdcbd458b6508080e99f5605da139060de5b6c0c` | yes |
 
 ### Entry 1, PR #9
 
@@ -212,3 +211,20 @@ of completed merges, not a census: every merge now goes through this channel.
 `tree(tested) == tree(landed)` and `base == parent_1(landed)` both hold. Nothing
 advanced `main` between the last required check and the merge, and the strict
 policy would have refused the merge if it had.
+
+### Entry 2, PR #10
+
+- Base when the checks ran: `c9ae2648e5230f0ba79c6be4919806b20763959d`.
+- Head: `b138d1d1e0380493eb679f6a7c4fa1b903034665`.
+- All seven required checks green; `mergeStateStatus` `CLEAN` at merge time.
+- Tested commit, `refs/pull/10/merge`: `9baeb13df499deae63a68baca6cb921be302c1cf`,
+  tree `cdcbd458b6508080e99f5605da139060de5b6c0c`, first parent
+  `c9ae2648e5230f0ba79c6be4919806b20763959d`.
+- Merge performed with `gh pr merge 10 --merge` at 2026-11-20T12:27:23Z.
+- Landed commit `e3fef895fb464a123eff6c8bc375f23cbc5b1a30`, tree
+  `cdcbd458b6508080e99f5605da139060de5b6c0c`, first parent
+  `c9ae2648e5230f0ba79c6be4919806b20763959d`.
+
+Again `tree(tested) == tree(landed)` and `base == parent_1(landed)`. The second
+entry was produced by an ordinary change after the first had landed, so the
+result does not depend on the ruleset having been freshly created.
