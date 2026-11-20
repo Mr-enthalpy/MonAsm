@@ -1,4 +1,4 @@
-# ADR-0128 revision log (fourteenth through twenty-eighth revision)
+# ADR-0128 revision log (fourteenth through twenty-ninth revision)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The normative entry is
@@ -6,13 +6,26 @@
 > authoritative. These notes were moved out of the ADR opening by the
 > twenty-ninth revision so that a new implementer reads current decisions first.
 
-The notes below are preserved from the twenty-eighth revision. Where they
+The notes below are preserved from the twenty-ninth revision. Where they
 conflict with the current ADR, the current ADR wins; in particular the
-twenty-ninth revision removes the `target_profile`/`profile_id` equality
-condition, defines two conformance modes, and scopes the compat adapter claim to
-the API layer.
+thirtieth revision replaces the tree-only `P(T)` with `P(B,T,e,M)`, keeps `R(T)`
+tree-only, separates the publication audit's three claims, and restores H3 to
+consuming the nine-key bundle's ownership facts.
 
 ## Revision notes
+
+- Revision: thirtieth revision, 2026-11-20, after the sealed-format,
+  publication-audit-scope, build-postcondition and publication-order audit. It
+  fixes the publication verdict as
+  `P(B,T,e,M) = A(T) ∧ R(T) ∧ PreservesPublished(B,T) ∧ AuthorizedMerge(B,T,e,M)`;
+  makes `R(T)` a tree-only predicate and moves base-registry preservation to
+  `PreservesPublished`; separates current snapshot consistency, pre-merge
+  changed-path authorization and provenance trust; states that H3 consumes the
+  `form_owners` map and package covers already inside the nine-key bundle and
+  adds only plan-compatibility rules and a verification entry; restates that a
+  successful build implies only `A_β(T_r)`; and orders publication as N4b
+  (format/audit/synthetic tests), N5a (protected merge mechanism) and N5b (first
+  real publication).
 
 - Revision: twenty-eighth revision, 2026-11-20, after the per-bundle-artifact,
   registry-field, evidence-history, snapshot-name and merge-mode audit. It splits

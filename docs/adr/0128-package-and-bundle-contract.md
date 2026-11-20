@@ -10,17 +10,19 @@
   merged, and no H2a commit contains it, so the work never satisfies and depends
   on its own precondition. A later design change reopens `proposed` and needs the
   same sequence again.
-- Revision: twenty-ninth revision, 2026-11-20. The normative entry now keeps
+- Revision: thirtieth revision, 2026-11-20. The normative entry now keeps
   only current decisions; per-revision audit notes (fourteenth through
-  twenty-eighth) are in `research/he1/adr-0128-revision-log.md`, which is
+  twenty-ninth) are in `research/he1/adr-0128-revision-log.md`, which is
   historical evidence and not a contract. Earlier decisions remain in force
   except where this revision or the `Settles` list restates them. This revision
-  removes the label-equality condition between a package's `target_profile` and
-  the bundle's `target.profile_id`, so composition depends only on
-  `definition_format` and the six-key `target.identity`; defines two conformance
-  modes for ordinary package-only PRs and for reader/validator/materializer
-  changes; and states the compat adapter as the only typed H1 adapter in
-  `fmp-definition` rather than a process-global exclusivity claim.
+  makes the publication verdict the four-argument predicate
+  `P(B,T,e,M) = A(T) ∧ R(T) ∧ PreservesPublished(B,T) ∧ AuthorizedMerge(B,T,e,M)`,
+  keeps `R(T)` a predicate of the tree alone, separates current snapshot
+  consistency from pre-merge authorization and provenance trust, states that H3
+  consumes the ownership facts the nine-key bundle already carries instead of
+  adding a sealed format, and orders publication work as registry format and
+  audit with synthetic tests (N4b), a protected merge mechanism (N5a), then the
+  first real publication (N5b).
 - History: `research/he1/adr-0128-revision-log.md`.
 - Settles: the `monasm-package/0.1`, `monasm-bundle-spec/0.1`,
   `monasm-lock/0.1`, `monasm-bundle/0.1` and `monasm-published/0.1` formats;
@@ -31,7 +33,8 @@
   self-contained nine-key `monasm-bundle/0.1` that recomputes its own definition
   and `bundle_digest` from the bytes it carries, and the lock pairing that
   separately verifies source paths, release evidence and the builder record —
-  H3 needs no new sealed format for self-verification; the declared-versus-derived
+  H3 needs no new sealed format for self-verification or for consuming ownership
+  facts; the declared-versus-derived
   capability set;
   the release-shaped digest vector; the value-defined case diff; the digest
   layering and its byte-level preimages; the reservation of every frozen legacy
@@ -66,20 +69,24 @@
   target covers versus bundle target selection; the descriptive-only status of
   `target_profile` and `target.profile_id`, which are kept in manifests and
   digests but never decide composition; the H3 condition for accepting a
-  subset target (a versioned build rule, a plan protocol, and a per-instruction
-  owner/requirement source that always checks the owner's declared cover
-  `E_package(owner(form(i))) ⊆ E_plan` and adds a per-form requirement only when
+  subset target (a versioned build rule, a plan protocol, and the per-instruction
+  owner/requirement facts that always check the owner's declared cover
+  `E_package(owner(form(i))) ⊆ E_plan` and add a per-form requirement only when
   its format version proves that requirement complete, with default rejection
-  when the proof is absent);
+  when the proof is absent); those owner and cover facts are already carried by
+  `monasm-bundle/0.1` and bound by `bundle_digest`, so H3 adds the plan rule and
+  its verification entry rather than a new sealed format;
   the injective full-`package_id` directory mapping and target-tip
   publication authority (`Published(B) ⊆ Published(H)` with tree-byte equality);
   the merge-freshness rule that a verdict is keyed on the base commit SHA, the
   tested candidate tree SHA and the merge mode, and must be re-established when
   any of them moves, with the provenance of the gate logic that produced it and a
   mode read from the platform's merge record; the per-bundle artifact predicate
-  `A_β(T)`, the whole-tree conjunction `A(T)`, and `R(T)` as
-  `R_packages ∧ R_identities`, where a successful build implies only
-  `A_β(T)`; the permanent
+  `A_β(T)`, the whole-tree conjunction `A(T)`, `R(T)` as
+  `R_packages ∧ R_identities` over the tree alone, and the four-argument
+  publication verdict `P(B,T,e,M) = A(T) ∧ R(T) ∧ PreservesPublished(B,T) ∧
+  AuthorizedMerge(B,T,e,M)`, where a successful build implies only `A_β(T)`; the
+  permanent
   `monasm-package/0.1` rejection of non-empty `exports.types`/`exports.profiles`
   with their semantics reserved to an explicit later package format; the ordered
   input pipeline (lexical path, no-follow open, handle type check, same-handle
@@ -1895,7 +1902,7 @@ record of the operation that created `M` (the merge or merge-queue event/API
 object) and stores its identifier next to `(B_checked, C_checked, mode)`. It does
 not infer the mode from `git log`, from the parent count, or from the branch
 name. When the platform exposes no record for the landed commit, the verdict is
-incomplete and V-P stops at N5 rather than guessing a mode that makes the
+incomplete and V-P stops at N5a rather than guessing a mode that makes the
 equations pass.
 
 Without this, a correct run can still be stale in the worst way, and the tip rule
@@ -1976,7 +1983,7 @@ from the branch-protection detail endpoint. Per the previous sentence, that is
 an evidence gap, not a finding that no protection exists; it does not authorize
 a publication verdict.
 
-**A green CI run on the planning PR is not that evidence.** N5 cannot be closed
+**A green CI run on the planning PR is not that evidence.** N5a cannot be closed
 by pointing at successful checks: they were produced for some `(B_checked,
 C_checked, mode)`, and a workflow that would happily merge a different tree has
 not been tested by them. The publication-channel acceptance must therefore (a)
@@ -1988,7 +1995,7 @@ that moves the target tip, and a merge attempt that must be rejected and re-run
 rather than land `C_A` on the new base. A dry description of the equations, or a
 settings page quoted without the operation, does not satisfy (b).
 
-If the mechanism cannot be demonstrated, the publication verdict stops at N5 and
+If the mechanism cannot be demonstrated, the publication verdict stops at N5a and
 the publication gate stays open. A post-merge audit on the target branch remains
 detection only and may not be substituted for the pre-merge authorization;
 shipping H2 with "we will notice afterwards" is the failure this gate exists to
@@ -2626,11 +2633,36 @@ Five propositions are involved, and the contract keeps them separate:
   establishes `R(T)` with both commands: `--all --check` rejects a missing row
   for a selected spec (`published-registry-incomplete`), and
   `--published --check` recomputes each recorded value (`snapshot-mismatch`,
-  `published-registry-invalid`). `R(T)` is vacuous when
-  no registry exists on either the base or the head (§8.5 rule 3).
-- `PublicationReady(T)` (`P(T)`) — `A(T) ∧ R(T)` plus the merge-freshness and
-  gate-provenance conditions of §8.1, which are properties of the merge operation
-  rather than of the tree alone. No tree-only predicate can carry them.
+  `published-registry-invalid`). `R(T)` is a predicate of the tree alone: when
+  `T` has no registry it is **true by definition** (there is nothing to be
+  incomplete), and when `T` has one, every selected spec needs its rows. `R(T)`
+  does not read the base commit; the rule that a base registry may not be dropped
+  is `PreservesPublished(B, T)` below, not an implicit dependency of `R` on the
+  past.
+- `PublicationReady(B, T, e, M)` (`P(B,T,e,M)`) — four conjuncts, deliberately
+  separated because they answer different questions:
+  - `A(T)` — the current artifacts are pairwise consistent;
+  - `R(T)` — the current registry completes the current selection;
+  - `PreservesPublished(B, T)` — the state transition from the base commit `B` to
+    the candidate tree `T` is legal: `Published(B) ⊆ Published(T)`, every path
+    published in `B` still exists in `T` with equal bytes, and no base registry
+    row is deleted, rewritten or reordered (§8.1);
+  - `AuthorizedMerge(B, T, e, M)` — that transition was authorized by evidence
+    `e` and by the landed operation `M`. `e` binds the tested base commit, the
+    tested candidate **tree** SHA, the gate-logic revision and the gate's
+    authorization source; `e` is not freely substitutable. `M` is the actual
+    landed operation: `B_landed = B_checked`, `Tree(M) = C_checked`,
+    `mode(M) = mode`, where the mode comes from the platform's merge record
+    (§8.1) and not from the commit's parent list.
+
+  `P` is therefore not a function of `T` alone: the same tree can arrive through
+  an authorized merge or be written around the gate, and only the evidence and the
+  landed operation distinguish them. No tree-only command can establish
+  `AuthorizedMerge`; `verify --all --check` and `verify --published --check`
+  establish `A(T)` and `R(T)`, the changed-path gate establishes
+  `PreservesPublished` before the merge, and the platform record establishes the
+  landed operation and mode. A report must name which conjuncts it actually
+  checked and must not promote a tree check to a publication verdict.
 
 For any accepted input, `BuildSucceeded(r, β)` implies `A_β(T_r)` on the tree `r`
 wrote, and nothing wider. It does **not** imply `A(T_r)`: a build touches one
@@ -2638,7 +2670,8 @@ spec, so a second selected spec whose committed lock is stale keeps `A(T_r)`
 false, and `verify --all --check` fails on that bundle even though `r` exited 0.
 `a_single_bundle_build_does_not_prove_the_whole_tree` fixes this direction, and
 it is the reason the implication is stated per bundle rather than over the tree.
-It also does **not** imply `R(T_r)` or `P(T_r)`: `build` never writes registry
+It also does **not** imply `R(T_r)` or the publication verdict
+`P(B,T_r,e,M)`: `build` never writes registry
 rows, so a legally successful build of a new spec in a tree that already has a
 registry leaves that spec without a row. That intermediate tree is exactly what
 the publication flow orders — build, then append rows, then run both `--check`s,
@@ -2891,13 +2924,14 @@ H2 is therefore accepted through **two verdicts**, recorded separately:
   equality, the build write phase with its bounded streaming comparison, the
   legacy-snapshot equality gate, `verify --package`, and the `A(T)` part of
   `verify --all --check` over the committed specs. A V-A report cites `A(T)`;
-  `R(T)` is vacuous before a registry exists and belongs to V-P, so V-A never
-  turns a green `--all --check` on a tree with a registry into evidence. V-A has
-  no external prerequisite and does not wait for V-P.
+  when `T` itself has no registry, `R(T)` is true by definition and belongs to
+  V-P, so V-A never turns a green `--all --check` on a tree with a registry into
+  evidence. V-A has no external prerequisite and does not wait for V-P.
 - **V-P, publication channel.** The hardened reader (open-time no-follow, exact
   directory-entry names, replacement-race binding, regular-file-only leaves) with
   its three-platform PoC, `bundles/published.json` with `identities` and
-  `snapshot_digest`, append-only and retirement rules, `R(T)` and `P(T)`, the
+  `snapshot_digest`, append-only and retirement rules, `R(T)` and
+  `P(B,T,e,M)`, the
   full-history audit including the rejection of every unreferenced non-regular
   directory entry, the changed-path gate, the merge-freshness proof with the
   executed stale-CI counterexample and the provenance of the gate logic itself
@@ -2915,13 +2949,14 @@ a false claim:
    consistency, and explicitly not a publication record.
 3. `bundles/published.json` does not exist before V-P. Creating it early would
    assert an immutability the channel cannot yet enforce, and `verify --published
-   --check` is not a CI gate before then. While no registry exists on either the
-   base commit `B` or the head `H`, `verify --all --check` verifies the lock,
-   the sealed bundle and the legacy equality gate and reports every selected path
+   --check` is not a CI gate before then. While `T` has no registry, `R(T)` is
+   true by definition and `verify --all --check` verifies the lock, the sealed
+   bundle and the legacy equality gate and reports every selected path
    as a **development artifact**; it does not report
    `published-registry-incomplete`, because nothing claims to be published. A
    branch whose base `B` has a registry cannot use that state: deleting or
-   bypassing it is `published-registry-modified`, and from then on every
+   bypassing it fails `PreservesPublished(B,T)` and is
+   `published-registry-modified`, and from then on every
    head-selected path needs a head row (§8.1, §8.3).
 4. A development artifact is not promoted by relabelling. The first V-P
    publication rebuilds its inputs through the hardened reader, or re-verifies
@@ -2931,11 +2966,20 @@ a false claim:
    the initial x86 slice (§8.3). A build produces `A_β(T)` for its own bundle; the
    whole-tree `A(T)` is the conjunction over every selected spec and is not a
    product of one build. Only the registry append plus both `--check`s produce
-   `R(T)`; `P(T)` additionally needs the merge evidence of §8.1. No report may
+   `R(T)`; `P(B,T,e,M)` additionally needs `PreservesPublished(B,T)` and the merge
+   evidence of §8.1. No report may
    promote one predicate to the next because the bytes look right.
 5. V-P failure stops the publication claim and the H2 exit, not the author layer.
    No post-merge audit, green CI run or after-the-fact review may substitute for
    a V-P prerequisite (§8.1).
+
+The work is ordered accordingly: registry format and audit code are tested on
+synthetic trees first, then the protected merge mechanism is established and its
+stale-CI counterexample executed, and only then is the first real
+`bundles/published.json` committed with every spec selected at HEAD. The first
+two steps produce no real registry. A change that edits the publication gate is
+not authorized by the green run of that same change; it needs an independent
+authorization mechanism that existed before the change (§8.1).
 
 Merging the planning PR accepts the design in this ADR; it does **not** make V-P
 available and does not record a platform guarantee. As observed on 2026-11-19,
@@ -3957,7 +4001,7 @@ comparing the materializer with itself proves the bytes.
   the platform API and records the evidence. A 403, an empty ruleset list or an
   unreadable setting is a missing evidence step, not proof that no protection
   exists (§8.1, §8.5).
-- No claim that a green CI run closes the publication gate. N5 needs the
+- No claim that a green CI run closes the publication gate. N5a needs the
   mechanism recorded and the stale-CI counterexample executed; otherwise the
   publication-channel verdict stops there, and a post-merge audit is detection,
   never authorization (§8.1, §8.5).
@@ -4099,15 +4143,18 @@ comparing the materializer with itself proves the bytes.
   merge, and the publication is authorized only by a run whose base and tree are
   the ones actually landed. The cost is a merge queue or an operation that writes
   the recorded candidate; required up-to-date checks alone do not establish it.
-  N5 closes only when the effective mechanism is recorded and the stale-CI
+  N5a closes only when the effective mechanism is recorded and the stale-CI
   counterexample has been executed; if neither can be shown, the publication
   verdict stops at that
   gate, because a post-merge audit is detection and cannot authorize a merge.
-- H3 pays an artifact change for target subsets. `monasm-bundle/0.1` records its
-  selected `packages` and the merged definition, not per-form owners or covers, so
-  a subset plan cannot be checked against it. H3's versioned bundle or frozen
-  companion source carries that proof, and a form without one is rejected rather
-  than read as needing no extension (§4.1).
+- H3 consumes the ownership facts `monasm-bundle/0.1` already carries.
+  `form_owners` maps every form to its owning package, and each
+  `packages[]` entry carries that package's declared `enabled_extensions` cover;
+  both are inside `bundle_digest`, so a subset plan can be checked against the
+  sealed bytes without a new sealed format or a companion source. H3's work is
+  the plan-compatibility rule and its verification entry, not a second bundle
+  version; a form missing from `form_owners` is already `bundle-owner-incomplete`
+  (§4.1, §8.2).
 - `monasm-package/0.1` rejects non-empty `exports.types`/`exports.profiles`
   permanently, so acceptance cannot silently widen with a builder upgrade. H4
   pays one explicit package-format version for type/profile semantics instead of
@@ -4217,14 +4264,21 @@ comparing the materializer with itself proves the bytes.
   `verify --package` never executes the plan. A value such as `{"reg":-1}` thus
   has a legal plan-scope representation without being dressed as form coverage,
   and a form-scope case stays `bind`-only (§9.1).
-- The publication audit's claim is bounded to the executable assets and
-  identity. Whole-directory immutability is enforced by the changed-path gate,
-  which compares the **target-branch tip `B`** against the merged result `H`
-  (`Published(B) ⊆ Published(H)` and equal tree bytes for every published path),
-  and recorded by git history, not re-attested by `verify --published --check`;
-  H2 says so instead of implying a snapshot proof it does not have. Using the
-  merge base here would miss a version published on the target branch after the
-  feature branch forked.
+- The publication audit re-proves current snapshot consistency, not who
+  authorized or produced the record. `verify --published --check` re-enumerates
+  every published version directory — unselected retired versions, `README`,
+  `NOTICE`, tests, evidence, and every unlisted non-regular entry — and recomputes
+  `snapshot_digest` against the recorded value, so a current byte or entry-set
+  change is `snapshot-mismatch` or `not-a-regular-file`. That is the first of
+  three separate claims: the changed-path gate compares the **target-branch tip
+  `B`** with the merged result `H` to forbid modifying a published version before
+  merge (`Published(B) ⊆ Published(H)` with equal tree bytes), and a protected
+  merge mechanism is what prevents a writer from bypassing that gate or
+  authorizing a merge with a stale verdict. The audit cannot prove that the gate
+  ran, that the original recorder was honest, or that history was not rewritten
+  around it; H2 states the three claims separately instead of collapsing them
+  into one. Using the merge base instead of `B` would miss a version published on
+  the target branch after the feature branch forked.
 - Digest preimages, the Level 0/Level 1 projections and the package budgets are
   frozen at the byte and key level, with a cross-language vector, so a Rust and a
   Python implementation cannot silently disagree.
@@ -4752,19 +4806,23 @@ comparing the materializer with itself proves the bytes.
 | One loaded package value feeds the source digest, row/target comparison, per-package `read` and merge | specified; no reader exists | **unverified** — H2a |
 | First publication bootstraps without a registry cycle, and `build` validates every output before writing | specified; `build` validating outputs before writing is the author layer, the order build success → append rows → both `--check`s → commit is the publication channel, and publication is the merged commit; no builder exists | **unverified** — H2a (validate-before-write), V-P (publication order) |
 | `--check` proves the lock and sealed bundle, and compares a committed legacy snapshot with the sealed definition as a one-way equality gate (absence legal, no digest input) | specified; per bundle that is `A_β(T)`, and over every selected spec `A(T)`, independent of registry rows; the write phase removes `<legacy>/definition.json` first and writes it last, so an interrupted write leaves it absent, not stale; no builder exists | **specified, not implemented** — H2a |
-| A successful build proves only its own bundle: `BuildSucceeded(r, β)` implies `A_β(T_r)`, not `A(T_r)`, `R(T_r)` or `P(T_r)` | specified; `build` writes one closure's artifacts and never a registry row; with an existing registry, a new spec is `published-registry-incomplete` between the build and the append; with a second stale spec, `--all --check` still fails; `a_single_bundle_build_does_not_prove_the_whole_tree` and `a_successful_build_does_not_complete_the_registry` are the acceptance tests | **specified, not implemented** — H2a (predicate), V-P (registry) |
+| A successful build proves only its own bundle: `BuildSucceeded(r, β)` implies `A_β(T_r)`, not `A(T_r)`, `R(T_r)` or `P(B,T_r,e,M)` | specified; `build` writes one closure's artifacts and never a registry row; with an existing registry, a new spec is `published-registry-incomplete` between the build and the append; with a second stale spec, `--all --check` still fails; `a_single_bundle_build_does_not_prove_the_whole_tree` and `a_successful_build_does_not_complete_the_registry` are the acceptance tests | **specified, not implemented** — H2a (predicate), V-P (registry) |
 | `R(T)` uses only registry fields: `R_packages` checks `path`/`package_id`/`version`/`source_package_digest`/`snapshot_digest`, `R_identities` checks the permanent digest binding; `release_digest` is not a registry field | specified; `release_digest` lives in the lock and is recomputed inside `A_β(T)`; no registry or lock exists | **specified, not implemented** — H2b (registry), H2a (lock) |
 | An evidence-only change keeps `bundle_digest` and moves `release_digest` only for an unpublished candidate; a published version cannot change evidence without a new version that also changes `bundle_digest` | §1.1 freezes the version directory and §7.1 puts evidence in `evidence_digest`; the candidate case is stated, and the published case is unreachable by construction | **specified** — H2a (digests), V-P (immutability) |
 | A committed legacy snapshot whose bytes differ from the sealed definition is `legacy-snapshot-mismatch` (exit 1) | specified; the gate compares canonical bytes without rebuilding the cache; no `--check` exists | **specified, not implemented** — H2a |
 | A definition-identity mismatch is not expressible as a `monasm-cases/0.1` case | the case requires the `$standalone` sentinel and the harness substitutes the correct identity, so a wrong digest is `case-plan-identity`; the derived-plan binding test carries the negative | **specified; reader behaviour read** — H2a |
 | The base registry (target-branch tip `B`) decides published-path containment before head-side `package.json` discovery | specified; no changed-path mapper exists, so a nested manifest masking an ancestor is untested | **specified, not implemented** — V-P |
 | A version published on the target branch after a feature branch forked still freezes that branch's edits | specified; the counterexample is a fork from `M0`, publication of `P/0.1.0` on the target branch, then an edit to `P/0.1.0/README.md`; tip-based `Published(B) ⊆ Published(H)` plus tree-byte equality rejects it, and `snapshot_digest` independently detects the edit in the audit | **specified, not implemented** — V-P |
-| A publication verdict authorizes only the `(B_checked, C_checked, mode)` triple it read: a stale green result cannot authorize a merge after another PR publishes first | specified; requires a merge queue or an operation that writes the recorded candidate, and V-P must prove the setting through the platform API; no workflow or settings evidence exists | **specified, not implemented** — V-P N5 |
-| H3 target subsets check `E_package(owner(form(i))) ⊆ E_plan` for every selected instruction, from `form_owners` plus the owner's declared cover, and add a per-form conjunct only when the format proves that requirement complete; a form without a proof is rejected | specified; `monasm-bundle/0.1` carries the owner map and covers, but H2 builds no subset cell and no H3 plan or consumer exists; the `c.addi`/`rv64i` case is untested | **specified, not implemented** — H3 |
+| A publication verdict authorizes only the `(B_checked, C_checked, mode)` triple it read: a stale green result cannot authorize a merge after another PR publishes first | specified; requires a merge queue or an operation that writes the recorded candidate, and V-P must prove the setting through the platform API; no workflow or settings evidence exists | **specified, not implemented** — V-P N5a |
+| The publication verdict is `P(B,T,e,M) = A(T) ∧ R(T) ∧ PreservesPublished(B,T) ∧ AuthorizedMerge(B,T,e,M)`, not a function of the tree alone | specified; the same tree can be reached by an authorized merge or written around the gate; no tree-only command establishes `AuthorizedMerge`, and a report must name the conjuncts it actually checked | **specified, not implemented** — V-P N5a |
+| `R(T)` is a predicate of the tree alone: true by definition when `T` has no registry, otherwise requiring every selected spec's `published` and `identities` rows; dropping a base registry is a separate `PreservesPublished(B,T)` failure | specified; `R` never reads the base commit; deleting the table or a row is `published-registry-modified` even though the head tree then has no registry; `a_base_registry_deletion_fails_preserves_published` is the acceptance test | **specified, not implemented** — V-P |
+| Three publication claims stay distinct: `snapshot_digest` re-proves current byte and entry-set consistency; the changed-path gate forbids modifying a published version before merge against target tip `B`; a protected merge mechanism establishes who authorized the landed transition | specified; the audit cannot prove the gate ran, the original recorder was honest, or history was not rewritten; neither the audit nor the gate alone carries all three | **specified, not implemented** — V-P |
+| Publication work is ordered N4b (registry format, audit code and synthetic tests; no real `bundles/published.json`), N5a (establish and verify the protected merge mechanism; no real registry commit), N5b (first publication of every HEAD spec through that mechanism) | specified; N4b and N5a use synthetic trees or a scratch repository; a PR that edits the publication gate cannot authorize itself; no workflow exists | **specified, not implemented** — V-P N4b/N5a/N5b |
+| H3 target subsets check `E_package(owner(form(i))) ⊆ E_plan` for every selected instruction, from `form_owners` plus the owner's declared cover, and add a per-form conjunct only when the format proves that requirement complete; a form without a proof is rejected | specified; `monasm-bundle/0.1` already carries the owner map and covers inside `bundle_digest`, so H3 adds the plan-compatibility rule and verification entry, not a new sealed format; H2 builds no subset cell and no H3 plan or consumer exists; the `c.addi`/`rv64i` case is untested | **specified, not implemented** — H3 |
 | `monasm-bundle/0.1` is self-verifying: `bundle_digest` is recomputed from the file's own `target`, per-package `enabled_extensions`, `form_owners` and `definition` | specified; the §7 preimage is complete inside the nine-key file, the lock is checked separately for paths, evidence and builder, and the §8 vectors were recomputed from that preimage; no sealed bundle or consumer exists | **specified, not implemented** — H2a (build), H3 (consume) |
 | Required up-to-date checks alone do not prove the landed tree equals the tested tree; a 403 or empty ruleset list is missing evidence, not absence of protection | specified; on 2026-11-19 `main` reported `protected: false`, the repository-rulesets list was empty, and the branch-protection detail endpoint returned 403; no merge-queue evidence has been recorded | **unobtained; V-P must record API evidence** |
-| N5 cannot close on a green CI run: the effective merge mechanism must be recorded and the stale-CI counterexample executed, or the publication verdict stops at the gate | specified; `Gates`/`Determinism` succeeded on the planning PR, but a green run is a verdict for its own `(B_checked, C_checked, mode)` and does not demonstrate the mechanism; no counterexample has been run | **unobtained; V-P N5** |
-| Merging the planning PR accepts the design only; it does not make V-P available | §8.5; V-P still requires an authorized repository owner or the publication automation to name the effective merge mechanism and run the stale-CI counterexample end to end; the 2026-11-19 settings observation is an evidence gap, not a guarantee | **unobtained; V-P N5** |
+| N5a cannot close on a green CI run: the effective merge mechanism must be recorded and the stale-CI counterexample executed, or the publication verdict stops at the gate | specified; `Gates`/`Determinism` succeeded on the planning PR, but a green run is a verdict for its own `(B_checked, C_checked, mode)` and does not demonstrate the mechanism; no counterexample has been run | **unobtained; V-P N5a** |
+| Merging the planning PR accepts the design only; it does not make V-P available | §8.5; V-P still requires an authorized repository owner or the publication automation to name the effective merge mechanism and run the stale-CI counterexample end to end; the 2026-11-19 settings observation is an evidence gap, not a guarantee | **unobtained; V-P N5a** |
 | `monasm-bundle/0.1` has exactly nine keys, carries the bundle-level `target`, each package's `enabled_extensions` and a complete `form_owners` map, and its `bundle_digest` is recomputable from the file | specified; this revision replaced the round-21 companion rule and the round-22 seven-key set; no sealed bundle exists, so the key-set, owner-map and self-verification tests are unrun | **specified, not implemented** — H2a |
 | `builder` records provenance but does not prove it; a change to `builder.version`/`build` can pass `--all --check` | specified; the drift projection excludes `builder` and no digest covers it; no lock exists, so the counterexample is unrun | **specified, not implemented** — H2a |
 | `monasm-package/0.1` rejects non-empty `exports.types`/`exports.profiles` permanently, independent of the builder version; a later format version owns the semantics | specified; no builder exists, and no later package format is written | **specified, not implemented** — H2a |
@@ -4773,7 +4831,7 @@ comparing the materializer with itself proves the bytes.
 | Only a regular file is accepted at an opened leaf, checked on the handle, and a POSIX FIFO is rejected without blocking | specified; no hardened path layer exists; the N1b gate must create a FIFO at a declared asset path on Linux/macOS and require `not-a-regular-file` (exit 1) rather than a blocking read or exit 2 | **specified, not implemented** — V-P N1b |
 | Every directory entry in a published version directory is enumerated and classified, so an unlisted symlink, reparse point, FIFO, socket or device node is rejected rather than skipped | specified; `snapshot_digest` would be unchanged by a skipped entry, so the entry set is part of the audit's claim; no audit exists | **specified, not implemented** — V-P |
 | Every regular file the snapshot covers obeys the §1.3 name grammar and case-fold uniqueness, including unreferenced files | specified; the snapshot domain is the directory, not the declared path set; `notes/Manual.md` beside `notes/manual.md` is `path-lexical` even with no manifest reference; `an_unreferenced_case_fold_collision_in_a_published_directory_is_rejected` is the acceptance test | **specified, not implemented** — V-P |
-| `mode(M)` is read from a trusted platform record, not inferred from the landed commit's parents | specified; a squash, rebase and fast-forward can land trees whose parent lists do not identify the mode; the verdict stores the platform event identifier; no workflow or platform evidence exists | **unobtained; V-P N5** |
+| `mode(M)` is read from a trusted platform record, not inferred from the landed commit's parents | specified; a squash, rebase and fast-forward can land trees whose parent lists do not identify the mode; the verdict stores the platform event identifier; no workflow or platform evidence exists | **unobtained; V-P N5a** |
 | A retired bundle's lock, sealed bundle and legacy snapshot leave the tree with its last spec, and `--all --check` rejects an orphan | specified; no builder and no `--all --check` exist; the one-to-one rule is untested | **specified, not implemented** — H2a |
 | Extension and capability arrays have one strictly increasing, duplicate-free spelling | specified; `extension-lexical`/`capability-lexical` are format rejections before the set relation | **specified, not implemented** — H2a |
 | The 64 MiB closure budget charges every package-root byte read, once per path, and rejects at the crossing read | specified; the counted set is manifest, declared assets, cases, evidence manifest and listed evidence files; no reader exists | **specified, not implemented** — H2a |
@@ -4843,7 +4901,7 @@ comparing the materializer with itself proves the bytes.
   invalidates it, and no other gate looks at those bytes (§8.1).
 - Someone cites "required branches to be up to date" as proof that the landed
   tree equals the tested tree, treats a 403 or an empty ruleset list as proof
-  that no protection exists, or closes N5 on a green CI run or a post-merge
+  that no protection exists, or closes N5a on a green CI run or a post-merge
   audit: stop. Up-to-date checks bound base staleness, not tree identity; the
   mechanism plus the stale-CI counterexample is the evidence, and without it the
   publication verdict stops (§8.1, §8.5).
@@ -5049,9 +5107,12 @@ comparing the materializer with itself proves the bytes.
   whole-object replacement as the container pointer when the members differ:
   stop. The difference is defined over final values, so a member edit is a member
   pointer and a two-member change is two differences (§9.1).
-- Someone claims `verify --published --check` proves whole-directory immutability:
-  stop. It proves the executable assets and identity; the changed-path gate and
-  git history carry the rest (§8.4).
+- Someone claims `verify --published --check` proves who authorized or produced a
+  publication, or that history was not rewritten: stop. It re-proves the current
+  directory bytes and entry set against the recorded `snapshot_digest`; the
+  changed-path gate forbids modifying a published version before merge, and the
+  protected merge record is what establishes authorization. The three claims are
+  separate (§8.1, §8.4).
 - Someone counts an `E-BYTE-001`/`E-SIZE-001` materialize failure, or any
   diagnostic not on the mutated operand, as form coverage: stop. Form-scope
   negatives are `bind` rejections at the mutated operand surface (§9.1).

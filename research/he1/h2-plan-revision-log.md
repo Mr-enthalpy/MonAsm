@@ -1,20 +1,35 @@
-# H2 plan revision log (twelfth through twenty-ninth round notes)
+# H2 plan revision log (twelfth through thirtieth round notes)
 
 > Historical evidence only. This file is not a contract, is never a build input,
 > and must not be read as current normative text. The current plan is
 > `docs/architecture/he1-h2-plan.md`; current decisions live in its §3 and in
 > `docs/adr/0128-package-and-bundle-contract.md`. These notes were moved out of
 > the plan opening by the twenty-fifth revision; the twenty-fifth through
-> twenty-ninth round notes are added below.
+> thirtieth round notes are added below.
 
 Where a note conflicts with the current plan or ADR, the current document wins.
-The twenty-ninth revision in particular makes `target_profile`/`profile_id`
-descriptive labels that never decide composition, defines affected-set and full
-conformance modes with the `Σ C_i` scaling boundary, and scopes the compat
-adapter to the API layer.
+The twenty-ninth revision makes `target_profile`/`profile_id` descriptive
+labels that never decide composition, defines affected-set and full conformance
+modes with the `Σ C_i` scaling boundary, and scopes the compat adapter to the API
+layer. The thirtieth revision replaces `P(T)` with `P(B,T,e,M)`, keeps `R(T)`
+tree-only, separates the audit's three claims, and orders publication as
+N4b/N5a/N5b.
 
 ## Round notes
 
+  第三十轮固定：`monasm-bundle/0.1` 的九键 sealed 已携带并由 `bundle_digest`
+  绑定 `form_owners` 与 `packages[].enabled_extensions`；H3 只新增计划兼容规则
+  与验证入口，不再新增 sealed 格式或 companion source。发布审计拆成三个互不
+  替代的命题：`snapshot_digest` 重证当前目录字节与条目集一致；变更路径门禁在
+  合并前禁止改已发布版本；受保护合并机制证明落地操作经过授权，审计本身不证明
+  来源可信或历史未被重写。发布谓词改为
+  `P(B,T,e,M) = A(T) ∧ R(T) ∧ PreservesPublished(B,T) ∧ AuthorizedMerge(B,T,e,M)`；
+  `R(T)` 只依赖树（无登记表时为真），删除 base 登记属于 `PreservesPublished`
+  失败而不是 `R` 依赖过去。`build` 成功只推出本次 bundle 的 `A_β(T_r)`，全树
+  `A(T_r)` 由 `verify --all --check` 另行证明。发布顺序拆成 N4b（格式/审计代码/
+  合成测试，不提交真实 registry）、N5a（建立并验证受保护合并机制，不首次发布）、
+  N5b（经该通道首次发布全部 HEAD spec）；修改发布门禁的 PR 不能用自己的绿色 CI
+  为自己授权。平台保护证据的责任归 H2b N5a，失败只停 V-P，不否定已通过的 V-A。
   第二十九轮固定：`target_profile` 与 `target.profile_id` 都是描述性名义标签，
   仍进入各自清单/摘要，但构建器不比较二者；组合只由 `definition_format` 与六键
   `target.identity` 决定，`two_packages_with_equal_target_identity_and_distinct_profile_labels_can_compose`
