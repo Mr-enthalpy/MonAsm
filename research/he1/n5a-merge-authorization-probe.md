@@ -96,14 +96,21 @@ GitHub restricts it to organization-owned public repositories, and the
 repository was then user-owned, so every `merge_queue` payload returned
 `422 Invalid rule 'merge_queue'`. The repository was then transferred to the
 `Teancher-H` organization, the same payload was accepted, and the first queued
-merge landed with `origin/main` equal to the `merge_group` head SHA. Three
-entries, including that queued one, are recorded in
+merge landed with `origin/main` equal to the `merge_group` head SHA. Six
+entries, including four queued ones, are recorded in
 `research/he1/n5a-protected-merge-trial.md`.
+
+Gate-input provenance was closed afterwards: every `uses:` in the three
+workflows names a full commit, and `sha_pinning_required` is `true`, so a tag
+reference fails in `Set up job` instead of running. The pinning change (entry 6)
+was itself tested by the unpinned workflows it replaced, which is why the policy
+flag was flipped only after that merge; the negative test and the residual
+runner-image gap are recorded in §8 of the trial log.
 
 This section does not revise the probe: the table above still describes the
 configuration at probe time. What remains open for N5a is independent approval
-(0 required approvals) and gate-logic provenance (mutable action tags), not the
-queue.
+(0 required approvals, one actor) — the queue and the pins are no longer the
+obstacle.
 
 ## Non-claims
 
