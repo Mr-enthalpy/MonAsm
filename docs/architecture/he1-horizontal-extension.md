@@ -9,6 +9,8 @@
 
 本文件 §3 的 `HE-AC` 表和 §14 的 `HE-T` 表是这两个 ID 族的注册表：每个 ID 只在这里声明一次，其他文档只引用。`tools/check_ids.py` 校验这一条。
 
+包与 bundle 的结构以 `ADR-0128` 为准。§6、§7、§10 已于 2026-11-18 按该 ADR 修订：目录形态、清单键、`exports.forms` 的 `{id, path}`、bundle 的四类派生产物都只保留当前合法形式；尚未实现的类型包与 Fixup Profile 明确标为 H4 能力，不再以 `monasm-package/0.1` 的合法形式出现。
+
 ---
 
 ## 0. 决策摘要
@@ -110,8 +112,8 @@ ISA 资料 / LLVM 与其他 oracle / 人工审查
                    |
                    v
           独立 Target Packages
-        forms / types / profiles
-          tests / evidence / NOTICE
+            forms / tests / evidence
+              NOTICE / README
                    |
          显式 BundleSpec + 依赖闭包
                    |
@@ -190,69 +192,90 @@ fmp-cli ---------> 上述运行组件；不依赖 fmp-plan 执行规划
 
 ## 6. 包模型：把指令族变成独立工作单元
 
-### 6.1 建议目录
+### 6.1 目录
+
+包结构与 `ADR-0128` 一致；本节展示的是目标状态，H2 尚未实现。
 
 ```text
 packages/
   x86_64/
-    shared-types/
-    mov-register/
-    mov-memory/
-    scalar-alu/
+    monasm.x86.mov-register/0.1.0/          # <完整 package_id>/<version>
+    monasm.x86.mov-memory/0.1.0/
+    monasm.x86.scalar-alu/0.1.0/
   aarch64/
-    integer/
-    branch/
+    monasm.aarch64.add-immediate/0.1.0/
   rv64/
-    integer/
-    branch/
+    monasm.riscv.integer-alu/0.1.0/
 
-每个叶包：
-  package.json
-  types.json                  # 可选
-  forms/*.json
-  fixup-profiles.json          # 可选
-  constraints.json            # 可选，受限声明式约束
-  tests/cases/*.json
-  tests/oracles/*
-  evidence/sources.json
-  evidence/decisions/*.md
+每个版本目录 `packages/<target>/<完整 package_id>/<version>/`：
+  package.json                  # 唯一入口，monasm-package/0.1
+  forms/*.json                  # 由 exports.forms 的 {id, path} 逐个显式列出
+  tests/cases.json              # monasm-cases/0.1，唯一用例入口
+  evidence/manifest.json        # 可发布包必需
+  evidence/*.md                 # 来源记录、手册摘录等
   NOTICE
   README.md
 
 bundles/
-  profiles/<bundle-name>.json
-  locks/<bundle-name>.lock.json
+  specs/<bundle_id>.json            # monasm-bundle-spec/0.1，作者显式选择
+  locks/<bundle_id>.lock.json       # 生成：路径与摘要
+  sealed/<bundle_id>.bundle.json    # 生成：monasm-bundle/0.1
+  legacy/<bundle_id>/definition.json  # 生成：派生的开发缓存
 
 tests/
   conformance/
   compatibility/
   extension-probes/
 
-definitions/                  # 既有冻结资产，继续可用
+definitions/                    # 既有冻结资产，继续可用
 ```
+
+- 目录段是**完整** `package_id`（例如 `monasm.x86.mov-register`），不是它的最后一段；映射是单射，`monasm.x86.crypto` 与 `vendor.x86.crypto` 因而可同版本共存。`<version>` 段必须同时等于清单 `version` 与 spec 的 `packages[].version`，不一致是 `path-version-mismatch`。
+- 版本目录是**发布快照**：已发布的 `(package_id, version)` 不可原地修改，新版本用同级新目录，其他 bundle 不受影响。
+- 用例只有包根 `tests/cases.json` 一个入口（`monasm-cases/0.1`，`cases` 按 `case_id` 排序）；`evidence/`、`tests/`、`README.md`、`NOTICE` 不进入执行摘要。
+- `monasm-package/0.1` 没有独立的类型或 profile 资产文件：`exports.types`/`exports.profiles` 在 `0.1` 中必须是空数组，非空永久拒绝，与构建器版本无关。类型包与 Fixup Profile 是 H4 能力，需要显式的新包格式版本（§10）。
+- bundle 只从 `bundles/specs/*.json` 显式读取；目录扫描只能回答「仓库里有哪些包」，永不决定「这份计划采用哪些包」。
 
 不要求本轮把全部已有 forms 移入包。每个 ISA 选择一个有代表性的纵向切片，新旧路径可并存。
 
 ### 6.2 包清单
 
-以下是逻辑字段草案，不代表仓库已经存在此格式：
+`monasm-package/0.1` 是封闭对象，唯一入口是版本目录下的 `package.json`。以下示例取自 H2 计划里的 x86 切片：
 
 ```json
 {
   "package_format": "monasm-package/0.1",
-  "package_id": "monasm.x86.scalar-alu",
+  "package_id": "monasm.x86.mov-register",
   "version": "0.1.0",
   "target_profile": "monasm.target.x86_64",
-  "requires_capabilities": [
-    "field-placement/v1",
-    "integer-domain/v1"
-  ],
+  "definition_format": "fmp-def/0.1",
+  "target_identity": {
+    "isa_family": "x86",
+    "isa_variant": "x86-64",
+    "execution_mode": "64",
+    "enabled_extensions": [],
+    "byte_order": "little",
+    "address_width": 64
+  },
+  "legacy_source": { "isa": "x86_64", "version": "0.1.0" },
+  "requires_capabilities": ["field-placement/v1"],
   "dependencies": [],
   "exports": {
-    "forms": ["forms/add.json", "forms/sub.json"]
+    "forms": [
+      { "id": "x86:mov/r64-rm/legacy", "path": "forms/mov-r64-rm.json" },
+      { "id": "x86:mov/rm-r64/legacy", "path": "forms/mov-rm-r64.json" }
+    ],
+    "types": [],
+    "profiles": []
   }
 }
 ```
+
+- 必需键是 `package_format`、`package_id`、`version`、`target_profile`、`definition_format`、`target_identity`、`requires_capabilities`、`dependencies`、`exports.forms`；可选键只有 `legacy_source`、`exports.types`、`exports.profiles`。未知键、重复键、缺必需键都拒绝。
+- `target_profile` 只是包内名义标签，目标身份是六键 `target_identity`；同名 profile 配不同 identity 合法，不存在中心 profile 表。
+- `exports.forms` 用 `{id, path}` 而不是裸字符串：文件里的 `form_id` 必须等于声明的 `id`，交换两个文件不能静默改变归属。数组按 `id` 严格升序，`requires_capabilities` 与 `enabled_extensions` 也必须严格升序无重复；同一个集合只有一种写法。
+- `exports.types`/`exports.profiles` 在 `0.1` 中必须为空；非空是永久拒绝，留给需要显式新包格式版本的 H4 能力。
+- `dependencies` 的每项是封闭对象 `{package_id, version, source_package_digest}`，三项精确匹配，没有 semver 范围、`latest` 或隐式升级。
 
 依赖项一旦存在，必须明确 package ID、精确版本和内容摘要。这里的版本是目标资产版本，不是 kernel 版本或 FMP wire 版本。
 
@@ -262,17 +285,17 @@ definitions/                  # 既有冻结资产，继续可用
 
 公共层只理解命名空间、字符串身份、唯一性和引用关系，不根据 mnemonic 字符串判断怎么编码。
 
-现有 form ID 在 legacy 中保持不变。新包可以导出现有 ID；bundle 构建时建立唯一归属表：
+现有 form ID 在 legacy 中保持不变。新包可以导出现有 ID；构建器在合并时建立唯一归属表：
 
 ```text
-form_id -> package_id + exact revision + verified form
-type_id -> owner package + verified type
-profile_id -> owner package + verified profile
+form_id -> package_id + exact version + verified form      # monasm-package/0.1
 ```
 
 不同包导出同一 ID，即使内容碰巧一样，也必须报告归属冲突。公共依赖包在依赖闭包中重复出现且精确身份一致时只加载一次；这与两个包各自重新定义同一 form 不同。
 
-共享寄存器类型和 profile 由独立小包维护，避免每个指令族复制类型语义。普通扩展不需要递增全局数字或申请下一个 ADR 号。
+`type_id`、`profile_id` 的归属表属于 H4：`monasm-package/0.1` 的 `exports.types`/`exports.profiles` 必须为空，所以 `0.1` 里没有可归属的类型或 profile。共享寄存器类型和 Fixup Profile 的独立小包也要等那个显式的新包格式版本；普通扩展不需要递增全局数字或申请下一个 ADR 号。
+
+归属表随 sealed bundle 一起冻结：`monasm-bundle/0.1` 的 `form_owners`（每个合并 form 恰好一行 `{form_id, package_id}`）与 `packages` 里每个包的 `enabled_extensions` 覆盖共同给出「每条 form 的归属与扩展需求」，两者都在 `bundle_digest` 预映像内。H2 只记录这些事实，不做子集判定；H3 逐指令无条件检查归属包覆盖 `E_package(owner(form(i))) ⊆ E_plan`，逐 form 需求只在该定义格式版本证明其完整时作为附加合取项，不能替代覆盖；这些事实直接来自 sealed，不需要第二个 bundle 版本，也不能从 `fmp/0.2` 或 mnemonic 反推（§7.3）。
 
 ### 6.4 依赖不使用隐式版本求解
 
@@ -286,13 +309,20 @@ HE-1 不实现包管理生态。不查询“最新版本”，不使用 semver �
 
 ### 7.1 Bundle 是显式的目标快照
 
-BundleSpec 明确列出 target profile 和所选包的精确身份。构建器计算闭包、检查冲突并生成：
+`bundles/specs/<bundle_id>.json` 是 `monasm-bundle-spec/0.1`，显式列出 target、`definition_format`、namespace/version 和所选包的**完整闭包**（每项 `{package_id, version, path, source_package_digest}`）。构建器只读取 spec 列出的路径，不扫描 `packages/`，并生成：
 
-1. lock：具体依赖及摘要；
-2. 执行 bundle：扁平化、可验证的数据；
-3. 派生目录和覆盖报告。
+1. `bundles/locks/<bundle_id>.lock.json`：具体依赖路径与摘要；
+2. `bundles/sealed/<bundle_id>.bundle.json`：`monasm-bundle/0.1`，恰好九个键，含 bundle 级 `target`、合并后的定义、带 `enabled_extensions` 的 `packages` 与 `form_owners`；
+3. `bundles/legacy/<bundle_id>/definition.json`：派生的开发缓存，可缺失。
 
 一个 FMP 绑定一个精确 bundle 身份。新增包不会自动加入既有 bundle。
+
+`monasm-bundle/0.1` 保存完整的 digest 预映像：bundle 级 `target`（含 `profile_id`）、
+逐包 `enabled_extensions` 与 `form_owners` 都在文件里，所以 sealed 可以独立重算
+`definition_digest` 与 `bundle_digest`，并检查 `target.identity == definition.target`。
+lock 仍单独校验包路径、`evidence_digest`、`release_digest` 与 builder 记录；H2 的
+`verify --check` 从 spec 重建两件产物并成对比较。自校验只证明 bundle 说了什么，
+不证明计划可用；H3 仍以 `bind(Plan, Arc<Definition>)` 为入口。
 
 目录扫描只可用于开发期展示“有哪些包”，不能用于决定“这份计划采用哪些包”。
 
@@ -301,7 +331,7 @@ BundleSpec 明确列出 target profile 和所选包的精确身份。构建器�
 | 身份 | 覆盖内容 |
 |---|---|
 | `source_package_digest` | 包内规范化清单及显式声明的可执行定义输入，记录包修订 |
-| `definition_digest` | 实际执行的类型、forms、约束、profile、原语语义版本及所需目标事实 |
+| `definition_digest` | 实际执行的 types、forms、约束、profile（仅在支持它们的格式版本中）及所需目标事实 |
 | `plan_digest` | 实际执行的冻结计划事实，包括显式输出和布局约定 |
 | `artifact_digest` | 规范化结果载荷：字节/节/符号/fixup |
 | `implementation_id` | 本次物化器构建身份，如 release、commit、构建描述摘要 |
@@ -314,15 +344,16 @@ BundleSpec 明确列出 target profile 和所选包的精确身份。构建器�
 
 ### 7.3 新旧协议策略
 
-冻结并继续接受 `fmp/0.1` 及既有 `fmp-def/0.1`、`fmp-def/0.2` 资产。
+冻结并继续接受 `fmp/0.1` 及既有 `fmp-def/0.1`、`fmp-def/0.2` 资产。H2/H3 的版本面各自独立：
 
-建议为新路径建立最小新版本：
+- `fmp/0.1`：冻结，不新增错误码。`fmp/0.2` 是 H3 的产物（允许目标定义提供命名空间化 ISA 身份、允许以 profile ID 绑定 fixup，不引入高级语义操作）；它本身不放宽目标集合关系。
+- `monasm-package/0.1`：开发期包格式；`exports.types`/`exports.profiles` 永久为空。
+- `monasm-bundle-spec/0.1`、`monasm-lock/0.1`、`monasm-bundle/0.1`：显式选择、锁与运行期定义快照。
+- `monasm-cases/0.1`、`monasm-evidence/0.1`：包级用例与证据。
 
-- `fmp/0.2`：允许目标定义提供命名空间化 ISA 身份；允许以 profile ID 绑定 fixup；不引入高级语义操作。
-- `monasm-package/0.1`：开发期包格式。
-- `monasm-bundle/0.1`：运行期定义快照格式。
+具体字符串由 `ADR-0128` 固定。这些版本语义必须分开：升级读取器不得改变旧格式的接受结论。
 
-具体字符串可以由首份 ADR 固定，但三种版本语义必须分开。
+**H3 的目标子集直接消费 `monasm-bundle/0.1` 的归属事实，不引入第二个 bundle 版本。** `form_owners` 给出每条 form 的 owner，该 owner 在 `packages` 中的 `enabled_extensions` 给出保守覆盖；两者都在 `bundle_digest` 内。H3 对每条选中指令无条件检查 `E_package(owner(form(i))) ⊆ E_plan`，逐 form 需求只在定义格式版本证明其完整时附加，不能替代覆盖；缺少 owner 行或覆盖的产物默认拒绝，不按空集放行。只新增 `fmp/0.2` 并把集合关系从相等改成子集，或优先采用未证明完整的逐 form 需求，都会放行声明 `{rv64i}` 的计划选中 `c.addi`。
 
 新 FMP 的 layout、instruction、operand 基本骨架沿用现有结构。`definition_identity` 可以继续承担 bundle 身份，不必仅为改名新增一套冗余字段。
 
@@ -348,18 +379,18 @@ BundleSpec 明确列出 target profile 和所选包的精确身份。构建器�
 逻辑接口示意：
 
 ```rust
-fn load_bundle(bytes: &[u8]) -> Result<VerifiedBundle, DefinitionErrors>;
+fn load_bundle(bytes: &[u8]) -> Result<CheckedBundle, DefinitionErrors>;
 
 fn bind_and_validate(
     plan_bytes: &[u8],
-    bundle: Arc<VerifiedBundle>,
+    bundle: Arc<CheckedBundle>,
 ) -> Result<ValidatedPlan, PlanErrors>;
 
 fn materialize(plan: &ValidatedPlan)
     -> Result<MaterializationResult, MaterializationFailure>;
 ```
 
-接口是设计约束示意，不是现成可编译代码。实施可保留便捷 facade，但底层最终必须通过这一生命周期。
+接口是设计约束示意，不是现成可编译代码；`CheckedBundle`/`bind_and_validate` 是 H3 的目标形态。H2 的执行入口仍只有 `bind(Plan, Arc<Definition>)`；H3 另加 bundle 入口，不改 H1 的 `bind`。H2 只增加开发期构建器，以及把 `CheckedBundle` 收窄为 `Arc<Definition>` 的 `fmp_definition::compat::as_legacy_definition`；该适配器长期保留，不是待替代入口。实现可保留便捷 facade，但底层最终必须通过这一生命周期。`CheckedBundle` 只表示结构与闭包检查通过，不代表已发布、来源已验证或 V-P 通过（`ADR-0128` §10）。`bind_and_validate` 的保证只覆盖经它执行的计划；只要旧 `bind` 仍是公开入口，就不能声称所有执行都经过 bundle 归属检查，字节相同也不等于证明强度相同（`ADR-0128` §10 第 6 条）。
 
 `ValidatedPlan` 表示结构和静态约束通过，不应虚称已经证明所有字节级断言。`MaterializationFailure` 至少区分生成字节后才能发现的确定性断言失败（例如 expected digest 不符）、主机故障和内部不变量错误。能够提前计算的 fixup 值和范围应尽量在验证阶段固定；无论在哪一阶段失败，都不得返回部分成功产物或尝试替代形式。
 
@@ -445,6 +476,8 @@ ISA 特定事实应进入目标数据、目标资产编译检查或 legacy 兼�
 
 ### 10.1 Profile 的职责
 
+**状态：H4 能力，不是 `monasm-package/0.1` 的合法形式。** 该格式的 `exports.profiles` 必须是空数组，非空永久拒绝；以下内容是 H4 用显式新包格式版本实现的目标，不在 H2/H3 的交付范围内。
+
 新路径中的 form/slot 应引用允许的 fixup profile。profile 固定：
 
 - 它可以修补的字段和字段顺序；
@@ -480,7 +513,7 @@ HE-1 可以用少量固定、参数化的变换结构覆盖现有规则；不要
 
 旧 FMP 的裸 `field_descriptor/transform` 路径通过版本固定的 adapter 保留。不能用一个“接受任意旧参数”的 profile 将旧路径变成安全绕过。
 
-先迁移现有正例使用的 profile；新格式普通扩展必须使用 profile。对于此前错误接受的计划可以收紧拒绝，但要记录行为变化和回归用例。
+先迁移现有正例使用的 profile；一旦 H4 的显式新包格式启用 profile，普通扩展必须使用它。对于此前错误接受的计划可以收紧拒绝，但要记录行为变化和回归用例。
 
 ELF relocation 编号、REL/RELA 写法和链接器 relaxation 不在 HE-1 中完整实现。当前产物仍需明确标为规范化 fixup，而非已经可链接的目标文件。
 
@@ -562,7 +595,7 @@ docs/STATUS.md 的手写覆盖计数
 | 变更类型 | 必跑 |
 |---|---|
 | 单包数据/测试修改 | 包验证、该包及依赖它的受影响包测试、包 oracle、公共边界 smoke |
-| 共享类型/profile 包修改 | 反向依赖闭包测试、bundle 冲突和兼容测试 |
+| 共享类型/profile 包修改（H4 引入显式新包格式后） | 反向依赖闭包测试、bundle 冲突和兼容测试 |
 | 核心、协议、构建器或规范化修改 | 全部新包、全部 legacy 夹具、跨主机一致性、oracle 基线 |
 | 发布 bundle 修改 | 精确闭包重建、lock 校验、目标快照输出与旧 lock 重放 |
 | 不确定的影响分析 | 退回全量测试，不能静默少跑 |
@@ -579,7 +612,7 @@ docs/STATUS.md 的手写覆盖计数
 Compose(Base, A, B) == Compose(Base, B, A)
 ```
 
-这里的相等是同一显式包集合经过规范化构建得到的 bundle 执行摘要和目录相等，不是 Git commit hash 相等。
+这里的相等是同一显式包集合经过规范化构建得到的 bundle 执行摘要和目录相等，不是 Git commit hash 相等。`A, B` 表示集合的枚举顺序，不是 `BundleSpec.packages` 的文档顺序；后者由 H2 契约按 `(package_id, version)` 严格排序，逆序 spec 是拒绝输入（`ADR-0128` §8.2）。
 
 若 A、B 有真实命名/依赖冲突，两个次序都必须以确定性冲突失败，不能靠加载顺序选胜者。
 
@@ -619,7 +652,9 @@ Compose(Base, A, B) == Compose(Base, B, A)
 
 实现唯一归属、精确依赖、路径边界和确定性规范化。共享检查以 Rust 为权威。
 
-**退出门槛：** 两个不同包可独立测试；新包不会要求改中心表格；对照字节和定义语义无漂移。
+验收分两个独立结论：**作者层**（包独立定义、校验、构建，产生相同机器事实，纯内存构建与确定性不依赖外部平台）与**发布通道**（不可信路径处理、不可变发布记录、合并竞态保护、全历史审计）。作者层可在发布通道前置条件未取到时推进；发布通道未通过前不存在 `bundles/published.json`，lock/sealed/legacy 都是开发产物，任何文档不得称其已发布、不可变或可信。
+
+**退出门槛：** 两个不同包可独立测试；新包不会要求改中心表格；对照字节和定义语义无漂移。发布通道另需三平台 no-follow 证据、合并新鲜度证明与历史审计成本阈值；其失败只停止发布结论与 H2 退出，不回退作者层已证明的事实。
 
 ### H3：新协议与通用加载边界
 
@@ -627,9 +662,11 @@ Compose(Base, A, B) == Compose(Base, B, A)
 
 增加最小 `fmp/0.2` 与 bundle reader；目标身份由快照声明，能力由内核检查；旧协议通过 legacy adapter 保留。
 
+目标子集要逐指令证明：对每条选中指令无条件检查 `E_package(owner(form(i))) ⊆ E_plan`，事实来自 `monasm-bundle/0.1` 的 `form_owners` 与各包 `enabled_extensions` 覆盖（两者都在 `bundle_digest` 内）；逐 form 需求只在该定义格式版本证明其完整时作为附加合取项，不能替代覆盖；缺少 owner 行或覆盖的产物默认拒绝，不能按空集推定其合法。只新增 `fmp/0.2` 并放宽集合关系不算完成。
+
 加载明确 lock 的闭包，不读取未选中包。新增合成目标仅需添加数据和测试。支持零操作数形式，避免用假操作数绕过结构限制。
 
-**退出门槛：** 新目标命名空间不修改公共白名单；未知能力严格拒绝；未选中包损坏不影响既有 bundle 的物化。
+**退出门槛：** 新目标命名空间不修改公共白名单；未知能力严格拒绝；未选中包损坏不影响既有 bundle 的物化；子集计划选中目标不支持的 form 被拒绝，两个既有目标兼容格子保持 H2 结论。
 
 ### H4：Fixup/profile 与包级一致性工具
 
@@ -686,13 +723,15 @@ H0 是共同前提。H1 的执行安全与 H2 的包契约设计可在接口明�
 | HE-T13 | 深层 JSON、超大清单、越界 placement | 有界拒绝，不进程崩溃或无界消耗 |
 | HE-T14 | 三 ISA 同一 conformance harness | 无 ISA 专用测试执行器分支才能通过 |
 | HE-T15 | 新合成目标命名空间 | 包级变更完成；不改核心 family 列表 |
-| HE-T16 | A+B 与 B+A 合并/构建 | 同一闭包同一执行产物 |
+| HE-T16 | 同一显式包集合 A∪B 在不同发现/构建顺序下合并 | 同一闭包同一执行产物；spec 文档本身按固定顺序书写，逆序是拒绝输入 |
 | HE-T17 | 新包只使用已有能力 | PR diff 不触碰禁止路径 |
 | HE-T18 | 精确字节、fixup 完整元数据、错误值边界 | 不是仅比较长度、记录数量或错误字段名 |
 | HE-T19 | 生成器/工具版本不同但产物相同 | 执行定义摘要相同，构建来源记录可区分 |
 | HE-T20 | 构建版本变化 | implementation ID 可追踪；不借元数据变化掩盖载荷差异 |
 
 HE-T19 只适用于规范中明确排除构建来源元数据的执行摘要。包源码摘要和构建收据可以不同。
+
+构建来源记录是**信息性**的：它不进入执行定义摘要，也不证明产物确实由该实现生成；改动记录可以不使 `verify --all --check` 失败。可信构建来源需要独立的构建证明或发布工件签名，不能靠把实现版本塞回定义摘要获得（`ADR-0128` §7）。
 
 主机故障不纳入“同一非法计划规范化错误必须相同”的测试；应验证其单独分类，不把环境不足误报成机器计划不合法。
 
