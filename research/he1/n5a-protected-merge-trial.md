@@ -166,19 +166,22 @@ queue's stronger ordering guarantee.
 
 ## 5. What this trial does not establish
 
-- **The queue closes the tested/landed gap; approval and provenance do not.**
-  Entries 1 and 2 predate the queue and establish only that under strict
-  up-to-date the landed tree equals the tested tree. Entry 3 is a queued merge
-  where the landed commit *is* the tested commit, so on that path the two cannot
-  diverge. What remains is independent authorization:
-  `required_approving_review_count` is 0, and the same account writes, merges
-  and administers, so the merge is enforced but not independently approved.
-  `AuthorizedMerge(B,T,e,M)` is therefore still not satisfied.
-- **Gate logic provenance is still weak.** The workflows reference
-  `actions/checkout@v4` and `actions/setup-python@v5` by mutable tag, and
-  `sha_pinning_required` is still `false`. The ruleset makes the workflow files
-  change-controlled (they can only land through a PR whose checks pass, and now
-  through the queue) but does not pin what the actions resolve to.
+- **The queue closes the tested/landed gap; approval does not.** Entries 1 and 2
+  predate the queue and establish only that under strict up-to-date the landed
+  tree equals the tested tree. Entries 3 to 6 are queued merges where the landed
+  commit *is* the tested commit, so on that path the two cannot diverge. What
+  remains is independent authorization: `required_approving_review_count` is 0,
+  and the same account writes, merges and administers, so the merge is enforced
+  but not independently approved. `AuthorizedMerge(B,T,e,M)` is therefore still
+  not satisfied. This is an accepted open gap while the project has a single
+  author; it is recorded, not worked around.
+- **Gate logic provenance is pinned; the runner is not.** As of entry 6 every
+  `uses:` names a full commit and the repository setting `sha_pinning_required`
+  is `true`, so a mutable tag no longer resolves — §8 records the policy and the
+  negative test that shows an unpinned reference fails in `Set up job`. What
+  pinning does not cover is the runner image and the toolchain it ships:
+  `ubuntu-latest` keeps moving, and only the LLVM release the oracle step names
+  is pinned. Pinning fixes *which* code the workflow runs, not the machine.
 - **A workflow change is still judged by the workflow it introduces.** For
   `pull_request` and `merge_group` events the checks come from the revision's own
   workflow files. The ruleset makes such a change reviewable and recorded; it
@@ -197,8 +200,8 @@ Entries are appended by a change that merges *after* the one being described,
 because a commit cannot contain its own merge SHAs. The table records every
 merge completed under this channel up to the change that wrote it; the merge
 that lands the newest entry is checked by the same procedure and becomes the next
-entry when one is added. Four consecutive entries show this is not a single-run
-accident: two merges under strict up-to-date and two through the queue. Every
+entry when one is added. Six consecutive entries show this is not a single-run
+accident: two merges under strict up-to-date and four through the queue. Every
 merge after entry 1 went through this channel.
 
 | Entry | PR | Tested tree | Landed commit | Landed tree | Equal |
@@ -207,6 +210,8 @@ merge after entry 1 went through this channel.
 | 2 | #10 | `cdcbd458b6508080e99f5605da139060de5b6c0c` | `e3fef895fb464a123eff6c8bc375f23cbc5b1a30` | `cdcbd458b6508080e99f5605da139060de5b6c0c` | yes |
 | 3 | #12 | `b5cbcd7f9aa120cc5f07099992a6d531b690fd71` | `cc7674206da2032eb6602c94fa760ca5a16fb60e` | `b5cbcd7f9aa120cc5f07099992a6d531b690fd71` | yes |
 | 4 | #13 | `4f5322d81b0a7561cd6450f413dd88ce32fbeb4e` | `0d07288aabd5b38b4e155b2ef92c923cee8b3917` | `4f5322d81b0a7561cd6450f413dd88ce32fbeb4e` | yes |
+| 5 | #14 | `fdc104fb1cf48a08bc90c5cdde7e4fe476368540` | `b7096be31c05943a91809cd698b384414b3d0be5` | `fdc104fb1cf48a08bc90c5cdde7e4fe476368540` | yes |
+| 6 | #15 | `07d7889f743b8e167225c4ac338e100d1bf08a44` | `af26da9c422b5b48d47f8601ae1cb3e63aa71c42` | `07d7889f743b8e167225c4ac338e100d1bf08a44` | yes |
 
 ### Entry 1, PR #9
 
@@ -285,6 +290,39 @@ Again `origin/main` is exactly the `merge_group` head. Two consecutive queued
 merges now show the property, and entry 4 was queued after entry 3 had landed,
 so it does not depend on a freshly enabled queue.
 
+### Entry 5, PR #14 — third queued merge
+
+- Base: `0d07288aabd5b38b4e155b2ef92c923cee8b3917` (entry 4's landed commit).
+- Head: `7f9654a228bdd30854338afc87083bdcb6eb849d`, tree
+  `fdc104fb1cf48a08bc90c5cdde7e4fe476368540`.
+- `merge_group` runs on head `b7096be31c05943a91809cd698b384414b3d0be5`:
+  `44744114175` (`gates`) and `44744114068` (`determinism`), both `success`.
+- The queue merged at 2026-11-20T13:31:31Z.
+- Landed commit `b7096be31c05943a91809cd698b384414b3d0be5`, tree
+  `fdc104fb1cf48a08bc90c5cdde7e4fe476368540`, first parent
+  `0d07288aabd5b38b4e155b2ef92c923cee8b3917`.
+
+### Entry 6, PR #15 — the pinning merge
+
+- Base: `b7096be31c05943a91809cd698b384414b3d0be5` (entry 5's landed commit).
+- Head: `85c8298d3f0991145f25613b03b05ed6eca858f8`, tree
+  `07d7889f743b8e167225c4ac338e100d1bf08a44`.
+- `merge_group` runs on head `af26da9c422b5b48d47f8601ae1cb3e63aa71c42`:
+  `44746766510` (`gates`) and `44746766480` (`determinism`), both `success`.
+- The queue merged at 2026-11-20T13:47:42Z.
+- Landed commit `af26da9c422b5b48d47f8601ae1cb3e63aa71c42`, tree
+  `07d7889f743b8e167225c4ac338e100d1bf08a44`, first parent
+  `b7096be31c05943a91809cd698b384414b3d0be5`.
+
+This is the change that pinned every `uses:` to a full commit (§8). It landed
+through the queue it hardens, but it was *tested by the unpinned workflows it
+replaced* — the gate logic that approved it was the old gate logic. That
+ordering is unavoidable and is why the policy flag was flipped afterwards, not
+before.
+
+Entries 5 and 6 were both produced by ordinary changes after the queue had
+proven itself on entries 3 and 4.
+
 ## 7. Merge queue after the organization transfer
 
 Later on 2026-11-20 the repository was transferred from `Mr-enthalpy/MonAsm` to
@@ -337,5 +375,67 @@ The enabled rule, verbatim:
    gates ran on *is* the commit on `main`, not merely one with the same tree.
 5. Cross-check `origin/main^{tree}` against `refs/pull/<n>/merge^{tree}`.
 
-The first two queued merges are entries 3 and 4; their values are recorded by the
-changes that follow them, as §6 explains.
+The queued merges are entries 3 to 6; their values are recorded by the changes
+that follow them, as §6 explains. All four were groups of one entry, so the
+queue has still not been observed merging a combined group.
+
+## 8. Gate-input provenance: commit pins and the pinning policy
+
+Until entry 6 the workflows named `actions/checkout@v4` and
+`actions/setup-python@v5`. A tag is a mutable name: the same workflow file can
+execute different code next week, and neither the plan, the definition nor the
+recorded run says which code ran. That is a hole in the *gate*, not in the
+materializer, so no fixture is invalidated — but "the checks passed" was not a
+statement about a fixed verifier.
+
+Entry 6 replaced all eight `uses:` lines with full commits:
+
+| Reference before | Reference after | Release that commit is |
+|---|---|---|
+| `actions/checkout@v4` (6 uses) | `actions/checkout@11d5960a326750d5838078e36cf38b85af677262` | v4.4.0 |
+| `actions/setup-python@v5` (2 uses) | `actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065` | v5.6.0 |
+
+The SHAs are what the tags resolved to at pin time — `v4` → `v4.4.0`, `v5` →
+`v5.6.0`, read with `git ls-remote --tags` and cross-checked with
+`GET /commits/{ref}` — so the change alters no behaviour; it only makes the
+reference immutable. The newest release of each action was v7.x then; upgrading
+is a separate decision and was not taken here. What the pin asserts is that the
+named commit was the release at pin time, which rests on the upstream tag
+object, not on an independent audit of that commit.
+
+After entry 6 landed, `sha_pinning_required` was set to `true` on the repository
+(`PUT /repos/Teancher-H/MonAsm/actions/permissions`; a later `GET` returns
+`"sha_pinning_required": true`). The order is forced: with the policy on, the
+pull request that introduces the pins cannot run its own checks, because its
+base revision still references tags.
+
+### Negative test of the policy
+
+A throwaway branch `he1/pin-negative` was cut from `main` with a single workflow
+file whose only content was `uses: actions/checkout@v4` followed by a step that
+would print a line. Pushing a branch is not gated, so the push was accepted and
+the workflow was started — and then refused. Run `44747579142` concluded
+`failure` with its single job listing exactly one step, `Set up job`, and this
+message:
+
+```
+##[error]The action actions/checkout@v4 is not allowed in Teancher-H/MonAsm
+because all actions must be pinned to a full-length commit SHA.
+```
+
+The step after the unpinned reference never executed. The branch was then
+deleted locally and on the remote, and `git ls-tree -r origin/main` contains no
+`pin-negative-probe.yml`, so the file never landed. The rejection happens before
+any repository code runs, which is the property that matters: an unpinned gate
+step cannot execute at all.
+
+### What is still floating
+
+- The runner image. `ubuntu-latest` and its siblings are moving labels; the
+  service, the OS packages and most of the toolchain change underneath a
+  pinned workflow. Only the oracle's LLVM release is named explicitly, because
+  `apt.llvm.org` tracks the newest release in the series.
+- `actions`-owned dependencies of a pinned action — a pinned `checkout` still
+  downloads whatever its own code asks for at run time.
+- The policy is a repository setting, not an organization or enterprise one; it
+  applies here because it was set here.
