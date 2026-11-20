@@ -1,15 +1,18 @@
 # ADR-0128: the package and bundle contract, and the H2 definition builder
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-14
-- Review: this is a proposal, not a frozen decision. Review of the H2 planning
-  PR approves the design, but merging that PR does **not** flip the status: the
-  ADR stays `proposed` in the merged tree. A separate docs-only acceptance change
-  then edits only the status lines here and in the plan, cites the review record,
-  and lands on the target branch. H2a starts only after that acceptance change is
-  merged, and no H2a commit contains it, so the work never satisfies and depends
-  on its own precondition. A later design change reopens `proposed` and needs the
-  same sequence again.
+- Accepted: 2026-11-20, by this docs-only acceptance change after the H2
+  planning PR merged. The reviewed design is the one merged as PR #4 (merge
+  commit `185049401d6cfb79d4702b22a3b0fec8ef761198`,
+  https://github.com/Mr-enthalpy/MonAsm/pull/4); its review record is that PR's
+  audit comments through the thirty-third round. Merging the planning PR alone
+  did **not** flip the status: it stayed `proposed` in that merged tree, and
+  this separate change edits only the status lines here and in the plan, cites
+  the review record, and lands on the target branch. H2a starts only after this
+  acceptance change is merged, and no H2a commit contains it, so the work never
+  satisfies and depends on its own precondition. A later design change reopens
+  `proposed` and needs the same sequence again.
 - Revision: thirty-third revision, 2026-11-20. The normative entry now keeps
   only current decisions; per-revision audit notes (fourteenth through
   thirty-second) are in `research/he1/adr-0128-revision-log.md`, which is
