@@ -31,7 +31,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cc -std=c11 -O2 -Wall -Wextra -o n1b_poc research/he1/n1b-poc/n1b_poc.c
+          cc -std=gnu11 -O2 -Wall -Wextra -o n1b_poc research/he1/n1b-poc/n1b_poc.c
           ./n1b_poc "$RUNNER_TEMP/n1b"
 
       - name: Build and run (Windows)

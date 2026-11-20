@@ -30,6 +30,9 @@
 #if !defined(_WIN32)
 #define _POSIX_C_SOURCE 200809L
 #define _DEFAULT_SOURCE 1
+#if defined(__APPLE__)
+#define _DARWIN_C_SOURCE 1
+#endif
 #if defined(__linux__)
 #define _GNU_SOURCE 1
 #endif
