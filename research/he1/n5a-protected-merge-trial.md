@@ -181,10 +181,34 @@ queue's stronger ordering guarantee.
 
 ## 6. Log
 
-Entries are appended by the change that merges *after* the one being described,
-because a commit cannot contain its own merge SHAs. Entry 1 is recorded in the
-next change to this file.
+Entries are appended by a change that merges *after* the one being described,
+because a commit cannot contain its own merge SHAs. The merge that lands an
+entry is therefore always one change behind this table; the procedure in §4 is
+applied to it as well, and its values appear in the next entry. That lag is
+inherent to an append-only log, not an omission.
 
 | Entry | PR | Tested tree | Landed commit | Landed tree | Equal |
 |---|---|---|---|---|---|
-| 1 | this PR | pending next entry | pending next entry | pending next entry | pending |
+| 1 | #9 | `88c65951b350a513247338a3fdda1d470d677933` | `c9ae2648e5230f0ba79c6be4919806b20763959d` | `88c65951b350a513247338a3fdda1d470d677933` | yes |
+
+The merge that lands this entry (PR #10) is verified by the same procedure; its
+values are appended when the entry after it is recorded. The table is a sample
+of completed merges, not a census: every merge now goes through this channel.
+
+### Entry 1, PR #9
+
+- Base when the checks ran: `5b7285538edb2b6213df5a3f1f35dc8d2bb3f24c`.
+- Head: `558fed56f4c50fd9c899263a70f5a637885d3ac0`.
+- While the required checks were still pending, `mergeStateStatus` was
+  `BLOCKED`; with all seven green it became `CLEAN`.
+- Tested commit, `refs/pull/9/merge`: `1588601a9b0fe4cac873f109ccf0ccc0e46ea53c`,
+  tree `88c65951b350a513247338a3fdda1d470d677933`, first parent
+  `5b7285538edb2b6213df5a3f1f35dc8d2bb3f24c`.
+- Merge performed with `gh pr merge 9 --merge` at 2026-11-20T12:18:53Z.
+- Landed commit `c9ae2648e5230f0ba79c6be4919806b20763959d`, tree
+  `88c65951b350a513247338a3fdda1d470d677933`, first parent
+  `5b7285538edb2b6213df5a3f1f35dc8d2bb3f24c`.
+
+`tree(tested) == tree(landed)` and `base == parent_1(landed)` both hold. Nothing
+advanced `main` between the last required check and the merge, and the strict
+policy would have refused the merge if it had.
