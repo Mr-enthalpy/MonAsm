@@ -31,7 +31,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # `HE-T20`: every host labels the checked-out commit, not the PR head.
       # On a pull request the checkout is GitHub's merge commit; the head is
