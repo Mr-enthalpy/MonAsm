@@ -90,15 +90,20 @@ separate decision from this probe and is not performed here.
 ## Follow-up, 2026-11-20 (after the probe)
 
 The decision was taken and a ruleset is now active on `main` (id `27723469`):
-pull requests only, the seven gate contexts required with the strict up-to-date
-policy, force pushes refused, no bypass actors. The merge queue in the path above
-turned out to be unavailable: GitHub restricts it to organization-owned public
-repositories, and this repository is user-owned, so every `merge_queue` payload
-is rejected with `422 Invalid rule 'merge_queue'`. Two protected merges with
-tested tree equal to landed tree are recorded in
-`research/he1/n5a-protected-merge-trial.md`, which supersedes nothing here: this
-section still describes the configuration at probe time, and the queue gap
-stands.
+pull requests only, the seven gate contexts required, force pushes refused, no
+bypass actors. The merge queue in the path above was initially unavailable —
+GitHub restricts it to organization-owned public repositories, and the
+repository was then user-owned, so every `merge_queue` payload returned
+`422 Invalid rule 'merge_queue'`. The repository was then transferred to the
+`Teancher-H` organization, the same payload was accepted, and the first queued
+merge landed with `origin/main` equal to the `merge_group` head SHA. Three
+entries, including that queued one, are recorded in
+`research/he1/n5a-protected-merge-trial.md`.
+
+This section does not revise the probe: the table above still describes the
+configuration at probe time. What remains open for N5a is independent approval
+(0 required approvals) and gate-logic provenance (mutable action tags), not the
+queue.
 
 ## Non-claims
 

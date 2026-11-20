@@ -166,21 +166,29 @@ queue's stronger ordering guarantee.
 
 ## 5. What this trial does not establish
 
-- **N5a is still unsatisfied.** `AuthorizedMerge(B,T,e,M)` needs a merge path
-  whose tested and landed objects cannot diverge. Without a queue there is a
-  residual window; with no second reviewer there is no independent approval.
+- **The queue closes the tested/landed gap; approval and provenance do not.**
+  Entries 1 and 2 predate the queue and establish only that under strict
+  up-to-date the landed tree equals the tested tree. Entry 3 is a queued merge
+  where the landed commit *is* the tested commit, so on that path the two cannot
+  diverge. What remains is independent authorization:
+  `required_approving_review_count` is 0, and the same account writes, merges
+  and administers, so the merge is enforced but not independently approved.
+  `AuthorizedMerge(B,T,e,M)` is therefore still not satisfied.
 - **Gate logic provenance is still weak.** The workflows reference
   `actions/checkout@v4` and `actions/setup-python@v5` by mutable tag, and
   `sha_pinning_required` is still `false`. The ruleset makes the workflow files
-  change-controlled (they can only land through a PR whose checks pass) but does
-  not pin what the actions resolve to. Pinning is a separate change.
+  change-controlled (they can only land through a PR whose checks pass, and now
+  through the queue) but does not pin what the actions resolve to.
 - **A workflow change is still judged by the workflow it introduces.** For
-  `pull_request` events the checks come from the PR head's own workflow files.
-  The ruleset makes such a change reviewable and recorded; it does not make the
-  change self-verifying.
-- **No stale-CI counterexample is recorded here.** Demonstrating that an
-  out-of-date PR is refused requires a controlled base advance during a run and
-  belongs to the N5a evidence set, not to this log.
+  `pull_request` and `merge_group` events the checks come from the revision's own
+  workflow files. The ruleset makes such a change reviewable and recorded; it
+  does not make the change self-verifying.
+- **No stale-CI counterexample is recorded here.** A queued entry whose build
+  fails must be removed and the branch returned; that is a different experiment
+  from this log and belongs to the N5a evidence set.
+- **Only single-entry groups have been exercised.** `grouping_strategy` is
+  `ALLGREEN` with `max_entries_to_merge` 5, but no group of two has been built,
+  so the combined-tree case is untested.
 - **No claim about other branches, tags, organization policy, or audit logs.**
 
 ## 6. Log
@@ -189,14 +197,15 @@ Entries are appended by a change that merges *after* the one being described,
 because a commit cannot contain its own merge SHAs. The table records every
 merge completed under this channel up to the change that wrote it; the merge
 that lands the newest entry is checked by the same procedure and becomes the next
-entry when one is added. Two consecutive entries are enough to show this is not
-a single-run accident, and the repository's whole history now goes through the
-channel.
+entry when one is added. Three consecutive entries show this is not a single-run
+accident: two merges under strict up-to-date and one through the queue. Every
+merge after entry 1 went through this channel.
 
 | Entry | PR | Tested tree | Landed commit | Landed tree | Equal |
 |---|---|---|---|---|---|
 | 1 | #9 | `88c65951b350a513247338a3fdda1d470d677933` | `c9ae2648e5230f0ba79c6be4919806b20763959d` | `88c65951b350a513247338a3fdda1d470d677933` | yes |
 | 2 | #10 | `cdcbd458b6508080e99f5605da139060de5b6c0c` | `e3fef895fb464a123eff6c8bc375f23cbc5b1a30` | `cdcbd458b6508080e99f5605da139060de5b6c0c` | yes |
+| 3 | #12 | `b5cbcd7f9aa120cc5f07099992a6d531b690fd71` | `cc7674206da2032eb6602c94fa760ca5a16fb60e` | `b5cbcd7f9aa120cc5f07099992a6d531b690fd71` | yes |
 
 ### Entry 1, PR #9
 
@@ -232,6 +241,31 @@ policy would have refused the merge if it had.
 Again `tree(tested) == tree(landed)` and `base == parent_1(landed)`. The second
 entry was produced by an ordinary change after the first had landed, so the
 result does not depend on the ruleset having been freshly created.
+
+### Entry 3, PR #12 — first queued merge
+
+- Base: `01fdd50966aaed5c15c642fcf8f1a51385d3b64c`.
+- Head: `41ffcf758cbc405a944829510ef3cfd6855f2aa4`.
+- The seven required checks passed on the pull request, then the entry was added
+  to the queue with `gh pr merge 12 --auto`.
+- `merge_group` runs, both on head
+  `cc7674206da2032eb6602c94fa760ca5a16fb60e`:
+  `44739653651` (`gates`: document and definition gates, workspace tests, H0
+  payload baseline, oracle rerun) and `44739653755` (`determinism`: ubuntu-latest,
+  macos-latest, windows-latest). Both concluded `success`.
+- The queue merged at 2026-11-20T13:01:19Z.
+- Landed commit `cc7674206da2032eb6602c94fa760ca5a16fb60e`, tree
+  `b5cbcd7f9aa120cc5f07099992a6d531b690fd71`, first parent
+  `01fdd50966aaed5c15c642fcf8f1a51385d3b64c`.
+
+For this entry the stronger form holds, not just tree equality:
+`origin/main` **is** the `merge_group` head SHA, `cc76742`, because a queue entry
+of one is landed by fast-forwarding the branch to the commit the queue built.
+The tested commit and the landed commit are the same object.
+
+The strict up-to-date policy from §1 is still on. With a queue it is redundant —
+the queue re-tests against the current base — but it is kept so entries 1 to 3
+were produced under one unchanged configuration.
 
 ## 7. Merge queue after the organization transfer
 
