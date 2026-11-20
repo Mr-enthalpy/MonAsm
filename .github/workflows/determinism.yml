@@ -16,6 +16,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  merge_group:
   workflow_dispatch:
 
 permissions:
@@ -38,7 +39,7 @@ jobs:
       - name: Label the build with the checked-out commit
         shell: bash
         env:
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
         run: |
           set -euo pipefail
           commit="$(git rev-parse HEAD)"

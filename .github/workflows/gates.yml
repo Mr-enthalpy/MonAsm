@@ -42,6 +42,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  merge_group:
   workflow_dispatch:
 
 permissions:
@@ -84,11 +85,18 @@ jobs:
         env:
           PUSH_BEFORE: ${{ github.event.before }}
           PULL_REQUEST_BASE: ${{ github.event.pull_request.base.sha }}
+          # A queued merge runs on a synthetic commit whose first parent is the
+          # target tip; `merge_group.base_sha` is the base the queue tested
+          # against, so the whitespace range still covers the change itself.
+          MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}
         run: |
           set -euo pipefail
           if [ -n "${PULL_REQUEST_BASE}" ] \
              && git rev-parse --verify --quiet "${PULL_REQUEST_BASE}^{commit}" > /dev/null; then
             base="$(git merge-base "${PULL_REQUEST_BASE}" HEAD)"
+          elif [ -n "${MERGE_GROUP_BASE}" ] \
+             && git rev-parse --verify --quiet "${MERGE_GROUP_BASE}^{commit}" > /dev/null; then
+            base="$(git merge-base "${MERGE_GROUP_BASE}" HEAD)"
           elif [ -n "${PUSH_BEFORE}" ] \
              && git rev-parse --verify --quiet "${PUSH_BEFORE}^{commit}" > /dev/null; then
             base="${PUSH_BEFORE}"
@@ -115,7 +123,7 @@ jobs:
       # present, is recorded separately instead of being passed off as the build.
       - name: Label the build with the checked-out commit
         env:
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
         run: |
           set -euo pipefail
           commit="$(git rev-parse HEAD)"
@@ -193,7 +201,7 @@ jobs:
       # and its receipt should name the commit this job built.
       - name: Label the build with the checked-out commit
         env:
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
         run: |
           set -euo pipefail
           commit="$(git rev-parse HEAD)"
